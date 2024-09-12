@@ -1,0 +1,1 @@
+{"version":3,"file":"bundle.js","sources":["../src/three/index.ts"],"sourcesContent":["function add(a: number, b: number): number {\n  return a + b;\n}\n\nexport { add };"],"names":[],"mappings":"AAAA,SAAS,GAAG,CAAC,CAAS,EAAE,CAAS,EAAA;IAC/B,OAAO,CAAC,GAAG,CAAC,CAAC;AACf;;;;"}

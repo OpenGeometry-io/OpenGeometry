@@ -1,0 +1,40 @@
+{
+  "name": "opengeometry",
+  "version": "0.0.1",
+  "description": "Kernel For Graphics Engine",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rollup -c rollup.config.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenGeometry-io/OpenGeometry.git"
+  },
+  "keywords": [
+    "Graphics",
+    "Kernel",
+    "Geometry"
+  ],
+  "author": "Vishwajeet Vinayak Mane",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/OpenGeometry-io/OpenGeometry/issues"
+  },
+  "homepage": "https://github.com/OpenGeometry-io/OpenGeometry#readme",
+  "peerDependencies": {
+    "three": "^0.168.0"
+  },
+  "dependencies": {
+    "tsc": "^2.0.4"
+  },
+  "devDependencies": {
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^26.0.1",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "rollup": "^4.21.3",
+    "tslib": "^2.7.0"
+  }
+}

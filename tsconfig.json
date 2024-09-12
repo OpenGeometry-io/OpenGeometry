@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "es2020", // Use "es2020" for ESM
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true, // Add this line for ESM
+    "moduleResolution": "node", // Change module resolution to "node" for ESM
+    "baseUrl": ".", // Add this line for ESM
+    "paths": {
+      "*": ["src/*"] // Add this line for ESM
+    }
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
