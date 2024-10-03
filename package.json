@@ -6,7 +6,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "rollup -c rollup.config.js"
+    "build": "rollup -c rollup.config.js",
+    "build-core": "cd src/opengeometry && wasm-pack build --target web && cargo build --release"
   },
   "repository": {
     "type": "git",
@@ -34,6 +35,7 @@
     "@rollup/plugin-commonjs": "^26.0.1",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-typescript": "^11.1.6",
+    "@types/three": "^0.168.0",
     "rollup": "^4.21.3",
     "tslib": "^2.7.0"
   }

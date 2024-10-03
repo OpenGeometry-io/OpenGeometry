@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OpenGeometry</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.168.0/build/three.module.js",
+        "OrbitControls": "https://unpkg.com/three@0.168.0/examples/jsm/controls/OrbitControls.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <h1>OpenGeometry inside Three</h1>
+  <script type="module">
+    import { OpenGeometry, OVector3D, OPolygon } from './../dist/bundle.js';
+    import * as THREE from 'three';
+    import { OrbitControls } from 'OrbitControls';
+
+    let scene, camera, renderer;
+
+    async function init(){
+      const openGeometry = new OpenGeometry();
+      await openGeometry.setup();
+
+
+      const oPoly = new OPolygon();
+      oPoly.addVertex(3.0,    -2.0, 48.0, );
+      oPoly.addVertex(52.0,   -2.0, 8.0,  );
+      oPoly.addVertex(99.0,   -2.0, 50.0, );
+      oPoly.addVertex(138.0,  -2.0, 25.0, );
+      oPoly.addVertex(175.0,  -2.0, 77.0, );
+      oPoly.addVertex(131.0,  -2.0, 72.0, );
+      oPoly.addVertex(111.0,  -2.0, 113.0,);
+      oPoly.addVertex(72.0,   -2.0, 43.0, );
+      oPoly.addVertex(26.0,   -2.0, 55.0, );
+      oPoly.addVertex(29.0,   -2.0, 100.0,);
+
+
+      // reverse the order of vertices
+      // oPoly.addVertex(29.0,   2.0, 100.0);
+      // oPoly.addVertex(26.0,   2.0, 55.0);
+      // oPoly.addVertex(72.0,   2.0, 43.0);
+      // oPoly.addVertex(111.0,  2.0, 113.0);
+      // oPoly.addVertex(131.0,  2.0, 72.0);
+      // oPoly.addVertex(175.0,  2.0, 77.0);
+      // oPoly.addVertex(138.0,  2.0, 25.0);
+      // oPoly.addVertex(99.0,   2.0, 50.0);
+      // oPoly.addVertex(52.0,   2.0, 8.0);
+      // oPoly.addVertex(3.0,    2.0, 48.0);
+    
+
+      // // Create Cube
+      // oPoly.addVertex(2, 0, 2);
+      // oPoly.addVertex(2, 0, 0);
+      // oPoly.addVertex(0, 0, 0);
+      // oPoly.addVertex(0, 0, 2);
+
+      // You can triangulate even polygon
+      // oPoly.generateMesh();
+
+      const oPolyMesh = oPoly.extrude(15);
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(oPolyMesh), 3));
+      geometry.computeVertexNormals();
+
+      // each face should have different color
+      const colors = new Float32Array(oPolyMesh.length);
+      for (let i = 0; i < colors.length; i += 9) {
+        const r = Math.random();
+        const g = Math.random();
+        const b = Math.random();
+        colors[i] = r;
+        colors[i + 1] = g;
+        colors[i + 2] = b;
+        colors[i + 3] = r;
+        colors[i + 4] = g;
+        colors[i + 5] = b;
+        colors[i + 6] = r;
+        colors[i + 7] = g;
+        colors[i + 8] = b;
+      }
+
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const material = new THREE.MeshPhongMaterial( {
+					color: 0xffffff,
+					flatShading: true,
+					vertexColors: true,
+					shininess: 0
+			});
+      
+      // const material = new THREE.MeshStandardMaterial({
+      //   color: 0xff0000,
+      //   side: THREE.DoubleSide
+      // })
+      const mesh = new THREE.Mesh(geometry, material);
+
+      const wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+      const wireframe = new THREE.Mesh(geometry, wireframeMaterial);
+      mesh.add(wireframe);
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      renderer = new THREE.WebGLRenderer();
+      
+      // grid
+      const gridHelper = new THREE.GridHelper(200, 200);
+      scene.add(gridHelper);
+
+      scene.background = new THREE.Color(0xf0f0f0);
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      mesh.position.set(-90, 0, -50);
+      scene.add(mesh);
+
+      camera.position.z = 50;
+      camera.position.y = 50;
+
+      animate();
+
+      // ambient light
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+      scene.add(ambientLight);
+
+      // directional light
+      // const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      // directionalLight.position.set(10, 10, 10);
+      // scene.add(directionalLight);
+
+      // const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1);
+      // directionalLight2.position.set(-10, 10, -10);
+      // scene.add(directionalLight2);
+
+      // controls
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.update();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+
+    init();
+  </script>
+</body>
+</html>

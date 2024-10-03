@@ -4,10 +4,26 @@
   <title>My Website</title>
 </head>
 <body>
-  <h1>Welcome to My Website</h1>
+  <h1>OpenGeometry Console</h1>
   <script type="module">
-    import { add } from './../dist/bundle.js';
-    console.log(add(1, 2)); // 3
+    import { OpenGeometry, OVector3D, OPolygon } from './../dist/bundle.js';
+    
+    const openGeometry = new OpenGeometry();
+    await openGeometry.setup();
+
+    const oVec = OVector3D(1, 2, 3);
+    console.log(oVec);
+
+    const oPoly = new OPolygon();
+    oPoly.addVertex(2, 0, 2);
+    oPoly.addVertex(-2, 0, 2);
+    oPoly.addVertex(-2, 0, -2);
+    oPoly.addVertex(2, 0, -2);
+
+    oPoly.generateMesh();
+
+    const oPolyMesh = oPoly.extrude(5);
+    console.log(oPolyMesh);
   </script>
 </body>
 </html>

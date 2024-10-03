@@ -1,1 +1,1 @@
-export * from './three';
+export * from './og-three';
