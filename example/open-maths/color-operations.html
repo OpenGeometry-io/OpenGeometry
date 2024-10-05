@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Color Operations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./../css/open-maths.css">
+</head>
+<body>
+  <div class="om-card">
+    <span class="om-span-l">HEX to RGBA</span>
+    <br />
+    <br />
+    <span class="om-span-s">HEX</span>
+    <input class="om-input" id="hex"/>
+    <br />
+    <br />
+    <button onclick="prefillRGBA()">Prefill</button>
+    <button onclick="convertToRGBA()">Convert to RGBA</button>
+    
+    <span class="om-span-m result-span" id="result-eg-id"></span>
+  </div>
+
+  <div class="om-card">
+    <span class="om-span-l">RGBA to HEX</span>
+    <br />
+    <br />
+    <span class="om-span-s">R</span>
+    <input class="om-input" id="r"/>
+    <span class="om-span-s">G</span>
+    <input class="om-input" id="g"/>
+    <span class="om-span-s">B</span>
+    <input class="om-input" id="b"/>
+    <br />
+    <br />
+    <button onclick="prefillHEX()">Prefill</button>
+    <button onclick="convertToHEX()">Convert to HEX</button>
+
+    <span class="om-span-m result-span" id="result-eg-id-2"></span>
+  </div>
+  
+  <script type="module">
+    import init, { Color, ColorRGB } from "./../../src/opengeometry/pkg/opengeometry.js";
+    init().then((e) => {
+      window.convertToRGBA = () => {
+        const hex = document.getElementById('hex').value;
+        const color = new Color(hex);
+        const colorHex = color.to_rgba();
+        document.getElementById('result-eg-id').innerHTML = `rgba(${colorHex.r}, ${colorHex.g}, ${colorHex.b})`;
+      };
+
+      window.prefillRGBA = () => {
+        document.getElementById('hex').value = `#4460FF`;
+      };
+
+      window.convertToHEX = () => {
+        const r = document.getElementById('r').value;
+        const g = document.getElementById('g').value;
+        const b = document.getElementById('b').value;
+        const color = new ColorRGB(r, g, b);
+        const colorHex = color.to_hex();
+        document.getElementById('result-eg-id-2').innerHTML = `${colorHex}`;
+      };
+
+      window.prefillHEX = () => {
+        document.getElementById('r').value = 68;
+        document.getElementById('g').value = 96;
+        document.getElementById('b').value = 255;
+      };
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta charcreate="UTF-8" />
+    <title>hello-wasm example</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: "Source Code Pro", monospace;
+        font-optical-sizing: auto;
+        font-style: normal;
+        margin: 40px;
+      }
+
+      .om-header {
+        font-size: 1.6rem;
+        font-weight: 500;
+        padding-top: 20px;
+        padding-bottom: 20px;
+      }
+
+      .om-span-l {
+        font-size: 1.2rem;
+        font-weight: 400;
+      }
+
+      .om-span-m {
+        font-size: 1rem;
+        font-weight: 400;
+        margin-bottom: 10px;
+      }
+
+      .om-span-s {
+        font-size: 0.8rem;
+        font-weight: 400;
+      }
+
+      .om-card {
+        margin-top: 20px;
+        padding: 20px;
+        border-radius: 5px;
+        border: 1px solid #2f2f2f;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        position: relative;
+      }
+
+      .om-input {
+        font-size: 0.8rem;
+        font-weight: 400;
+        padding: 5px;
+        border-radius: 5px;
+        border: 1px solid #2f2f2f;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        width: 50px;
+      }
+
+      button {
+        font-size: 1rem;
+        font-weight: 500;
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        background: #4460FF;
+        border: none;
+        cursor: pointer;
+        color: white;
+      }
+
+      .result-span{
+        position: absolute;
+        right: 20px;
+        bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="om-header">OpenMaths</p>
+    
+    <!-- Add Vectors -->
+    <div class="om-card">
+      <span class="om-span-l">Add Vectors</span>
+      <br />
+      <br />
+      <span class="om-span-m">Vector 1</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="x1" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="y1" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="z1" value="0" />
+      <br />
+      <br />
+      <span class="om-span-m">Vector 2</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="x2" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="y2" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="z2" value="0" />
+      <br />
+      <br />
+      <button onclick="addVector()">Add Vectors</button>
+      
+      <span class="om-span-m result-span" id="create-vector-eg-id"></span>
+    </div>
+
+    <!-- Subtract Vectors -->
+    <div class="om-card">
+      <span class="om-span-l">Subtract Vector 1 in Vector 2</span>
+      <br />
+      <br />
+      <span class="om-span-m">Vector 1</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="sub-x1" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="sub-y1" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="sub-z1" value="0" />
+      <br />
+      <br />
+      <span class="om-span-m">Vector 2</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="sub-x2" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="sub-y2" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="sub-z2" value="0" />
+      <br />
+      <br />
+      <button onclick="subVector()">Subtract Vectors</button>
+      
+      <span class="om-span-m result-span" id="sub-vector-eg-id"></span>
+    </div>
+
+    <!-- Cross Vector V1 x V2 -->
+    <div class="om-card">
+      <span class="om-span-l">Cross Vector V1 x V2</span>
+      <br />
+      <br />
+      <span class="om-span-m">Vector 1</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="cross-x1" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="cross-y1" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="cross-z1" value="0" />
+      <br />
+      <br />
+      <span class="om-span-m">Vector 2</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="cross-x2" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="cross-y2" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="cross-z2" value="0" />
+      <br />
+      <br />
+      <button onclick="crossVector()">Cross Vectors</button>
+      
+      <span class="om-span-m result-span" id="cross-vector-eg-id"></span>
+    </div>
+
+    <!-- Check Point Between Triangle Points -->
+    <div class="om-card">
+      <span class="om-span-l">Check Point Between Triangle Points</span>
+      <br />
+      <br />
+      <span class="om-span-m">Point 1</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="triangle-point-test-t1-x" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="triangle-point-test-t1-y" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="triangle-point-test-t1-z" value="0" />
+      <br />
+      <br />
+      <span class="om-span-m">Point 2</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="triangle-point-test-t2-x" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="triangle-point-test-t2-y" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="triangle-point-test-t2-z" value="0" />
+      <br />
+      <br />
+      <span class="om-span-m">Point 3</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="triangle-point-test-t3-x" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="triangle-point-test-t3-y" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="triangle-point-test-t3-z" value="0" />
+      <br />
+      <br />
+      <span class="om-span-m">Point</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="triangle-point-test-t-x" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="triangle-point-test-t-y" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="triangle-point-test-t-z" value="0" />
+      <br />
+      <br />
+      <button onclick="prefilPointBetweenTriangle()">Prefil</button>
+      <button onclick="checkPointBetweenTriangle()">Check Point</button>
+      <span class="om-span-m result-span" id="check-point-eg-id"></span>
+    </div>
+
+    <!-- Create Polygon from Points -->
+    <div class="om-card">
+      <span class="om-span-l">Create Polygon from Points</span>
+      <br />
+      <br />
+      <span class="om-span-m">Point 1</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="p1-x" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="p1-y" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="p1-z" value="0" />
+      <br />
+      <br />
+      <span class="om-span-m">Point 2</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="p2-x" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="p2-y" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="p2-z" value="0" />
+      <br />
+      <br />
+      <span class="om-span-m">Point 3</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="p3-x" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="p3-y" value="0" />
+
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="p3-z" value="0" />
+      <br />
+      <br />
+      <span class="om-span-s">Point 4</span>
+      <br />
+      <span class="om-span-s">x</span>
+      <input class="om-input" type="number" id="p4-x" value="0" />
+
+      <span class="om-span-s">y</span>
+      <input class="om-input" type="number" id="p4-y" value="0" />
+      
+      <span class="om-span-s">z</span>
+      <input class="om-input" type="number" id="p4-z" value="0" />
+      <br />
+      <br />
+
+      <button onclick="prefilVertices()">Prefil Vertices</button>
+      <button onclick="createPolygon()">Create Polygon</button>
+      <button onclick="updatePolygon()">Update Vertex</button>
+      <button onclick="extrudePolygon()">Extrude Polygon</button>
+      <!-- <button onclick="earCutPolygon()">Get Test Earcut</button> -->
+      <span class="om-span-m result-span" id="create-polygon-eg-id"></span>
+    </div>
+
+    <!-- EarCut Test-->
+    <div class="om-card">
+      <span class="om-span-l">Earcut without Holes</span>
+      <br />
+      <br />
+      <button onclick="earCutPolygon()">Get Triangulated Polygon</button>
+    </div>
+
+    <script type="module">
+      // tricut
+      import init, { Vector3D, Polygon, Triangle, get_tricut_vertices, triangulate_mesh } from "./../src/opengeometry/pkg/opengeometry.js";
+      init().then((e) => {
+        console.log("WASM Module Loaded");
+        console.log(e);
+
+        window.addVector = () => {
+          const x1 = document.getElementById('x1').value;
+          const y1 = document.getElementById('y1').value;
+          const z1 = document.getElementById('z1').value;
+
+          const x2 = document.getElementById('x2').value;
+          const y2 = document.getElementById('y2').value;
+          const z2 = document.getElementById('z2').value;
+
+          // Replace all 
+          const vector1 = new Vector3D(x1, y1, z1);
+          const vector2 = new Vector3D(x2, y2, z2);
+
+          const result = vector1.add(vector2);
+
+          document.getElementById('create-vector-eg-id').innerText = `Result: x: ${result.x}, y: ${result.y}, z: ${result.z}`;
+        };
+
+        window.subVector = () => {
+          const x1 = document.getElementById('sub-x1').value;
+          const y1 = document.getElementById('sub-y1').value;
+          const z1 = document.getElementById('sub-z1').value;
+
+          const x2 = document.getElementById('sub-x2').value;
+          const y2 = document.getElementById('sub-y2').value;
+          const z2 = document.getElementById('sub-z2').value;
+
+          const vector1 = new Vector3D(x1, y1, z1);
+          console.log(vector1);
+          const vector2 = new Vector3D(x2, y2, z2);
+
+          const result = vector2.subtract(vector1);
+
+          document.getElementById('sub-vector-eg-id').innerText = `Result: x: ${result.x}, y: ${result.y}, z: ${result.z}`;
+        };
+
+        window.crossVector = () => {
+          const x1 = document.getElementById('cross-x1').value;
+          const y1 = document.getElementById('cross-y1').value;
+          const z1 = document.getElementById('cross-z1').value;
+
+          const x2 = document.getElementById('cross-x2').value;
+          const y2 = document.getElementById('cross-y2').value;
+          const z2 = document.getElementById('cross-z2').value;
+
+          const vector1 = new Vector3D(x1, y1, z1);
+          const vector2 = new Vector3D(x2, y2, z2);
+
+          const result = vector1.cross(vector2);
+
+          document.getElementById('cross-vector-eg-id').innerText = `Result: x: ${result.x}, y: ${result.y}, z: ${result.z}`;
+        };
+
+        window.prefilPointBetweenTriangle = () => {
+          document.getElementById('triangle-point-test-t1-x').value = 99;
+          document.getElementById('triangle-point-test-t1-y').value = 0;
+          document.getElementById('triangle-point-test-t1-z').value = 50;
+
+          document.getElementById('triangle-point-test-t2-x').value = 138;
+          document.getElementById('triangle-point-test-t2-y').value = 0;
+          document.getElementById('triangle-point-test-t2-z').value = 25;
+
+          document.getElementById('triangle-point-test-t3-x').value = 175;
+          document.getElementById('triangle-point-test-t3-y').value = 0;
+          document.getElementById('triangle-point-test-t3-z').value = 77;
+
+          document.getElementById('triangle-point-test-t-x').value = 0;
+          document.getElementById('triangle-point-test-t-y').value = 0;
+          document.getElementById('triangle-point-test-t-z').value = 0;
+        }
+        window.checkPointBetweenTriangle = () => {
+          const t1x = document.getElementById('triangle-point-test-t1-x').value;
+          const t1y = document.getElementById('triangle-point-test-t1-y').value;
+          const t1z = document.getElementById('triangle-point-test-t1-z').value;
+
+          const t2x = document.getElementById('triangle-point-test-t2-x').value;
+          const t2y = document.getElementById('triangle-point-test-t2-y').value;
+          const t2z = document.getElementById('triangle-point-test-t2-z').value;
+
+          const t3x = document.getElementById('triangle-point-test-t3-x').value;
+          const t3y = document.getElementById('triangle-point-test-t3-y').value;
+          const t3z = document.getElementById('triangle-point-test-t3-z').value;
+
+          const tx = document.getElementById('triangle-point-test-t-x').value;
+          const ty = document.getElementById('triangle-point-test-t-y').value;
+          const tz = document.getElementById('triangle-point-test-t-z').value;
+
+          const point1 = new Vector3D(t1x, t1y, t1z);
+          const point2 = new Vector3D(t2x, t2y, t2z);
+          const point3 = new Vector3D(t3x, t3y, t3z);
+          const point = new Vector3D(tx, ty, tz);
+
+          const triangle = new Triangle();
+          triangle.set_vertices(point1, point2, point3);
+
+          const result = triangle.is_point_in_triangle(point);
+
+          document.getElementById('check-point-eg-id').innerText = `is in Triangle: ${result}`;
+        }
+
+        window.prefilVertices = () => {
+          document.getElementById('p1-x').value = 2;
+          document.getElementById('p1-y').value = 0;
+          document.getElementById('p1-z').value = 2;
+
+          document.getElementById('p2-x').value = -2;
+          document.getElementById('p2-y').value = 0;
+          document.getElementById('p2-z').value = 2;
+
+          document.getElementById('p3-x').value = -2;
+          document.getElementById('p3-y').value = 0;
+          document.getElementById('p3-z').value = -2;
+
+          document.getElementById('p4-x').value = 2;
+          document.getElementById('p4-y').value = 0;
+          document.getElementById('p4-z').value = -2;
+        };
+
+        let polygon;
+        window.createPolygon = () => {
+          const p1x = document.getElementById('p1-x').value;
+          const p1y = document.getElementById('p1-y').value;
+          const p1z = document.getElementById('p1-z').value;
+
+          const p2x = document.getElementById('p2-x').value;
+          const p2y = document.getElementById('p2-y').value;
+          const p2z = document.getElementById('p2-z').value;
+
+          const p3x = document.getElementById('p3-x').value;
+          const p3y = document.getElementById('p3-y').value;
+          const p3z = document.getElementById('p3-z').value;
+
+          const p4x = document.getElementById('p4-x').value;
+          const p4y = document.getElementById('p4-y').value;
+          const p4z = document.getElementById('p4-z').value;
+
+          const point1 = new Vector3D(p1x, p1y, p1z);
+          const point2 = new Vector3D(p2x, p2y, p2z);
+          const point3 = new Vector3D(p3x, p3y, p3z);
+          const point4 = new Vector3D(p4x, p4y, p4z);
+
+          polygon = new Polygon();
+          polygon.add_vertex(point1);
+          polygon.add_vertex(point2);
+          polygon.add_vertex(point3);
+          polygon.add_vertex(point4);
+
+          // const result = polygon.get_vertex(1);
+          // console.log(result);
+
+          // TODO: This is not working
+          // polygon.position.x = 10;
+          // console.log(polygon.position.x);
+
+          const points = polygon.get_all_vertices();
+          console.log(points);
+        };
+
+        window.updatePolygon = () => {
+          const point1 = new Vector3D(10, 10, 10);
+          polygon.update_vertex(1, point1);
+          const points = polygon.get_all_vertices();
+          console.log(points);
+        };
+
+        window.extrudePolygon = () => {
+          // First Set Extrude to true
+          // EXTRUDE == MESH here
+          const extrude = polygon.set_extrude(true);
+          console.log(extrude);
+
+          const copiedPoligonVertices = extrude.get_poligon_vertices();
+          console.log(copiedPoligonVertices);
+
+          // Then Extrude the Polygon by Height
+          const extrudedPoints = extrude.set_extrude_height(10);
+          
+          console.log(JSON.parse(extrude.get_geometry()));
+
+          const vertices_of_mesh_tricut = triangulate_mesh(extrude);
+          console.log(vertices_of_mesh_tricut.length);
+          for (let i = 0; i < vertices_of_mesh_tricut.length; i += 9) {
+            console.log(vertices_of_mesh_tricut[i], vertices_of_mesh_tricut[i + 1], vertices_of_mesh_tricut[i + 2]);
+            console.log(vertices_of_mesh_tricut[i + 3], vertices_of_mesh_tricut[i + 4], vertices_of_mesh_tricut[i + 5]);
+            console.log(vertices_of_mesh_tricut[i + 6], vertices_of_mesh_tricut[i + 7], vertices_of_mesh_tricut[i + 8]);
+            console.log("----");
+          }
+        };
+
+        window.earCutPolygon = () => {
+          // TRICUT EXAMPLE
+          // const getVerticesTricut = get_tricut_vertices();
+
+          // const prefilData = [];          
+          // prefilData.push(new Vector3D(3.0, 0.0, 48.0));
+          // prefilData.push(new Vector3D(52.0, 0.0, 8.0));
+          // prefilData.push(new Vector3D(99.0, 0.0, 50.0));
+          // prefilData.push(new Vector3D(138.0, 0.0, 25.0));
+          // prefilData.push(new Vector3D(175.0, 0.0, 77.0));
+          // prefilData.push(new Vector3D(131.0, 0.0, 72.0));
+          // prefilData.push(new Vector3D(111.0, 0.0, 113.0));
+          // prefilData.push(new Vector3D(72.0, 0.0, 43.0));
+          // prefilData.push(new Vector3D(26.0, 0.0, 55.0));
+          // prefilData.push(new Vector3D(29.0, 0.0, 100.0));
+          // console.log(prefilData[0]);
+
+          // const earcut = tricut(prefilData);
+          // console.log("After Tricut")
+          // console.log(JSON.parse(earcut));
+        };
+      });
+    </script>
+  </body>
+</html>

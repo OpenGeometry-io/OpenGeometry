@@ -1,8 +1,8 @@
 pub mod opengeometry {
   use core::num;
-use std::{collections::HashMap, hash::Hash};
+  use std::{collections::HashMap, hash::Hash};
 
-use wasm_bindgen::prelude::*;
+  use wasm_bindgen::prelude::*;
   use serde::{Serialize, Deserialize};
 
   #[wasm_bindgen]
@@ -20,7 +20,6 @@ use wasm_bindgen::prelude::*;
       Vector3D { x, y, z }
     }
 
-    // TODO: This is not working
     pub fn update(&mut self, x: f64, y: f64, z: f64) {
       self.x = x;
       self.y = y;
@@ -51,6 +50,14 @@ use wasm_bindgen::prelude::*;
       }
     }
 
+    pub fn subtract_scalar(&self, scalar: f64) -> Vector3D {
+      Vector3D {
+        x: self.x - scalar,
+        y: self.y - scalar,
+        z: self.z - scalar,
+      }
+    }
+
     pub fn add_extrude_in_up(&self, height: f64, up_vector: Vector3D) -> Vector3D {
       Vector3D {
         x: self.x + up_vector.x * height,
@@ -66,56 +73,101 @@ use wasm_bindgen::prelude::*;
         z: self.x * other.y - self.y * other.x,
       }
     }
+
+    pub fn dot(&self, other: &Vector3D) -> f64 {
+      self.x * other.x + self.y * other.y + self.z * other.z
+    }
   }
 
   #[wasm_bindgen]
   #[derive(Copy, Clone, Serialize, Deserialize)]
   pub struct Matrix3D {
-      pub m11: f64, pub m12: f64, pub m13: f64,
-      pub m21: f64, pub m22: f64, pub m23: f64,
-      pub m31: f64, pub m32: f64, pub m33: f64,
+    pub m11: f64, pub m12: f64, pub m13: f64,
+    pub m21: f64, pub m22: f64, pub m23: f64,
+    pub m31: f64, pub m32: f64, pub m33: f64,
   }
 
   #[wasm_bindgen]
   impl Matrix3D {
-      pub fn set(
-          m11: f64, m12: f64, m13: f64,
-          m21: f64, m22: f64, m23: f64,
-          m31: f64, m32: f64, m33: f64,
-      ) -> Matrix3D {
-          Matrix3D { m11, m12, m13, m21, m22, m23, m31, m32, m33 }
-      }
+    #[wasm_bindgen(constructor)]
+    pub fn set(
+      m11: f64, m12: f64, m13: f64,
+      m21: f64, m22: f64, m23: f64,
+      m31: f64, m32: f64, m33: f64,
+    ) -> Matrix3D {
+      Matrix3D { m11, m12, m13, m21, m22, m23, m31, m32, m33 }
+    }
 
-      pub fn add(&self, other: &Matrix3D) -> Matrix3D {
-          Matrix3D {
-              m11: self.m11 + other.m11, m12: self.m12 + other.m12, m13: self.m13 + other.m13,
-              m21: self.m21 + other.m21, m22: self.m22 + other.m22, m23: self.m23 + other.m23,
-              m31: self.m31 + other.m31, m32: self.m32 + other.m32, m33: self.m33 + other.m33,
-          }
+    pub fn add(&self, other: &Matrix3D) -> Matrix3D {
+      Matrix3D {
+        m11: self.m11 + other.m11, m12: self.m12 + other.m12, m13: self.m13 + other.m13,
+        m21: self.m21 + other.m21, m22: self.m22 + other.m22, m23: self.m23 + other.m23,
+        m31: self.m31 + other.m31, m32: self.m32 + other.m32, m33: self.m33 + other.m33,
       }
+    }
 
-      pub fn subtract(&self, other: &Matrix3D) -> Matrix3D {
-          Matrix3D {
-              m11: self.m11 - other.m11, m12: self.m12 - other.m12, m13: self.m13 - other.m13,
-              m21: self.m21 - other.m21, m22: self.m22 - other.m22, m23: self.m23 - other.m23,
-              m31: self.m31 - other.m31, m32: self.m32 - other.m32, m33: self.m33 - other.m33,
-          }
+    pub fn subtract(&self, other: &Matrix3D) -> Matrix3D {
+      Matrix3D {
+        m11: self.m11 - other.m11, m12: self.m12 - other.m12, m13: self.m13 - other.m13,
+        m21: self.m21 - other.m21, m22: self.m22 - other.m22, m23: self.m23 - other.m23,
+        m31: self.m31 - other.m31, m32: self.m32 - other.m32, m33: self.m33 - other.m33,
       }
+    }
   }
 
   #[wasm_bindgen]
   #[derive(Copy, Clone, Serialize, Deserialize)]
-  pub struct ColorRGBA {
-      pub r: f64,
-      pub g: f64,
-      pub b: f64,
-      pub a: f64,
+  pub struct ColorRGB {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+  }
+
+  #[wasm_bindgen]
+  impl ColorRGB {
+    #[wasm_bindgen(constructor)]
+    pub fn new(r: u8, g: u8, b: u8) -> ColorRGB {
+      ColorRGB { r, g, b }
+    }
+
+    pub fn to_hex(&self) -> String {
+      format!("#{:02X}{:02X}{:02X}", self.r, self.g, self.b)
+    }
+  }
+
+  #[wasm_bindgen]
+  pub struct Color {
+    hex: String
+  }
+
+  #[wasm_bindgen]
+  impl Color {
+    #[wasm_bindgen(constructor)]
+    pub fn new(hex: String) -> Color {
+      Color { hex }
+    }
+
+    #[wasm_bindgen]
+    pub fn to_rgba(&self) -> Result<ColorRGB, String> {
+      let hex = self.hex.trim_start_matches('#');
+      let len = hex.len();
+
+      if len != 6 && len != 8 {
+          return Err("Hex string must be in the format #RRGGBB or #RRGGBBAA".to_string());
+      }
+
+      let r = u8::from_str_radix(&hex[0..2], 16).map_err(|_| "Invalid red component")?;
+      let g = u8::from_str_radix(&hex[2..4], 16).map_err(|_| "Invalid green component")?;
+      let b = u8::from_str_radix(&hex[4..6], 16).map_err(|_| "Invalid blue component")?;
+
+      Ok(ColorRGB { r, g, b })
+    }
   }
 
   pub struct EdgeStructured {
     pub start: Vector3D,
     pub end: Vector3D,
-    pub color: ColorRGBA,
+    pub color: ColorRGB,
   }
 
   #[derive(Clone, Serialize, Deserialize)]
@@ -150,7 +202,7 @@ use wasm_bindgen::prelude::*;
     pub rotation_matrix: Matrix3D,
     pub scale: Vector3D,
     pub scale_matrix: Matrix3D,
-    pub color: ColorRGBA,
+    pub color: ColorRGB,
     buf_faces: Vec<Vector3D>,
     poligon_vertices: Vec<Vector3D>,
     geometry: Geometry,
@@ -167,7 +219,7 @@ use wasm_bindgen::prelude::*;
         rotation_matrix: Matrix3D::set(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
         scale: Vector3D::create(1.0, 1.0, 1.0),
         scale_matrix: Matrix3D::set(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0),
-        color: ColorRGBA { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+        color: ColorRGB { r: 0, g: 0, b: 0 },
         buf_faces: Vec::new(),
         poligon_vertices: Vec::new(),
         geometry: Geometry::new(),
