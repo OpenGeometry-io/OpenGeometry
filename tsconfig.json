@@ -9,11 +9,11 @@
     "moduleResolution": "node", // Change module resolution to "node" for ESM
     "baseUrl": ".", // Add this line for ESM
     "paths": {
-      "*": ["src/*"] // Add this line for ESM
+      "*": ["main/*"] // Add this line for ESM
     }
   },
   "include": [
-    "src/**/*.ts"
+    "main/**/*.ts"
   ],
   "exclude": [
     "node_modules"

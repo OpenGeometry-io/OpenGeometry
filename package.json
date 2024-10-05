@@ -7,7 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build-three": "rollup -c rollup.config.js",
-    "build-core": "cd src/opengeometry && wasm-pack build --target web && cargo build --release",
+    "build-core": "cd main/opengeometry && wasm-pack build --target web && cargo build --release",
     "build": "npm run build-core && npm run build-three"
   },
   "repository": {

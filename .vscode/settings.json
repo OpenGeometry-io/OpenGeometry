@@ -1,5 +1,5 @@
 {
   "rust-analyzer.linkedProjects": [
-      "./src/opengeometry/Cargo.toml"
+      "./main/opengeometry/Cargo.toml"
   ]
 }
