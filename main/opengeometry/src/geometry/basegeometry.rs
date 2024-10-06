@@ -13,13 +13,21 @@ use std::path;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
+// #[wasm_bindgen]
+// #[derive(Clone, Serialize, Deserialize)]
+// pub struct Buffer {
+//   vertices: Vec<openmath::Vector3D>,
+//   indices: Vec<u32>
+// }
+
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BaseGeometry {
   pub id: u32,
   vertices: Vec<openmath::Vector3D>,
   indices: Vec<u32>,
-  normals: Vec<f32>
+  normals: Vec<f32>,
+  treated: bool
 }
 
 #[wasm_bindgen]
@@ -30,7 +38,8 @@ impl BaseGeometry {
       id,
       vertices: Vec::new(),
       indices: Vec::new(),
-      normals: Vec::new()
+      normals: Vec::new(),
+      treated: false
     }
   }
 
@@ -64,5 +73,10 @@ impl BaseGeometry {
   #[wasm_bindgen]
   pub fn get_vertices(&self) -> Vec<openmath::Vector3D> {
     self.vertices.clone()
+  }
+  
+  #[wasm_bindgen]
+  pub fn get_buffer(&self) -> String {
+    serde_json::to_string(&self).unwrap()
   }
 }

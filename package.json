@@ -8,7 +8,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build-three": "rollup -c rollup.config.js",
     "build-core": "cd main/opengeometry && wasm-pack build --target web && cargo build --release",
-    "build": "npm run build-core && npm run build-three"
+    "cpy-wasm-dist": "cpy main/opengeometry/pkg/opengeometry_bg.wasm dist --flat",
+    "cpy-wasm-dt-dist": "cpy main/opengeometry/pkg/opengeometry_bg.wasm.d.ts dist --flat",
+    "build": "npm run build-core && npm run build-three && npm run cpy-wasm-dist && npm run cpy-wasm-dt-dist"
   },
   "repository": {
     "type": "git",
@@ -29,7 +31,8 @@
     "three": "^0.168.0"
   },
   "dependencies": {
-    "tsc": "^2.0.4"
+    "tsc": "^2.0.4",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-babel": "^6.0.4",
@@ -37,6 +40,7 @@
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-typescript": "^11.1.6",
     "@types/three": "^0.168.0",
+    "@types/uuid": "^10.0.0",
     "rollup": "^4.21.3",
     "tslib": "^2.7.0"
   }

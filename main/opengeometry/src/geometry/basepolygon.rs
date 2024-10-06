@@ -53,13 +53,15 @@ impl BasePolygon {
     }
   }
 
+  #[wasm_bindgen]
   pub fn triangulate(&mut self) {
     if !self.is_polygon {
       return;
     }
   }
 
-  pub fn get_buffer(&self) {
-    
+  #[wasm_bindgen]
+  pub fn get_buffer(&self) -> String {
+    serde_json::to_string(&self.geometry).unwrap()
   }
 }

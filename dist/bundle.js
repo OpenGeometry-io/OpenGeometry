@@ -90,6 +90,21 @@ function getDataViewMemory0() {
   return cachedDataViewMemory0;
 }
 let WASM_VECTOR_LEN = 0;
+const cachedTextEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder('utf-8') : {
+  encode: () => {
+    throw Error('TextEncoder not available');
+  }
+};
+typeof cachedTextEncoder.encodeInto === 'function' ? function (arg, view) {
+  return cachedTextEncoder.encodeInto(arg, view);
+} : function (arg, view) {
+  const buf = cachedTextEncoder.encode(arg);
+  view.set(buf);
+  return {
+    read: arg.length,
+    written: buf.length
+  };
+};
 function passArrayJsValueToWasm0(array, malloc) {
   const ptr = malloc(array.length * 4, 4) >>> 0;
   const mem = getDataViewMemory0();
@@ -99,327 +114,75 @@ function passArrayJsValueToWasm0(array, malloc) {
   WASM_VECTOR_LEN = array.length;
   return ptr;
 }
-function getArrayJsValueFromWasm0(ptr, len) {
-  ptr = ptr >>> 0;
-  const mem = getDataViewMemory0();
-  const result = [];
-  for (let i = ptr; i < ptr + 4 * len; i += 4) {
-    result.push(takeObject(mem.getUint32(i, true)));
-  }
-  return result;
-}
-let cachedFloat64ArrayMemory0 = null;
-function getFloat64ArrayMemory0() {
-  if (cachedFloat64ArrayMemory0 === null || cachedFloat64ArrayMemory0.byteLength === 0) {
-    cachedFloat64ArrayMemory0 = new Float64Array(wasm.memory.buffer);
-  }
-  return cachedFloat64ArrayMemory0;
-}
-function getArrayF64FromWasm0(ptr, len) {
-  ptr = ptr >>> 0;
-  return getFloat64ArrayMemory0().subarray(ptr / 8, ptr / 8 + len);
-}
-/**
-* @param {Mesh} mesh
-* @returns {Float64Array}
-*/
-function triangulate_mesh(mesh) {
-  try {
-    const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-    _assertClass(mesh, Mesh$1);
-    var ptr0 = mesh.__destroy_into_raw();
-    wasm.triangulate_mesh(retptr, ptr0);
-    var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-    var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-    var v2 = getArrayF64FromWasm0(r0, r1).slice();
-    wasm.__wbindgen_free(r0, r1 * 8, 8);
-    return v2;
-  } finally {
-    wasm.__wbindgen_add_to_stack_pointer(16);
-  }
-}
-const ColorRGBAFinalization = typeof FinalizationRegistry === 'undefined' ? {
+typeof FinalizationRegistry === 'undefined' ? {
   register: () => {},
   unregister: () => {}
-} : new FinalizationRegistry(ptr => wasm.__wbg_colorrgba_free(ptr >>> 0, 1));
+} : new FinalizationRegistry(ptr => wasm.__wbg_basegeometry_free(ptr >>> 0, 1));
+typeof FinalizationRegistry === 'undefined' ? {
+  register: () => {},
+  unregister: () => {}
+} : new FinalizationRegistry(ptr => wasm.__wbg_basemesh_free(ptr >>> 0, 1));
+const BasePolygonFinalization = typeof FinalizationRegistry === 'undefined' ? {
+  register: () => {},
+  unregister: () => {}
+} : new FinalizationRegistry(ptr => wasm.__wbg_basepolygon_free(ptr >>> 0, 1));
 /**
 */
-class ColorRGBA {
-  static __wrap(ptr) {
-    ptr = ptr >>> 0;
-    const obj = Object.create(ColorRGBA.prototype);
-    obj.__wbg_ptr = ptr;
-    ColorRGBAFinalization.register(obj, obj.__wbg_ptr, obj);
-    return obj;
-  }
+class BasePolygon {
   __destroy_into_raw() {
     const ptr = this.__wbg_ptr;
     this.__wbg_ptr = 0;
-    ColorRGBAFinalization.unregister(this);
+    BasePolygonFinalization.unregister(this);
     return ptr;
   }
   free() {
     const ptr = this.__destroy_into_raw();
-    wasm.__wbg_colorrgba_free(ptr, 0);
+    wasm.__wbg_basepolygon_free(ptr, 0);
   }
   /**
   * @returns {number}
   */
-  get r() {
-    const ret = wasm.__wbg_get_colorrgba_r(this.__wbg_ptr);
-    return ret;
+  get id() {
+    const ret = wasm.__wbg_get_basepolygon_id(this.__wbg_ptr);
+    return ret >>> 0;
   }
   /**
   * @param {number} arg0
   */
-  set r(arg0) {
-    wasm.__wbg_set_colorrgba_r(this.__wbg_ptr, arg0);
+  set id(arg0) {
+    wasm.__wbg_set_basepolygon_id(this.__wbg_ptr, arg0);
   }
   /**
-  * @returns {number}
+  * @returns {boolean}
   */
-  get g() {
-    const ret = wasm.__wbg_get_colorrgba_g(this.__wbg_ptr);
-    return ret;
+  get extruded() {
+    const ret = wasm.__wbg_get_basepolygon_extruded(this.__wbg_ptr);
+    return ret !== 0;
   }
   /**
-  * @param {number} arg0
+  * @param {boolean} arg0
   */
-  set g(arg0) {
-    wasm.__wbg_set_colorrgba_g(this.__wbg_ptr, arg0);
+  set extruded(arg0) {
+    wasm.__wbg_set_basepolygon_extruded(this.__wbg_ptr, arg0);
   }
   /**
-  * @returns {number}
+  * @returns {boolean}
   */
-  get b() {
-    const ret = wasm.__wbg_get_colorrgba_b(this.__wbg_ptr);
-    return ret;
+  get is_polygon() {
+    const ret = wasm.__wbg_get_basepolygon_is_polygon(this.__wbg_ptr);
+    return ret !== 0;
   }
   /**
-  * @param {number} arg0
+  * @param {boolean} arg0
   */
-  set b(arg0) {
-    wasm.__wbg_set_colorrgba_b(this.__wbg_ptr, arg0);
-  }
-  /**
-  * @returns {number}
-  */
-  get a() {
-    const ret = wasm.__wbg_get_colorrgba_a(this.__wbg_ptr);
-    return ret;
-  }
-  /**
-  * @param {number} arg0
-  */
-  set a(arg0) {
-    wasm.__wbg_set_colorrgba_a(this.__wbg_ptr, arg0);
-  }
-}
-const Matrix3DFinalization = typeof FinalizationRegistry === 'undefined' ? {
-  register: () => {},
-  unregister: () => {}
-} : new FinalizationRegistry(ptr => wasm.__wbg_matrix3d_free(ptr >>> 0, 1));
-/**
-*/
-class Matrix3D {
-  static __wrap(ptr) {
-    ptr = ptr >>> 0;
-    const obj = Object.create(Matrix3D.prototype);
-    obj.__wbg_ptr = ptr;
-    Matrix3DFinalization.register(obj, obj.__wbg_ptr, obj);
-    return obj;
-  }
-  __destroy_into_raw() {
-    const ptr = this.__wbg_ptr;
-    this.__wbg_ptr = 0;
-    Matrix3DFinalization.unregister(this);
-    return ptr;
-  }
-  free() {
-    const ptr = this.__destroy_into_raw();
-    wasm.__wbg_matrix3d_free(ptr, 0);
-  }
-  /**
-  * @returns {number}
-  */
-  get m11() {
-    const ret = wasm.__wbg_get_colorrgba_r(this.__wbg_ptr);
-    return ret;
-  }
-  /**
-  * @param {number} arg0
-  */
-  set m11(arg0) {
-    wasm.__wbg_set_colorrgba_r(this.__wbg_ptr, arg0);
-  }
-  /**
-  * @returns {number}
-  */
-  get m12() {
-    const ret = wasm.__wbg_get_colorrgba_g(this.__wbg_ptr);
-    return ret;
-  }
-  /**
-  * @param {number} arg0
-  */
-  set m12(arg0) {
-    wasm.__wbg_set_colorrgba_g(this.__wbg_ptr, arg0);
-  }
-  /**
-  * @returns {number}
-  */
-  get m13() {
-    const ret = wasm.__wbg_get_colorrgba_b(this.__wbg_ptr);
-    return ret;
-  }
-  /**
-  * @param {number} arg0
-  */
-  set m13(arg0) {
-    wasm.__wbg_set_colorrgba_b(this.__wbg_ptr, arg0);
-  }
-  /**
-  * @returns {number}
-  */
-  get m21() {
-    const ret = wasm.__wbg_get_colorrgba_a(this.__wbg_ptr);
-    return ret;
-  }
-  /**
-  * @param {number} arg0
-  */
-  set m21(arg0) {
-    wasm.__wbg_set_colorrgba_a(this.__wbg_ptr, arg0);
-  }
-  /**
-  * @returns {number}
-  */
-  get m22() {
-    const ret = wasm.__wbg_get_matrix3d_m22(this.__wbg_ptr);
-    return ret;
-  }
-  /**
-  * @param {number} arg0
-  */
-  set m22(arg0) {
-    wasm.__wbg_set_matrix3d_m22(this.__wbg_ptr, arg0);
-  }
-  /**
-  * @returns {number}
-  */
-  get m23() {
-    const ret = wasm.__wbg_get_matrix3d_m23(this.__wbg_ptr);
-    return ret;
-  }
-  /**
-  * @param {number} arg0
-  */
-  set m23(arg0) {
-    wasm.__wbg_set_matrix3d_m23(this.__wbg_ptr, arg0);
-  }
-  /**
-  * @returns {number}
-  */
-  get m31() {
-    const ret = wasm.__wbg_get_matrix3d_m31(this.__wbg_ptr);
-    return ret;
-  }
-  /**
-  * @param {number} arg0
-  */
-  set m31(arg0) {
-    wasm.__wbg_set_matrix3d_m31(this.__wbg_ptr, arg0);
-  }
-  /**
-  * @returns {number}
-  */
-  get m32() {
-    const ret = wasm.__wbg_get_matrix3d_m32(this.__wbg_ptr);
-    return ret;
-  }
-  /**
-  * @param {number} arg0
-  */
-  set m32(arg0) {
-    wasm.__wbg_set_matrix3d_m32(this.__wbg_ptr, arg0);
-  }
-  /**
-  * @returns {number}
-  */
-  get m33() {
-    const ret = wasm.__wbg_get_matrix3d_m33(this.__wbg_ptr);
-    return ret;
-  }
-  /**
-  * @param {number} arg0
-  */
-  set m33(arg0) {
-    wasm.__wbg_set_matrix3d_m33(this.__wbg_ptr, arg0);
-  }
-  /**
-  * @param {number} m11
-  * @param {number} m12
-  * @param {number} m13
-  * @param {number} m21
-  * @param {number} m22
-  * @param {number} m23
-  * @param {number} m31
-  * @param {number} m32
-  * @param {number} m33
-  * @returns {Matrix3D}
-  */
-  static set(m11, m12, m13, m21, m22, m23, m31, m32, m33) {
-    const ret = wasm.matrix3d_set(m11, m12, m13, m21, m22, m23, m31, m32, m33);
-    return Matrix3D.__wrap(ret);
-  }
-  /**
-  * @param {Matrix3D} other
-  * @returns {Matrix3D}
-  */
-  add(other) {
-    _assertClass(other, Matrix3D);
-    const ret = wasm.matrix3d_add(this.__wbg_ptr, other.__wbg_ptr);
-    return Matrix3D.__wrap(ret);
-  }
-  /**
-  * @param {Matrix3D} other
-  * @returns {Matrix3D}
-  */
-  subtract(other) {
-    _assertClass(other, Matrix3D);
-    const ret = wasm.matrix3d_subtract(this.__wbg_ptr, other.__wbg_ptr);
-    return Matrix3D.__wrap(ret);
-  }
-}
-const MeshFinalization = typeof FinalizationRegistry === 'undefined' ? {
-  register: () => {},
-  unregister: () => {}
-} : new FinalizationRegistry(ptr => wasm.__wbg_mesh_free(ptr >>> 0, 1));
-/**
-*/
-let Mesh$1 = class Mesh {
-  static __wrap(ptr) {
-    ptr = ptr >>> 0;
-    const obj = Object.create(Mesh.prototype);
-    obj.__wbg_ptr = ptr;
-    MeshFinalization.register(obj, obj.__wbg_ptr, obj);
-    return obj;
-  }
-  __destroy_into_raw() {
-    const ptr = this.__wbg_ptr;
-    this.__wbg_ptr = 0;
-    MeshFinalization.unregister(this);
-    return ptr;
-  }
-  free() {
-    const ptr = this.__destroy_into_raw();
-    wasm.__wbg_mesh_free(ptr, 0);
+  set is_polygon(arg0) {
+    wasm.__wbg_set_basepolygon_is_polygon(this.__wbg_ptr, arg0);
   }
   /**
   * @returns {Vector3D}
   */
   get position() {
-    const ret = wasm.__wbg_get_mesh_position(this.__wbg_ptr);
+    const ret = wasm.__wbg_get_basepolygon_position(this.__wbg_ptr);
     return Vector3D.__wrap(ret);
   }
   /**
@@ -428,28 +191,13 @@ let Mesh$1 = class Mesh {
   set position(arg0) {
     _assertClass(arg0, Vector3D);
     var ptr0 = arg0.__destroy_into_raw();
-    wasm.__wbg_set_mesh_position(this.__wbg_ptr, ptr0);
-  }
-  /**
-  * @returns {Matrix3D}
-  */
-  get position_matrix() {
-    const ret = wasm.__wbg_get_mesh_position_matrix(this.__wbg_ptr);
-    return Matrix3D.__wrap(ret);
-  }
-  /**
-  * @param {Matrix3D} arg0
-  */
-  set position_matrix(arg0) {
-    _assertClass(arg0, Matrix3D);
-    var ptr0 = arg0.__destroy_into_raw();
-    wasm.__wbg_set_mesh_position_matrix(this.__wbg_ptr, ptr0);
+    wasm.__wbg_set_basepolygon_position(this.__wbg_ptr, ptr0);
   }
   /**
   * @returns {Vector3D}
   */
   get rotation() {
-    const ret = wasm.__wbg_get_mesh_rotation(this.__wbg_ptr);
+    const ret = wasm.__wbg_get_basepolygon_rotation(this.__wbg_ptr);
     return Vector3D.__wrap(ret);
   }
   /**
@@ -458,28 +206,13 @@ let Mesh$1 = class Mesh {
   set rotation(arg0) {
     _assertClass(arg0, Vector3D);
     var ptr0 = arg0.__destroy_into_raw();
-    wasm.__wbg_set_mesh_rotation(this.__wbg_ptr, ptr0);
-  }
-  /**
-  * @returns {Matrix3D}
-  */
-  get rotation_matrix() {
-    const ret = wasm.__wbg_get_mesh_rotation_matrix(this.__wbg_ptr);
-    return Matrix3D.__wrap(ret);
-  }
-  /**
-  * @param {Matrix3D} arg0
-  */
-  set rotation_matrix(arg0) {
-    _assertClass(arg0, Matrix3D);
-    var ptr0 = arg0.__destroy_into_raw();
-    wasm.__wbg_set_mesh_rotation_matrix(this.__wbg_ptr, ptr0);
+    wasm.__wbg_set_basepolygon_rotation(this.__wbg_ptr, ptr0);
   }
   /**
   * @returns {Vector3D}
   */
   get scale() {
-    const ret = wasm.__wbg_get_mesh_scale(this.__wbg_ptr);
+    const ret = wasm.__wbg_get_basepolygon_scale(this.__wbg_ptr);
     return Vector3D.__wrap(ret);
   }
   /**
@@ -488,113 +221,47 @@ let Mesh$1 = class Mesh {
   set scale(arg0) {
     _assertClass(arg0, Vector3D);
     var ptr0 = arg0.__destroy_into_raw();
-    wasm.__wbg_set_mesh_scale(this.__wbg_ptr, ptr0);
+    wasm.__wbg_set_basepolygon_scale(this.__wbg_ptr, ptr0);
   }
   /**
-  * @returns {Matrix3D}
+  * @param {number} id
   */
-  get scale_matrix() {
-    const ret = wasm.__wbg_get_mesh_scale_matrix(this.__wbg_ptr);
-    return Matrix3D.__wrap(ret);
-  }
-  /**
-  * @param {Matrix3D} arg0
-  */
-  set scale_matrix(arg0) {
-    _assertClass(arg0, Matrix3D);
-    var ptr0 = arg0.__destroy_into_raw();
-    wasm.__wbg_set_mesh_scale_matrix(this.__wbg_ptr, ptr0);
-  }
-  /**
-  * @returns {ColorRGBA}
-  */
-  get color() {
-    const ret = wasm.__wbg_get_mesh_color(this.__wbg_ptr);
-    return ColorRGBA.__wrap(ret);
-  }
-  /**
-  * @param {ColorRGBA} arg0
-  */
-  set color(arg0) {
-    _assertClass(arg0, ColorRGBA);
-    var ptr0 = arg0.__destroy_into_raw();
-    wasm.__wbg_set_mesh_color(this.__wbg_ptr, ptr0);
-  }
-  /**
-  * @returns {Mesh}
-  */
-  static new() {
-    const ret = wasm.mesh_new();
-    return Mesh.__wrap(ret);
+  constructor(id) {
+    const ret = wasm.basepolygon_new(id);
+    this.__wbg_ptr = ret >>> 0;
+    BasePolygonFinalization.register(this, this.__wbg_ptr, this);
+    return this;
   }
   /**
   * @param {(Vector3D)[]} vertices
   */
-  copy_poligon_vertices(vertices) {
+  add_vertices(vertices) {
     const ptr0 = passArrayJsValueToWasm0(vertices, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
-    wasm.mesh_copy_poligon_vertices(this.__wbg_ptr, ptr0, len0);
-  }
-  /**
-  * @returns {(Vector3D)[]}
-  */
-  get_poligon_vertices() {
-    try {
-      const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-      wasm.mesh_get_poligon_vertices(retptr, this.__wbg_ptr);
-      var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-      var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-      var v1 = getArrayJsValueFromWasm0(r0, r1).slice();
-      wasm.__wbindgen_free(r0, r1 * 4, 4);
-      return v1;
-    } finally {
-      wasm.__wbindgen_add_to_stack_pointer(16);
-    }
+    wasm.basepolygon_add_vertices(this.__wbg_ptr, ptr0, len0);
   }
   /**
   * @param {Vector3D} vertex
   */
-  add_buf_face(vertex) {
+  add_vertex(vertex) {
     _assertClass(vertex, Vector3D);
     var ptr0 = vertex.__destroy_into_raw();
-    wasm.mesh_add_buf_face(this.__wbg_ptr, ptr0);
+    wasm.basepolygon_add_vertex(this.__wbg_ptr, ptr0);
   }
   /**
-  * @param {number} index
   */
-  remove_buf_face(index) {
-    wasm.mesh_remove_buf_face(this.__wbg_ptr, index);
-  }
-  /**
-  * @param {Vector3D} position
-  */
-  set_position(position) {
-    _assertClass(position, Vector3D);
-    var ptr0 = position.__destroy_into_raw();
-    wasm.mesh_set_position(this.__wbg_ptr, ptr0);
-  }
-  /**
-  * @returns {Vector3D}
-  */
-  get_position() {
-    const ret = wasm.mesh_get_position(this.__wbg_ptr);
-    return Vector3D.__wrap(ret);
-  }
-  /**
-  * @param {number} height
-  */
-  set_extrude_height(height) {
-    wasm.mesh_set_extrude_height(this.__wbg_ptr, height);
+  triangulate() {
+    wasm.basepolygon_triangulate(this.__wbg_ptr);
   }
   /**
   * @returns {string}
   */
-  get_geometry() {
+  get_buffer() {
     let deferred1_0;
     let deferred1_1;
     try {
       const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-      wasm.mesh_get_geometry(retptr, this.__wbg_ptr);
+      wasm.basepolygon_get_buffer(retptr, this.__wbg_ptr);
       var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
       var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
       deferred1_0 = r0;
@@ -605,159 +272,27 @@ let Mesh$1 = class Mesh {
       wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
     }
   }
-};
-const PolygonFinalization = typeof FinalizationRegistry === 'undefined' ? {
+}
+typeof FinalizationRegistry === 'undefined' ? {
+  register: () => {},
+  unregister: () => {}
+} : new FinalizationRegistry(ptr => wasm.__wbg_color_free(ptr >>> 0, 1));
+typeof FinalizationRegistry === 'undefined' ? {
+  register: () => {},
+  unregister: () => {}
+} : new FinalizationRegistry(ptr => wasm.__wbg_colorrgb_free(ptr >>> 0, 1));
+typeof FinalizationRegistry === 'undefined' ? {
+  register: () => {},
+  unregister: () => {}
+} : new FinalizationRegistry(ptr => wasm.__wbg_matrix3d_free(ptr >>> 0, 1));
+typeof FinalizationRegistry === 'undefined' ? {
+  register: () => {},
+  unregister: () => {}
+} : new FinalizationRegistry(ptr => wasm.__wbg_mesh_free(ptr >>> 0, 1));
+typeof FinalizationRegistry === 'undefined' ? {
   register: () => {},
   unregister: () => {}
 } : new FinalizationRegistry(ptr => wasm.__wbg_polygon_free(ptr >>> 0, 1));
-/**
-*/
-class Polygon {
-  __destroy_into_raw() {
-    const ptr = this.__wbg_ptr;
-    this.__wbg_ptr = 0;
-    PolygonFinalization.unregister(this);
-    return ptr;
-  }
-  free() {
-    const ptr = this.__destroy_into_raw();
-    wasm.__wbg_polygon_free(ptr, 0);
-  }
-  /**
-  * @returns {Vector3D}
-  */
-  get position() {
-    const ret = wasm.__wbg_get_polygon_position(this.__wbg_ptr);
-    return Vector3D.__wrap(ret);
-  }
-  /**
-  * @param {Vector3D} arg0
-  */
-  set position(arg0) {
-    _assertClass(arg0, Vector3D);
-    var ptr0 = arg0.__destroy_into_raw();
-    wasm.__wbg_set_polygon_position(this.__wbg_ptr, ptr0);
-  }
-  /**
-  * @returns {boolean}
-  */
-  get extrude() {
-    const ret = wasm.__wbg_get_polygon_extrude(this.__wbg_ptr);
-    return ret !== 0;
-  }
-  /**
-  * @param {boolean} arg0
-  */
-  set extrude(arg0) {
-    wasm.__wbg_set_polygon_extrude(this.__wbg_ptr, arg0);
-  }
-  /**
-  */
-  constructor() {
-    const ret = wasm.polygon_new();
-    this.__wbg_ptr = ret >>> 0;
-    PolygonFinalization.register(this, this.__wbg_ptr, this);
-    return this;
-  }
-  /**
-  * @param {Vector3D} vertex
-  */
-  add_vertex(vertex) {
-    _assertClass(vertex, Vector3D);
-    var ptr0 = vertex.__destroy_into_raw();
-    wasm.polygon_add_vertex(this.__wbg_ptr, ptr0);
-  }
-  /**
-  * @param {number} index
-  */
-  remove_vertex(index) {
-    wasm.polygon_remove_vertex(this.__wbg_ptr, index);
-  }
-  /**
-  * @param {number} index
-  * @param {Vector3D} vertex
-  */
-  update_vertex(index, vertex) {
-    _assertClass(vertex, Vector3D);
-    var ptr0 = vertex.__destroy_into_raw();
-    wasm.polygon_update_vertex(this.__wbg_ptr, index, ptr0);
-  }
-  /**
-  * @param {number} index
-  * @returns {Vector3D | undefined}
-  */
-  get_vertex(index) {
-    const ret = wasm.polygon_get_vertex(this.__wbg_ptr, index);
-    return ret === 0 ? undefined : Vector3D.__wrap(ret);
-  }
-  /**
-  * @returns {number}
-  */
-  vertex_count() {
-    const ret = wasm.polygon_vertex_count(this.__wbg_ptr);
-    return ret >>> 0;
-  }
-  /**
-  * @returns {(Vector3D)[]}
-  */
-  get_all_vertices() {
-    try {
-      const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-      wasm.polygon_get_all_vertices(retptr, this.__wbg_ptr);
-      var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-      var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-      var v1 = getArrayJsValueFromWasm0(r0, r1).slice();
-      wasm.__wbindgen_free(r0, r1 * 4, 4);
-      return v1;
-    } finally {
-      wasm.__wbindgen_add_to_stack_pointer(16);
-    }
-  }
-  /**
-  */
-  clear_vertices() {
-    wasm.polygon_clear_vertices(this.__wbg_ptr);
-  }
-  /**
-  * @param {Vector3D} position
-  */
-  set_position(position) {
-    _assertClass(position, Vector3D);
-    var ptr0 = position.__destroy_into_raw();
-    wasm.polygon_set_position(this.__wbg_ptr, ptr0);
-  }
-  /**
-  * @returns {Vector3D}
-  */
-  get_position() {
-    const ret = wasm.polygon_get_position(this.__wbg_ptr);
-    return Vector3D.__wrap(ret);
-  }
-  /**
-  * @param {boolean} extrude
-  * @returns {Mesh}
-  */
-  set_extrude(extrude) {
-    const ret = wasm.polygon_set_extrude(this.__wbg_ptr, extrude);
-    return Mesh$1.__wrap(ret);
-  }
-  /**
-  * @returns {Float64Array}
-  */
-  earcut() {
-    try {
-      const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-      wasm.polygon_earcut(retptr, this.__wbg_ptr);
-      var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-      var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-      var v1 = getArrayF64FromWasm0(r0, r1).slice();
-      wasm.__wbindgen_free(r0, r1 * 8, 8);
-      return v1;
-    } finally {
-      wasm.__wbindgen_add_to_stack_pointer(16);
-    }
-  }
-}
 typeof FinalizationRegistry === 'undefined' ? {
   register: () => {},
   unregister: () => {}
@@ -796,40 +331,40 @@ class Vector3D {
   * @returns {number}
   */
   get x() {
-    const ret = wasm.__wbg_get_colorrgba_r(this.__wbg_ptr);
+    const ret = wasm.__wbg_get_matrix3d_m11(this.__wbg_ptr);
     return ret;
   }
   /**
   * @param {number} arg0
   */
   set x(arg0) {
-    wasm.__wbg_set_colorrgba_r(this.__wbg_ptr, arg0);
+    wasm.__wbg_set_matrix3d_m11(this.__wbg_ptr, arg0);
   }
   /**
   * @returns {number}
   */
   get y() {
-    const ret = wasm.__wbg_get_colorrgba_g(this.__wbg_ptr);
+    const ret = wasm.__wbg_get_matrix3d_m12(this.__wbg_ptr);
     return ret;
   }
   /**
   * @param {number} arg0
   */
   set y(arg0) {
-    wasm.__wbg_set_colorrgba_g(this.__wbg_ptr, arg0);
+    wasm.__wbg_set_matrix3d_m12(this.__wbg_ptr, arg0);
   }
   /**
   * @returns {number}
   */
   get z() {
-    const ret = wasm.__wbg_get_colorrgba_b(this.__wbg_ptr);
+    const ret = wasm.__wbg_get_matrix3d_m13(this.__wbg_ptr);
     return ret;
   }
   /**
   * @param {number} arg0
   */
   set z(arg0) {
-    wasm.__wbg_set_colorrgba_b(this.__wbg_ptr, arg0);
+    wasm.__wbg_set_matrix3d_m13(this.__wbg_ptr, arg0);
   }
   /**
   * @param {number} x
@@ -877,6 +412,14 @@ class Vector3D {
     return Vector3D.__wrap(ret);
   }
   /**
+  * @param {number} scalar
+  * @returns {Vector3D}
+  */
+  subtract_scalar(scalar) {
+    const ret = wasm.vector3d_subtract_scalar(this.__wbg_ptr, scalar);
+    return Vector3D.__wrap(ret);
+  }
+  /**
   * @param {number} height
   * @param {Vector3D} up_vector
   * @returns {Vector3D}
@@ -895,6 +438,15 @@ class Vector3D {
     _assertClass(other, Vector3D);
     const ret = wasm.vector3d_cross(this.__wbg_ptr, other.__wbg_ptr);
     return Vector3D.__wrap(ret);
+  }
+  /**
+  * @param {Vector3D} other
+  * @returns {number}
+  */
+  dot(other) {
+    _assertClass(other, Vector3D);
+    const ret = wasm.vector3d_dot(this.__wbg_ptr, other.__wbg_ptr);
+    return ret;
   }
 }
 async function __wbg_load(module, imports) {
@@ -931,6 +483,10 @@ function __wbg_get_imports() {
     const ret = Vector3D.__unwrap(takeObject(arg0));
     return ret;
   };
+  imports.wbg.__wbindgen_string_new = function (arg0, arg1) {
+    const ret = getStringFromWasm0(arg0, arg1);
+    return addHeapObject(ret);
+  };
   imports.wbg.__wbg_vector3d_new = function (arg0) {
     const ret = Vector3D.__wrap(arg0);
     return addHeapObject(ret);
@@ -944,7 +500,6 @@ function __wbg_finalize_init(instance, module) {
   wasm = instance.exports;
   __wbg_init.__wbindgen_wasm_module = module;
   cachedDataViewMemory0 = null;
-  cachedFloat64ArrayMemory0 = null;
   cachedUint8ArrayMemory0 = null;
   return wasm;
 }
@@ -954,7 +509,7 @@ async function __wbg_init(module_or_path) {
     module_or_path
   } = module_or_path);else console.warn('using deprecated parameters for the initialization function; pass a single object instead');
   if (typeof module_or_path === 'undefined') {
-    module_or_path = new URL('openmaths_bg.wasm', import.meta.url);
+    module_or_path = new URL('opengeometry_bg.wasm', import.meta.url);
   }
   const imports = __wbg_get_imports();
   if (typeof module_or_path === 'string' || typeof Request === 'function' && module_or_path instanceof Request || typeof URL === 'function' && module_or_path instanceof URL) {
@@ -11210,50 +10765,46 @@ if ( typeof window !== 'undefined' ) {
 
 }
 
+function getUUID() {
+    const time = performance.now() * 1000;
+    const random = Math.random() * 1000;
+    const uuid = Math.floor(time + random);
+    console.log(uuid);
+    return uuid;
+}
+
 class OpenGeometry {
     constructor() {
-        this.polygons = [];
         // this.setup();
     }
     setup() {
         return __awaiter(this, void 0, void 0, function* () {
             yield __wbg_init();
-            console.log("OpenMaths initialized");
+            console.log("OpenGeometry Kernel 0.0.1");
         });
     }
 }
-function OVector3D(x, y, z) {
-    return new Vector3D(x, y, z);
-}
-class OPolygon extends Mesh {
-    constructor() {
+class BasePoly extends Mesh {
+    constructor(vertices) {
         super();
-        this.vertices = [];
-        this.polygon = new Polygon();
-    }
-    addVertex(x, y, z) {
-        const xVertex = x;
-        const yVertex = y;
-        const zVertex = z;
-        const vertex = new Vector3D(xVertex, yVertex, zVertex);
-        this.polygon.add_vertex(vertex);
-        this.vertices.push(vertex);
-    }
-    generateMesh() {
-        this.polygon.earcut();
-    }
-    extrude(height) {
-        console.log("Extruding polygon");
-        if (!(typeof height === "number")) {
-            throw new Error("Extrude height must be a number");
+        this.polygon = null;
+        this.isTriangulated = false;
+        this.polygon = new BasePolygon(getUUID());
+        if (vertices) {
+            this.polygon.add_vertices(vertices);
+            // Triangulate the polygon
         }
-        const polySolid = this.polygon.set_extrude(true);
-        polySolid.set_extrude_height(height);
-        const geometry = triangulate_mesh(polySolid);
-        return geometry;
+        this.getBuf();
     }
-    extrudeMesh() { }
+    addVertex(vertex) {
+        var _a;
+        (_a = this.polygon) === null || _a === void 0 ? void 0 : _a.add_vertex(vertex);
+    }
+    getBuf() {
+        var _a;
+        console.log((_a = this.polygon) === null || _a === void 0 ? void 0 : _a.get_buffer());
+    }
 }
 
-export { OPolygon, OVector3D, OpenGeometry };
+export { BasePoly, OpenGeometry, Vector3D };
 //# sourceMappingURL=bundle.js.map
