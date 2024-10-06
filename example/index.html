@@ -2,6 +2,13 @@
 <html>
 <head>
   <title>OpenGeometry</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      margin: 0;
+    }
+  </style>
   <script type="importmap">
     {
       "imports": {
@@ -12,7 +19,6 @@
   </script>
 </head>
 <body>
-  <h1>OpenGeometry inside Three</h1>
   <script type="module">
     import { 
       OpenGeometry,
@@ -51,8 +57,8 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
 
-      camera.position.z = 50;
-      camera.position.y = 50;
+      camera.position.z = 0;
+      camera.position.y = 5;
 
       animate();
 
@@ -72,6 +78,17 @@
       // controls
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.update();
+
+      // Flat Plane
+      const plane = new THREE.Mesh(
+        new THREE.PlaneGeometry(5, 5, 1, 1),
+        new THREE.MeshBasicMaterial({ color: 0xe4e4e4, side: THREE.DoubleSide })
+      );
+      plane.rotation.x = Math.PI / 2;
+      scene.add(plane);
+
+      // Base Poly
+      scene.add(basePoly);
     }
 
     function animate() {

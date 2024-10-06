@@ -1,4 +1,5 @@
-use crate::utility::openmath;
+use crate::operations::triangulate::triangulate_polygon_buffer_geometry;
+use crate::{operations::triangulate, utility::openmath};
 use crate::geometry::basegeometry;
 use std::path;
 
@@ -54,10 +55,17 @@ impl BasePolygon {
   }
 
   #[wasm_bindgen]
-  pub fn triangulate(&mut self) {
-    if !self.is_polygon {
-      return;
-    }
+  pub fn triangulate(&mut self) -> String {
+    // if !self.is_polygon {
+    //   return String::from("Polygon not created yet");
+    // }
+
+    // if self.geometry.get_vertices().len() < 3 {
+    //   return String::from("Polygon should have atleast 3 vertices");
+    // }
+
+    self.is_polygon = true;
+    triangulate_polygon_buffer_geometry(self.geometry.clone())
   }
 
   #[wasm_bindgen]

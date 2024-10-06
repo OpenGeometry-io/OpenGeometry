@@ -249,9 +249,23 @@ class BasePolygon {
     wasm.basepolygon_add_vertex(this.__wbg_ptr, ptr0);
   }
   /**
+  * @returns {string}
   */
   triangulate() {
-    wasm.basepolygon_triangulate(this.__wbg_ptr);
+    let deferred1_0;
+    let deferred1_1;
+    try {
+      const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+      wasm.basepolygon_triangulate(retptr, this.__wbg_ptr);
+      var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+      var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+      deferred1_0 = r0;
+      deferred1_1 = r1;
+      return getStringFromWasm0(r0, r1);
+    } finally {
+      wasm.__wbindgen_add_to_stack_pointer(16);
+      wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
   }
   /**
   * @returns {string}
@@ -10786,6 +10800,7 @@ class OpenGeometry {
 }
 class BasePoly extends Mesh {
     constructor(vertices) {
+        var _a;
         super();
         this.polygon = null;
         this.isTriangulated = false;
@@ -10794,7 +10809,8 @@ class BasePoly extends Mesh {
             this.polygon.add_vertices(vertices);
             // Triangulate the polygon
         }
-        this.getBuf();
+        const data = (_a = this.polygon) === null || _a === void 0 ? void 0 : _a.triangulate();
+        console.log(data);
     }
     addVertex(vertex) {
         var _a;

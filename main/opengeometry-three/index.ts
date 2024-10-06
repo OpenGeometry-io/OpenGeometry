@@ -27,7 +27,8 @@ export class BasePoly extends THREE.Mesh {
       // Triangulate the polygon
     }
 
-    this.getBuf();
+    const data = this.polygon?.triangulate();
+    console.log(data);
   }
 
   addVertex(vertex: Vector3D) {

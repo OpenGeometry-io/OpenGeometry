@@ -617,40 +617,6 @@ pub fn tricut(polygon_vertices: Vec<Vector3D>) -> Vec<Vec<u32>> {
 
   // serde_json::to_string(&triangle_indices).unwrap()
   triangle_indices
-
-
-  // previous implementation before changing the winding order - maybe winding order of faces can be changed
-  // let mut all_vertices: HashMap<u32, Vec<f64>> = HashMap::new();
-  //   for (i, vertex) in polygon_vertices.iter().enumerate() {
-  //       all_vertices.insert(i as u32, vec![vertex.x, vertex.y, vertex.z]);
-  //   }
-
-  //   let mut remaining_vertices: Vec<u32> = (0..all_vertices.len() as u32).collect();
-  //   let mut triangle_indices: Vec<Vec<u32>> = Vec::new();
-    
-  //   while remaining_vertices.len() > 3 {
-  //       let len = remaining_vertices.len();
-  //       for i in 0..len {
-  //           let a = remaining_vertices[(i + len - 1) % len];
-  //           let b = remaining_vertices[i];
-  //           let c = remaining_vertices[(i + 1) % len];
-            
-  //           if ear_triangle_test(all_vertices.clone(), a, b, c) {
-  //               triangle_indices.push(vec![a, b, c]);
-  //               remaining_vertices.remove(i);
-  //               break;
-  //           }
-  //       }
-  //   }
-    
-  //   triangle_indices.push(vec![
-  //       remaining_vertices[0],
-  //       remaining_vertices[1],
-  //       remaining_vertices[2],
-  //   ]);
-    
-  //   // serde_json::to_string(&triangle_indices).unwrap()
-  //   triangle_indices
 }
 
 #[wasm_bindgen]
