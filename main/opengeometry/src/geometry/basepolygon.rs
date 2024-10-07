@@ -56,13 +56,14 @@ impl BasePolygon {
 
   #[wasm_bindgen]
   pub fn triangulate(&mut self) -> String {
-    // if !self.is_polygon {
-    //   return String::from("Polygon not created yet");
-    // }
+    if self.is_polygon {
+      // Polygon is already triangulated, destroy the previous triangulation
+      return String::from("Polygon is already triangulated");
+    }
 
-    // if self.geometry.get_vertices().len() < 3 {
-    //   return String::from("Polygon should have atleast 3 vertices");
-    // }
+    if self.geometry.get_vertices().len() < 3 {
+      return String::from("Polygon should have atleast 3 vertices");
+    }
 
     self.is_polygon = true;
     triangulate_polygon_buffer_geometry(self.geometry.clone())
