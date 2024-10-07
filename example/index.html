@@ -44,14 +44,16 @@
       // const vector4 = new Vector3D(1, 0, -1);
       // polyVector.push(vector4);
 
-      const vector1 = new Vector3D(1, 0, 1);
+      const vector1 = new Vector3D(2, 0, 4);
       polyVector.push(vector1);
-      const vector2 = new Vector3D(1, 0, -1);
+      const vector2 = new Vector3D(-2, 0, 2);
       polyVector.push(vector2);
-      const vector3 = new Vector3D(-1, 0, -1);
+      const vector3 = new Vector3D(-2, 0, -2);
       polyVector.push(vector3);
-      const vector4 = new Vector3D(-1, 0, 1);
+      const vector4 = new Vector3D(2, 0, -2);
       polyVector.push(vector4);
+      const vector5 = new Vector3D(0, 0, -1);
+      polyVector.push(vector5);
       const basePoly = new BasePoly(polyVector);
 
       scene = new THREE.Scene();

@@ -88,7 +88,7 @@ pub fn tricut(polygon_vertices: Vec<Vector3D>) -> Vec<Vec<u32>> {
 pub fn triangulate_polygon_buffer_geometry(geom_buf: BaseGeometry) -> String {
   
   let raw_vertices = geom_buf.get_vertices().clone();
-  let winded_vertices = windingsort::wind_points(raw_vertices);
+  let winded_vertices = windingsort::ccw_test(raw_vertices);
 
   // let mut triangles_vertices: Vec<f64> = Vec::new();
 
