@@ -27,7 +27,8 @@ pub struct BaseGeometry {
   vertices: Vec<openmath::Vector3D>,
   indices: Vec<u32>,
   normals: Vec<f32>,
-  treated: bool
+  treated: bool,
+  buffer: Vec<openmath::Vector3D>
 }
 
 #[wasm_bindgen]
@@ -39,7 +40,8 @@ impl BaseGeometry {
       vertices: Vec::new(),
       indices: Vec::new(),
       normals: Vec::new(),
-      treated: false
+      treated: false,
+      buffer: Vec::new()
     }
   }
 
@@ -76,7 +78,7 @@ impl BaseGeometry {
   }
   
   #[wasm_bindgen]
-  pub fn get_buffer(&self) -> String {
+  pub fn get_geometry(&self) -> String {
     serde_json::to_string(&self).unwrap()
   }
 }

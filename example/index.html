@@ -35,25 +35,31 @@
       await openGeometry.setup();
 
       const polyVector = [];
-      // const vector1 = new Vector3D(1, 0, 1);
-      // polyVector.push(vector1);
-      // const vector2 = new Vector3D(-1, 0, 1);
-      // polyVector.push(vector2);
-      // const vector3 = new Vector3D(-1, 0, -1);
-      // polyVector.push(vector3);
-      // const vector4 = new Vector3D(1, 0, -1);
-      // polyVector.push(vector4);
 
-      const vector1 = new Vector3D(2, 0, 4);
-      polyVector.push(vector1);
-      const vector2 = new Vector3D(-2, 0, 2);
-      polyVector.push(vector2);
-      const vector3 = new Vector3D(-2, 0, -2);
-      polyVector.push(vector3);
-      const vector4 = new Vector3D(2, 0, -2);
-      polyVector.push(vector4);
+      // Anti-clockwise from Bottom View - This is Good Order
+      // const vector1 = new Vector3D(2, 0, 4);
+      // polyVector.push(vector1);
+      // const vector2 = new Vector3D(-2, 0, 2);
+      // polyVector.push(vector2);
+      // const vector3 = new Vector3D(-2, 0, -2);
+      // polyVector.push(vector3);
+      // const vector4 = new Vector3D(2, 0, -2);
+      // polyVector.push(vector4);
+      // const vector5 = new Vector3D(0, 0, -1);
+      // polyVector.push(vector5);
+    
+      // Clockwise from Bottom View - This is Bad Order but can be actual use case
       const vector5 = new Vector3D(0, 0, -1);
       polyVector.push(vector5);
+      const vector4 = new Vector3D(2, 0, -2);
+      polyVector.push(vector4);
+      const vector3 = new Vector3D(-2, 0, -2);
+      polyVector.push(vector3);
+      const vector2 = new Vector3D(-2, 0, 2);
+      polyVector.push(vector2);
+      const vector1 = new Vector3D(2, 0, 4);
+      polyVector.push(vector1);
+
       const basePoly = new BasePoly(polyVector);
 
       scene = new THREE.Scene();

@@ -9,6 +9,5 @@ export declare class BasePoly extends THREE.Mesh {
     isTriangulated: boolean;
     constructor(vertices?: Vector3D[]);
     addVertex(vertex: Vector3D): void;
-    private getBuf;
 }
 export { Vector3D };

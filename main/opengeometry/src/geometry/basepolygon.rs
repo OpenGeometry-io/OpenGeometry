@@ -15,7 +15,8 @@ pub struct BasePolygon {
   pub is_polygon: bool,
   pub position: openmath::Vector3D,
   pub rotation: openmath::Vector3D,
-  pub scale: openmath::Vector3D
+  pub scale: openmath::Vector3D,
+  buffer: Vec<f64>
 }
 
 /**
@@ -35,7 +36,8 @@ impl BasePolygon {
       is_polygon : false,
       position : openmath::Vector3D::create(0.0, 0.0, 0.0),
       rotation : openmath::Vector3D::create(0.0, 0.0, 0.0),
-      scale : openmath::Vector3D::create(1.0, 1.0, 1.0)
+      scale : openmath::Vector3D::create(1.0, 1.0, 1.0),
+      buffer : Vec::new()
     }
   }
 
@@ -54,23 +56,47 @@ impl BasePolygon {
     }
   }
 
+  // #[wasm_bindgen]
+  // pub fn triangulate(&mut self) -> String {
+  //   if self.is_polygon {
+  //     // Polygon is already triangulated, destroy the previous triangulation
+  //     return String::from("Polygon is already triangulated");
+  //   }
+
+  //   if self.geometry.get_vertices().len() < 3 {
+  //     return String::from("Polygon should have atleast 3 vertices");
+  //   }
+
+  //   self.is_polygon = true;
+  //   triangulate_polygon_buffer_geometry(self.geometry.clone())
+  // }
+
   #[wasm_bindgen]
-  pub fn triangulate(&mut self) -> String {
+  pub fn triangulate(&mut self) {
     if self.is_polygon {
       // Polygon is already triangulated, destroy the previous triangulation
-      return String::from("Polygon is already triangulated");
+      // return String::from("Polygon is already triangulated");
     }
 
     if self.geometry.get_vertices().len() < 3 {
-      return String::from("Polygon should have atleast 3 vertices");
+      // return String::from("Polygon should have atleast 3 vertices");
     }
 
     self.is_polygon = true;
-    triangulate_polygon_buffer_geometry(self.geometry.clone())
+    let indices = triangulate_polygon_buffer_geometry(self.geometry.clone());
+
+    for index in indices {
+      for i in index {
+        let vertex = self.geometry.get_vertices()[i as usize].clone();
+        self.buffer.push(vertex.x);
+        self.buffer.push(vertex.y);
+        self.buffer.push(vertex.z);
+      }
+    }
   }
 
   #[wasm_bindgen]
-  pub fn get_buffer(&self) -> String {
-    serde_json::to_string(&self.geometry).unwrap()
+  pub fn get_buffer_flush(&self) -> String {
+    serde_json::to_string(&self.buffer).unwrap()
   }
 }

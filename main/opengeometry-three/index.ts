@@ -25,18 +25,15 @@ export class BasePoly extends THREE.Mesh {
       this.polygon.add_vertices(vertices);
 
       // Triangulate the polygon
-    }
+      this.polygon?.triangulate();
 
-    const data = this.polygon?.triangulate();
-    console.log(data);
+      const bufFlush = this.polygon?.get_buffer_flush();
+      console.log(bufFlush);
+    }
   }
 
   addVertex(vertex: Vector3D) {
     this.polygon?.add_vertex(vertex);
-  }
-
-  private getBuf() {
-    console.log(this.polygon?.get_buffer());
   }
 }
 
