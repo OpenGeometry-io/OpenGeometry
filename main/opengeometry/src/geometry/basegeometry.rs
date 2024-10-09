@@ -81,4 +81,13 @@ impl BaseGeometry {
   pub fn get_geometry(&self) -> String {
     serde_json::to_string(&self).unwrap()
   }
+
+  #[wasm_bindgen]
+  pub fn reset_geometry(&mut self) {
+    self.vertices.clear();
+    self.indices.clear();
+    self.normals.clear();
+    self.treated = false;
+    self.buffer.clear();
+  }
 }

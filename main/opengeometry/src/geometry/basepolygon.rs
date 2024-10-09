@@ -73,15 +73,15 @@ impl BasePolygon {
   // }
 
   #[wasm_bindgen]
-  pub fn triangulate(&mut self) {
-    if self.is_polygon {
-      // Polygon is already triangulated, destroy the previous triangulation
-      // return String::from("Polygon is already triangulated");
-    }
+  pub fn triangulate(&mut self) -> String {
+    // if self.is_polygon {
+    //   // Polygon is already triangulated, destroy the previous triangulation
+    //   // return String::from("Polygon is already triangulated");
+    // }
 
-    if self.geometry.get_vertices().len() < 3 {
-      // return String::from("Polygon should have atleast 3 vertices");
-    }
+    // if self.geometry.get_vertices().len() < 3 {
+    //   // return String::from("Polygon should have atleast 3 vertices");
+    // }
 
     self.is_polygon = true;
     let indices = triangulate_polygon_buffer_geometry(self.geometry.clone());
@@ -96,10 +96,19 @@ impl BasePolygon {
         self.buffer.push(vertex.z);
       }
     }
+
+    serde_json::to_string(&self.buffer).unwrap()
   }
 
   #[wasm_bindgen]
   pub fn get_buffer_flush(&self) -> String {
     serde_json::to_string(&self.buffer).unwrap()
+  }
+
+  #[wasm_bindgen]
+  pub fn reset_polygon(&mut self) {
+    self.is_polygon = false;
+    self.geometry.reset_geometry();
+    self.buffer.clear();
   }
 }
