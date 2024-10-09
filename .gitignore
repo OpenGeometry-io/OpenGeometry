@@ -22,3 +22,5 @@ Cargo.lock
 
 # Web 
 node_modules/
+
+dist

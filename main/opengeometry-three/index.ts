@@ -28,12 +28,23 @@ export class BasePoly extends THREE.Mesh {
       this.polygon?.triangulate();
 
       const bufFlush = this.polygon?.get_buffer_flush();
-      console.log(bufFlush);
+      this.addFlushBufferToScene(bufFlush);
     }
   }
 
   addVertex(vertex: Vector3D) {
     this.polygon?.add_vertex(vertex);
+  }
+
+  addFlushBufferToScene(flush: string) {
+    const flushBuffer = JSON.parse(flush);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
+    const material = new THREE.MeshStandardMaterial({ color: 0xff0000  });
+    this.geometry = geometry;
+    this.material = material;
+    // this.geometry.attributes.position.needsUpdate = true;
+    // this.geometry.computeVertexNormals();
   }
 }
 

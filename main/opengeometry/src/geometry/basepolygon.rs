@@ -1,4 +1,5 @@
 use crate::operations::triangulate::triangulate_polygon_buffer_geometry;
+use crate::operations::windingsort;
 use crate::{operations::triangulate, utility::openmath};
 use crate::geometry::basegeometry;
 use std::path;
@@ -85,9 +86,11 @@ impl BasePolygon {
     self.is_polygon = true;
     let indices = triangulate_polygon_buffer_geometry(self.geometry.clone());
 
+    let ccw_vertices = windingsort::ccw_test(self.geometry.get_vertices());
+    
     for index in indices {
       for i in index {
-        let vertex = self.geometry.get_vertices()[i as usize].clone();
+        let vertex = ccw_vertices[i as usize];
         self.buffer.push(vertex.x);
         self.buffer.push(vertex.y);
         self.buffer.push(vertex.z);
