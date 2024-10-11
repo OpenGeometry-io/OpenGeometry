@@ -76,6 +76,14 @@ impl Vector3D {
   pub fn dot(&self, other: &Vector3D) -> f64 {
     self.x * other.x + self.y * other.y + self.z * other.z
   }
+
+  pub fn clone(&self) -> Vector3D {
+    Vector3D {
+      x: self.x,
+      y: self.y,
+      z: self.z,
+    }
+  }
 }
 
 #[wasm_bindgen]

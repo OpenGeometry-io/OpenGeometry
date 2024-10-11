@@ -48,13 +48,13 @@ impl BaseGeometry {
   #[wasm_bindgen]
   pub fn add_vertices(&mut self, vertices: Vec<openmath::Vector3D>) {
     for vertex in vertices {
-      self.vertices.push(vertex);
+      self.vertices.push(vertex.clone());
     }
   }
 
   #[wasm_bindgen]
   pub fn add_vertex(&mut self, vertex: openmath::Vector3D) {
-    self.vertices.push(vertex);
+    self.vertices.push(vertex.clone());
   }
 
   #[wasm_bindgen]

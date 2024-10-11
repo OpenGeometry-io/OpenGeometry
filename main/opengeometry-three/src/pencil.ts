@@ -19,7 +19,7 @@ export class Pencil {
   pencilMode: PencilMode = "cursor";
 
   // dummy plane can be ignored when we have at least one object in the scene
-  dummyPlane: THREE.Mesh | undefined;
+  private dummyPlane: THREE.Mesh | undefined;
   
   constructor(container: HTMLElement, scene: THREE.Scene, private camera: THREE.Camera) {
     this.container = container;
@@ -29,6 +29,10 @@ export class Pencil {
 
   set mode(mode: PencilMode) {
     this.pencilMode = mode;
+  }
+
+  get drawingCanvas() {
+    return this.dummyPlane;
   }
 
   setup() {

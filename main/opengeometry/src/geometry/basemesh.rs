@@ -1,14 +1,17 @@
 use crate::utility::openmath;
-use std::path;
-
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
+use super::basegeometry;
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BaseMesh {
   pub id: u32,
-  vertices: Vec<openmath::Vector3D>,
-  indices: Vec<u32>,
-  normals: Vec<f32>
+  geometry: basegeometry::BaseGeometry,
+  pub extruded: bool,
+  pub is_polygon: bool,
+  pub position: openmath::Vector3D,
+  pub rotation: openmath::Vector3D,
+  pub scale: openmath::Vector3D,
+  buffer: Vec<f64>
 }

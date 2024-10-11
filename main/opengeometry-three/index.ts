@@ -1,8 +1,13 @@
-import init, { Vector3D, BasePolygon } from "../opengeometry/pkg/opengeometry";
+import init, { 
+  Vector3D, 
+  BasePolygon,
+  BaseFlatMesh
+} from "../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { getUUID } from "./src/utils/randomizer";
 import { Pencil } from "./src/pencil";
+import { SpotLabel } from "./src/markup/spotMarker";
 
 export class OpenGeometry {
   protected scene: THREE.Scene | undefined;
@@ -63,6 +68,8 @@ export class OpenGeometry {
 
 export class BasePoly extends THREE.Mesh {
   layerVertices: Vector3D[] = [];
+  layerBackVertices: Vector3D[] = [];
+
   polygon: BasePolygon | null = null;
   isTriangulated: boolean = false;
 
@@ -83,14 +90,26 @@ export class BasePoly extends THREE.Mesh {
 
   addVertex(threeVertex: Vector3D) {
     if (this.isTriangulated) {
-      // clear the previous polygon
+      this.layerVertices = [];
       this.geometry.dispose();
       this.polygon?.reset_polygon();
-
       this.isTriangulated = false;
 
-      console.log("Clearing the previous polygon");
+      console.log("Resetting the polygon");
+      console.log(this.layerBackVertices);
+
+      for (const vertex of this.layerBackVertices) {
+        this.layerVertices.push(vertex.clone());
+      }
+      console.log(this.layerVertices);
     };
+
+    const backupVertex = new Vector3D(
+      parseFloat(threeVertex.x.toFixed(2)),
+      0,
+      parseFloat(threeVertex.z.toFixed(2))
+    );
+    this.layerBackVertices.push(backupVertex);
 
     const vertex = new Vector3D(
       parseFloat(threeVertex.x.toFixed(2)),
@@ -100,18 +119,14 @@ export class BasePoly extends THREE.Mesh {
     );
     this.layerVertices.push(vertex);
 
-    console.log(this.layerVertices);
     if (this.layerVertices.length > 3) {
-
-      console.log("Adding vertices to polygon");
-
       this.polygon?.add_vertices(this.layerVertices);
+      const bufFlush = this.polygon?.triangulate();
 
-      console.log("Triangulating the polygon");
-      const bufFlush = this.polygon?.triangulate();;
+      console.log(this.layerBackVertices);
       console.log(bufFlush);
+      
       if (!bufFlush) {
-        console.error("Buffer Flush is empty");
         return;
       }
       this.addFlushBufferToScene(bufFlush);
@@ -124,7 +139,7 @@ export class BasePoly extends THREE.Mesh {
     const flushBuffer = JSON.parse(flush);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
-    const material = new THREE.MeshStandardMaterial({ color: 0xff0000  });
+    const material = new THREE.MeshStandardMaterial({ color: 0xff0000, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
     this.geometry = geometry;
     this.material = material;
     // this.geometry.attributes.position.needsUpdate = true;
@@ -133,6 +148,26 @@ export class BasePoly extends THREE.Mesh {
 }
 
 
+/**
+ * Base Flat Mesh
+ */
+export class FlatMesh extends THREE.Mesh {
+  constructor(vertices: Vector3D[]) {
+    super();
+    const baseMesh = new BaseFlatMesh(getUUID());
+    baseMesh.add_vertices(vertices);
+    const bufFlush = baseMesh.triangulate();
+    const flushBuffer = JSON.parse(bufFlush);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
+    const material = new THREE.MeshStandardMaterial({ color: 0xff0000, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+    this.geometry = geometry;
+    this.material = material;
+  }
+}
+
+
 export {
   Vector3D,
+  SpotLabel,
 }
