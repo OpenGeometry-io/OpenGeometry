@@ -56,7 +56,6 @@ export class Pencil {
     cursorElement.style.backgroundColor = "red";
     cursorElement.style.pointerEvents = "none";
 
-    // Horizontal line
     const horizontalLine = document.createElement("div");
     horizontalLine.style.position = "absolute";
     horizontalLine.style.width = "60px";
@@ -66,6 +65,8 @@ export class Pencil {
     horizontalLine.style.backgroundColor = "red";
     horizontalLine.style.pointerEvents = "none";
     cursorElement.appendChild(horizontalLine);
+
+    this.container.style.cursor = "none";
 
     const cursorMesh = new CSS2DObject(cursorElement);
     cursorMesh.position.set(0, 0, 0);

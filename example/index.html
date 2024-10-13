@@ -123,22 +123,14 @@
       const pencil = openGeometry.pencil;
       console.log(pencil);
       pencil.onCursorDown.add((point) => {
-        // const ogVertex = new Vector3D(point.x, point.y, point.z);
-        // // Add Points to Scene
-        // const geometry = new THREE.SphereGeometry(0.1, 32, 32);
-        // const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        // const sphere = new THREE.Mesh(geometry, material);
-        // sphere.position.set(point.x, point.y, point.z);
-        // scene.add(sphere);
-
-        // basePoly.addVertex(ogVertex);
+        const ogVertex = new Vector3D(point.x, point.y, point.z);
+        basePoly.addVertex(ogVertex);
 
         const spotLabel = new SpotLabel();
         scene.add(spotLabel);
         console.log(point);
         spotLabel.position.set(point.x, 0, point.z);
       });
-
 
       window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;

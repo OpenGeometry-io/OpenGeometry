@@ -6,7 +6,7 @@ import typescript from '@rollup/plugin-typescript';
 export default {
   input: 'main/opengeometry-three/index.ts',
   output: {
-    file: 'dist/bundle.js',
+    file: 'dist/index.js',
     format: 'esm',
     name: 'opengeometry',
     sourcemap: true,
@@ -17,7 +17,7 @@ export default {
     typescript({
       tsconfig: './tsconfig.json', // Use your project's tsconfig
       declaration: true,
-      declarationDir: 'dist/types', // Outputs declarations in a specific folder
+      declarationDir: 'dist/', // Outputs declarations in a specific folder
     }),
     babel({
       babelHelpers: 'bundled',
