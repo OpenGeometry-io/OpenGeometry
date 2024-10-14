@@ -10,7 +10,8 @@
     "build-core": "cd main/opengeometry && wasm-pack build --target web && cargo build --release",
     "cpy-wasm-dist": "cpy main/opengeometry/pkg/opengeometry_bg.wasm dist --flat",
     "cpy-wasm-dt-dist": "cpy main/opengeometry/pkg/opengeometry_bg.wasm.d.ts dist --flat",
-    "build": "npm run build-core && npm run build-three && npm run cpy-wasm-dist && npm run cpy-wasm-dt-dist"
+    "build": "npm run build-core && npm run build-three && npm run cpy-wasm-dist && npm run cpy-wasm-dt-dist",
+    "build-local": "npm run build && cpy dist/* ./../openplans/kernel/"
   },
   "repository": {
     "type": "git",

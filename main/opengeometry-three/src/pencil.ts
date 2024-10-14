@@ -48,6 +48,12 @@ export class Pencil {
     this.dummyPlane = plane;
   }
 
+  groundVisible(visible: boolean) {
+    if (this.dummyPlane) {
+      this.dummyPlane.visible = visible;
+    }
+  }
+
   setupCursor() {
     const cursorElement = document.createElement("div");
     cursorElement.style.position = "absolute";
