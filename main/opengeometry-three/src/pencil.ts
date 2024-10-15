@@ -12,9 +12,12 @@ export class Pencil {
   private container: HTMLElement;
   private scene: THREE.Scene;
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
+  pencilMeshes: THREE.Mesh[] = [];
 
   cursor: CSS2DObject | undefined;
   onCursorDown: Event<THREE.Vector3> = new Event();
+  onCursorMove: Event<THREE.Vector3> = new Event();
+  onElementSelected: Event<THREE.Mesh> = new Event();
 
   pencilMode: PencilMode = "cursor";
 
@@ -45,6 +48,7 @@ export class Pencil {
     const plane = new THREE.Mesh(geometry, material);
     plane.rotation.x = Math.PI / 2;
     this.scene.add(plane);
+    plane.visible = false;
     this.dummyPlane = plane;
   }
 
@@ -75,9 +79,9 @@ export class Pencil {
     this.container.style.cursor = "none";
 
     const cursorMesh = new CSS2DObject(cursorElement);
+    cursorMesh.name = "cursor";
     cursorMesh.position.set(0, 0, 0);
     this.scene.add(cursorMesh);
-
     this.cursor = cursorMesh;
   }
 
@@ -88,12 +92,13 @@ export class Pencil {
       const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
       this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
-      const intersects = this.raycaster.intersectObjects([this.dummyPlane!]);
+      const intersects = this.raycaster.intersectObjects([this.dummyPlane!, ...this.pencilMeshes]);
 
       if (intersects.length > 0) {
         const intersect = intersects[0];
         const point = intersect.point;
         this.cursor?.position.set(point.x, point.y, point.z);
+        this.onCursorMove.trigger(point);
       }
     });
 
@@ -104,12 +109,13 @@ export class Pencil {
         const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
         this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
-        const intersects = this.raycaster.intersectObjects([this.dummyPlane!]);
+        const intersects = this.raycaster.intersectObjects([this.dummyPlane!, ...this.pencilMeshes]);
 
         if (intersects.length > 0) {
           const intersect = intersects[0];
           const point = intersect.point;
           this.onCursorDown.trigger(point);
+          this.onElementSelected.trigger(intersect.object as THREE.Mesh);
         }
       }
     });

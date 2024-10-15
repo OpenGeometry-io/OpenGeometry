@@ -5,6 +5,5 @@ export function getUUID() {
   const random = Math.random() * 1000;
 
   const uuid = Math.floor(time + random);
-  console.log(uuid);
   return uuid;
 }
