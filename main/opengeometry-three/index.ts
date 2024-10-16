@@ -67,6 +67,7 @@ export class OpenGeometry {
 }
 
 export class BasePoly extends THREE.Mesh {
+  ogid: number;
   layerVertices: Vector3D[] = [];
   layerBackVertices: Vector3D[] = [];
 
@@ -75,7 +76,9 @@ export class BasePoly extends THREE.Mesh {
 
   constructor(vertices?: Vector3D[]) {
     super();
-    this.polygon = new BasePolygon(getUUID());
+    this.ogid = getUUID();
+    console.log("OGID: ", this.ogid);
+    this.polygon = new BasePolygon(this.ogid);
     
     if (vertices) {
       this.polygon.add_vertices(vertices);
@@ -86,6 +89,22 @@ export class BasePoly extends THREE.Mesh {
       const bufFlush = this.polygon?.get_buffer_flush();
       this.addFlushBufferToScene(bufFlush);
     }
+  }
+
+  addVertices(vertices: Vector3D[]) {
+    if (!this.polygon) return;
+    this.polygon.add_vertices(vertices);
+    this.polygon?.triangulate();
+    const bufFlush = this.polygon?.get_buffer_flush();
+    this.addFlushBufferToScene(bufFlush);
+  }
+
+  resetVertices() {
+    if (!this.polygon) return;
+    this.layerVertices = [];
+    this.geometry.dispose();
+    this.polygon?.reset_polygon();
+    this.isTriangulated = false;
   }
 
   addVertex(threeVertex: Vector3D) {

@@ -93,6 +93,7 @@ export class Pencil {
 
       this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
       const intersects = this.raycaster.intersectObjects([this.dummyPlane!, ...this.pencilMeshes]);
+      // const intersects = this.raycaster.intersectObjects(this.pencilMeshes);
 
       if (intersects.length > 0) {
         const intersect = intersects[0];
@@ -109,7 +110,8 @@ export class Pencil {
         const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
         this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
-        const intersects = this.raycaster.intersectObjects([this.dummyPlane!, ...this.pencilMeshes]);
+        // const intersects = this.raycaster.intersectObjects([this.dummyPlane!, ...this.pencilMeshes]);
+        const intersects = this.raycaster.intersectObjects(this.pencilMeshes);
 
         if (intersects.length > 0) {
           const intersect = intersects[0];
