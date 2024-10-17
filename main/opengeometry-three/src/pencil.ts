@@ -34,6 +34,12 @@ export class Pencil {
 
   set mode(mode: PencilMode) {
     this.pencilMode = mode;
+
+    if (mode === "select") {
+      this.container.style.cursor = "default";
+    } else {
+      this.container.style.cursor = "none";
+    }
   }
 
   get drawingCanvas() {
