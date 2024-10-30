@@ -158,7 +158,7 @@ export class BasePoly extends THREE.Mesh {
     const flushBuffer = JSON.parse(flush);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
-    const material = new THREE.MeshStandardMaterial({ color: 0xff0000, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+    const material = new THREE.MeshStandardMaterial({ color: 0x3a86ff, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
     this.geometry = geometry;
     this.material = material;
     // this.geometry.attributes.position.needsUpdate = true;

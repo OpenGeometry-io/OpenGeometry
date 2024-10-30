@@ -13,7 +13,9 @@
     {
       "imports": {
         "three": "https://unpkg.com/three@0.168.0/build/three.module.js",
-        "OrbitControls": "https://unpkg.com/three@0.168.0/examples/jsm/controls/OrbitControls.js"
+        "OrbitControls": "https://unpkg.com/three@0.168.0/examples/jsm/controls/OrbitControls.js",
+        "stats.js": "https://unpkg.com/three@0.168.0/examples/jsm/libs/stats.module.js",
+        "GUI": "https://unpkg.com/three@0.168.0/examples/jsm/libs/lil-gui.module.min.js"
       }
     }
   </script>
@@ -32,6 +34,11 @@
     } from './../dist/index.js';
     import * as THREE from 'three';
     import { OrbitControls } from 'OrbitControls';
+
+    import Stats from 'stats.js';
+    import * as GUI from 'GUI';
+
+    console.log(GUI);
   
     let scene, camera, renderer;
     let openGeometry;
@@ -144,6 +151,8 @@
           pencil.mode = 'select';
         }
       });
+
+      initGUI();
     }
 
     function animate() {
@@ -153,6 +162,16 @@
     }
 
     init();
+
+    function initGUI() {
+      const gui = new GUI.GUI();
+      const pencilControls = {
+        mode: 'draw'
+      }
+      gui.add(pencilControls, 'mode', ['draw', 'select']).onChange((value) => {
+        openGeometry.pencil.mode = value;
+      });
+    }
   </script>
 </body>
 </html>

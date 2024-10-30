@@ -6,7 +6,7 @@ import { Event } from "./utils/event";
  * Whenever you want something to work with pencil you should add it to pencil object
  */
 
-export type PencilMode = "draw" | "erase" | "select" | "cursor";
+export type PencilMode = "draw" | "erase" | "select" | "cursor" | "view";
 
 export class Pencil {
   private container: HTMLElement;
@@ -35,7 +35,7 @@ export class Pencil {
   set mode(mode: PencilMode) {
     this.pencilMode = mode;
 
-    if (mode === "select") {
+    if (mode === "select" || mode === "view") {
       this.container.style.cursor = "default";
     } else {
       this.container.style.cursor = "none";
@@ -49,6 +49,9 @@ export class Pencil {
   setup() {
     this.setupCursor();
     this.setupCursorEvent();
+
+    // Raycaster
+    this.raycaster.params.Line.threshold = 0.1
 
     // A Dummy Ground Plane
     const geometry = new THREE.PlaneGeometry(100, 100);
