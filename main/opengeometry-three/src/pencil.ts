@@ -57,6 +57,7 @@ export class Pencil {
     const geometry = new THREE.PlaneGeometry(100, 100);
     const material = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide, transparent: true, opacity: 0 });
     const plane = new THREE.Mesh(geometry, material);
+    plane.name = "pencil-ground";
     plane.rotation.x = Math.PI / 2;
     this.scene.add(plane);
     plane.visible = false;
