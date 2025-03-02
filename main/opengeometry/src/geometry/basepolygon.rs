@@ -10,7 +10,7 @@ use serde::{Serialize, Deserialize};
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BasePolygon {
-  pub id: u32,
+  id: String,
   geometry: basegeometry::BaseGeometry,
   pub extruded: bool,
   pub is_polygon: bool,
@@ -26,13 +26,24 @@ pub struct BasePolygon {
 
 #[wasm_bindgen]
 impl BasePolygon {
+  // Why Getter and Setter - https://github.com/rustwasm/wasm-bindgen/issues/1775
+  #[wasm_bindgen(setter)]
+  pub fn set_id(&mut self, id: String) {
+    self.id = id;
+  }
+
+  #[wasm_bindgen(getter)]
+  pub fn id(&self) -> String {
+    self.id.clone()
+  }
+
   // Add the ability to create polygon with list of verticies passed in constructor itself
   // as of now use add_vertices method to push all vertices at once
   #[wasm_bindgen(constructor)]
-  pub fn new(id: u32) -> BasePolygon {
+  pub fn new(id: String) -> BasePolygon {
     BasePolygon {
-      id,
-      geometry : basegeometry::BaseGeometry::new(id),
+      id: id.clone(),
+      geometry : basegeometry::BaseGeometry::new(id.clone()),
       extruded : false,
       is_polygon : false,
       position : openmath::Vector3D::create(0.0, 0.0, 0.0),

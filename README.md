@@ -19,4 +19,3 @@
 - Extrude is a operation which elevates the given 2D polygon by a given height
 - `polygon.extrude(height: number)`
 - returns a Buffer Geometry
-

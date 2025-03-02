@@ -23,7 +23,7 @@ use serde::{Serialize, Deserialize};
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BaseGeometry {
-  pub id: u32,
+  id: String,
   vertices: Vec<openmath::Vector3D>,
   indices: Vec<u32>,
   normals: Vec<f32>,
@@ -33,8 +33,19 @@ pub struct BaseGeometry {
 
 #[wasm_bindgen]
 impl BaseGeometry {
+  // Why Getter and Setter - https://github.com/rustwasm/wasm-bindgen/issues/1775
+  #[wasm_bindgen(setter)]
+  pub fn set_id(&mut self, id: String) {
+    self.id = id;
+  }
+
+  #[wasm_bindgen(getter)]
+  pub fn id(&self) -> String {
+    self.id.clone()
+  }
+
   #[wasm_bindgen(constructor)]
-  pub fn new(id: u32) -> BaseGeometry {
+  pub fn new(id: String) -> BaseGeometry {
     BaseGeometry {
       id,
       vertices: Vec::new(),

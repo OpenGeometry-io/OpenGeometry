@@ -12,7 +12,7 @@ use super::basegeometry;
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BaseFlatMesh {
-  pub id: u32,
+  id: String,
   geometry: basegeometry::BaseGeometry,
   pub extruded: bool,
   pub is_mesh: bool,
@@ -24,11 +24,23 @@ pub struct BaseFlatMesh {
 
 #[wasm_bindgen]
 impl BaseFlatMesh {
+  // Why Getter and Setter - https://github.com/rustwasm/wasm-bindgen/issues/1775
+  #[wasm_bindgen(setter)]
+  pub fn set_id(&mut self, id: String) {
+    self.id = id;
+  }
+
+  #[wasm_bindgen(getter)]
+  pub fn id(&self) -> String {
+    self.id.clone()
+  }
+
   #[wasm_bindgen(constructor)]
-  pub fn new(id: u32) -> BaseFlatMesh {
+  pub fn new(id: String) -> BaseFlatMesh {
+    let geometry_id = id.clone();
     BaseFlatMesh {
       id,
-      geometry : basegeometry::BaseGeometry::new(id),
+      geometry : basegeometry::BaseGeometry::new(geometry_id.clone()),
       extruded : false,
       is_mesh : false,
       position : openmath::Vector3D::create(0.0, 0.0, 0.0),

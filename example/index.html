@@ -81,7 +81,9 @@
       const vector1 = new Vector3D(2, 0, 4);
       polyVector.push(vector1);
 
-      const basePoly = new BasePoly();
+      const basePoly = new BasePoly(polyVector);
+      scene.add(basePoly);
+      console.log(basePoly);
       
       // grid
       const gridHelper = new THREE.GridHelper(200, 200);

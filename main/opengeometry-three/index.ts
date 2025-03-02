@@ -30,7 +30,6 @@ export class OpenGeometry {
     this._pencil = new Pencil(this.container, this.scene, this.camera);
 
     this.setupEvent();
-    console.log("OpenGeometry Kernel 0.0.1");
   }
 
   get pencil() {
@@ -67,7 +66,7 @@ export class OpenGeometry {
 }
 
 export class BasePoly extends THREE.Mesh {
-  ogid: number;
+  ogid: string;
   layerVertices: Vector3D[] = [];
   layerBackVertices: Vector3D[] = [];
 
@@ -77,7 +76,6 @@ export class BasePoly extends THREE.Mesh {
   constructor(vertices?: Vector3D[]) {
     super();
     this.ogid = getUUID();
-    console.log("OGID: ", this.ogid);
     this.polygon = new BasePolygon(this.ogid);
     
     if (vertices) {
@@ -114,13 +112,10 @@ export class BasePoly extends THREE.Mesh {
       this.polygon?.reset_polygon();
       this.isTriangulated = false;
 
-      console.log("Resetting the polygon");
-      console.log(this.layerBackVertices);
-
       for (const vertex of this.layerBackVertices) {
         this.layerVertices.push(vertex.clone());
       }
-      console.log(this.layerVertices);
+
     };
 
     const backupVertex = new Vector3D(
@@ -141,9 +136,6 @@ export class BasePoly extends THREE.Mesh {
     if (this.layerVertices.length > 3) {
       this.polygon?.add_vertices(this.layerVertices);
       const bufFlush = this.polygon?.triangulate();
-
-      console.log(this.layerBackVertices);
-      console.log(bufFlush);
       
       if (!bufFlush) {
         return;
