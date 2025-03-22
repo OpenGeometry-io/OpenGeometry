@@ -1,0 +1,179 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+  <title>OpenGeometry</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      margin: 0;
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.168.0/build/three.module.js",
+        "OrbitControls": "https://unpkg.com/three@0.168.0/examples/jsm/controls/OrbitControls.js",
+        "stats.js": "https://unpkg.com/three@0.168.0/examples/jsm/libs/stats.module.js",
+        "GUI": "https://unpkg.com/three@0.168.0/examples/jsm/libs/lil-gui.module.min.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app"
+    style="width: 100vw; height: 100vh;"
+  ></div>
+
+  <script type="module">
+    import { 
+      OpenGeometry,
+      BasePoly,
+      Vector3D,
+      SpotLabel
+    } from './../dist/index.js';
+    import * as THREE from 'three';
+    import { OrbitControls } from 'OrbitControls';
+
+    import Stats from 'stats.js';
+    import * as GUI from 'GUI';
+
+    console.log(GUI);
+  
+    let scene, camera, renderer;
+    let openGeometry;
+
+    async function init(){
+      const app = document.getElementById('app');
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      renderer = new THREE.WebGLRenderer();
+      renderer.setSize(app.clientWidth, app.clientHeight);
+      app.appendChild(renderer.domElement);
+
+      openGeometry = new OpenGeometry(app, scene, camera);
+      await openGeometry.setup();
+
+      const polyVector = [];
+
+      // Anti-clockwise from Bottom View - This is Good Order
+      // const vector1 = new Vector3D(2, 0, 4);
+      // polyVector.push(vector1);
+      // const vector2 = new Vector3D(-2, 0, 2);
+      // polyVector.push(vector2);
+      // const vector3 = new Vector3D(-2, 0, -2);
+      // polyVector.push(vector3);
+      // const vector4 = new Vector3D(2, 0, -2);
+      // polyVector.push(vector4);
+      // const vector5 = new Vector3D(0, 0, -1);
+      // polyVector.push(vector5);
+    
+      // Clockwise from Bottom View - This is Bad Order but can be actual use case
+      const vector5 = new Vector3D(0, 0, -1);
+      polyVector.push(vector5);
+      const vector4 = new Vector3D(2, 0, -2);
+      polyVector.push(vector4);
+      const vector3 = new Vector3D(-2, 0, -2);
+      polyVector.push(vector3);
+      const vector2 = new Vector3D(-2, 0, 2);
+      polyVector.push(vector2);
+      const vector1 = new Vector3D(2, 0, 4);
+      polyVector.push(vector1);
+
+      const basePoly = new BasePoly(polyVector);
+      scene.add(basePoly);
+      console.log(basePoly);
+      
+      // grid
+      const gridHelper = new THREE.GridHelper(200, 200);
+      scene.add(gridHelper);
+
+      scene.background = new THREE.Color(0xf0f0f0);
+
+      camera.position.z = 0;
+      camera.position.y = 5;
+
+      animate();
+
+      // ambient light
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+      scene.add(ambientLight);
+
+      // directional light
+      // const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      // directionalLight.position.set(10, 10, 10);
+      // scene.add(directionalLight);
+
+      // const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1);
+      // directionalLight2.position.set(-10, 10, -10);
+      // scene.add(directionalLight2);
+
+      // controls
+      const controls = new OrbitControls(
+        camera,
+        openGeometry.labelRenderer.domElement
+      );
+      controls.update();
+
+      // Flat Plane
+      // const plane = new THREE.Mesh(
+      //   new THREE.PlaneGeometry(5, 5, 1, 1),
+      //   new THREE.MeshBasicMaterial({ color: 0xe4e4e4, side: THREE.DoubleSide })
+      // );
+      // plane.rotation.x = Math.PI / 2;
+      // scene.add(plane);
+
+      // Base Poly
+      scene.add(basePoly);
+
+
+      // Cursor
+      const pencil = openGeometry.pencil;
+      console.log(pencil);
+      pencil.onCursorDown.add((point) => {
+        const ogVertex = new Vector3D(point.x, point.y, point.z);
+        basePoly.addVertex(ogVertex);
+
+        const spotLabel = new SpotLabel();
+        scene.add(spotLabel);
+        console.log(point);
+        spotLabel.position.set(point.x, 0, point.z);
+      });
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'd') {
+          console.log('Done');
+          pencil.mode = 'select';
+        }
+      });
+
+      initGUI();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+      openGeometry.update(scene, camera);
+    }
+
+    init();
+
+    function initGUI() {
+      const gui = new GUI.GUI();
+      const pencilControls = {
+        mode: 'draw'
+      }
+      gui.add(pencilControls, 'mode', ['draw', 'select']).onChange((value) => {
+        openGeometry.pencil.mode = value;
+      });
+    }
+  </script>
+</body>
+</html> -->

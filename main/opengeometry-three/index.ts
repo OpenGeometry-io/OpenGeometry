@@ -1,7 +1,8 @@
 import init, { 
   Vector3D, 
   BasePolygon,
-  BaseFlatMesh
+  BaseFlatMesh,
+  CircleArc,
 } from "../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
@@ -158,6 +159,60 @@ export class BasePoly extends THREE.Mesh {
   }
 }
 
+interface IBaseCircleOptions {
+  radius: number;
+  segments: number;
+  position: Vector3D;
+  startAngle: number;
+  endAngle: number;
+}
+export class BaseCircle extends THREE.Line {
+  ogid: string;
+  circleArc: CircleArc;
+
+  constructor({ radius, segments, position, startAngle, endAngle }: IBaseCircleOptions) {
+    super();
+    this.ogid = getUUID();
+
+    const performance = window.performance.now();
+    this.circleArc = new CircleArc(
+      this.ogid,
+      position,
+      radius,
+      startAngle,
+      endAngle,
+      segments
+    );
+    this.circleArc.generate_points();
+    const bufFlush = JSON.parse(this.circleArc.get_points());
+
+    const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
+    const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+    this.geometry = line;
+    this.material = material;
+  }
+}
+
+export class CirclePoly extends THREE.Mesh {
+  ogid: string;
+  polygon: BasePolygon;
+  constructor(baseCircle: BaseCircle) {
+    super();
+    this.ogid = getUUID();
+    this.polygon = BasePolygon.new_with_circle(baseCircle.circleArc);
+    const bufFlush = this.polygon.get_buffer_flush();
+    this.addFlushBufferToScene(bufFlush);
+  }
+
+  addFlushBufferToScene(flush: string) {
+    const flushBuffer = JSON.parse(flush);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
+    const material = new THREE.MeshStandardMaterial({ color: 0x3a86ff, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+    this.geometry = geometry;
+    this.material = material;
+  }
+}
 
 /**
  * Base Flat Mesh

@@ -1,8 +1,8 @@
 use crate::operations::triangulate::triangulate_polygon_buffer_geometry;
 use crate::operations::windingsort;
+use crate::primitives;
 use crate::{operations::triangulate, utility::openmath};
 use crate::geometry::basegeometry;
-use std::path;
 
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
@@ -51,6 +51,14 @@ impl BasePolygon {
       scale : openmath::Vector3D::create(1.0, 1.0, 1.0),
       buffer : Vec::new()
     }
+  }
+
+  #[wasm_bindgen]
+  pub fn new_with_circle(circle_arc: primitives::circle::CircleArc) -> BasePolygon {
+    let mut polygon = BasePolygon::new(circle_arc.id());
+    polygon.add_vertices(circle_arc.get_raw_points());
+    polygon.triangulate();
+    polygon
   }
 
   #[wasm_bindgen]

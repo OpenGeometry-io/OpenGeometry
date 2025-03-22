@@ -16,3 +16,7 @@ pub mod operations {
 pub mod utility {
   pub mod openmath;
 }
+
+pub mod primitives {
+  pub mod circle;
+}

@@ -29,7 +29,7 @@ impl Vector3D {
     Vector3D {
       x: self.x + other.x,
       y: self.y + other.y,
-      z: self.z + other.z,
+      z: self.z + other.z
     }
   }
 
@@ -37,7 +37,7 @@ impl Vector3D {
     Vector3D {
       x: self.x - other.x,
       y: self.y - other.y,
-      z: self.z - other.z,
+      z: self.z - other.z
     }
   }
 
@@ -45,7 +45,7 @@ impl Vector3D {
     Vector3D {
       x: self.x + scalar,
       y: self.y + scalar,
-      z: self.z + scalar,
+      z: self.z + scalar
     }
   }
 
@@ -53,7 +53,7 @@ impl Vector3D {
     Vector3D {
       x: self.x - scalar,
       y: self.y - scalar,
-      z: self.z - scalar,
+      z: self.z - scalar
     }
   }
 
@@ -61,7 +61,7 @@ impl Vector3D {
     Vector3D {
       x: self.x + up_vector.x * height,
       y: self.y + up_vector.y * height,
-      z: self.z + up_vector.z * height,
+      z: self.z + up_vector.z * height
     }
   }
 
@@ -69,7 +69,7 @@ impl Vector3D {
     Vector3D {
       x: self.y * other.z - self.z * other.y,
       y: self.z * other.x - self.x * other.z,
-      z: self.x * other.y - self.y * other.x,
+      z: self.x * other.y - self.y * other.x
     }
   }
 
@@ -81,7 +81,7 @@ impl Vector3D {
     Vector3D {
       x: self.x,
       y: self.y,
-      z: self.z,
+      z: self.z
     }
   }
 }
