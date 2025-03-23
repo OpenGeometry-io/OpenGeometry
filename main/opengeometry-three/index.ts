@@ -169,46 +169,176 @@ interface IBaseCircleOptions {
 export class BaseCircle extends THREE.Line {
   ogid: string;
   circleArc: CircleArc;
+  options: IBaseCircleOptions;
+  nodeChild: CirclePoly | null = null;
+  nodeOperation: String = "none";
 
-  constructor({ radius, segments, position, startAngle, endAngle }: IBaseCircleOptions) {
+  constructor(options: IBaseCircleOptions) {
     super();
     this.ogid = getUUID();
+    this.options = options;
+    this.circleArc = new CircleArc(this.ogid);
 
-    const performance = window.performance.now();
-    this.circleArc = new CircleArc(
-      this.ogid,
+    this.setConfig();
+    this.generateGeometry();
+  }
+
+  setConfig() {
+    const { radius, segments, position, startAngle, endAngle } = this.options;
+    this.circleArc.set_config(
       position,
       radius,
       startAngle,
       endAngle,
       segments
     );
-    this.circleArc.generate_points();
-    const bufFlush = JSON.parse(this.circleArc.get_points());
+  }
 
+  generateGeometry() {
+    this.circleArc.generate_points();
+    const bufRaw = this.circleArc.get_points();
+    const bufFlush = JSON.parse(bufRaw);
+    console.log(bufFlush);
     const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
     const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
     this.geometry = line;
     this.material = material;
   }
+
+  discardGeoemtry() {
+    this.geometry.dispose();
+  }
+  
+  set radius(radius: number) {
+    this.options.radius = radius;
+    this.circleArc.update_radius(radius);
+
+    this.generateGeometry();
+    if (this.nodeChild) {
+      this.nodeChild.update();
+    }
+  }
 }
 
 export class CirclePoly extends THREE.Mesh {
   ogid: string;
-  polygon: BasePolygon;
+  polygon: BasePolygon | null = null;
+  baseCircle: BaseCircle;
+  isExtruded: boolean = false;
+
   constructor(baseCircle: BaseCircle) {
     super();
     this.ogid = getUUID();
-    this.polygon = BasePolygon.new_with_circle(baseCircle.circleArc);
-    const bufFlush = this.polygon.get_buffer_flush();
-    this.addFlushBufferToScene(bufFlush);
+
+    if (!baseCircle.circleArc) {
+      throw new Error("CircleArc is not defined");
+    }
+    baseCircle.nodeChild = this;
+    baseCircle.nodeOperation = "polygon";
+    this.baseCircle = baseCircle;
+
+    this.generateGeometry();
+    this.addFlushBufferToScene();
   }
 
-  addFlushBufferToScene(flush: string) {
-    const flushBuffer = JSON.parse(flush);
+  update() {
+    this.geometry.dispose();
+
+    this.polygon?.clear_vertices();
+    this.polygon?.add_vertices(this.baseCircle.circleArc.get_raw_points());
+    
+    this.generateGeometry();
+    this.addFlushBufferToScene();
+  }
+
+  generateGeometry() {
+    if (!this.baseCircle.circleArc) return;
+    this.polygon = BasePolygon.new_with_circle(this.baseCircle.circleArc.clone());
+  }
+
+  addFlushBufferToScene() {
+    if (!this.polygon) return;
+    const bufFlush = this.polygon.get_buffer_flush();
+    const flushBuffer = JSON.parse(bufFlush);
+    console.log(flushBuffer);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
-    const material = new THREE.MeshStandardMaterial({ color: 0x3a86ff, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+    
+    // different colors for each triangle in the polygon dont interolate
+    const colors = new Float32Array(flushBuffer.length);
+    for (let i = 0; i < colors.length; i += 9) {
+      const r = Math.random();
+      const g = Math.random();
+      const b = Math.random();
+      colors[i] = r;
+      colors[i + 1] = g;
+      colors[i + 2] = b;
+      colors[i + 3] = r;
+      colors[i + 4] = g;
+      colors[i + 5] = b;
+      colors[i + 6] = r;
+      colors[i + 7] = g;
+      colors[i + 8] = b;
+    }
+
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const material = new THREE.MeshPhongMaterial( {
+        color: 0xffffff,
+        flatShading: true,
+        vertexColors: true,
+        shininess: 0,
+        side: THREE.DoubleSide
+    });
+
+    this.geometry = geometry;
+    this.material = material;
+  }
+
+  clearGeometry() {
+    this.geometry.dispose();
+  }
+
+  extrude(height: number) {
+    if (!this.polygon) return;
+    const extruded_buff = this.polygon.extrude_by_height(height);
+    console.log(JSON.parse(extruded_buff));
+    this.isExtruded = true;
+    
+    this.generateExtrudedGeometry(extruded_buff);
+  }
+
+  generateExtrudedGeometry(extruded_buff: string) {
+    const flushBuffer = JSON.parse(extruded_buff);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
+
+    const colors = new Float32Array(flushBuffer.length);
+    for (let i = 0; i < colors.length; i += 9) {
+      const r = Math.random();
+      const g = Math.random();
+      const b = Math.random();
+      colors[i] = r;
+      colors[i + 1] = g;
+      colors[i + 2] = b;
+      colors[i + 3] = r;
+      colors[i + 4] = g;
+      colors[i + 5] = b;
+      colors[i + 6] = r;
+      colors[i + 7] = g;
+      colors[i + 8] = b;
+    }
+
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const material = new THREE.MeshPhongMaterial( {
+        color: 0xffffff,
+        flatShading: true,
+        vertexColors: true,
+        shininess: 0,
+        side: THREE.DoubleSide
+    });
+    
     this.geometry = geometry;
     this.material = material;
   }

@@ -1,9 +1,12 @@
+use crate::operations::extrude::extrude_polygon_by_buffer_geometry;
 use crate::operations::triangulate::triangulate_polygon_buffer_geometry;
 use crate::operations::windingsort;
 use crate::primitives;
+use crate::utility::openmath::Vector3D;
 use crate::{operations::triangulate, utility::openmath};
 use crate::geometry::basegeometry;
 
+use serde_json::ser;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
@@ -56,7 +59,10 @@ impl BasePolygon {
   #[wasm_bindgen]
   pub fn new_with_circle(circle_arc: primitives::circle::CircleArc) -> BasePolygon {
     let mut polygon = BasePolygon::new(circle_arc.id());
-    polygon.add_vertices(circle_arc.get_raw_points());
+    // discard the last point as it is same as the first point
+    let mut circle_arc_points = circle_arc.get_raw_points();
+    circle_arc_points.pop();
+    polygon.add_vertices(circle_arc_points);
     polygon.triangulate();
     polygon
   }
@@ -125,9 +131,44 @@ impl BasePolygon {
   }
 
   #[wasm_bindgen]
-  pub fn reset_polygon(&mut self) {
-    self.is_polygon = false;
+  pub fn clear_vertices(&mut self) {
     self.geometry.reset_geometry();
-    self.buffer.clear();
+  }
+
+  #[wasm_bindgen]
+  pub fn reset_polygon(&mut self) {
+    // Reset the geometry
+  }
+
+  #[wasm_bindgen]
+  pub fn extrude_by_height(&mut self, height: f64) -> String {
+    self.extruded = true;
+    let extruded_raw = extrude_polygon_by_buffer_geometry(self.geometry.clone(), height);
+    
+    let faces = extruded_raw.faces;
+    let vertices = extruded_raw.vertices;
+
+    let mut generated: Vec<f64> = Vec::new();
+
+    for face in faces {
+      let mut face_vertices: Vec<Vector3D> = Vec::new();
+      for index in face {
+        face_vertices.push(vertices[index as usize].clone());
+      }
+
+      let triangulated_face = triangulate::triangulate_polygon_by_face(face_vertices.clone());
+      for index in triangulated_face {
+        for i in index {
+          let vertex = face_vertices[i as usize];
+          generated.push(vertex.x);
+          generated.push(vertex.y);
+          generated.push(vertex.z);
+        }
+      }
+    }
+
+    serde_json::to_string(&generated).unwrap()
+
+    // serde_json::to_string(&extruded_raw).unwrap()
   }
 }

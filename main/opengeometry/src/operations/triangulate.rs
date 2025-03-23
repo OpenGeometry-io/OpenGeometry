@@ -107,3 +107,18 @@ pub fn triangulate_polygon_buffer_geometry(geom_buf: BaseGeometry) -> Vec<Vec<u3
   
   tri_indices
 }
+
+
+//
+// Triangule by faces and vertices
+//
+pub fn triangulate_polygon_by_face(face: Vec<Vector3D>) -> Vec<Vec<u32>> {
+  let raw_vertices = face.clone();
+  let ccw_vertices = windingsort::ccw_test(raw_vertices.clone());
+
+  // let mut triangles_vertices: Vec<f64> = Vec::new();
+  let tri_indices = tricut(ccw_vertices);
+  
+  tri_indices
+}
+

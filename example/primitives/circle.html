@@ -35,7 +35,9 @@
 
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      renderer = new THREE.WebGLRenderer();
+      renderer = new THREE.WebGLRenderer({
+        antialias: true
+      });
       renderer.setSize(app.clientWidth, app.clientHeight);
       app.appendChild(renderer.domElement);
 
@@ -71,17 +73,25 @@
 
       const circleData = {
         radius: 2,
-        segments: 10,
+        segments: 8,
         position: new Vector3D(0, 0, 0),
         startAngle: 0,
         endAngle: Math.PI * 2,
       }
 
+      // Create Base Circle
       const ogCircle = new BaseCircle(circleData);
       scene.add(ogCircle);
 
+      // Create Circle Poly from Base Circle
       const ogCirclePoly = new CirclePoly(ogCircle);
       scene.add(ogCirclePoly);
+
+      // Change Radius
+      ogCircle.radius = 3;
+      
+      // Extrude By 3
+      ogCirclePoly.extrude(3);
 
       initGUI();
       animate();

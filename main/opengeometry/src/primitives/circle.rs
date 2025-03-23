@@ -35,16 +35,38 @@ impl CircleArc {
   }
 
   #[wasm_bindgen(constructor)]
-  pub fn new(id: String, center: openmath::Vector3D, radius: f64, start_angle: f64, end_angle: f64, segments: u32) -> CircleArc {
+  pub fn new(id: String) -> CircleArc {
     CircleArc {
       id,
-      center,
-      radius,
-      start_angle,
-      end_angle,
-      segments,
+      center: openmath::Vector3D::create(0.0, 0.0, 0.0),
+      radius: 1.0,
+      start_angle: 0.0,
+      end_angle: 2.0 * std::f64::consts::PI,
+      segments: 32,
       points: Vec::new()
     }
+  }
+
+  #[wasm_bindgen]
+  pub fn clone(&self) -> CircleArc {
+    CircleArc {
+      id: self.id.clone(),
+      center: self.center.clone(),
+      radius: self.radius,
+      start_angle: self.start_angle,
+      end_angle: self.end_angle,
+      segments: self.segments,
+      points: self.points.clone()
+    }
+  }
+
+  #[wasm_bindgen]
+  pub fn set_config(&mut self, center: openmath::Vector3D, radius: f64, start_angle: f64, end_angle: f64, segments: u32) {
+    self.center = center;
+    self.radius = radius;
+    self.start_angle = start_angle;
+    self.end_angle = end_angle;
+    self.segments = segments;
   }
 
   #[wasm_bindgen]
@@ -64,14 +86,12 @@ impl CircleArc {
   pub fn update_radius(&mut self, radius: f64) {
     self.destroy();
     self.radius = radius;
-    self.generate_points();
   }
 
   #[wasm_bindgen]
   pub fn update_center(&mut self, center: openmath::Vector3D) {
     self.destroy();
     self.center = center;
-    self.generate_points();
   }
 
   // Dispose
