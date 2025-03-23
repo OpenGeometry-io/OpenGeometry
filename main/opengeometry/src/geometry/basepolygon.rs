@@ -5,8 +5,6 @@ use crate::primitives;
 use crate::utility::openmath::Vector3D;
 use crate::{operations::triangulate, utility::openmath};
 use crate::geometry::basegeometry;
-
-use serde_json::ser;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
@@ -82,32 +80,8 @@ impl BasePolygon {
     }
   }
 
-  // #[wasm_bindgen]
-  // pub fn triangulate(&mut self) -> String {
-  //   if self.is_polygon {
-  //     // Polygon is already triangulated, destroy the previous triangulation
-  //     return String::from("Polygon is already triangulated");
-  //   }
-
-  //   if self.geometry.get_vertices().len() < 3 {
-  //     return String::from("Polygon should have atleast 3 vertices");
-  //   }
-
-  //   self.is_polygon = true;
-  //   triangulate_polygon_buffer_geometry(self.geometry.clone())
-  // }
-
   #[wasm_bindgen]
   pub fn triangulate(&mut self) -> String {
-    // if self.is_polygon {
-    //   // Polygon is already triangulated, destroy the previous triangulation
-    //   // return String::from("Polygon is already triangulated");
-    // }
-
-    // if self.geometry.get_vertices().len() < 3 {
-    //   // return String::from("Polygon should have atleast 3 vertices");
-    // }
-
     self.is_polygon = true;
     let indices = triangulate_polygon_buffer_geometry(self.geometry.clone());
 
@@ -168,7 +142,5 @@ impl BasePolygon {
     }
 
     serde_json::to_string(&generated).unwrap()
-
-    // serde_json::to_string(&extruded_raw).unwrap()
   }
 }

@@ -1,6 +1,5 @@
 use crate::geometry::{self, basegeometry::BaseGeometry, triangle::Triangle};
 use crate::operations::windingsort;
-use wasm_bindgen::prelude::*;
 use std::collections::HashMap;
 use crate::utility::openmath::Vector3D;
 
@@ -80,22 +79,9 @@ pub fn tricut(polygon_vertices: Vec<Vector3D>) -> Vec<Vec<u32>> {
     remaining_vertices[2],
   ]);
 
-  // serde_json::to_string(&triangle_indices).unwrap()
   triangle_indices
 }
 
-// This is working - backup
-// #[wasm_bindgen]
-// pub fn triangulate_polygon_buffer_geometry(geom_buf: BaseGeometry) -> String {
-  
-//   let raw_vertices = geom_buf.get_vertices().clone();
-//   let ccw_vertices = windingsort::ccw_test(raw_vertices.clone());
-
-//   // let mut triangles_vertices: Vec<f64> = Vec::new();
-//   let tri_indices = tricut(ccw_vertices);
-  
-//   serde_json::to_string(&tri_indices).unwrap()
-// }
 
 pub fn triangulate_polygon_buffer_geometry(geom_buf: BaseGeometry) -> Vec<Vec<u32>> {
   

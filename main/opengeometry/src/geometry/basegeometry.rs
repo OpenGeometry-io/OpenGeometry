@@ -7,18 +7,8 @@
  */
 
 use crate::utility::openmath;
- 
-use std::path;
-
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
-
-// #[wasm_bindgen]
-// #[derive(Clone, Serialize, Deserialize)]
-// pub struct Buffer {
-//   vertices: Vec<openmath::Vector3D>,
-//   indices: Vec<u32>
-// }
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
@@ -80,7 +70,7 @@ impl BaseGeometry {
 
   #[wasm_bindgen]
   pub fn clone_geometry(&self) -> BaseGeometry {
-    self.clone()  // Use Clone to duplicate the struct safely.
+    self.clone()
   }
 
   #[wasm_bindgen]

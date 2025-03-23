@@ -115,7 +115,4 @@ impl CircleArc {
   pub fn get_raw_points(&self) -> Vec<openmath::Vector3D> {
     self.points.clone()
   }
-
-  // TODO: Implement Get Buffer Geometry for the Circle
-  // Get Buffer Geometry for the Circle
 }

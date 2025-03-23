@@ -50,9 +50,8 @@
 
       scene.background = new THREE.Color(0xf0f0f0);
 
-      camera.position.z = 0;
+      camera.position.z = 5;
       camera.position.y = 5;
-
     
       // ambient light
       const ambientLight = new THREE.AmbientLight(0xffffff, 1);
@@ -87,11 +86,11 @@
       const ogCirclePoly = new CirclePoly(ogCircle);
       scene.add(ogCirclePoly);
 
-      // Change Radius
+      // // Change Radius
       ogCircle.radius = 3;
       
-      // Extrude By 3
-      ogCirclePoly.extrude(3);
+      // // Extrude By 3
+      ogCirclePoly.extrude(10);
 
       initGUI();
       animate();

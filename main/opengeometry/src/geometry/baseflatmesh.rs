@@ -64,32 +64,8 @@ impl BaseFlatMesh {
     }
   }
 
-  // #[wasm_bindgen]
-  // pub fn triangulate(&mut self) -> String {
-  //   if self.is_polygon {
-  //     // Polygon is already triangulated, destroy the previous triangulation
-  //     return String::from("Polygon is already triangulated");
-  //   }
-
-  //   if self.geometry.get_vertices().len() < 3 {
-  //     return String::from("Polygon should have atleast 3 vertices");
-  //   }
-
-  //   self.is_polygon = true;
-  //   triangulate_polygon_buffer_geometry(self.geometry.clone())
-  // }
-
   #[wasm_bindgen]
   pub fn triangulate(&mut self) -> String {
-    // if self.is_polygon {
-    //   // Polygon is already triangulated, destroy the previous triangulation
-    //   // return String::from("Polygon is already triangulated");
-    // }
-
-    // if self.geometry.get_vertices().len() < 3 {
-    //   // return String::from("Polygon should have atleast 3 vertices");
-    // }
-
     self.is_mesh = true;
     let indices = triangulate_polygon_buffer_geometry(self.geometry.clone());
 

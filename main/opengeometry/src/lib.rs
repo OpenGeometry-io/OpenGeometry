@@ -10,7 +10,6 @@ pub mod geometry {
 pub mod operations {
   pub mod triangulate;
   pub mod windingsort;
-  pub mod intersect;
   pub mod extrude;
 }
 

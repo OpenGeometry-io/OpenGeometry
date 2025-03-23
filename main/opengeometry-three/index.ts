@@ -200,7 +200,7 @@ export class BaseCircle extends THREE.Line {
     const bufFlush = JSON.parse(bufRaw);
     console.log(bufFlush);
     const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
-    const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+    const material = new THREE.LineBasicMaterial({ color: 0x000000 });
     this.geometry = line;
     this.material = material;
   }
