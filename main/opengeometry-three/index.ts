@@ -3,6 +3,8 @@ import init, {
   BasePolygon,
   BaseFlatMesh,
   CircleArc,
+  OGSimpleLine,
+  OGPolyLine,
 } from "../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
@@ -341,6 +343,99 @@ export class CirclePoly extends THREE.Mesh {
     
     this.geometry = geometry;
     this.material = material;
+  }
+}
+
+/**
+ * Simple Line defined by Two Points
+ */
+export class SimpleLine extends THREE.Line {
+  ogid: string;
+  points: Vector3D[] = [];
+  constructor(
+    start: Vector3D = new Vector3D(1, 0, 0),
+    end: Vector3D = new Vector3D(-1, 0, 0)
+  ) {
+    super();
+    console.log("Simple Line");
+    console.log(start, end);
+    this.ogid = getUUID();
+    this.points.push(start);
+    this.points.push(end);
+
+    this.generateGeometry();
+  }
+
+  addPoint(point: Vector3D) {
+    this.points.push(point);
+    if (this.points.length > 2) {
+      throw new Error("SimpleLine can only have two points, clear points or use PolyLine");
+    }
+
+    if (this.points.length < 2) return;
+    this.generateGeometry();
+  }
+
+  private generateGeometry() {
+    const ogLine = new OGSimpleLine(this.ogid);
+    ogLine.set_config(this.points[0], this.points[1]);
+    const buf = ogLine.get_points();
+    const bufFlush = JSON.parse(buf);
+    const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
+    const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
+    this.geometry = line;
+    this.material = material;
+  }
+}
+
+/**
+ * PolyLine defined by multiple points
+ */
+export class PolyLine extends THREE.Line {
+  ogid: string;
+  points: Vector3D[] = [];
+  isClosed: boolean = false;
+
+  private polyline: OGPolyLine;
+
+  constructor(points: Vector3D[] = []) {
+    super();
+    this.ogid = getUUID();
+    this.points = points;
+    this.polyline = new OGPolyLine(this.ogid);
+  
+    this.setConfig(points);
+    this.generateGeometry();
+  }
+
+  setConfig(points: Vector3D[]) {
+    if (this.points.length < 2) return;
+    this.polyline.set_config(points);
+  }
+
+  addPoint(point: Vector3D) {
+    this.points.push(point);
+    this.polyline.add_point(point);
+
+    if (this.points.length < 2) return;
+    this.generateGeometry();
+  }
+
+  private clearGeometry() {
+    this.geometry.dispose();
+  }
+
+  private generateGeometry() {
+    this.clearGeometry();
+    const buf = this.polyline.get_points();
+    const bufFlush = JSON.parse(buf);
+    console.log(bufFlush);
+    const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
+    const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
+    this.geometry = line;
+    this.material = material;
+
+    this.isClosed = this.polyline.is_closed();
   }
 }
 

@@ -19,4 +19,6 @@ pub mod utility {
 
 pub mod primitives {
   pub mod circle;
+  pub mod simple_line;
+  pub mod poly_line;
 }

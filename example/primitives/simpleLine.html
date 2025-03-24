@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>OpenGeometry</title>
+  <title>Simple</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
@@ -22,7 +22,8 @@
       BaseCircle,
       CirclePoly,
       Vector3D,
-      SpotLabel
+      SpotLabel,
+      SimpleLine
     } from './../index.ts';
     import * as THREE from 'three';
     import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -43,10 +44,6 @@
 
       openGeometry = new OpenGeometry(app, scene, camera);
       await openGeometry.setup();
-
-      // grid
-      const gridHelper = new THREE.GridHelper(200, 200);
-      scene.add(gridHelper);
 
       scene.background = new THREE.Color(0xf0f0f0);
 
@@ -70,27 +67,16 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      const circleData = {
-        radius: 2,
-        segments: 16,
-        position: new Vector3D(0, 0, 0),
-        startAngle: 0,
-        endAngle: Math.PI * 2,
-      }
+      // Unit Line with Length 1 on XZ Plane
+      const ogSimple = new SimpleLine();
+      scene.add(ogSimple);
 
-      // Create Base Circle
-      const ogCircle = new BaseCircle(circleData);
-      scene.add(ogCircle);
-
-      // Create Circle Poly from Base Circle
-      const ogCirclePoly = new CirclePoly(ogCircle);
-      scene.add(ogCirclePoly);
-
-      // Change Radius
-      // ogCircle.radius = 3;
-      
-      // Extrude By 3
-      ogCirclePoly.extrude(10);
+      // Line with 2 points 
+      const ogSimple2 = new SimpleLine(
+        new Vector3D(1, 4, 2),
+        new Vector3D(1, 4, -2)
+      );
+      scene.add(ogSimple2);
 
       initGUI();
       animate();

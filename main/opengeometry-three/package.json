@@ -1,0 +1,17 @@
+{
+  "name": "@opengeometry/kernel-three",
+  "version": "1.0.0",
+  "description": "OpenGeometry Kernel for Three.js",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "opengeometry",
+    "three",
+    "geometry"
+  ],
+  "author": "Vishwajeet Mane",
+  "license": "MIT",
+  "dependencies": {}
+}
