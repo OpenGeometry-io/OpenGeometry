@@ -5,6 +5,7 @@ import init, {
   CircleArc,
   OGSimpleLine,
   OGPolyLine,
+  OGRectangle,
 } from "../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
@@ -438,6 +439,72 @@ export class PolyLine extends THREE.Line {
     this.isClosed = this.polyline.is_closed();
   }
 }
+
+
+export type RectangeOptions = {
+  width: number;
+  breadth: number;
+  center: Vector3D
+}
+/**
+ * Rectangle
+ */
+export class Rectangle extends THREE.Line {
+  ogid: string;
+  polyLineRectangle: OGRectangle;
+  options: RectangeOptions;
+  
+  constructor(options: RectangeOptions) {
+    super();
+    this.ogid = getUUID();
+    this.options = options;
+    this.polyLineRectangle = new OGRectangle(this.ogid);
+
+    this.setConfig();
+    this.generateGeometry();
+  }
+
+  setConfig() {
+    const { breadth, width, center } = this.options;
+    this.polyLineRectangle.set_config(
+      center,
+      width,
+      breadth
+    );
+  }
+
+  generateGeometry() {
+    this.polyLineRectangle.generate_points();
+    const bufRaw = this.polyLineRectangle.get_points();
+    const bufFlush = JSON.parse(bufRaw);
+    const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
+    const material = new THREE.LineBasicMaterial({ color: 0x000000 });
+    this.geometry = line;
+    this.material = material;
+  }
+
+  discardGeometry() {
+    this.geometry.dispose();
+  }
+
+  set width(width: number) {
+    this.options.width = width;
+    this.polyLineRectangle.update_width(width);
+
+    this.generateGeometry();
+  }
+
+  set breadth(breadth: number) {
+    this.options.breadth = breadth;
+    this.polyLineRectangle.update_breadth(breadth);
+
+    this.generateGeometry();
+  }
+
+  // threejs position has the center, so how do use that trigger instead?
+  // set center(center: number) {}
+}
+
 
 /**
  * Base Flat Mesh
