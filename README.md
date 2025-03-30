@@ -1,3 +1,8 @@
+## 🚧 Under Development 🚧  
+
+**This project is currently a work in progress!**  
+Expect frequent updates, breaking changes, and exciting new features. 
+
 # OpenGeometry
 
 #### Initialize Library
