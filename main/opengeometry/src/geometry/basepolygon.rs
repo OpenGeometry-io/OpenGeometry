@@ -1,10 +1,13 @@
+use std::collections::HashMap;
+
 use crate::operations::extrude::extrude_polygon_by_buffer_geometry;
 use crate::operations::triangulate::triangulate_polygon_buffer_geometry;
 use crate::operations::windingsort;
-use crate::primitives;
+use crate::{geometry, primitives};
 use crate::utility::openmath::Vector3D;
 use crate::{operations::triangulate, utility::openmath};
 use crate::geometry::basegeometry;
+use serde_json::ser;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
@@ -81,11 +84,18 @@ impl BasePolygon {
   }
 
   #[wasm_bindgen]
+  pub fn add_holes(&mut self, holes: Vec<openmath::Vector3D>) {
+    self.geometry.add_holes(holes);
+  }
+
+  #[wasm_bindgen]
   pub fn triangulate(&mut self) -> String {
     self.is_polygon = true;
+    
     let indices = triangulate_polygon_buffer_geometry(self.geometry.clone());
 
     let ccw_vertices = windingsort::ccw_test(self.geometry.get_vertices());
+    // let ccw_vertices = windingsort::ccw_test(merged_vertices.clone());
     
     for index in indices {
       for i in index {
@@ -97,6 +107,162 @@ impl BasePolygon {
     }
 
     serde_json::to_string(&self.buffer).unwrap()
+
+    // serde_json::to_string(&indices).unwrap()
+
+    // serde_json::to_string(&merged_vertices).unwrap()
+  }
+
+  pub fn new_triangulate(&mut self) -> String {
+    // Step 1 - Flatten the geometry - Works
+    let flat_data = triangulate::flatten_buffer_geometry(self.geometry.clone());
+    let vertices = flat_data.vertices.clone();
+    let holes = flat_data.holes;
+    let dimension = flat_data.dimension;
+
+    // Step 2 - Find the left most point in the first hole
+    let start_index_in_vertices = holes[0] * 3;
+    let mut end_index_in_vertices = 0;
+
+    if holes.len() > 1 {
+      end_index_in_vertices = holes[1] * 3;
+    } else {
+      // if only one hole is present
+      end_index_in_vertices = vertices.len() as u32;
+    }
+
+    let right_most_index = triangulate::find_right_most_point_index(vertices.clone(), start_index_in_vertices, end_index_in_vertices);
+
+    // Step 3 - Find Ray Casting with the outer edges
+    let right_point = Vector3D::create(
+      vertices[right_most_index as usize],
+      vertices[right_most_index as usize + 1],
+      vertices[right_most_index as usize + 2]
+    );
+    
+    // Step 4 is inside
+    let ray_edge = triangulate::check_vertex_collision_with_flat_vertices(
+      vertices.clone(),
+      right_point,
+      0,
+      start_index_in_vertices + 1
+    );
+
+    let mut new_vertices_processed: Vec<f64> = Vec::new();
+    // Step 5 - Create Bridge
+    let bridge_start_index = ray_edge[0][0];
+    let bridge_end_index = right_most_index;
+    let bridge_start = Vector3D::create(
+      vertices[bridge_start_index as usize],
+      vertices[bridge_start_index as usize + 1],
+      vertices[bridge_start_index as usize + 2]
+    );
+    let bridge_end = Vector3D::create(
+      vertices[bridge_end_index as usize],
+      vertices[bridge_end_index as usize + 1],
+      vertices[bridge_end_index as usize + 2]
+    );
+
+    let hole_one = self.geometry.get_holes()[0].clone();
+    let hole_vertex_nodes = triangulate::create_vertex_nodes(hole_one.clone(), start_index_in_vertices, end_index_in_vertices - 1, true);
+
+    // Before Bridge Vertices
+    for i in 0..bridge_start_index+3 {
+      let vertex = vertices[i as usize];
+      new_vertices_processed.push(vertex);
+    }
+
+    // Insert Bridge Vertices
+    let mut vertex_nodes_data: Vec<f64> = Vec::new();
+    let mut vertex_next_nodes_data: Vec<f64> = Vec::new();
+    for node in hole_vertex_nodes {
+      vertex_nodes_data.push(node.vertex.x);
+      vertex_nodes_data.push(node.vertex.y);
+      vertex_nodes_data.push(node.vertex.z);
+
+      vertex_next_nodes_data.push(node.next_index as f64);
+    }
+    for i in vertex_next_nodes_data.iter() {
+      let index = *i as usize;
+      let x = vertices[index];
+      let y = vertices[index + 1];
+      let z = vertices[index + 2];
+
+      new_vertices_processed.push(x);
+      new_vertices_processed.push(y);
+      new_vertices_processed.push(z);
+    }
+
+    // Start Index Of Hole-Bridge again to complete the loop, i.e. vertex_next_nodes
+    let start_index_of_bridge_to_hole = vertex_next_nodes_data[0] as usize;
+    let bridge_to_hole_x = vertices[start_index_of_bridge_to_hole];
+    let bridge_to_hole_y = vertices[start_index_of_bridge_to_hole + 1];
+    let bridge_to_hole_z = vertices[start_index_of_bridge_to_hole + 2];
+    new_vertices_processed.push(bridge_to_hole_x);
+    new_vertices_processed.push(bridge_to_hole_y);
+    new_vertices_processed.push(bridge_to_hole_z);
+
+    // // Back To Bridge
+    let bridge_x = vertices[bridge_start_index as usize];
+    let bridge_y = vertices[bridge_start_index as usize + 1];
+    let bridge_z = vertices[bridge_start_index as usize + 2];
+    new_vertices_processed.push(bridge_x);
+    new_vertices_processed.push(bridge_y);
+    new_vertices_processed.push(bridge_z);
+
+    // After Bridge Vertices
+    let before_hole_start_index = holes[0] * 3;
+    for i in bridge_start_index..before_hole_start_index as u32 {
+      let vertex = vertices[i as usize];
+      new_vertices_processed.push(vertex);
+    }
+
+
+    let mut new_buffergeometry = basegeometry::BaseGeometry::new("new_buffergeometry".to_string());
+    let og_vertices: Vec<Vector3D> = new_vertices_processed.chunks(3)
+      .map(|chunk| Vector3D::create(chunk[0], chunk[1], chunk[2]))
+      .collect();
+    new_buffergeometry.add_vertices(og_vertices);
+    let new_tricut = triangulate_polygon_buffer_geometry(new_buffergeometry.clone());
+    let ccw_vertices = windingsort::ccw_test(new_buffergeometry.get_vertices());
+    let mut new_buffer: Vec<f64> = Vec::new();
+    
+    for index in new_tricut {
+      for i in index {
+        let vertex = ccw_vertices[i as usize];
+        new_buffer.push(vertex.x);
+        new_buffer.push(vertex.y);
+        new_buffer.push(vertex.z);
+      }
+    }
+
+
+    let mut data = HashMap::new();
+    data.insert("vertices", vertices);
+    data.insert("holes", holes.into_iter().map(|x| x as f64).collect());
+    data.insert("dimension", vec![dimension as f64]);
+    data.insert("start_index_in_vertices", vec![start_index_in_vertices as f64]);
+    data.insert("end_index_in_vertices", vec![end_index_in_vertices as f64]);
+    data.insert("right_most_index", vec![right_most_index as f64]);
+    data.insert("right_point", vec![right_point.x, right_point.y, right_point.z]);
+    data.insert("bridge_start", vec![bridge_start.x, bridge_start.y, bridge_start.z]);
+    data.insert("bridge_end", vec![bridge_end.x, bridge_end.y, bridge_end.z]);
+    
+    data.insert("new_vertices_processed", new_vertices_processed);
+    data.insert("vertex_nodes", vertex_nodes_data);
+    data.insert("vertex_next_nodes", vertex_next_nodes_data);
+
+    data.insert("new_buffer", new_buffer);
+
+    let mut edge_data: Vec<f64> = Vec::new();
+    for edge in ray_edge {
+      for i in edge {
+        edge_data.push(i as f64);
+      }
+    }
+    data.insert("ray_edge", edge_data);
+
+    serde_json::to_string(&data).unwrap()
   }
 
   #[wasm_bindgen]
@@ -124,23 +290,30 @@ impl BasePolygon {
 
     let mut generated: Vec<f64> = Vec::new();
 
-    for face in faces {
-      let mut face_vertices: Vec<Vector3D> = Vec::new();
-      for index in face {
-        face_vertices.push(vertices[index as usize].clone());
-      }
+    // this works for now, but need to find a better way to do this
+    // for face in faces {
+    //   let mut face_vertices: Vec<Vector3D> = Vec::new();
+    //   for index in face {
+    //     face_vertices.push(vertices[index as usize].clone());
+    //   }
 
-      let triangulated_face = triangulate::triangulate_polygon_by_face(face_vertices.clone());
-      for index in triangulated_face {
-        for i in index {
-          let vertex = face_vertices[i as usize];
-          generated.push(vertex.x);
-          generated.push(vertex.y);
-          generated.push(vertex.z);
-        }
-      }
-    }
+    //   let triangulated_face = triangulate::triangulate_polygon_by_face(face_vertices.clone());
+    //   for index in triangulated_face {
+    //     for i in index {
+    //       let vertex = face_vertices[i as usize];
+    //       generated.push(vertex.x);
+    //       generated.push(vertex.y);
+    //       generated.push(vertex.z);
+    //     }
+    //   }
+    // }
 
     serde_json::to_string(&generated).unwrap()
+  }
+
+  #[wasm_bindgen]
+  pub fn get_geometry(&self) -> String {
+    let geometry = self.geometry.get_geometry();
+    geometry
   }
 }

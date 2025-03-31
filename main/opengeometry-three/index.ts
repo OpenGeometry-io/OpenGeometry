@@ -150,11 +150,30 @@ export class BasePoly extends THREE.Mesh {
     }
   }
 
+  addHole(holeVertices: Vector3D[]) {
+    console.log(holeVertices);
+    if (!this.polygon) return;
+    this.polygon.add_holes(holeVertices);
+    console.log(this.polygon.get_geometry());
+
+    const triResult = JSON.parse(this.polygon.new_triangulate());
+    console.log(triResult);
+    const newBufferFlush = triResult.new_buffer;
+    console.log(newBufferFlush);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(newBufferFlush), 3));
+    this.geometry = geometry;
+
+    // const bufFlush = this.polygon.get_buffer_flush();
+    // this.addFlushBufferToScene(bufFlush);
+  }
+
   addFlushBufferToScene(flush: string) {
     const flushBuffer = JSON.parse(flush);
+    console.log(flushBuffer);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
-    const material = new THREE.MeshStandardMaterial({ color: 0x3a86ff, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+    const material = new THREE.MeshStandardMaterial({ color: 0x3a86ff, transparent: true, opacity: 0.5 });
     this.geometry = geometry;
     this.material = material;
     // this.geometry.attributes.position.needsUpdate = true;

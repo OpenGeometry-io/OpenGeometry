@@ -67,20 +67,24 @@ impl BaseFlatMesh {
   #[wasm_bindgen]
   pub fn triangulate(&mut self) -> String {
     self.is_mesh = true;
+
+    let merged_vertices = self.geometry.get_vertices();
     let indices = triangulate_polygon_buffer_geometry(self.geometry.clone());
 
-    let ccw_vertices = windingsort::ccw_test(self.geometry.get_vertices());
+    // let ccw_vertices = windingsort::ccw_test(self.geometry.get_vertices());
     
-    for index in indices {
-      for i in index {
-        let vertex = ccw_vertices[i as usize];
-        self.buffer.push(vertex.x);
-        self.buffer.push(vertex.y);
-        self.buffer.push(vertex.z);
-      }
-    }
+    // for index in indices {
+    //   for i in index {
+    //     let vertex = ccw_vertices[i as usize];
+    //     self.buffer.push(vertex.x);
+    //     self.buffer.push(vertex.y);
+    //     self.buffer.push(vertex.z);
+    //   }
+    // }
 
-    serde_json::to_string(&self.buffer).unwrap()
+    // serde_json::to_string(&self.buffer).unwrap()
+
+    serde_json::to_string(&merged_vertices).unwrap()
   }
 
   #[wasm_bindgen]
