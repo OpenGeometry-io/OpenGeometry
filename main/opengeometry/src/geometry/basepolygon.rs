@@ -17,6 +17,7 @@ pub struct BasePolygon {
   id: String,
   geometry: basegeometry::BaseGeometry,
   pub extruded: bool,
+  pub extruded_height: f64,
   pub is_polygon: bool,
   pub position: openmath::Vector3D,
   pub rotation: openmath::Vector3D,
@@ -49,6 +50,7 @@ impl BasePolygon {
       id: id.clone(),
       geometry : basegeometry::BaseGeometry::new(id.clone()),
       extruded : false,
+      extruded_height : 0.0,
       is_polygon : false,
       position : openmath::Vector3D::create(0.0, 0.0, 0.0),
       rotation : openmath::Vector3D::create(0.0, 0.0, 0.0),
@@ -64,6 +66,17 @@ impl BasePolygon {
     let mut circle_arc_points = circle_arc.get_raw_points();
     circle_arc_points.pop();
     polygon.add_vertices(circle_arc_points);
+    polygon.triangulate();
+    polygon
+  }
+
+  #[wasm_bindgen]
+  pub fn new_with_rectangle(rectangle: primitives::rectangle::OGRectangle) -> BasePolygon {
+    let mut polygon = BasePolygon::new(rectangle.id());
+    // discard the last point as it is same as the first point
+    let mut rectangle_points = rectangle.get_raw_points();
+    rectangle_points.pop();
+    polygon.add_vertices(rectangle_points);
     polygon.triangulate();
     polygon
   }
@@ -283,32 +296,83 @@ impl BasePolygon {
   #[wasm_bindgen]
   pub fn extrude_by_height(&mut self, height: f64) -> String {
     self.extruded = true;
+    self.extruded_height = height;
+
     let extruded_raw = extrude_polygon_by_buffer_geometry(self.geometry.clone(), height);
-    
+  
+    // THIS IS WORKING    
     let faces = extruded_raw.faces;
     let vertices = extruded_raw.vertices;
 
     let mut generated: Vec<f64> = Vec::new();
 
     // this works for now, but need to find a better way to do this
+    for face in faces {
+      let mut face_vertices: Vec<Vector3D> = Vec::new();
+      for index in face {
+        face_vertices.push(vertices[index as usize].clone());
+      }
+
+      let triangulated_face = triangulate::triangulate_polygon_by_face(face_vertices.clone());
+      for index in triangulated_face {
+        for i in index {
+          let vertex = face_vertices[i as usize];
+          generated.push(vertex.x);
+          generated.push(vertex.y);
+          generated.push(vertex.z);
+        }
+      }
+    }
+
+    serde_json::to_string(&generated).unwrap()
+
+
+    // ABOVE LINE WORKING
+
+    // // TESTING EDGES OUTLINE
+    // let mut outline_data: Vec<Vec<Vector3D>> = Vec::new();
+
+    // // for edge in extruded_raw.edges {
+    // //   let start = vertices[edge[0] as usize].clone();
+    // //   let end = vertices[edge[1] as usize].clone();
+
+    // //   let edge_vertices = vec![start, end];
+    // //   outline_data.push(edge_vertices);
+    // // }
+
     // for face in faces {
     //   let mut face_vertices: Vec<Vector3D> = Vec::new();
     //   for index in face {
-    //     face_vertices.push(vertices[index as usize].clone());
+    //     let v_face = vertices[index as usize].clone();
+    //     face_vertices.push(v_face);
     //   }
-
-    //   let triangulated_face = triangulate::triangulate_polygon_by_face(face_vertices.clone());
-    //   for index in triangulated_face {
-    //     for i in index {
-    //       let vertex = face_vertices[i as usize];
-    //       generated.push(vertex.x);
-    //       generated.push(vertex.y);
-    //       generated.push(vertex.z);
-    //     }
-    //   }
+    //   outline_data.push(face_vertices);
     // }
 
-    serde_json::to_string(&generated).unwrap()
+    // serde_json::to_string(&outline_data).unwrap()
+  }
+
+  #[wasm_bindgen]
+  pub fn get_outlines(&self) -> String {
+    let height = self.extruded_height;
+    if height == 0.0 {
+      return "Please extrude the polygon first".to_string();
+    }
+
+    let mut outline_data: Vec<Vec<Vector3D>> = Vec::new();
+    let extruded_raw = extrude_polygon_by_buffer_geometry(self.geometry.clone(), height);
+    let faces = extruded_raw.faces;
+    let vertices = extruded_raw.vertices;
+
+    for face in faces {
+      let mut face_vertices: Vec<Vector3D> = Vec::new();
+      for index in face {
+        let v_face = vertices[index as usize].clone();
+        face_vertices.push(v_face);
+      }
+      outline_data.push(face_vertices);
+    }
+    serde_json::to_string(&outline_data).unwrap()
   }
 
   #[wasm_bindgen]
