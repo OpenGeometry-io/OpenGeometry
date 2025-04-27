@@ -42,16 +42,16 @@
       app.appendChild(renderer.domElement);
 
       openGeometry = new OpenGeometry(app, scene, camera);
-      await openGeometry.setup();
+      await openGeometry.setup("./opengeometry_bg.wasm");
 
       // grid
       const gridHelper = new THREE.GridHelper(200, 200);
-      scene.add(gridHelper);
+      // scene.add(gridHelper);
 
       scene.background = new THREE.Color(0xf0f0f0);
 
-      camera.position.z = 5;
-      camera.position.y = 5;
+      camera.position.z = 20;
+      camera.position.y = 15;
     
       // ambient light
       const ambientLight = new THREE.AmbientLight(0xffffff, 1);
@@ -71,8 +71,8 @@
       });
 
       const circleData = {
-        radius: 2,
-        segments: 16,
+        radius: 3,
+        segments: 15,
         position: new Vector3D(0, 0, 0),
         startAngle: 0,
         endAngle: Math.PI * 2,
@@ -89,8 +89,19 @@
       // Change Radius
       // ogCircle.radius = 3;
       
-      // Extrude By 3
       ogCirclePoly.extrude(10);
+
+      const topOutline = ogCirclePoly.getOutline('top');
+      topOutline.position.set(7, 0, 0);
+      scene.add(topOutline);
+
+      const frontOutline = ogCirclePoly.getOutline('front');
+      frontOutline.position.set(14, 0, 0);
+      scene.add(frontOutline);
+
+      const sideOutline = ogCirclePoly.getOutline('side');
+      sideOutline.position.set(-7, 0, 0);
+      scene.add(sideOutline);
 
       initGUI();
       animate();

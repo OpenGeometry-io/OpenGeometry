@@ -48,7 +48,7 @@
       scene.background = new THREE.Color(0xf0f0f0);
 
       camera.position.z = 0;
-      camera.position.y = -90;
+      camera.position.y = -6;
     
       // ambient light
       const ambientLight = new THREE.AmbientLight(0xffffff, 1);
@@ -67,16 +67,6 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      // // Simple Poly to Triangulate
-      // const ogVertices = [
-      //   new Vector3D(10.0, 0, 10),
-      //   new Vector3D(10, 0, -30),
-      //   new Vector3D(50, 0, -20),
-      //   new Vector3D(60, 0, 0),
-      //   new Vector3D(50, 0, 10),
-      // ];
-      // const ogPoly = new BasePoly(ogVertices);
-      // scene.add(ogPoly);
       // // Simple Poly Hole - Counter Clockwise - Not Works
       // const hole = [
       //   new Vector3D(20, 0, -10),
@@ -87,7 +77,19 @@
       // // If Hole is Clockwise, it will not work. Convert to Counter Clockwise
       // ogPoly.addHole(hole);
 
-      // Simple Poly Hole - Clockwise - Works
+
+      // // Simple Poly to Triangulate
+      // const ogVertices = [
+      //   new Vector3D(10.0, 0, 10),
+      //   new Vector3D(10, 0, -30),
+      //   new Vector3D(50, 0, -20),
+      //   new Vector3D(60, 0, 0),
+      //   new Vector3D(50, 0, 10),
+      // ];
+      // const ogPoly = new BasePoly(ogVertices);
+      // scene.add(ogPoly);
+
+      // // Simple Poly Hole - Clockwise - Works
       // const clockWise = [
       //   new Vector3D(20, 0, -10),
       //   new Vector3D(30, 0, -10),
@@ -95,6 +97,7 @@
       //   new Vector3D(20, 0, -20),
       // ];
       // ogPoly.addHole(clockWise);
+
 
       // Complex Poly
       const ogVertices = [
@@ -119,6 +122,7 @@
       const ogPoly = new BasePoly(ogVertices);
       scene.add(ogPoly);
 
+      //This hole set is working
       const holeClockwise = [
         new Vector3D(-1, 0, -1),
         new Vector3D(0, 0, -1),
@@ -126,6 +130,25 @@
         new Vector3D(-1, 0, -2),
       ];
       ogPoly.addHole(holeClockwise);
+
+
+
+
+
+
+
+
+
+
+
+
+      // // Edge case when two points in the hole have same X coordinate, since internally we are comparing the X coordinate and choosing the max X coordinate
+      // const holeClockwise = [
+      //   new Vector3D(-1, 0, 1),
+      //   new Vector3D(-1, 0, -1),
+      //   new Vector3D(-1.5, 0, 0),
+      // ];
+      // ogPoly.addHole(holeClockwise);
 
       const colors = new Float32Array(ogPoly.geometry.attributes.position.array.length);
       for (let i = 0; i < colors.length; i += 9) {

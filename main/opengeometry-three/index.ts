@@ -13,6 +13,8 @@ import { getUUID } from "./src/utils/randomizer";
 import { Pencil } from "./src/pencil";
 import { SpotLabel } from "./src/markup/spotMarker";
 
+export type OUTLINE_TYPE = "front" | "side" | "top";
+
 export class OpenGeometry {
   protected scene: THREE.Scene | undefined;
   protected container: HTMLElement | undefined;
@@ -26,8 +28,10 @@ export class OpenGeometry {
     this.container = container;
   }
 
-  async setup() {
-    await init();
+  async setup(wasmURL: string) {
+    console.log("OpenGeometry Setup");
+    console.log(wasmURL);
+    await init(wasmURL);
     this.setuplabelRenderer();
 
     if (!this.container || !this.scene) return;
@@ -310,7 +314,9 @@ export class CirclePoly extends THREE.Mesh {
         flatShading: true,
         vertexColors: true,
         shininess: 0,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.1
     });
 
     this.geometry = geometry;
@@ -329,40 +335,335 @@ export class CirclePoly extends THREE.Mesh {
     
     this.generateExtrudedGeometry(extruded_buff);
   }
+ 
+  getOutline(type: OUTLINE_TYPE) {
+    if (!this.polygon) return;
+    const outlines = this.polygon.get_outlines();
+    const outlineBuffer = JSON.parse(outlines);
+
+    // TODO: move this logic to Kernel
+    const faces = [];
+    for (const data of outlineBuffer) {
+      const vertices = [];
+      for (const vertex of data) {
+        const x_float = type === "side" ? 0 : parseFloat(vertex.x.toFixed(5));
+        const y_float = type === "top" ? 0 : parseFloat(vertex.y.toFixed(5));
+        const z_float = type === "front" ? 0 : parseFloat(vertex.z.toFixed(5));
+        vertices.push(new THREE.Vector3(x_float, y_float, z_float));
+      }
+      faces.push(vertices);
+    }
+
+    const clonedFaces = faces.map((face) => {
+      return face.map((vertex) => {
+        return new THREE.Vector3(vertex.x, vertex.y, vertex.z);
+      });
+    }
+    );
+
+    // remove duplicates inside the faces
+    const uniqueFaces = clonedFaces.map((face) => {
+      return face.filter((vertex, index, self) =>
+        index === self.findIndex((v) => (
+          v.x === vertex.x && v.y === vertex.y && v.z === vertex.z
+        ))
+      );
+    });
+
+    // Picking unique vertices from all faces
+    const uniqueVertices = [];
+    const vertexSet = new Set();
+    for (const face of uniqueFaces) {
+      for (const vertex of face) {
+        const key = `${vertex.x},${vertex.y},${vertex.z}`;
+        if (!vertexSet.has(key)) {
+          vertexSet.add(key);
+          uniqueVertices.push(vertex);
+        }
+      }
+    }
+    
+    // arrange the vertices in a clockwise manner
+    const center = new THREE.Vector3();
+    for (const vertex of uniqueVertices) {
+      center.add(vertex);
+    }
+    center.divideScalar(uniqueVertices.length);
+    console.log(center);
+    uniqueVertices.sort((a, b) => {
+      if (type === "side") {
+        const angleA = Math.atan2(a.y - center.y, a.z - center.z);
+        const angleB = Math.atan2(b.y - center.y, b.z - center.z);
+        return angleA - angleB;
+      } else if (type === "top") {
+        const angleA = Math.atan2(a.x - center.x, a.z - center.z);
+        const angleB = Math.atan2(b.x - center.x, b.z - center.z);
+        return angleA - angleB;
+      }
+      const angleA = Math.atan2(a.x - center.x, a.y - center.y);
+      const angleB = Math.atan2(b.x - center.x, b.y - center.y);
+      return angleA - angleB;
+    }
+    );
+
+    // merge collinear vertices
+    const mergedVertices = [];
+    for (let i = 0; i < uniqueVertices.length; i++) {
+      const current = uniqueVertices[i];
+      const next = uniqueVertices[(i + 1) % uniqueVertices.length];
+      const prev = uniqueVertices[(i - 1 + uniqueVertices.length) % uniqueVertices.length];
+
+      const v1 = new THREE.Vector3().subVectors(current, prev);
+      const v2 = new THREE.Vector3().subVectors(next, current);
+
+      if (v1.angleTo(v2) > 0.01) {
+        mergedVertices.push(current);
+      }
+    }
+
+    mergedVertices.push(mergedVertices[0]);
+    // TODO: move logic until here to Kernel
+
+    // Create a new geometry with the merged vertices
+    const mergedGeometry = new THREE.BufferGeometry().setFromPoints(mergedVertices);
+    const mergedMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
+    const mergedMesh = new THREE.Line(mergedGeometry, mergedMaterial);
+    return mergedMesh;
+  }
 
   generateExtrudedGeometry(extruded_buff: string) {
+    // THIS WORKS
     const flushBuffer = JSON.parse(extruded_buff);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
+    geometry.computeVertexNormals();
 
-    const colors = new Float32Array(flushBuffer.length);
-    for (let i = 0; i < colors.length; i += 9) {
-      const r = Math.random();
-      const g = Math.random();
-      const b = Math.random();
-      colors[i] = r;
-      colors[i + 1] = g;
-      colors[i + 2] = b;
-      colors[i + 3] = r;
-      colors[i + 4] = g;
-      colors[i + 5] = b;
-      colors[i + 6] = r;
-      colors[i + 7] = g;
-      colors[i + 8] = b;
-    }
+    // To Test If Triangulation is working
+    // const colors = new Float32Array(flushBuffer.length);
+    // for (let i = 0; i < colors.length; i += 9) {
+    //   const r = Math.random();
+    //   const g = Math.random();
+    //   const b = Math.random();
+    //   colors[i] = r;
+    //   colors[i + 1] = g;
+    //   colors[i + 2] = b;
+    //   colors[i + 3] = r;
+    //   colors[i + 4] = g;
+    //   colors[i + 5] = b;
+    //   colors[i + 6] = r;
+    //   colors[i + 7] = g;
+    //   colors[i + 8] = b;
+    // }
 
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    // geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    const material = new THREE.MeshPhongMaterial( {
-        color: 0xffffff,
-        flatShading: true,
-        vertexColors: true,
-        shininess: 0,
-        side: THREE.DoubleSide
+    // const material = new THREE.MeshPhongMaterial( {
+    //     color: 0xffffff,
+    //     flatShading: true,
+    //     vertexColors: true,
+    //     shininess: 0,
+    //     side: THREE.DoubleSide
+    // });
+
+    const material = new THREE.MeshPhongMaterial({
+      color: 0x3a86ff,
     });
+    material.side = THREE.DoubleSide;
     
     this.geometry = geometry;
     this.material = material;
+  }
+}
+
+export class RectanglePoly extends THREE.Mesh {
+  ogid: string;
+  polygon: BasePolygon | null = null;
+  baseRectangle: Rectangle;
+  isExtruded: boolean = false;
+  constructor(baseRectangle: Rectangle) {
+    super();
+    this.ogid = getUUID();
+   
+    if (!baseRectangle.polyLineRectangle) {
+      throw new Error("BaseRectangle is not defined");
+    }
+    baseRectangle.nodeChild = this;
+    baseRectangle.nodeOperation = "polygon";
+    this.baseRectangle = baseRectangle;
+    
+    this.generateGeometry();
+    this.addFlushBufferToScene();
+  }
+
+  update() {
+    this.geometry.dispose();
+    this.polygon?.clear_vertices();
+    this.polygon?.add_vertices(this.baseRectangle.polyLineRectangle.get_raw_points());
+    this.generateGeometry();
+    this.addFlushBufferToScene();
+  }
+  generateGeometry() {
+    if (!this.baseRectangle.polyLineRectangle) return;
+    this.polygon = BasePolygon.new_with_rectangle(this.baseRectangle.polyLineRectangle.clone());
+  }
+
+  addFlushBufferToScene() {
+    if (!this.polygon) return;
+    const bufFlush = this.polygon.get_buffer_flush();
+    const flushBuffer = JSON.parse(bufFlush);
+    console.log(flushBuffer);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
+    const material = new THREE.MeshStandardMaterial({ color: 0x3a86ff, transparent: true, opacity: 0.5 });
+    this.geometry = geometry;
+    this.material = material;
+  }
+
+  clearGeometry() {
+    this.geometry.dispose();
+  }
+
+  extrude(height: number) {
+    if (!this.polygon) return;
+    const extruded_buff = this.polygon.extrude_by_height(height);
+    console.log(JSON.parse(extruded_buff));
+    this.isExtruded = true;
+    this.generateExtrudedGeometry(extruded_buff);
+  }
+
+  generateExtrudedGeometry(extruded_buff: string) {
+    // THIS WORKS
+    const flushBuffer = JSON.parse(extruded_buff);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
+    geometry.computeVertexNormals();
+
+    // const colors = new Float32Array(flushBuffer.length);
+    // for (let i = 0; i < colors.length; i += 9) {
+    //   const r = Math.random();
+    //   const g = Math.random();
+    //   const b = Math.random();
+    //   colors[i] = r;
+    //   colors[i + 1] = g;
+    //   colors[i + 2] = b;
+    //   colors[i + 3] = r;
+    //   colors[i + 4] = g;
+    //   colors[i + 5] = b;
+    //   colors[i + 6] = r;
+    //   colors[i + 7] = g;
+    //   colors[i + 8] = b;
+    // }
+    // geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    // const material = new THREE.MeshPhongMaterial( {
+    //     color: 0xffffff,
+    //     flatShading: true,
+    //     vertexColors: true,
+    //     shininess: 0,
+    //     side: THREE.DoubleSide
+    // });
+
+    const material = new THREE.MeshPhongMaterial({
+      color: 0x3a86ff,
+    });
+    material.side = THREE.DoubleSide;
+
+    this.geometry = geometry;
+    this.material = material;
+  }
+
+  getOutline(type: OUTLINE_TYPE) {
+    if (!this.polygon) return;
+    const outlines = this.polygon.get_outlines();
+    const outlineBuffer = JSON.parse(outlines);
+
+    // TODO: move this logic to Kernel
+    const faces = [];
+    for (const data of outlineBuffer) {
+      const vertices = [];
+      for (const vertex of data) {
+        const x_float = type === "side" ? 0 : parseFloat(vertex.x.toFixed(5));
+        const y_float = type === "top" ? 0 : parseFloat(vertex.y.toFixed(5));
+        const z_float = type === "front" ? 0 : parseFloat(vertex.z.toFixed(5));
+        vertices.push(new THREE.Vector3(x_float, y_float, z_float));
+      }
+      faces.push(vertices);
+    }
+
+    const clonedFaces = faces.map((face) => {
+      return face.map((vertex) => {
+        return new THREE.Vector3(vertex.x, vertex.y, vertex.z);
+      });
+    }
+    );
+
+    // remove duplicates inside the faces
+    const uniqueFaces = clonedFaces.map((face) => {
+      return face.filter((vertex, index, self) =>
+        index === self.findIndex((v) => (
+          v.x === vertex.x && v.y === vertex.y && v.z === vertex.z
+        ))
+      );
+    });
+
+    // Picking unique vertices from all faces
+    const uniqueVertices = [];
+    const vertexSet = new Set();
+    for (const face of uniqueFaces) {
+      for (const vertex of face) {
+        const key = `${vertex.x},${vertex.y},${vertex.z}`;
+        if (!vertexSet.has(key)) {
+          vertexSet.add(key);
+          uniqueVertices.push(vertex);
+        }
+      }
+    }
+    
+    // arrange the vertices in a clockwise manner
+    const center = new THREE.Vector3();
+    for (const vertex of uniqueVertices) {
+      center.add(vertex);
+    }
+    center.divideScalar(uniqueVertices.length);
+    console.log(center);
+    uniqueVertices.sort((a, b) => {
+      if (type === "side") {
+        const angleA = Math.atan2(a.y - center.y, a.z - center.z);
+        const angleB = Math.atan2(b.y - center.y, b.z - center.z);
+        return angleA - angleB;
+      } else if (type === "top") {
+        const angleA = Math.atan2(a.x - center.x, a.z - center.z);
+        const angleB = Math.atan2(b.x - center.x, b.z - center.z);
+        return angleA - angleB;
+      }
+      const angleA = Math.atan2(a.x - center.x, a.y - center.y);
+      const angleB = Math.atan2(b.x - center.x, b.y - center.y);
+      return angleA - angleB;
+    }
+    );
+
+    // merge collinear vertices
+    const mergedVertices = [];
+    for (let i = 0; i < uniqueVertices.length; i++) {
+      const current = uniqueVertices[i];
+      const next = uniqueVertices[(i + 1) % uniqueVertices.length];
+      const prev = uniqueVertices[(i - 1 + uniqueVertices.length) % uniqueVertices.length];
+
+      const v1 = new THREE.Vector3().subVectors(current, prev);
+      const v2 = new THREE.Vector3().subVectors(next, current);
+
+      if (v1.angleTo(v2) > 0.01) {
+        mergedVertices.push(current);
+      }
+    }
+
+    mergedVertices.push(mergedVertices[0]);
+    // TODO: move logic until here to Kernel
+
+    // Create a new geometry with the merged vertices
+    const mergedGeometry = new THREE.BufferGeometry().setFromPoints(mergedVertices);
+    const mergedMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
+    const mergedMesh = new THREE.Line(mergedGeometry, mergedMaterial);
+    return mergedMesh;
   }
 }
 
@@ -472,6 +773,8 @@ export class Rectangle extends THREE.Line {
   ogid: string;
   polyLineRectangle: OGRectangle;
   options: RectangeOptions;
+  nodeChild: RectanglePoly | null = null;
+  nodeOperation: String = "none";
   
   constructor(options: RectangeOptions) {
     super();
@@ -522,6 +825,14 @@ export class Rectangle extends THREE.Line {
 
   // threejs position has the center, so how do use that trigger instead?
   // set center(center: number) {}
+
+  // extrude(height: number) {
+  //   if (!this.polyLineRectangle) return;
+  //   const extruded_buff = this.polyLineRectangle.extrude_by_height(height);
+  //   console.log(JSON.parse(extruded_buff));
+    
+  //   this.generateExtrudedGeometry(extruded_buff);
+  // }
 }
 
 

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OpenGeometry Multi-Viewport</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    .viewport {
+      position: absolute;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+    }
+    .viewport-label {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      color: #333;
+      background-color: rgba(255, 255, 255, 0.7);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: Arial, sans-serif;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewport-persp" class="viewport" style="top: 0; left: 0; width: 50vw; height: 50vh;">
+    <div class="viewport-label">Perspective</div>
+  </div>
+  <div id="viewport-top" class="viewport" style="top: 0; left: 50vw; width: 50vw; height: 50vh;">
+    <div class="viewport-label">Top View</div>
+  </div>
+  <div id="viewport-front" class="viewport" style="top: 50vh; left: 0; width: 50vw; height: 50vh;">
+    <div class="viewport-label">Front View</div>
+  </div>
+  <div id="viewport-side" class="viewport" style="top: 50vh; left: 50vw; width: 50vw; height: 50vh;">
+    <div class="viewport-label">Side View</div>
+  </div>
+
+  <script type="module">
+    import {
+      OpenGeometry,
+      BaseCircle,
+      CirclePoly,
+      Vector3D,
+      Rectangle,
+      RectanglePoly
+    } from './../index.ts';
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+    import Stats from 'three/examples/jsm/libs/stats.module.js';
+
+    const viewports = {
+      persp: document.getElementById('viewport-persp'),
+      top: document.getElementById('viewport-top'),
+      front: document.getElementById('viewport-front'),
+      side: document.getElementById('viewport-side'),
+    };
+
+    let scene, openGeometry, stats;
+    const renderers = {};
+    const cameras = {};
+    const controls = {};
+    const viewScenes = {}; // Separate scenes for each viewport
+
+    function createRenderer(container) {
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(renderer.domElement);
+      return renderer;
+    }
+
+    function createCamera(type, aspect) {
+      let cam;
+      const orthographicSize = 30; // Size of the orthographic view
+      
+      if (type === 'persp') {
+        cam = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+        cam.position.set(20, 15, 20);
+      } else {
+        // Create orthographic cameras for engineering views
+        cam = new THREE.OrthographicCamera(
+          -orthographicSize * aspect, 
+          orthographicSize * aspect, 
+          orthographicSize, 
+          -orthographicSize,
+          0.1,
+          1000
+        );
+        
+        // Set camera positions based on viewport type
+        switch(type) {
+          case 'top':
+            cam.position.set(0, 50, 0);
+            cam.up.set(0, 0, -1); // Set up vector for top view
+            break;
+          case 'front':
+            cam.position.set(0, 0, 50);
+            break;
+          case 'side':
+            cam.position.set(50, 0, 0);
+            break;
+        }
+      }
+      
+      cam.lookAt(0, 0, 0);
+      return cam;
+    }
+
+    // Handle window resize
+    function onWindowResize() {
+      for (const key of Object.keys(viewports)) {
+        const container = viewports[key];
+        const renderer = renderers[key];
+        const camera = cameras[key];
+        
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        const aspect = width / height;
+        
+        if (camera instanceof THREE.PerspectiveCamera) {
+          camera.aspect = aspect;
+        } else if (camera instanceof THREE.OrthographicCamera) {
+          const orthographicSize = 30;
+          camera.left = -orthographicSize * aspect;
+          camera.right = orthographicSize * aspect;
+          camera.top = orthographicSize;
+          camera.bottom = -orthographicSize;
+        }
+        
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+      }
+    }
+
+    async function init() {
+      try {
+        // Create main scene
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f0f0);
+
+        // Create individual scenes for each viewport
+        viewScenes.persp = new THREE.Scene();
+        viewScenes.top = new THREE.Scene();
+        viewScenes.front = new THREE.Scene();
+        viewScenes.side = new THREE.Scene();
+        
+        // Set backgrounds for all scenes
+        for (const key in viewScenes) {
+          viewScenes[key].background = new THREE.Color(0xf0f0f0);
+        }
+
+        // Stats setup
+        stats = new Stats();
+        document.body.appendChild(stats.dom);
+
+        // Setup renderers, cameras, and controls for each viewport
+        for (const key of Object.keys(viewports)) {
+          const container = viewports[key];
+          const aspect = container.clientWidth / container.clientHeight;
+          renderers[key] = createRenderer(container);
+          cameras[key] = createCamera(key, aspect);
+          controls[key] = new OrbitControls(cameras[key], renderers[key].domElement);
+          controls[key].update();
+        }
+
+        // Initialize OpenGeometry
+        openGeometry = new OpenGeometry(viewports.persp, scene, cameras.persp);
+        await openGeometry.setup();
+
+        // Add lights to each scene
+        for (const key in viewScenes) {
+          const currentScene = viewScenes[key];
+          
+          const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+          const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+          dirLight1.position.set(100, 100, 100);
+          const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
+          dirLight2.position.set(-100, 70, -100);
+          
+          currentScene.add(ambientLight, dirLight1, dirLight2);
+        }
+
+        // Geometry setup
+        const circleRadius = 2.42;
+        const circleExtrude = 1.8;
+        const circleSegments = 16;
+        const circlePositions = [
+          [-12, -4], [-4, -4], [4, -4], [12, -4],
+          [-12, 4], [-4, 4], [4, 4], [12, 4],
+        ];
+
+        const polys = [];
+        for (let i = 0; i < circlePositions.length; i++) {
+          const [x, z] = circlePositions[i];
+          // Make sure position is an instance of Vector3D
+          const position = new Vector3D(x, 0, z);
+          
+          const base = new BaseCircle({
+            radius: circleRadius,
+            segments: circleSegments,
+            position: position,
+            startAngle: 0,
+            endAngle: Math.PI * 2
+          });
+          
+          scene.add(base);
+          viewScenes.persp.add(base);
+          
+          const poly = new CirclePoly(base);
+          poly.extrude(circleExtrude);
+          scene.add(poly);
+          viewScenes.persp.add(poly);
+          polys.push(poly);
+        }
+
+        const rectangle = new Rectangle({
+          center: new Vector3D(0, 0, 0),
+          width: 31.8,
+          breadth: 15.8
+        });
+        
+        scene.add(rectangle);
+        viewScenes.persp.add(rectangle);
+        
+        const rectanglePoly = new RectanglePoly(rectangle);
+        rectanglePoly.extrude(-9.6);
+        scene.add(rectanglePoly);
+        viewScenes.persp.add(rectanglePoly);
+
+        // Create outlines for each view
+        for (const poly of polys) {
+          const frontOutline = poly.getOutline('front');
+          const sideOutline = poly.getOutline('side');
+          const topOutline = poly.getOutline('top');
+          
+          if (frontOutline) viewScenes.front.add(frontOutline);
+          if (sideOutline) viewScenes.side.add(sideOutline);
+          if (topOutline) viewScenes.top.add(topOutline);
+        }
+
+        const rectFrontOutline = rectanglePoly.getOutline('front');
+        const rectSideOutline = rectanglePoly.getOutline('side');
+        const rectTopOutline = rectanglePoly.getOutline('top');
+
+        if (rectFrontOutline) viewScenes.front.add(rectFrontOutline);
+        if (rectSideOutline) viewScenes.side.add(rectSideOutline);
+        if (rectTopOutline) viewScenes.top.add(rectTopOutline);
+
+        // Add axes helpers to each scene
+        for (const key in viewScenes) {
+          const axesHelper = new THREE.AxesHelper(10);
+          viewScenes[key].add(axesHelper);
+        }
+
+        // Add window resize event listener
+        window.addEventListener('resize', onWindowResize, false);
+
+        // Start animation loop
+        animate();
+      } catch (error) {
+        console.error("Error in initialization:", error);
+        // Show more detailed error information
+        if (error.stack) {
+          console.error(error.stack);
+        }
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      stats.update();
+
+      try {
+        // Render each viewport with its corresponding scene
+        for (const key of Object.keys(renderers)) {
+          const renderer = renderers[key];
+          const camera = cameras[key];
+          const viewScene = viewScenes[key];
+          
+          renderer.render(viewScene, camera);
+          
+          // Only update OpenGeometry for the perspective view
+          if (key === 'persp') {
+            viewScene.rotation.y += 0.001; // Rotate the perspective view
+            openGeometry.update(viewScene, camera);
+          }
+        }
+      } catch (error) {
+        console.error("Error in animation loop:", error);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
