@@ -1,1 +1,0 @@
-export * from "./../main/opengeometry-three/index.ts";
