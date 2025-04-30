@@ -12,10 +12,13 @@ import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { getUUID } from "./src/utils/randomizer";
 import { Pencil } from "./src/pencil";
 import { SpotLabel } from "./src/markup/spotMarker";
+import { OPEN_GEOMETRY_THREE_VERSION, OpenGeometryOptions } from "./src/base-types";
 
 export type OUTLINE_TYPE = "front" | "side" | "top";
 
 export class OpenGeometry {
+  static version = OPEN_GEOMETRY_THREE_VERSION;
+
   protected scene: THREE.Scene | undefined;
   protected container: HTMLElement | undefined;
   private _pencil: Pencil | undefined;
@@ -24,11 +27,29 @@ export class OpenGeometry {
   constructor(container:HTMLElement, threeScene: THREE.Scene, private camera: THREE.Camera) {
     // this.setup();
     this.scene = threeScene;
-
     this.container = container;
   }
 
-  async setup(wasmURL: string) {
+  // Why Generic Types are used sometimes
+  // verifyOptions(options: OpenGeometryOptions) {
+  //   for (const key in options) {
+  //     if (options[key as keyof OpenGeometryOptions] === undefined) {
+  //       throw new Error(`Missing required option: ${key}`);
+  //     }
+  //   }
+  // }
+
+  static async create(options: OpenGeometryOptions) {
+    const { container, scene, camera } = options;
+    if (!container || !scene || !camera) {
+      throw new Error("Missing required options");
+    }
+    const openGeometry = new OpenGeometry(container, scene, camera);
+    await openGeometry.setup(options.wasmURL);
+    return openGeometry;
+  }
+
+  private async setup(wasmURL: string) {
     console.log("OpenGeometry Setup");
     console.log(wasmURL);
     await init(wasmURL);

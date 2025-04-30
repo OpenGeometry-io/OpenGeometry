@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  root: 'example',
+  root: 'test',
   server: {
     port: 7070
   }

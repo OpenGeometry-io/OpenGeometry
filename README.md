@@ -24,3 +24,16 @@ Expect frequent updates, breaking changes, and exciting new features.
 - Extrude is a operation which elevates the given 2D polygon by a given height
 - `polygon.extrude(height: number)`
 - returns a Buffer Geometry
+
+- Scene Graph (List of Objects)
+- Access to Scene Graph for other classes
+- Bounding Boxes for BaseGeometry (min, max)
+- Check Intersection with existing BBoxes - multiple cases - Partial Outside | Inside | Touching | Outside
+
+### Test
+#### Basic Example
+- A basic example is available at `./test/index.html`
+
+#### Advanced and Additional Examples
+- Extensive Examples(Source Code) have a separate repo - https://github.com/OpenGeometry-io/OpenGeometry-examples
+- The live demo is available at [Kernel Examples](https://demos.opengeometry.io/examples/kernel/index.html)

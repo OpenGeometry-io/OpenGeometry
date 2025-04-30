@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OpenGeometry</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"
+    style="width: 100vw; height: 100vh;"
+  ></div>
+
+  <script type="module">
+    import {
+      OpenGeometry,
+      BasePoly,
+      Vector3D,
+    } from './../main/opengeometry-three/';
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+  
+    let scene, camera, renderer;
+    let openGeometry;
+
+    async function init(){
+      const app = document.getElementById('app');
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      renderer = new THREE.WebGLRenderer({
+        antialias: true
+      });
+      renderer.setSize(app.clientWidth, app.clientHeight);
+      app.appendChild(renderer.domElement);
+      
+      openGeometry = await OpenGeometry.create({
+        container: app,
+        scene, 
+        camera
+      });
+
+      // grid
+      const gridHelper = new THREE.GridHelper(200, 200);
+      scene.add(gridHelper);
+
+      scene.background = new THREE.Color(0xf0f0f0);
+
+      camera.position.z = 5;
+      camera.position.y = 5;
+    
+      // ambient light
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+      scene.add(ambientLight);
+
+      // controls
+      const controls = new OrbitControls(
+        camera,
+        openGeometry.labelRenderer.domElement
+      );
+      controls.update();
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // Vertices
+      const vertices = [
+        new Vector3D(10, 0, -10),
+        new Vector3D(10, 0, 70),
+        new Vector3D(90, 0, 60),
+        new Vector3D(100, 0, 30),
+        new Vector3D(90, 0, 10),
+      ];
+
+      const ogPoly = new BasePoly(vertices);
+      const colors = new Float32Array(ogPoly.geometry.attributes.position.array.length);
+      for (let i = 0; i < colors.length; i += 9) {
+        const r = Math.random();
+        const g = Math.random();
+        const b = Math.random();
+        colors[i] = r;
+        colors[i + 1] = g;
+        colors[i + 2] = b;
+        colors[i + 3] = r;
+        colors[i + 4] = g;
+        colors[i + 5] = b;
+        colors[i + 6] = r;
+        colors[i + 7] = g;
+        colors[i + 8] = b;
+      }
+      ogPoly.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      const material = new THREE.MeshPhongMaterial( {
+          color: 0xffffff,
+          flatShading: true,
+          vertexColors: true,
+          shininess: 0,
+          side: THREE.DoubleSide
+      });
+      ogPoly.material = material;
+
+      scene.add(ogPoly);
+
+      initGUI();
+      animate();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+      openGeometry.update(scene, camera);
+    }
+
+    init();
+
+    function initGUI() {
+      
+    }
+  </script>
+</body>
+</html>
