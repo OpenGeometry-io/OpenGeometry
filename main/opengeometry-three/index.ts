@@ -13,6 +13,8 @@ import { getUUID } from "./src/utils/randomizer";
 import { Pencil } from "./src/pencil";
 import { SpotLabel } from "./src/markup/spotMarker";
 import { OPEN_GEOMETRY_THREE_VERSION, OpenGeometryOptions } from "./src/base-types";
+import { BaseCircle } from "./src/primitives/circle";
+import { Rectangle } from "./src/primitives/rectangle";
 
 export type OUTLINE_TYPE = "front" | "side" | "top";
 
@@ -208,59 +210,6 @@ interface IBaseCircleOptions {
   startAngle: number;
   endAngle: number;
 }
-export class BaseCircle extends THREE.Line {
-  ogid: string;
-  circleArc: CircleArc;
-  options: IBaseCircleOptions;
-  nodeChild: CirclePoly | null = null;
-  nodeOperation: String = "none";
-
-  constructor(options: IBaseCircleOptions) {
-    super();
-    this.ogid = getUUID();
-    this.options = options;
-    this.circleArc = new CircleArc(this.ogid);
-
-    this.setConfig();
-    this.generateGeometry();
-  }
-
-  setConfig() {
-    const { radius, segments, position, startAngle, endAngle } = this.options;
-    this.circleArc.set_config(
-      position,
-      radius,
-      startAngle,
-      endAngle,
-      segments
-    );
-  }
-
-  generateGeometry() {
-    this.circleArc.generate_points();
-    const bufRaw = this.circleArc.get_points();
-    const bufFlush = JSON.parse(bufRaw);
-    console.log(bufFlush);
-    const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
-    const material = new THREE.LineBasicMaterial({ color: 0x000000 });
-    this.geometry = line;
-    this.material = material;
-  }
-
-  discardGeoemtry() {
-    this.geometry.dispose();
-  }
-  
-  set radius(radius: number) {
-    this.options.radius = radius;
-    this.circleArc.update_radius(radius);
-
-    this.generateGeometry();
-    if (this.nodeChild) {
-      this.nodeChild.update();
-    }
-  }
-}
 
 export class CirclePoly extends THREE.Mesh {
   ogid: string;
@@ -275,7 +224,7 @@ export class CirclePoly extends THREE.Mesh {
     if (!baseCircle.circleArc) {
       throw new Error("CircleArc is not defined");
     }
-    baseCircle.nodeChild = this;
+    // baseCircle.nodeChild = this;
     baseCircle.nodeOperation = "polygon";
     this.baseCircle = baseCircle;
 
@@ -503,7 +452,7 @@ export class RectanglePoly extends THREE.Mesh {
     if (!baseRectangle.polyLineRectangle) {
       throw new Error("BaseRectangle is not defined");
     }
-    baseRectangle.nodeChild = this;
+    // baseRectangle.nodeChild = this;
     baseRectangle.nodeOperation = "polygon";
     this.baseRectangle = baseRectangle;
     
@@ -682,82 +631,6 @@ export class RectanglePoly extends THREE.Mesh {
     return mergedMesh;
   }
 }
-
-
-export type RectangeOptions = {
-  width: number;
-  breadth: number;
-  center: Vector3D
-}
-/**
- * Rectangle
- */
-export class Rectangle extends THREE.Line {
-  ogid: string;
-  polyLineRectangle: OGRectangle;
-  options: RectangeOptions;
-  nodeChild: RectanglePoly | null = null;
-  nodeOperation: String = "none";
-  
-  constructor(options: RectangeOptions) {
-    super();
-    this.ogid = getUUID();
-    this.options = options;
-    this.polyLineRectangle = new OGRectangle(this.ogid);
-
-    this.setConfig();
-    this.generateGeometry();
-  }
-
-  setConfig() {
-    const { breadth, width, center } = this.options;
-    this.polyLineRectangle.set_config(
-      center,
-      width,
-      breadth
-    );
-  }
-
-  generateGeometry() {
-    this.polyLineRectangle.generate_points();
-    const bufRaw = this.polyLineRectangle.get_points();
-    const bufFlush = JSON.parse(bufRaw);
-    const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
-    const material = new THREE.LineBasicMaterial({ color: 0x000000 });
-    this.geometry = line;
-    this.material = material;
-  }
-
-  discardGeometry() {
-    this.geometry.dispose();
-  }
-
-  set width(width: number) {
-    this.options.width = width;
-    this.polyLineRectangle.update_width(width);
-
-    this.generateGeometry();
-  }
-
-  set breadth(breadth: number) {
-    this.options.breadth = breadth;
-    this.polyLineRectangle.update_breadth(breadth);
-
-    this.generateGeometry();
-  }
-
-  // threejs position has the center, so how do use that trigger instead?
-  // set center(center: number) {}
-
-  // extrude(height: number) {
-  //   if (!this.polyLineRectangle) return;
-  //   const extruded_buff = this.polyLineRectangle.extrude_by_height(height);
-  //   console.log(JSON.parse(extruded_buff));
-    
-  //   this.generateExtrudedGeometry(extruded_buff);
-  // }
-}
-
 
 /**
  * Base Flat Mesh

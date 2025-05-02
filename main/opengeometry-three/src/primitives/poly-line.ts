@@ -12,6 +12,12 @@ export class PolyLine extends THREE.Line {
 
   private polyline: OGPolyLine;
 
+  set color(color: number) {
+    if (this.material instanceof THREE.LineBasicMaterial) {
+      this.material.color.set(color);
+    }
+  }
+
   constructor(points: Vector3D[] = []) {
     super();
     this.ogid = getUUID();
@@ -43,7 +49,6 @@ export class PolyLine extends THREE.Line {
     this.clearGeometry();
     const buf = this.polyline.get_points();
     const bufFlush = JSON.parse(buf);
-    console.log(bufFlush);
     const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
     const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
     this.geometry = line;

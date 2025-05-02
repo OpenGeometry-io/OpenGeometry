@@ -10,7 +10,6 @@ export class SimpleLine extends THREE.Line {
   points: Vector3D[] = [];
 
   set color(color: number) {
-    console.log("Setting color", color);
     if (this.material instanceof THREE.LineBasicMaterial) {
       this.material.color.set(color);
     }
