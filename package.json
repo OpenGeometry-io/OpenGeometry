@@ -1,6 +1,6 @@
 {
   "name": "opengeometry",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Kernel For CAD and Graphics",
   "type": "module",
   "main": "index.js",

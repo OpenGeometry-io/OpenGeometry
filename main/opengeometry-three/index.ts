@@ -173,15 +173,10 @@ export class BasePoly extends THREE.Mesh {
   }
 
   addHole(holeVertices: Vector3D[]) {
-    console.log(holeVertices);
     if (!this.polygon) return;
     this.polygon.add_holes(holeVertices);
-    console.log(this.polygon.get_geometry());
-
     const triResult = JSON.parse(this.polygon.new_triangulate());
-    console.log(triResult);
     const newBufferFlush = triResult.new_buffer;
-    console.log(newBufferFlush);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(newBufferFlush), 3));
     this.geometry = geometry;
@@ -192,14 +187,35 @@ export class BasePoly extends THREE.Mesh {
 
   addFlushBufferToScene(flush: string) {
     const flushBuffer = JSON.parse(flush);
-    console.log(flushBuffer);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
-    const material = new THREE.MeshStandardMaterial({ color: 0x3a86ff, transparent: true, opacity: 0.5 });
+    geometry.computeVertexNormals();
+
+    const material = new THREE.MeshStandardMaterial({ color: 0x3a86ff, side: THREE.DoubleSide });
     this.geometry = geometry;
     this.material = material;
-    // this.geometry.attributes.position.needsUpdate = true;
-    // this.geometry.computeVertexNormals();
+  }
+
+  extrude(height: number) {
+    if (!this.polygon) return;
+    const extruded_buff = this.polygon.extrude_by_height(height);
+    this.generateExtrudedGeometry(extruded_buff);
+  }
+
+  generateExtrudedGeometry(extruded_buff: string) {
+    // THIS WORKS
+    const flushBuffer = JSON.parse(extruded_buff);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
+    geometry.computeVertexNormals();
+
+    const material = new THREE.MeshPhongMaterial({
+      color: 0x3a86ff,
+    });
+    material.side = THREE.DoubleSide;
+
+    this.geometry = geometry;
+    this.material = material;
   }
 }
 
@@ -251,37 +267,34 @@ export class CirclePoly extends THREE.Mesh {
     if (!this.polygon) return;
     const bufFlush = this.polygon.get_buffer_flush();
     const flushBuffer = JSON.parse(bufFlush);
-    console.log(flushBuffer);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
     
+    // TODO: Do this using a set method, poly.visualizeTriangles = true
     // different colors for each triangle in the polygon dont interolate
-    const colors = new Float32Array(flushBuffer.length);
-    for (let i = 0; i < colors.length; i += 9) {
-      const r = Math.random();
-      const g = Math.random();
-      const b = Math.random();
-      colors[i] = r;
-      colors[i + 1] = g;
-      colors[i + 2] = b;
-      colors[i + 3] = r;
-      colors[i + 4] = g;
-      colors[i + 5] = b;
-      colors[i + 6] = r;
-      colors[i + 7] = g;
-      colors[i + 8] = b;
-    }
+    // const colors = new Float32Array(flushBuffer.length);
+    // for (let i = 0; i < colors.length; i += 9) {
+    //   const r = Math.random();
+    //   const g = Math.random();
+    //   const b = Math.random();
+    //   colors[i] = r;
+    //   colors[i + 1] = g;
+    //   colors[i + 2] = b;
+    //   colors[i + 3] = r;
+    //   colors[i + 4] = g;
+    //   colors[i + 5] = b;
+    //   colors[i + 6] = r;
+    //   colors[i + 7] = g;
+    //   colors[i + 8] = b;
+    // }
 
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    // geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    const material = new THREE.MeshPhongMaterial( {
-        color: 0xffffff,
-        flatShading: true,
-        vertexColors: true,
-        shininess: 0,
+    const material = new THREE.MeshStandardMaterial( {
+        color: 0x4460FF,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.1
+        opacity: 0.8
     });
 
     this.geometry = geometry;
@@ -295,7 +308,6 @@ export class CirclePoly extends THREE.Mesh {
   extrude(height: number) {
     if (!this.polygon) return;
     const extruded_buff = this.polygon.extrude_by_height(height);
-    console.log(JSON.parse(extruded_buff));
     this.isExtruded = true;
     
     this.generateExtrudedGeometry(extruded_buff);
@@ -354,7 +366,6 @@ export class CirclePoly extends THREE.Mesh {
       center.add(vertex);
     }
     center.divideScalar(uniqueVertices.length);
-    console.log(center);
     uniqueVertices.sort((a, b) => {
       if (type === "side") {
         const angleA = Math.atan2(a.y - center.y, a.z - center.z);
@@ -476,7 +487,6 @@ export class RectanglePoly extends THREE.Mesh {
     if (!this.polygon) return;
     const bufFlush = this.polygon.get_buffer_flush();
     const flushBuffer = JSON.parse(bufFlush);
-    console.log(flushBuffer);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
     const material = new THREE.MeshStandardMaterial({ color: 0x3a86ff, transparent: true, opacity: 0.5 });
@@ -491,7 +501,6 @@ export class RectanglePoly extends THREE.Mesh {
   extrude(height: number) {
     if (!this.polygon) return;
     const extruded_buff = this.polygon.extrude_by_height(height);
-    console.log(JSON.parse(extruded_buff));
     this.isExtruded = true;
     this.generateExtrudedGeometry(extruded_buff);
   }
@@ -589,7 +598,6 @@ export class RectanglePoly extends THREE.Mesh {
       center.add(vertex);
     }
     center.divideScalar(uniqueVertices.length);
-    console.log(center);
     uniqueVertices.sort((a, b) => {
       if (type === "side") {
         const angleA = Math.atan2(a.y - center.y, a.z - center.z);

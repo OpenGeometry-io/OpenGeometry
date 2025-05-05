@@ -4,36 +4,13 @@
 Expect frequent updates, breaking changes, and exciting new features. 
 
 # OpenGeometry
+CAD Kernel for Web, built from scratch!
 
-#### Initialize Library
+Documentation is available at [OpenGeometry Documentation](https://docs.opengeometry.io)
 
-- `const openGeometry = new OpenGeometry()`
-- `await openGeometry.setup()`
-
-#### Create Polygon
-- `const oPoly = new OPolygon()`
-
-##### Add Points to Polygon
-- addVertex(x:number, y:number, z:number) - Add Point to the Given Polygon
-
-##### Generate Flat 2D Mesh
-- generateMesh() - Created a Flat 2D Mesh from the given Vertices
-- Minimum 3 Vertices are needed, else ask users for it
-
-### Extrude
-- Extrude is a operation which elevates the given 2D polygon by a given height
-- `polygon.extrude(height: number)`
-- returns a Buffer Geometry
-
-- Scene Graph (List of Objects)
-- Access to Scene Graph for other classes
-- Bounding Boxes for BaseGeometry (min, max)
-- Check Intersection with existing BBoxes - multiple cases - Partial Outside | Inside | Touching | Outside
-
-### Test
 #### Basic Example
-- A basic example is available at `./test/index.html`
+- A basic example is available at [Quick Start](https://github.com/OpenGeometry-io/quickstart-js)
 
 #### Advanced and Additional Examples
 - Extensive Examples(Source Code) have a separate repo - https://github.com/OpenGeometry-io/OpenGeometry-examples
-- The live demo is available at [Kernel Examples](https://demos.opengeometry.io/examples/kernel/index.html)
+- The live demo is available at [Kernel Examples](https://demos.opengeometry.io/src/kernel/index.html)
