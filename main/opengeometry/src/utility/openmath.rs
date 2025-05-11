@@ -179,7 +179,7 @@ pub struct Geometry {
 }
 
 impl Geometry {
-  fn new() -> Geometry {
+  pub fn new() -> Geometry {
     Geometry {
       vertices: Vec::new(),
       edges: Vec::new(),

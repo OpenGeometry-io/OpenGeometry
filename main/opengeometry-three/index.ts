@@ -665,3 +665,4 @@ export {
 }
 
 export * from './src/primitives/';
+export * from './src/shapes/';

@@ -19,9 +19,9 @@ pub struct BaseGeometry {
   normals: Vec<f32>,
   treated: bool,
   buffer: Vec<openmath::Vector3D>,
-  holes: Vec<Vec<openmath::Vector3D>>
+  holes: Vec<Vec<openmath::Vector3D>>,
+  flat_vertices: Vec<f64>,
 }
-
 
 impl BaseGeometry {
   // Why Getter and Setter - https://github.com/rustwasm/wasm-bindgen/issues/1775
@@ -41,14 +41,24 @@ impl BaseGeometry {
       normals: Vec::new(),
       treated: false,
       buffer: Vec::new(),
-      holes: Vec::new()
+      holes: Vec::new(),
+      flat_vertices: Vec::new(),
     }
   }
-
   
   pub fn add_vertices(&mut self, vertices: Vec<openmath::Vector3D>) {
     for vertex in vertices {
       self.vertices.push(vertex.clone());
+
+      self.flat_vertices.push(vertex.x);
+      self.flat_vertices.push(vertex.y);
+      self.flat_vertices.push(vertex.z);
+    }
+  }
+
+  pub fn add_indices(&mut self, indices: Vec<u32>) {
+    for index in indices {
+      self.indices.push(index);
     }
   }
   
@@ -88,7 +98,8 @@ impl BaseGeometry {
   
   
   pub fn get_geometry(&self) -> String {
-    serde_json::to_string(&self).unwrap()
+    let geometry = serde_json::to_string(&self).unwrap();
+    geometry
   }
 
   // pub fn get_dimension_for_vertex (&self) -> u32 {

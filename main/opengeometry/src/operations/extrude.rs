@@ -11,6 +11,7 @@ pub fn extrude_polygon_by_buffer_geometry(geom_buf: BaseGeometry, height: f64) -
 
   let current_length = buf_vertices.len();
 
+  // Bottom Face
   for i in 0..current_length {
     let edge = {
       vec![i as u8, ((i + 1) % geom_buf.get_vertices().len()) as u8]
@@ -52,20 +53,22 @@ pub fn extrude_polygon_by_buffer_geometry(geom_buf: BaseGeometry, height: f64) -
   // Side Faces
   for i in 0..current_length {
   let next = (i + 1) % current_length;
-  let face: Vec<u8> = vec![
+  let mut face: Vec<u8> = vec![
     i as u8,
     next as u8,
     (next + current_length) as u8,
     i as u8 + current_length as u8,
     ];
+    face.reverse();
     buf_faces.push(face);
   }
 
-  // Bottom Face
+  // Top Face
   let mut face: Vec<u8> = Vec::new();
   for i in 0..current_length {
     face.push(i as u8 + current_length as u8);
   }
+  face.reverse();
   buf_faces.push(face);
   
   let geometry = Geometry {

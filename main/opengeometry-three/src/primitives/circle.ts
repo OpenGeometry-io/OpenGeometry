@@ -41,6 +41,7 @@ export class BaseCircle extends THREE.Line {
     this.circleArc.generate_points();
     const bufRaw = this.circleArc.get_points();
     const bufFlush = JSON.parse(bufRaw);
+    console.log(bufFlush);
     const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
     const material = new THREE.LineBasicMaterial({ color: 0x000000 });
     this.geometry = line;

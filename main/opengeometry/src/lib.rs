@@ -22,4 +22,5 @@ pub mod primitives {
   pub mod simple_line;
   pub mod poly_line;
   pub mod rectangle;
+  pub mod cylinder;
 }
