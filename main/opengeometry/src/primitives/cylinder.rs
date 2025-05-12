@@ -187,4 +187,10 @@ impl OGCylinder {
     let outline_data_string = serde_json::to_string(&outline_points).unwrap();
     outline_data_string
   }
+
+  #[wasm_bindgen]
+  pub fn get_brep_dump(&mut self) -> String {
+    let brep_data_string = serde_json::to_string(&self.brep).unwrap();
+    brep_data_string
+  }
 }

@@ -16,7 +16,10 @@ export class Cylinder extends THREE.Mesh {
   cylinder: OGCylinder;
 
   #outlineMesh: THREE.Line | null = null;
-  #isOutline: boolean = false;
+
+  // Store local center offset to align outlines
+  // TODO: Can this be moved to Engine? It can increase performance | Needs to be used in other shapes too
+  private _geometryCenterOffset = new THREE.Vector3();
 
   constructor(options: ICylinderOptions) {
     super();
@@ -29,7 +32,6 @@ export class Cylinder extends THREE.Mesh {
   }
 
   validateOptions() {
-    console.log(this.options);
     if (!this.options) {
       throw new Error("Options are not defined for Cylinder");
     }
@@ -39,9 +41,8 @@ export class Cylinder extends THREE.Mesh {
     this.validateOptions();
 
     const { radius, height, segments, angle, center } = this.options;
-    this.options.center = center || new Vector3D(0, 0, 0);
     this.cylinder.set_config(
-      this.options.center,
+      center?.clone() || new Vector3D(0, 0, 0),
       radius,
       height,
       angle,
@@ -53,41 +54,59 @@ export class Cylinder extends THREE.Mesh {
     this.cylinder.generate_geometry();
     const geometryData = this.cylinder.get_geometry();
     const bufferData = JSON.parse(geometryData);
-    console.log(bufferData);
 
     const geometry = new THREE.BufferGeometry();
-      // .setFromPoints(bufferData.vertices)
-      // .setIndex(bufferData.indices);
-
     geometry.setAttribute(
       "position",
       new THREE.Float32BufferAttribute(bufferData, 3)
     );
+
     const material = new THREE.MeshStandardMaterial({
-      color: 0x00ff00, 
-      // side: THREE.DoubleSide, 
-      transparent: true, 
-      opacity: 0.5, 
-      // wireframe: true
+      color: 0x00ff00,
+      transparent: true,
+      opacity: 0.6,
     });
 
     geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+
+    const boundingBox = geometry.boundingBox;
+    if (boundingBox) {
+      boundingBox.getCenter(this._geometryCenterOffset);
+      geometry.translate(
+        -this._geometryCenterOffset.x,
+        -this._geometryCenterOffset.y,
+        -this._geometryCenterOffset.z
+      );
+    }
 
     this.geometry = geometry;
     this.material = material;
+
+    this.position.set(
+      this.options.center?.x || 0,
+      this.options.center?.y || 0,
+      this.options.center?.z || 0
+    );
   }
 
   set outline(enable: boolean) {
-    if (!this.outline) {
+    if (enable && !this.#outlineMesh) {
       const outline_buff = this.cylinder.outline_edges();
       const outline_buf = JSON.parse(outline_buff);
-      console.log(outline_buf);
 
       const outlineGeometry = new THREE.BufferGeometry();
       outlineGeometry.setAttribute(
         "position",
         new THREE.Float32BufferAttribute(outline_buf, 3)
       );
+
+      outlineGeometry.translate(
+        -this._geometryCenterOffset.x,
+        -this._geometryCenterOffset.y,
+        -this._geometryCenterOffset.z
+      );
+
       const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
       this.#outlineMesh = new THREE.LineSegments(
         outlineGeometry,
@@ -95,7 +114,18 @@ export class Cylinder extends THREE.Mesh {
       );
 
       this.add(this.#outlineMesh);
-      this.#isOutline = true;
     }
+
+    if (!enable && this.#outlineMesh) {
+      this.remove(this.#outlineMesh);
+      this.#outlineMesh.geometry.dispose();
+      this.#outlineMesh = null;
+    }
+  }
+
+  getBrepData() {
+    const brepData = this.cylinder.get_brep_dump();
+    const brepDataParsed = JSON.parse(brepData);
+    console.log(brepDataParsed);
   }
 }
