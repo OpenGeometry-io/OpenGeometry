@@ -298,33 +298,36 @@ impl BasePolygon {
     self.extruded = true;
     self.extruded_height = height;
 
-    let extruded_raw = extrude_polygon_by_buffer_geometry(self.geometry.clone(), height);
+    let extrude_data = extrude_polygon_by_buffer_geometry(self.geometry.clone(), height);
   
-    // THIS IS WORKING    
-    let faces = extruded_raw.faces;
-    let vertices = extruded_raw.vertices;
-
-    let mut generated: Vec<f64> = Vec::new();
-
-    // this works for now, but need to find a better way to do this
-    for face in faces {
+    let mut local_geometry = Vec::new();
+    
+    // let face = extrude_data.faces[0].clone();
+    for face in extrude_data.faces.clone() {
       let mut face_vertices: Vec<Vector3D> = Vec::new();
-      for index in face {
-        face_vertices.push(vertices[index as usize].clone());
+      for index in face.clone() {
+        face_vertices.push(extrude_data.vertices[index as usize].clone());
       }
 
       let triangulated_face = triangulate::triangulate_polygon_by_face(face_vertices.clone());
       for index in triangulated_face {
         for i in index {
           let vertex = face_vertices[i as usize];
-          generated.push(vertex.x);
-          generated.push(vertex.y);
-          generated.push(vertex.z);
+          local_geometry.push(vertex.x);
+          local_geometry.push(vertex.y);
+          local_geometry.push(vertex.z);
         }
       }
     }
+    
+    // let face_data_string = serde_json::to_string(&face).unwrap(); // Serialize face_data
+    // face_data_string
 
-    serde_json::to_string(&generated).unwrap()
+    // let extrude_data_string = serde_json::to_string(&extrude_data).unwrap(); // Serialize extrude_data
+    // extrude_data_string
+
+    let string_data = serde_json::to_string(&local_geometry).unwrap();
+    string_data
 
 
     // ABOVE LINE WORKING

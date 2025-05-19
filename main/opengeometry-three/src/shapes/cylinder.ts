@@ -54,7 +54,8 @@ export class Cylinder extends THREE.Mesh {
     this.cylinder.generate_geometry();
     const geometryData = this.cylinder.get_geometry();
     const bufferData = JSON.parse(geometryData);
-
+    console.log(bufferData);
+    
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
       "position",

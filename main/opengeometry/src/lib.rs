@@ -23,4 +23,5 @@ pub mod primitives {
   pub mod poly_line;
   pub mod rectangle;
   pub mod cylinder;
+  pub mod polygon;
 }

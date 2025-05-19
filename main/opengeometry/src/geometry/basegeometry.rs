@@ -21,6 +21,7 @@ pub struct BaseGeometry {
   buffer: Vec<openmath::Vector3D>,
   holes: Vec<Vec<openmath::Vector3D>>,
   flat_vertices: Vec<f64>,
+  pub ccw: bool,
 }
 
 impl BaseGeometry {
@@ -43,7 +44,12 @@ impl BaseGeometry {
       buffer: Vec::new(),
       holes: Vec::new(),
       flat_vertices: Vec::new(),
+      ccw: false,
     }
+  }
+
+  pub fn set_ccw(&mut self, ccw: bool) {
+    self.ccw = ccw;
   }
   
   pub fn add_vertices(&mut self, vertices: Vec<openmath::Vector3D>) {

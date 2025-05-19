@@ -193,3 +193,36 @@ impl Geometry {
     serialized
   }
 }
+
+
+// Brep Geometry with Holes
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Geometry_Holes {
+  pub vertices: Vec<Vector3D>,
+  pub edges: Vec<Vec<u8>>,
+  pub faces: Vec<Vec<u8>>,
+  pub holes: Vec<Vec<Vector3D>>,
+  pub face_holes_map: HashMap<u8, Vec<u8>>,
+  pub is_ccw_last_face: bool,
+  pub face_length: usize
+}
+
+impl Geometry_Holes {
+  pub fn new() -> Geometry_Holes {
+    Geometry_Holes {
+      vertices: Vec::new(),
+      edges: Vec::new(),
+      faces: Vec::new(),
+      holes: Vec::new(),
+      face_holes_map: HashMap::new(),
+      is_ccw_last_face: false,
+      face_length: 0,
+    }
+  }
+
+  pub fn get_geometry(&self) -> String {
+    // serialize geometry
+    let serialized = serde_json::to_string(&self).unwrap();
+    serialized
+  }
+}

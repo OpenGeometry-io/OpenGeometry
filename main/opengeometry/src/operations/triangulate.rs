@@ -89,10 +89,16 @@ pub fn tricut(polygon_vertices: Vec<Vector3D>) -> Vec<Vec<u32>> {
 pub fn triangulate_polygon_buffer_geometry(geom_buf: BaseGeometry) -> Vec<Vec<u32>> {
   
   let raw_vertices = geom_buf.get_vertices().clone();
-  let ccw_vertices = windingsort::ccw_test(raw_vertices.clone());
 
+  let vertices;
+
+  if (geom_buf.ccw) {
+    vertices = raw_vertices;
+  } else {
+    vertices = windingsort::ccw_test(raw_vertices.clone());
+  }
   // let mut triangles_vertices: Vec<f64> = Vec::new();
-  let tri_indices = tricut(ccw_vertices);
+  let tri_indices = tricut(vertices);
   
   tri_indices
 }
@@ -134,6 +140,7 @@ pub fn flatten_buffer_geometry(mut geom_buf: BaseGeometry) -> FlattenData {
     current_index += 1;
   }
 
+  // Do we check for clockwise or counterclockwise here?
   for hole in geom_buf.get_holes() {
     for vertex in &hole {
       vertices.push(vertex.x);
@@ -175,6 +182,9 @@ pub fn flatten_buffer_geometry(mut geom_buf: BaseGeometry) -> FlattenData {
 //   )
 // }
 
+/**
+ * Find Right Most Point in Given Polygon or Hole
+ */
 pub fn find_right_most_point_index(flat_data_vertices: Vec<f64>, start: u32, end: u32) -> u32 {
   let mut i = start;
   let mut right_most_index = start;

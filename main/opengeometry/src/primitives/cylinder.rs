@@ -1,7 +1,9 @@
 use core::str;
+use std::clone;
 
 use crate::operations::extrude::{self, extrude_polygon_by_buffer_geometry};
 use crate::operations::triangulate::triangulate_polygon_by_face;
+use crate::operations::windingsort;
 use crate::utility::openmath::{Geometry, Vector3D};
 /**
  * Copyright (c) 2025, OpenGeometry. All rights reserved.
@@ -113,7 +115,11 @@ impl OGCylinder {
     
     // Side Faces Indices
 
-    self.geometry.add_vertices(points);
+    // let ccw_points = windingsort::ccw_test(points.clone());
+    // self.geometry.add_vertices(ccw_points.clone());
+    let mut clonedpoints = points.clone();
+    clonedpoints.reverse();
+    self.geometry.add_vertices(clonedpoints);
     self.geometry.add_indices(indices);
   }
 
@@ -139,9 +145,11 @@ impl OGCylinder {
       }
 
       let triangulated_face = triangulate_polygon_by_face(face_vertices.clone());
+      // let ccw_vertices = windingsort::ccw_test(face_vertices.clone());
       for index in triangulated_face {
         for i in index {
-          let vertex = face_vertices[i as usize];
+          let vertex = face_vertices[i as usize].clone();
+          // let vertex = ccw_vertices[i as usize];
           local_geometry.push(vertex.x);
           local_geometry.push(vertex.y);
           local_geometry.push(vertex.z);

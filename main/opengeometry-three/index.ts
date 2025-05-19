@@ -6,6 +6,7 @@ import init, {
   OGSimpleLine,
   OGPolyLine,
   OGRectangle,
+  OGPolygon,
 } from "../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
@@ -189,9 +190,16 @@ export class BasePoly extends THREE.Mesh {
     const flushBuffer = JSON.parse(flush);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
-    geometry.computeVertexNormals();
+    // geometry.computeVertexNormals();
 
-    const material = new THREE.MeshStandardMaterial({ color: 0x3a86ff, side: THREE.DoubleSide });
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x00ff00, 
+      // side: THREE.DoubleSide, 
+      transparent: true, 
+      opacity: 0.5, 
+      // wireframe: true
+    });
+    
     this.geometry = geometry;
     this.material = material;
   }
@@ -205,17 +213,19 @@ export class BasePoly extends THREE.Mesh {
   generateExtrudedGeometry(extruded_buff: string) {
     // THIS WORKS
     const flushBuffer = JSON.parse(extruded_buff);
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
-    geometry.computeVertexNormals();
+    console.log(flushBuffer);
 
-    const material = new THREE.MeshPhongMaterial({
-      color: 0x3a86ff,
-    });
-    material.side = THREE.DoubleSide;
+    // const geometry = new THREE.BufferGeometry();
+    // geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
+    // // geometry.computeVertexNormals();
 
-    this.geometry = geometry;
-    this.material = material;
+    // // const material = new THREE.MeshPhongMaterial({
+    // //   color: 0x3a86ff,
+    // // });
+    // // material.side = THREE.DoubleSide;
+
+    // this.geometry = geometry;
+    // this.material = material;
   }
 }
 
@@ -229,7 +239,7 @@ interface IBaseCircleOptions {
 
 export class CirclePoly extends THREE.Mesh {
   ogid: string;
-  polygon: BasePolygon | null = null;
+  polygon: OGPolygon | null = null;
   baseCircle: BaseCircle;
   isExtruded: boolean = false;
 
@@ -260,7 +270,7 @@ export class CirclePoly extends THREE.Mesh {
 
   generateGeometry() {
     if (!this.baseCircle.circleArc) return;
-    this.polygon = BasePolygon.new_with_circle(this.baseCircle.circleArc.clone());
+    this.polygon = OGPolygon.new_with_circle(this.baseCircle.circleArc.clone());
   }
 
   addFlushBufferToScene() {
@@ -290,11 +300,12 @@ export class CirclePoly extends THREE.Mesh {
 
     // geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    const material = new THREE.MeshStandardMaterial( {
-        color: 0x4460FF,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.8
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x00ff00, 
+      // side: THREE.DoubleSide, 
+      transparent: true, 
+      opacity: 0.5, 
+      // wireframe: true
     });
 
     this.geometry = geometry;
@@ -308,9 +319,17 @@ export class CirclePoly extends THREE.Mesh {
   extrude(height: number) {
     if (!this.polygon) return;
     const extruded_buff = this.polygon.extrude_by_height(height);
+    console.log(JSON.parse(extruded_buff));
     this.isExtruded = true;
     
     this.generateExtrudedGeometry(extruded_buff);
+  }
+
+  getBrepData() {
+    if (!this.polygon) return;
+    const brepData = this.polygon.get_brep_data();
+    const parsedData = JSON.parse(brepData);
+    console.log(parsedData);
   }
  
   getOutline(type: OUTLINE_TYPE) {
@@ -412,7 +431,6 @@ export class CirclePoly extends THREE.Mesh {
     const flushBuffer = JSON.parse(extruded_buff);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
-    geometry.computeVertexNormals();
 
     // To Test If Triangulation is working
     // const colors = new Float32Array(flushBuffer.length);
@@ -441,13 +459,13 @@ export class CirclePoly extends THREE.Mesh {
     //     side: THREE.DoubleSide
     // });
 
-    const material = new THREE.MeshPhongMaterial({
-      color: 0x3a86ff,
-    });
-    material.side = THREE.DoubleSide;
+    // const material = new THREE.MeshPhongMaterial({
+    //   color: 0x3a86ff,
+    // });
+    // material.side = THREE.DoubleSide;
     
     this.geometry = geometry;
-    this.material = material;
+    // this.material = material;
   }
 }
 
