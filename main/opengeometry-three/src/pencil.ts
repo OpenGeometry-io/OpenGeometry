@@ -54,12 +54,14 @@ export class Pencil {
     this.raycaster.params.Line.threshold = 0.1
 
     // A Dummy Ground Plane
-    const geometry = new THREE.PlaneGeometry(100, 100);
+    const geometry = new THREE.PlaneGeometry(1000, 1000);
+    // const material = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide, wireframe: true });
     const material = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide, transparent: true, opacity: 0 });
     const plane = new THREE.Mesh(geometry, material);
     plane.name = "pencil-ground";
     plane.rotation.x = Math.PI / 2;
     this.scene.add(plane);
+    // plane.visible = true;
     plane.visible = false;
     this.dummyPlane = plane;
   }
@@ -139,5 +141,19 @@ export class Pencil {
         this.onElementSelected.trigger(intersect.object as THREE.Mesh);
       }
     });
+  }
+
+  fireCursor(mouse: MouseEvent) {
+    const rect = this.container.getBoundingClientRect();
+    const x = ((mouse.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((mouse.clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
+    const intersects = this.raycaster.intersectObjects([this.dummyPlane!]);
+    
+    if (intersects.length > 0) {
+      const point = intersects[0].point;
+      this.onCursorDown.trigger(point);
+    }
   }
 }

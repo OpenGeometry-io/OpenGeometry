@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 import { IBaseCircleOptions } from "../base-types";
 
+// TODO: What if user wants infintely smooth circle
 export class BaseCircle extends THREE.Line {
   ogid: string;
   circleArc: CircleArc;
@@ -41,7 +42,6 @@ export class BaseCircle extends THREE.Line {
     this.circleArc.generate_points();
     const bufRaw = this.circleArc.get_points();
     const bufFlush = JSON.parse(bufRaw);
-    console.log(bufFlush);
     const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
     const material = new THREE.LineBasicMaterial({ color: 0x000000 });
     this.geometry = line;

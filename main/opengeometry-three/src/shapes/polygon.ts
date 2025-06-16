@@ -47,6 +47,22 @@ export class Polygon extends THREE.Mesh {
     // };
   }
 
+  translate(translation: Vector3D) {
+    if (!this.polygon) return;
+
+    console.log("Translating polygon by", translation.x, translation.y, translation.z);
+    this.geometry.dispose();
+    this.polygon.clear_buffer();
+
+    this.polygon.translate(translation);
+    this.polygon.triangulate();
+    console.log("Polygon translated by", translation);
+
+    const bufFlush = this.polygon.get_buffer_flush();
+    console.log("Buffer flush after translation:", bufFlush);
+    this.addFlushBufferToScene(bufFlush);
+  }
+
   addVertices(vertices: Vector3D[]) {
     if (!this.polygon) return;
     this.polygon.add_vertices(vertices);
@@ -59,7 +75,7 @@ export class Polygon extends THREE.Mesh {
     if (!this.polygon) return;
     this.layerVertices = [];
     this.geometry.dispose();
-    this.polygon?.reset_polygon();
+    this.polygon?.clear_vertices();
     this.isTriangulated = false;
   }
 
@@ -67,7 +83,7 @@ export class Polygon extends THREE.Mesh {
     if (this.isTriangulated) {
       this.layerVertices = [];
       this.geometry.dispose();
-      this.polygon?.reset_polygon();
+      this.polygon?.clear_vertices();
       this.isTriangulated = false;
 
       for (const vertex of this.layerBackVertices) {
@@ -126,7 +142,7 @@ export class Polygon extends THREE.Mesh {
 
     const material = new THREE.MeshStandardMaterial({
       color: 0x00ff00, 
-      // side: THREE.DoubleSide, 
+      side: THREE.DoubleSide, 
       transparent: true, 
       opacity: 0.5, 
       // wireframe: true
@@ -153,18 +169,33 @@ export class Polygon extends THREE.Mesh {
     geometry.computeVertexNormals();
     this.geometry = geometry;
 
-    // const material = new THREE.MeshStandardMaterial({
-    //   color: 0x3a86ff,
-    // });
-    // // material.side = THREE.DoubleSide;
-    // this.material = material;
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x00ff00, 
+      side: THREE.FrontSide, 
+      transparent: true, 
+      opacity: 0.5, 
+      // wireframe: true
+    });
+    this.material = material;
   }
 
   getBrepData() {
-    if (!this.polygon) return;
+    if (!this.polygon) return null;
     const brepData = this.polygon.get_brep_data();
-    const parsedData = JSON.parse(brepData);
-    console.log(parsedData); 
+    return brepData;
+  }
+
+  set outlineColor(color: number) {
+    if (this.#outlineMesh && this.#outlineMesh.material instanceof THREE.LineBasicMaterial) {
+      this.#outlineMesh.material.color.set(color);
+    }
+  }
+
+  get outlineColor() {
+    if (this.#outlineMesh && this.#outlineMesh.material instanceof THREE.LineBasicMaterial) {
+      return this.#outlineMesh.material.color.getHex();
+    }
+    return 0x000000; // Default color if outline mesh is not present
   }
 
   set outline(enable: boolean) {
@@ -206,5 +237,29 @@ export class Polygon extends THREE.Mesh {
       return true;
     }
     return false;
+  }
+
+  bTree() {
+    if (!this.polygon) return;
+    const bTree = this.polygon.binary_tree();
+    const parsedData = JSON.parse(bTree);
+    console.log(parsedData);
+  }
+
+  dispose() {
+    // console.log("Disposing OG - Polygon");
+    this.geometry.dispose();
+    if (this.material instanceof THREE.Material) {
+      this.material.dispose();
+    }
+    if (this.#outlineMesh) {
+      this.#outlineMesh.geometry.dispose();
+      if (this.#outlineMesh.material instanceof THREE.Material) {
+        this.#outlineMesh.material.dispose();
+      }
+    }
+    this.polygon = null;
+    this.layerVertices = [];
+    this.layerBackVertices = [];
   }
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::operations::extrude::{extrude_polygon_by_buffer_geometry, extrude_polygon_with_holes};
 use crate::operations::triangulate::triangulate_polygon_buffer_geometry;
-use crate::operations::windingsort;
+use crate::operations::{self, windingsort};
 use crate::{geometry, primitives};
 use crate::utility::openmath::{Geometry, Vector3D};
 use crate::{operations::triangulate, utility::openmath};
@@ -25,6 +25,16 @@ pub struct OGPolygon {
   buffer: Vec<f64>,
   variable_geometry: basegeometry::BaseGeometry,
   brep: Geometry,
+}
+
+impl Drop for OGPolygon {
+  fn drop(&mut self) {
+    self.buffer.clear();
+    self.geometry.reset_geometry();
+    self.variable_geometry.reset_geometry();
+    self.brep.clear();
+    web_sys::console::log_1(&format!("Clearing Polygon with ID: {}", self.id).into());
+  }
 }
 
 /**
@@ -64,6 +74,24 @@ impl OGPolygon {
   }
 
   #[wasm_bindgen]
+  pub fn translate(&mut self, translation: openmath::Vector3D) {
+    self.position.x += translation.x;
+    self.position.y += translation.y;
+    self.position.z += translation.z;
+
+    self.geometry.translate(translation);
+
+    // TODO: Variable Geometry is used for triangulation with holes - Later
+    // self.variable_geometry.translate(translation);
+  }
+
+  // #[wasm_bindgen]
+  // pub fn set_position(&mut self, position: openmath::Vector3D) {
+  //   self.position = position;
+  //   self.geometry.set_position(position);
+  // }
+
+  #[wasm_bindgen]
   pub fn new_with_circle(circle_arc: primitives::circle::CircleArc) -> OGPolygon {
     let mut polygon = OGPolygon::new(circle_arc.id());
     // discard the last point as it is same as the first point
@@ -89,6 +117,32 @@ impl OGPolygon {
   #[wasm_bindgen]
   pub fn add_vertices(&mut self, vertices: Vec<openmath::Vector3D>) {
     self.geometry.add_vertices(vertices);
+
+    // If more than 3 vertices are added, then the polygon is created
+    if self.geometry.get_vertices().len() > 2 {
+      self.is_polygon = true;
+
+      // Create BREP - Should we do it when user asks for it explicitly and not when we add vertices?
+      // That way we can save some time + memory
+      let vertices = self.geometry.get_vertices();
+      let mut faces: Vec<Vec<u8>> = Vec::new();
+      let mut edges: Vec<Vec<u8>> = Vec::new();
+      let face: Vec<u8> = self.geometry.get_indices().into_iter().map(|x| x as u8).collect();
+      faces.push(face.clone());
+      for i in 0..vertices.len() {
+        let edge = {
+          vec![i as u8, ((i + 1) % vertices.len()) as u8]
+        };
+        edges.push(edge);
+      }
+      // Create BREP
+      let brep = Geometry {
+        vertices: vertices.clone(),
+        faces: faces.clone(),
+        edges: edges.clone()
+      };
+      self.brep = brep.clone();
+    }
   }
   
   #[wasm_bindgen]
@@ -110,7 +164,7 @@ impl OGPolygon {
   pub fn triangulate(&mut self) -> String {
     self.is_polygon = true;
     
-    let indices = triangulate_polygon_buffer_geometry(self.geometry.clone());
+    let mut indices = triangulate_polygon_buffer_geometry(self.geometry.clone());
 
     // This is important as the current vertices are not in the same order as the indices, Genius Vishwajeet
     let ccw_vertices = windingsort::ccw_test(self.geometry.get_vertices());
@@ -127,6 +181,7 @@ impl OGPolygon {
         self.buffer.push(vertex.z);
       }
     }
+
     serde_json::to_string(&self.buffer).unwrap()
   }
 
@@ -452,7 +507,13 @@ impl OGPolygon {
   }
 
   #[wasm_bindgen]
+  pub fn clear_buffer(&mut self) {
+    self.buffer.clear();
+  }
+
+  #[wasm_bindgen]
   pub fn clear_vertices(&mut self) {
+    self.buffer.clear();
     self.geometry.reset_geometry();
   }
 
@@ -661,6 +722,11 @@ impl OGPolygon {
     geometry
   }
 
+  // pub fn get_brep(&self) -> Vec<Vec<u8>> {
+  //   let faces = self.brep.get_faces();
+  //   faces
+  // }
+
   #[wasm_bindgen]
   pub fn outline_edges(&mut self) -> String {
     let mut outline_points: Vec<f64> = Vec::new();
@@ -683,5 +749,19 @@ impl OGPolygon {
 
     let outline_data_string = serde_json::to_string(&outline_points).unwrap();
     outline_data_string
+  }
+
+  // Test Binary Tree
+  #[wasm_bindgen]
+  pub fn binary_tree(&self) -> String {
+    let mut b_tree = operations::binary_tree::Binary2DTree::new();
+    b_tree.add_polygon(self.clone());
+
+    b_tree.build_tree();
+
+    let mid = b_tree.get_middle_index(&self);
+    
+    let mid_string = serde_json::to_string(&mid).unwrap();
+    mid_string
   }
 }

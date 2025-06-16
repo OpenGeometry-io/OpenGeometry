@@ -59,6 +59,8 @@ impl BaseGeometry {
       self.flat_vertices.push(vertex.x);
       self.flat_vertices.push(vertex.y);
       self.flat_vertices.push(vertex.z);
+
+      self.indices.push(self.vertices.len() as u32 - 1);
     }
   }
 
@@ -66,6 +68,10 @@ impl BaseGeometry {
     for index in indices {
       self.indices.push(index);
     }
+  }
+
+  pub fn get_indices(&self) -> Vec<u32> {
+    self.indices.clone()
   }
   
   pub fn add_holes(&mut self, holes: Vec<openmath::Vector3D>) {
@@ -80,29 +86,25 @@ impl BaseGeometry {
   
   pub fn add_vertex(&mut self, vertex: openmath::Vector3D) {
     self.vertices.push(vertex.clone());
+    self.indices.push(self.vertices.len() as u32 - 1);
   }
 
-  
   pub fn add_index(&mut self, index: u32) {
     self.indices.push(index);
   }
-
   
   pub fn add_normal(&mut self, normal: f32) {
     self.normals.push(normal);
   }
-
   
   pub fn clone_geometry(&self) -> BaseGeometry {
     self.clone()
   }
-
   
   pub fn get_vertices(&self) -> Vec<openmath::Vector3D> {
     self.vertices.clone()
   }
-  
-  
+    
   pub fn get_geometry(&self) -> String {
     let geometry = serde_json::to_string(&self).unwrap();
     geometry
@@ -111,9 +113,18 @@ impl BaseGeometry {
   // pub fn get_dimension_for_vertex (&self) -> u32 {
   //   self.vertices[0].
   // }
+
+  pub fn translate(&mut self, translation: openmath::Vector3D) {
+    for vertex in &mut self.vertices {
+      vertex.x += translation.x;
+      vertex.y += translation.y;
+      vertex.z += translation.z;
+    }
+  }
   
   pub fn reset_geometry(&mut self) {
     self.vertices.clear();
+    self.flat_vertices.clear();
     self.indices.clear();
     self.normals.clear();
     self.holes.clear();

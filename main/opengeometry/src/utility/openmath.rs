@@ -1,5 +1,5 @@
 use core::num;
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap, hash::Hash, ptr::null};
 
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
@@ -83,6 +83,41 @@ impl Vector3D {
       y: self.y,
       z: self.z
     }
+  }
+
+  pub fn length_squared(&self) -> f64 {
+    self.x * self.x + self.y * self.y + self.z * self.z
+  }
+
+  pub fn magnitude(&self) -> f64 {
+    (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
+  }
+
+  pub fn normalize(&self) -> Vector3D {
+    let mag = self.magnitude();
+    if mag == 0.0 {
+      return Vector3D { x: 0.0, y: 0.0, z: 0.0 };
+    }
+    Vector3D {
+      x: self.x / mag,
+      y: self.y / mag,
+      z: self.z / mag
+    }
+  }
+
+  pub fn multiply(&self, scalar: f64) -> Vector3D {
+    Vector3D {
+      x: self.x * scalar,
+      y: self.y * scalar,
+      z: self.z * scalar
+    }
+  }
+
+  pub fn distance_to(&self, other: &Vector3D) -> f64 {
+    let dx = self.x - other.x;
+    let dy = self.y - other.y;
+    let dz = self.z - other.z;
+    (dx * dx + dy * dy + dz * dz).sqrt()
   }
 }
 
@@ -191,6 +226,24 @@ impl Geometry {
     // serialize geometry
     let serialized = serde_json::to_string(&self).unwrap();
     serialized
+  }
+
+  pub fn get_geometry_raw(&self) -> Geometry {
+    self.clone()
+  }
+
+  pub fn get_faces(&self) -> Vec<Vec<u8>> {
+    self.faces.clone()
+  }
+
+  pub fn add_edge(&mut self, edge: Vec<u8>) {
+    self.edges.push(edge);
+  }
+
+  pub fn clear(&mut self) {
+    self.vertices.clear();
+    self.edges.clear();
+    self.faces.clear();
   }
 }
 

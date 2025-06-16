@@ -51,7 +51,7 @@ export class OpenGeometry {
     return openGeometry;
   }
 
-  private async setup(wasmURL: string) {
+  async setup(wasmURL: string) {
     await init(wasmURL);
     this.setuplabelRenderer();
     if (!this.container || !this.scene) return;
@@ -466,6 +466,14 @@ export class CirclePoly extends THREE.Mesh {
     
     this.geometry = geometry;
     // this.material = material;
+  }
+
+  dispose() {
+    if (!this.polygon) return;
+    this.geometry.dispose();
+    this.polygon?.clear_vertices();
+    this.polygon = null;
+    this.isExtruded = false;
   }
 }
 

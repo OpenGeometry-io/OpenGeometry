@@ -24,3 +24,19 @@ pub fn ccw_test(raw_points: Vec<Vector3D>) -> Vec<Vector3D> {
   }
   points
 }
+
+pub fn is_ccw_need(raw_points: Vec<Vector3D>) -> ccw_and_flag {
+  let mut points = raw_points;
+  let area = compute_signed_area(&points);
+  if area < 0.0 {
+    points.reverse();
+    ccw_and_flag { ccw: points, flag: true }
+  } else {
+    ccw_and_flag { ccw: points, flag: false }
+  }
+}
+
+pub struct ccw_and_flag {
+  pub ccw: Vec<Vector3D>,
+  pub flag: bool,
+}

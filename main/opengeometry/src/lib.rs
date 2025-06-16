@@ -11,6 +11,7 @@ pub mod operations {
   pub mod triangulate;
   pub mod windingsort;
   pub mod extrude;
+  pub mod binary_tree;
 }
 
 pub mod utility {

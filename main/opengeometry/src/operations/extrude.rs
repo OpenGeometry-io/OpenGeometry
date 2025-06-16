@@ -244,8 +244,7 @@ pub fn extrude_polygon_with_holes(mut geom_buf: BaseGeometry, height: f64) -> Ge
         buf_edges.push(edge);
       }
 
-      // SOME PROBLEM WITH THIS
-      // // Hole Side Face Actuals
+      // Hole Side Face Actuals
       let hole_end_index = buf_vertices.len() - hole.len();
       for i in 0..hole.len() {
         let next = (i + 1) % hole.len();
