@@ -27,36 +27,17 @@ export class OpenGeometry {
   private _pencil: Pencil | undefined;
   private _labelRenderer: CSS2DRenderer | undefined;
 
-  constructor(container:HTMLElement, threeScene: THREE.Scene, private camera: THREE.Camera) {
-    this.scene = threeScene;
-    this.container = container;
-  }
+  private _enableDebug: boolean = false;
 
-  // Why Generic Types are used sometimes
-  // verifyOptions(options: OpenGeometryOptions) {
-  //   for (const key in options) {
-  //     if (options[key as keyof OpenGeometryOptions] === undefined) {
-  //       throw new Error(`Missing required option: ${key}`);
-  //     }
-  //   }
-  // }
-
-  static async create(options: OpenGeometryOptions) {
-    const { container, scene, camera } = options;
-    if (!container || !scene || !camera) {
-      throw new Error("Missing required options");
+  set enablePencil(value: boolean) {
+    if (value && !this._pencil) {
+      if (!this.container || !this.scene) {
+        throw new Error("Container or Scene is not defined");
+      }
+      this._pencil = new Pencil(this.container, this.scene, this.camera);
+    } else if (!value && this._pencil) {
+      // TODO: Disable The Pencil Usage and Dispose it
     }
-    const openGeometry = new OpenGeometry(container, scene, camera);
-    await openGeometry.setup(options.wasmURL);
-    return openGeometry;
-  }
-
-  async setup(wasmURL: string) {
-    await init(wasmURL);
-    this.setuplabelRenderer();
-    if (!this.container || !this.scene) return;
-    this._pencil = new Pencil(this.container, this.scene, this.camera);
-    this.setupEvent();
   }
 
   get pencil() {
@@ -67,7 +48,69 @@ export class OpenGeometry {
     return this._labelRenderer;
   }
 
-  setuplabelRenderer() {
+  get enableDebug() {
+    return this._enableDebug;
+  }
+
+  /**
+   * Enables or disables debug mode for OpenGeometry.
+   * When enabled, it logs debug information to the console.
+   * Addtionally,
+   * 1. The geometry will be rendered with a semi-transparent material.
+   * 2. The faces will be rendered with a random color.
+   * 3. The normals will be rendered for better visualization.
+   * @param value - A boolean indicating whether to enable or disable debug mode.
+   */
+  set enableDebug(value: boolean) {
+    this._enableDebug = value;
+    if (this._enableDebug) {
+      console.log("OpenGeometry Debug Mode Enabled");
+    }
+  }
+
+  constructor(container:HTMLElement, threeScene: THREE.Scene, private camera: THREE.Camera) {
+    this.scene = threeScene;
+    this.container = container;
+  }
+
+  /**
+   * Asynchronously creates and initializes an instance of OpenGeometry.
+   *
+   * This factory method sets up the OpenGeometry engine by linking it with the
+   * rendering context and the WebAssembly module. It ensures all required
+   * options are provided and prepares the instance for 3D geometry operations.
+   *
+   * @param options - Configuration object for initializing OpenGeometry.
+   * @returns A promise that resolves to a fully initialized OpenGeometry instance.
+   * @throws If any of the required options (`container`, `scene`, or `camera`) are missing.
+   *
+   * @example
+   * ```ts
+   * const openGeometry = await OpenGeometry.create({
+   *   container: document.getElementById('myContainer')!,
+   *   scene: threeScene,
+   *   camera: threeCamera,
+   *   wasmURL: '/assets/opengeometry.wasm'
+   * });
+   * ```
+   */
+  static async create(options: OpenGeometryOptions) {
+    const { container, scene, camera } = options;
+    if (!container || !scene || !camera) {
+      throw new Error("Missing required options");
+    }
+    const openGeometry = new OpenGeometry(container, scene, camera);
+    await openGeometry.setup(options.wasmURL);
+    return openGeometry;
+  }
+
+  private async setup(wasmURL: string) {
+    await init(wasmURL);
+    this.setuplabelRenderer();
+    this.setupEvent();
+  }
+
+  private setuplabelRenderer() {
     if (!this.container || !this.scene) {
       throw new Error("Container or Scene is not defined");
     }
@@ -80,13 +123,22 @@ export class OpenGeometry {
     this._labelRenderer = labelRenderer;
   }
 
-  setupEvent() {
+  private setupEvent() {
+    // NOTE: The responsibility to resize normal rendererer lies with the user
+    // but the label renderer should be resized automatically
     window.addEventListener("resize", () => {
       if (!this.container) return;
       this._labelRenderer?.setSize(this.container?.clientWidth, this.container?.clientHeight);
     });
   }
 
+  // TODO: Can this be handled inside the OpenGeometry class itself?
+  /**
+   * Updates the label renderer to render the scene with the given camera.
+   * This method should be called in the animation loop or render loop of your application.
+   * @param scene - The Three.js scene containing the objects to be rendered.
+   * @param camera - The Three.js camera used for rendering the scene.
+   */
   update(scene: THREE.Scene, camera: THREE.Camera) {
     this._labelRenderer?.render(scene, camera);
   }
