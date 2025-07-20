@@ -1,5 +1,4 @@
-import init, { 
-  Vector3D, 
+import init, {
   BasePolygon,
   BaseFlatMesh,
   CircleArc,
@@ -7,7 +6,10 @@ import init, {
   OGPolyLine,
   OGRectangle,
   OGPolygon,
+  Vector3
 } from "../opengeometry/pkg/opengeometry";
+// Vector3 is also available in opengeometry package
+// import { Vector3 } from "@opengeometry/openmaths";
 import * as THREE from "three";
 import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { getUUID } from "./src/utils/randomizer";
@@ -146,13 +148,13 @@ export class OpenGeometry {
 
 export class BasePoly extends THREE.Mesh {
   ogid: string;
-  layerVertices: Vector3D[] = [];
-  layerBackVertices: Vector3D[] = [];
+  layerVertices: Vector3[] = [];
+  layerBackVertices: Vector3[] = [];
 
   polygon: BasePolygon | null = null;
   isTriangulated: boolean = false;
 
-  constructor(vertices?: Vector3D[]) {
+  constructor(vertices?: Vector3[]) {
     super();
     this.ogid = getUUID();
     this.polygon = new BasePolygon(this.ogid);
@@ -168,7 +170,7 @@ export class BasePoly extends THREE.Mesh {
     }
   }
 
-  addVertices(vertices: Vector3D[]) {
+  addVertices(vertices: Vector3[]) {
     if (!this.polygon) return;
     this.polygon.add_vertices(vertices);
     this.polygon?.triangulate();
@@ -184,7 +186,7 @@ export class BasePoly extends THREE.Mesh {
     this.isTriangulated = false;
   }
 
-  addVertex(threeVertex: Vector3D) {
+  addVertex(threeVertex: Vector3) {
     if (this.isTriangulated) {
       this.layerVertices = [];
       this.geometry.dispose();
@@ -197,14 +199,14 @@ export class BasePoly extends THREE.Mesh {
 
     };
 
-    const backupVertex = new Vector3D(
+    const backupVertex = new Vector3(
       parseFloat(threeVertex.x.toFixed(2)),
       0,
       parseFloat(threeVertex.z.toFixed(2))
     );
     this.layerBackVertices.push(backupVertex);
 
-    const vertex = new Vector3D(
+    const vertex = new Vector3(
       parseFloat(threeVertex.x.toFixed(2)),
       // when doing the parse operation getting -0 instead of 0
       0,
@@ -225,7 +227,7 @@ export class BasePoly extends THREE.Mesh {
     }
   }
 
-  addHole(holeVertices: Vector3D[]) {
+  addHole(holeVertices: Vector3[]) {
     if (!this.polygon) return;
     this.polygon.add_holes(holeVertices);
     const triResult = JSON.parse(this.polygon.new_triangulate());
@@ -284,7 +286,7 @@ export class BasePoly extends THREE.Mesh {
 interface IBaseCircleOptions {
   radius: number;
   segments: number;
-  position: Vector3D;
+  position: Vector3;
   startAngle: number;
   endAngle: number;
 }
@@ -538,11 +540,11 @@ export class RectanglePoly extends THREE.Mesh {
     super();
     this.ogid = getUUID();
    
-    if (!baseRectangle.polyLineRectangle) {
-      throw new Error("BaseRectangle is not defined");
-    }
-    // baseRectangle.nodeChild = this;
-    baseRectangle.nodeOperation = "polygon";
+    // if (!baseRectangle.polyLineRectangle) {
+    //   throw new Error("BaseRectangle is not defined");
+    // }
+    // // baseRectangle.nodeChild = this;
+    // baseRectangle.nodeOperation = "polygon";
     this.baseRectangle = baseRectangle;
     
     this.generateGeometry();
@@ -552,13 +554,13 @@ export class RectanglePoly extends THREE.Mesh {
   update() {
     this.geometry.dispose();
     this.polygon?.clear_vertices();
-    this.polygon?.add_vertices(this.baseRectangle.polyLineRectangle.get_raw_points());
+    // this.polygon?.add_vertices(this.baseRectangle.polyLineRectangle.get_raw_points());
     this.generateGeometry();
     this.addFlushBufferToScene();
   }
   generateGeometry() {
-    if (!this.baseRectangle.polyLineRectangle) return;
-    this.polygon = BasePolygon.new_with_rectangle(this.baseRectangle.polyLineRectangle.clone());
+    // if (!this.baseRectangle.polyLineRectangle) return;
+    // this.polygon = BasePolygon.new_with_rectangle(this.baseRectangle.polyLineRectangle.clone());
   }
 
   addFlushBufferToScene() {
@@ -722,7 +724,7 @@ export class RectanglePoly extends THREE.Mesh {
  * Base Flat Mesh
  */
 export class FlatMesh extends THREE.Mesh {
-  constructor(vertices: Vector3D[]) {
+  constructor(vertices: Vector3[]) {
     super();
     const baseMesh = new BaseFlatMesh(getUUID());
     baseMesh.add_vertices(vertices);
@@ -738,7 +740,7 @@ export class FlatMesh extends THREE.Mesh {
 
 
 export {
-  Vector3D,
+  Vector3,
   SpotLabel,
 }
 

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { OGSimpleLine, Vector3D } from "./../../opengeometry/pkg/opengeometry";
+import { OGSimpleLine, Vector3 } from "./../../opengeometry/pkg/opengeometry";
 
 export const OPEN_GEOMETRY_THREE_VERSION = '0.0.1';
 
@@ -13,13 +13,16 @@ export interface OpenGeometryOptions {
 export interface IBaseCircleOptions {
   radius: number;
   segments: number;
-  position: Vector3D;
+  position: Vector3;
   startAngle: number;
   endAngle: number;
 }
 
-export type RectangeOptions = {
+export interface RectangeOptions {
+  ogid?: string;
+
   width: number;
   breadth: number;
-  center: Vector3D
+  center: Vector3;
+  color: number;
 }

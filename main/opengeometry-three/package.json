@@ -13,5 +13,7 @@
   ],
   "author": "Vishwajeet Mane",
   "license": "MIT",
-  "dependencies": {}
+  "dependencies": {
+    "@opengeometry/openmaths": "^0.2.3"
+  }
 }

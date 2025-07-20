@@ -1,6 +1,7 @@
-use crate::utility::openmath::{self, Geometry};
+use crate::utility::geometry::{self, Geometry};
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
+use openmaths::Vector3;
 use super::basegeometry;
 
 #[wasm_bindgen]
@@ -11,9 +12,9 @@ pub struct BaseMesh {
   brep: Geometry,
   pub is_from_extruded: bool,
   pub is_from_polygon: bool,
-  pub position: openmath::Vector3D,
-  pub rotation: openmath::Vector3D,
-  pub scale: openmath::Vector3D,
+  pub position: Vector3,
+  pub rotation: Vector3,
+  pub scale: Vector3,
   buffer: Vec<f64>
 }
 
@@ -42,9 +43,9 @@ impl BaseMesh {
       },
       is_from_extruded : false,
       is_from_polygon : false,
-      position : openmath::Vector3D::create(0.0, 0.0, 0.0),
-      rotation : openmath::Vector3D::create(0.0, 0.0, 0.0),
-      scale : openmath::Vector3D::create(1.0, 1.0, 1.0),
+      position : Vector3::new(0.0, 0.0, 0.0),
+      rotation : Vector3::new(0.0, 0.0, 0.0),
+      scale : Vector3::new(1.0, 1.0, 1.0),
       buffer : Vec::new()
     }
   }

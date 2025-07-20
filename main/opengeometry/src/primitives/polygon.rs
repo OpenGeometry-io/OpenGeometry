@@ -4,12 +4,13 @@ use crate::operations::extrude::{extrude_polygon_by_buffer_geometry, extrude_pol
 use crate::operations::triangulate::triangulate_polygon_buffer_geometry;
 use crate::operations::{self, windingsort};
 use crate::{geometry, primitives};
-use crate::utility::openmath::{Geometry, Vector3D};
-use crate::{operations::triangulate, utility::openmath};
+use crate::utility::geometry::{Geometry};
+use crate::{operations::triangulate};
 use crate::geometry::basegeometry::{self, BaseGeometry};
 use serde_json::ser;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
+use openmaths::Vector3;
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
@@ -19,9 +20,9 @@ pub struct OGPolygon {
   pub extruded: bool,
   pub extruded_height: f64,
   pub is_polygon: bool,
-  pub position: openmath::Vector3D,
-  pub rotation: openmath::Vector3D,
-  pub scale: openmath::Vector3D,
+  pub position: Vector3,
+  pub rotation: Vector3,
+  pub scale: Vector3,
   buffer: Vec<f64>,
   variable_geometry: basegeometry::BaseGeometry,
   brep: Geometry,
@@ -64,9 +65,9 @@ impl OGPolygon {
       extruded : false,
       extruded_height : 0.0,
       is_polygon : false,
-      position : openmath::Vector3D::create(0.0, 0.0, 0.0),
-      rotation : openmath::Vector3D::create(0.0, 0.0, 0.0),
-      scale : openmath::Vector3D::create(1.0, 1.0, 1.0),
+      position : Vector3::new(0.0, 0.0, 0.0),
+      rotation : Vector3::new(0.0, 0.0, 0.0),
+      scale : Vector3::new(1.0, 1.0, 1.0),
       buffer : Vec::new(),
       variable_geometry: basegeometry::BaseGeometry::new(id.clone()),
       brep : Geometry::new(),
@@ -74,7 +75,7 @@ impl OGPolygon {
   }
 
   #[wasm_bindgen]
-  pub fn translate(&mut self, translation: openmath::Vector3D) {
+  pub fn translate(&mut self, translation: Vector3) {
     self.position.x += translation.x;
     self.position.y += translation.y;
     self.position.z += translation.z;
@@ -115,7 +116,7 @@ impl OGPolygon {
   }
 
   #[wasm_bindgen]
-  pub fn add_vertices(&mut self, vertices: Vec<openmath::Vector3D>) {
+  pub fn add_vertices(&mut self, vertices: Vec<Vector3>) {
     self.geometry.add_vertices(vertices);
 
     // If more than 3 vertices are added, then the polygon is created
@@ -146,7 +147,7 @@ impl OGPolygon {
   }
   
   #[wasm_bindgen]
-  pub fn add_vertex(&mut self, vertex: openmath::Vector3D) {
+  pub fn add_vertex(&mut self, vertex: Vector3) {
     self.geometry.add_vertex(vertex);
     
     // If more than 3 vertices are added, then the polygon is created
@@ -156,7 +157,7 @@ impl OGPolygon {
   }
 
   #[wasm_bindgen]
-  pub fn add_holes(&mut self, holes: Vec<openmath::Vector3D>) {
+  pub fn add_holes(&mut self, holes: Vec<Vector3>) {
     self.geometry.add_holes(holes);
   }
 
@@ -207,7 +208,7 @@ impl OGPolygon {
     let right_most_index = triangulate::find_right_most_point_index(vertices.clone(), start_index_in_vertices, end_index_in_vertices);
 
     // Step 3 - Find Ray Casting with the outer edges
-    let right_point = Vector3D::create(
+    let right_point = Vector3::new(
       vertices[right_most_index as usize],
       vertices[right_most_index as usize + 1],
       vertices[right_most_index as usize + 2]
@@ -225,12 +226,12 @@ impl OGPolygon {
     // Step 5 - Create Bridge
     let bridge_start_index = ray_edge[0][0];
     let bridge_end_index = right_most_index;
-    let bridge_start = Vector3D::create(
+    let bridge_start = Vector3::new(
       vertices[bridge_start_index as usize],
       vertices[bridge_start_index as usize + 1],
       vertices[bridge_start_index as usize + 2]
     );
-    let bridge_end = Vector3D::create(
+    let bridge_end = Vector3::new(
       vertices[bridge_end_index as usize],
       vertices[bridge_end_index as usize + 1],
       vertices[bridge_end_index as usize + 2]
@@ -286,8 +287,8 @@ impl OGPolygon {
       new_vertices_processed.push(vertex);
     }
     let mut new_buffergeometry = basegeometry::BaseGeometry::new("new_buffergeometry".to_string());
-    let og_vertices: Vec<Vector3D> = new_vertices_processed.chunks(3)
-      .map(|chunk| Vector3D::create(chunk[0], chunk[1], chunk[2]))
+    let og_vertices: Vec<Vector3> = new_vertices_processed.chunks(3)
+      .map(|chunk| Vector3::new(chunk[0], chunk[1], chunk[2]))
       .collect();
     new_buffergeometry.add_vertices(og_vertices);
     let new_tricut = triangulate_polygon_buffer_geometry(new_buffergeometry.clone());
@@ -372,7 +373,7 @@ impl OGPolygon {
     let right_most_index = triangulate::find_right_most_point_index(vertices.clone(), start_index_in_vertices, end_index_in_vertices);
 
     // Step 3 - Find Ray Casting with the outer edges
-    let right_point = Vector3D::create(
+    let right_point = Vector3::new(
       vertices[right_most_index as usize],
       vertices[right_most_index as usize + 1],
       vertices[right_most_index as usize + 2]
@@ -390,12 +391,12 @@ impl OGPolygon {
     // Step 5 - Create Bridge
     let bridge_start_index = ray_edge[0][0];
     let bridge_end_index = right_most_index;
-    let bridge_start = Vector3D::create(
+    let bridge_start = Vector3::new(
       vertices[bridge_start_index as usize],
       vertices[bridge_start_index as usize + 1],
       vertices[bridge_start_index as usize + 2]
     );
-    let bridge_end = Vector3D::create(
+    let bridge_end = Vector3::new(
       vertices[bridge_end_index as usize],
       vertices[bridge_end_index as usize + 1],
       vertices[bridge_end_index as usize + 2]
@@ -456,8 +457,8 @@ impl OGPolygon {
     }
 
     let mut new_buffergeometry = basegeometry::BaseGeometry::new("new_buffergeometry".to_string());
-    let og_vertices: Vec<Vector3D> = new_vertices_processed.chunks(3)
-      .map(|chunk| Vector3D::create(chunk[0], chunk[1], chunk[2]))
+    let og_vertices: Vec<Vector3> = new_vertices_processed.chunks(3)
+      .map(|chunk| Vector3::new(chunk[0], chunk[1], chunk[2]))
       .collect();
     new_buffergeometry.add_vertices(og_vertices);
     let new_tricut = triangulate_polygon_buffer_geometry(new_buffergeometry.clone());
@@ -551,7 +552,7 @@ impl OGPolygon {
     for face_index in face_map {
       let mut variable_geometry: BaseGeometry = BaseGeometry::new("variable_geometry".to_string());
       let face = faces[face_index as usize].clone();
-      let mut face_vertices: Vec<Vector3D> = Vec::new();
+      let mut face_vertices: Vec<Vector3> = Vec::new();
 
       for index in face.clone() {
         let v_face = all_vertices_raw[index as usize].clone();
@@ -635,7 +636,7 @@ impl OGPolygon {
     
     // let face = extrude_data.faces[0].clone();
     for face in extrude_data.faces.clone() {
-      let mut face_vertices: Vec<Vector3D> = Vec::new();
+      let mut face_vertices: Vec<Vector3> = Vec::new();
       for index in face.clone() {
         face_vertices.push(extrude_data.vertices[index as usize].clone());
       }
@@ -694,13 +695,13 @@ impl OGPolygon {
       return "Please extrude the polygon first".to_string();
     }
 
-    let mut outline_data: Vec<Vec<Vector3D>> = Vec::new();
+    let mut outline_data: Vec<Vec<Vector3>> = Vec::new();
     let extruded_raw = extrude_polygon_by_buffer_geometry(self.geometry.clone(), height);
     let faces = extruded_raw.faces;
     let vertices = extruded_raw.vertices;
 
     for face in faces {
-      let mut face_vertices: Vec<Vector3D> = Vec::new();
+      let mut face_vertices: Vec<Vector3> = Vec::new();
       for index in face {
         let v_face = vertices[index as usize].clone();
         face_vertices.push(v_face);

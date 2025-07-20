@@ -4,7 +4,7 @@
  * Created on XZ plane.
  */
 
-use crate::utility::openmath;
+use openmaths::Vector3;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
@@ -12,10 +12,10 @@ use serde::{Serialize, Deserialize};
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGRectangle {
   id: String,
-  center: openmath::Vector3D,
+  center: Vector3,
   width: f64,
   breadth: f64,
-  points: Vec<openmath::Vector3D>
+  points: Vec<Vector3>
 }
 
 #[wasm_bindgen]
@@ -34,7 +34,7 @@ impl OGRectangle {
   pub fn new(id: String) -> OGRectangle {
     OGRectangle {
       id,
-      center: openmath::Vector3D::create(0.0, 0.0, 0.0),
+      center: Vector3::new(0.0, 0.0, 0.0),
       width: 1.0,
       breadth: 1.0,
       points: Vec::new()
@@ -53,7 +53,7 @@ impl OGRectangle {
   }
 
   #[wasm_bindgen]
-  pub fn set_config(&mut self, center: openmath::Vector3D, width: f64, breadth: f64) {
+  pub fn set_config(&mut self, center: Vector3, width: f64, breadth: f64) {
     self.center = center;
     self.width = width;
     self.breadth = breadth;
@@ -64,10 +64,10 @@ impl OGRectangle {
     let half_width = self.width / 2.0;
     let half_breadth = self.breadth / 2.0;
 
-    let p1 = openmath::Vector3D::create(self.center.x - half_width, self.center.y, self.center.z - half_breadth);
-    let p2 = openmath::Vector3D::create(self.center.x + half_width, self.center.y, self.center.z - half_breadth);
-    let p3 = openmath::Vector3D::create(self.center.x + half_width, self.center.y, self.center.z + half_breadth);
-    let p4 = openmath::Vector3D::create(self.center.x - half_width, self.center.y, self.center.z + half_breadth);
+    let p1 = Vector3::new(self.center.x - half_width, self.center.y, self.center.z - half_breadth);
+    let p2 = Vector3::new(self.center.x + half_width, self.center.y, self.center.z - half_breadth);
+    let p3 = Vector3::new(self.center.x + half_width, self.center.y, self.center.z + half_breadth);
+    let p4 = Vector3::new(self.center.x - half_width, self.center.y, self.center.z + half_breadth);
 
     self.points.clear();
     self.points.push(p1);
@@ -90,7 +90,7 @@ impl OGRectangle {
   }
 
   #[wasm_bindgen]
-  pub fn update_center(&mut self, center: openmath::Vector3D) {
+  pub fn update_center(&mut self, center: Vector3) {
     self.destroy();
     self.center = center;
   }
@@ -111,7 +111,7 @@ impl OGRectangle {
     serde_json::to_string(&self.points).unwrap()
   }
 
-  pub fn get_raw_points(&self) -> Vec<openmath::Vector3D> {
+  pub fn get_raw_points(&self) -> Vec<Vector3> {
     self.points.clone()
   }
 }

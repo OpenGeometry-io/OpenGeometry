@@ -4,10 +4,11 @@
  * Potientally, it will be used for Creation of Walls and Other 2D Meshes
  */
 
-use crate::{operations::{triangulate::triangulate_polygon_buffer_geometry, windingsort}, utility::openmath};
+use crate::{operations::{triangulate::triangulate_polygon_buffer_geometry, windingsort}, utility::geometry};
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use super::basegeometry;
+use openmaths::Vector3;
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
@@ -16,9 +17,9 @@ pub struct BaseFlatMesh {
   geometry: basegeometry::BaseGeometry,
   pub extruded: bool,
   pub is_mesh: bool,
-  pub position: openmath::Vector3D,
-  pub rotation: openmath::Vector3D,
-  pub scale: openmath::Vector3D,
+  pub position: Vector3,
+  pub rotation: Vector3,
+  pub scale: Vector3,
   buffer: Vec<f64>
 }
 
@@ -43,20 +44,20 @@ impl BaseFlatMesh {
       geometry : basegeometry::BaseGeometry::new(geometry_id.clone()),
       extruded : false,
       is_mesh : false,
-      position : openmath::Vector3D::create(0.0, 0.0, 0.0),
-      rotation : openmath::Vector3D::create(0.0, 0.0, 0.0),
-      scale : openmath::Vector3D::create(1.0, 1.0, 1.0),
+      position : Vector3::new(0.0, 0.0, 0.0),
+      rotation : Vector3::new(0.0, 0.0, 0.0),
+      scale : Vector3::new(1.0, 1.0, 1.0),
       buffer : Vec::new()
     }
   }
 
   #[wasm_bindgen]
-  pub fn add_vertices(&mut self, vertices: Vec<openmath::Vector3D>) {
+  pub fn add_vertices(&mut self, vertices: Vec<Vector3>) {
     self.geometry.add_vertices(vertices);
   }
 
   #[wasm_bindgen]
-  pub fn add_vertex(&mut self, vertex: openmath::Vector3D) {
+  pub fn add_vertex(&mut self, vertex: Vector3) {
     self.geometry.add_vertex(vertex);
     
     if self.geometry.get_vertices().len() > 2 {

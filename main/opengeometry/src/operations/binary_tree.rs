@@ -1,4 +1,4 @@
-use crate::{primitives::polygon::OGPolygon, utility::openmath::Geometry};
+use crate::{primitives::polygon::OGPolygon, utility::geometry::Geometry};
 
 pub struct Binary2DNode {
     pub polygon: Option<OGPolygon>,

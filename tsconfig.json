@@ -7,6 +7,8 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true, // Add this line for ESM
     "moduleResolution": "node", // Change module resolution to "node" for ESM
+    "experimentalDecorators": true, // Enable decorators
+    "emitDecoratorMetadata": true, // Enable metadata for decorators
     "baseUrl": ".", // Add this line for ESM
     "paths": {
       "*": ["main/*"] // Add this line for ESM

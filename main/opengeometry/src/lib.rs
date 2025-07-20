@@ -15,7 +15,7 @@ pub mod operations {
 }
 
 pub mod utility {
-  pub mod openmath;
+  pub mod geometry;
 }
 
 pub mod primitives {

@@ -6,20 +6,18 @@
  * Instead of Serde bindgen can be directly used for getting values from struct - https://github.com/rustwasm/wasm-bindgen/issues/439
  */
 
-use crate::utility::openmath;
-use wasm_bindgen::prelude::*;
+use openmaths::Vector3;
 use serde::{Serialize, Deserialize};
-
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BaseGeometry {
   id: String,
-  vertices: Vec<openmath::Vector3D>,
+  vertices: Vec<Vector3>,
   indices: Vec<u32>,
   normals: Vec<f32>,
   treated: bool,
-  buffer: Vec<openmath::Vector3D>,
-  holes: Vec<Vec<openmath::Vector3D>>,
+  buffer: Vec<Vector3>,
+  holes: Vec<Vec<Vector3>>,
   flat_vertices: Vec<f64>,
   pub ccw: bool,
 }
@@ -52,7 +50,7 @@ impl BaseGeometry {
     self.ccw = ccw;
   }
   
-  pub fn add_vertices(&mut self, vertices: Vec<openmath::Vector3D>) {
+  pub fn add_vertices(&mut self, vertices: Vec<Vector3>) {
     for vertex in vertices {
       self.vertices.push(vertex.clone());
 
@@ -74,17 +72,17 @@ impl BaseGeometry {
     self.indices.clone()
   }
   
-  pub fn add_holes(&mut self, holes: Vec<openmath::Vector3D>) {
+  pub fn add_holes(&mut self, holes: Vec<Vector3>) {
     self.holes.push(holes.clone());
   }
 
   
-  pub fn get_holes(&mut self) -> Vec<Vec<openmath::Vector3D>> {
+  pub fn get_holes(&mut self) -> Vec<Vec<Vector3>> {
     self.holes.clone()
   }
 
   
-  pub fn add_vertex(&mut self, vertex: openmath::Vector3D) {
+  pub fn add_vertex(&mut self, vertex: Vector3) {
     self.vertices.push(vertex.clone());
     self.indices.push(self.vertices.len() as u32 - 1);
   }
@@ -101,7 +99,7 @@ impl BaseGeometry {
     self.clone()
   }
   
-  pub fn get_vertices(&self) -> Vec<openmath::Vector3D> {
+  pub fn get_vertices(&self) -> Vec<Vector3> {
     self.vertices.clone()
   }
     
@@ -114,7 +112,7 @@ impl BaseGeometry {
   //   self.vertices[0].
   // }
 
-  pub fn translate(&mut self, translation: openmath::Vector3D) {
+  pub fn translate(&mut self, translation: Vector3) {
     for vertex in &mut self.vertices {
       vertex.x += translation.x;
       vertex.y += translation.y;

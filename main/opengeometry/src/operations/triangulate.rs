@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use crate::geometry::{self, basegeometry::BaseGeometry, triangle::Triangle};
 use crate::operations::windingsort;
 use std::collections::HashMap;
-use crate::utility::openmath::Vector3D;
+use openmaths::Vector3;
 
 pub fn ear_triangle_test(
   vertices: HashMap<u32, Vec<f64>>,
@@ -12,23 +12,23 @@ pub fn ear_triangle_test(
   b_index: u32,
   c_index: u32,
 ) -> bool {
-  let point_a = Vector3D::create(
+  let mut point_a = Vector3::new(
     vertices[&(a_index)][0],
     vertices[&(a_index)][1],
     vertices[&(a_index)][2]
   );
-  let point_b = Vector3D::create(
+  let mut point_b = Vector3::new(
     vertices[&(b_index)][0],
     vertices[&(b_index)][1],
     vertices[&(b_index)][2]
   );
-  let point_c = Vector3D::create(
+  let point_c = Vector3::new(
     vertices[&(c_index)][0],
     vertices[&(c_index)][1],
     vertices[&(c_index)][2]
   );
-  let ba = point_b.subtract(&point_a);
-  let bc = point_b.subtract(&point_c);
+  let ba = point_b.clone().subtract(&point_a);
+  let bc = point_b.clone().subtract(&point_c);
   let cross_product = ba.cross(&bc);
 
   if cross_product.y < 0.0 {
@@ -40,7 +40,7 @@ pub fn ear_triangle_test(
 
   for (i, vertex) in vertices.iter() {
     if *i != a_index && *i != b_index && *i != c_index {
-      let p = Vector3D::create(vertex[0], vertex[1], vertex[2]);
+      let p = Vector3::new(vertex[0], vertex[1], vertex[2]);
       if triangle.is_point_in_triangle(p) {
         return false;
       }
@@ -51,7 +51,7 @@ pub fn ear_triangle_test(
 }
 
 // Accepting Vertices in CCW order
-pub fn tricut(polygon_vertices: Vec<Vector3D>) -> Vec<Vec<u32>> {
+pub fn tricut(polygon_vertices: Vec<Vector3>) -> Vec<Vec<u32>> {
   let mut all_vertices: HashMap<u32, Vec<f64>> = HashMap::new();
   for (i, vertex) in polygon_vertices.iter().enumerate() {
     all_vertices.insert(i as u32, vec![vertex.x, vertex.y, vertex.z]);
@@ -107,7 +107,7 @@ pub fn triangulate_polygon_buffer_geometry(geom_buf: BaseGeometry) -> Vec<Vec<u3
 //
 // Triangule by faces and vertices
 //
-pub fn triangulate_polygon_by_face(face: Vec<Vector3D>) -> Vec<Vec<u32>> {
+pub fn triangulate_polygon_by_face(face: Vec<Vector3>) -> Vec<Vec<u32>> {
   let raw_vertices = face.clone();
   let ccw_vertices = windingsort::ccw_test(raw_vertices.clone());
 
@@ -163,7 +163,7 @@ pub fn flatten_buffer_geometry(mut geom_buf: BaseGeometry) -> FlattenData {
 /**
  * Find Left Most Point in Given Polygon
  */
-// pub fn find_left_most_point(flat_data_vertices: Vec<f64>, start: u32, end: u32) -> Vector3D {
+// pub fn find_left_most_point(flat_data_vertices: Vec<f64>, start: u32, end: u32) -> Vector3 {
 //   let mut left_most_index = start;
 //   let mut left_most_x = flat_data_vertices[start as usize * 3];
 
@@ -175,7 +175,7 @@ pub fn flatten_buffer_geometry(mut geom_buf: BaseGeometry) -> FlattenData {
 //     }
 //   }
 
-//   Vector3D::create(
+//   Vector3::new(
 //     flat_data_vertices[left_most_index as usize * 3],
 //     flat_data_vertices[left_most_index as usize * 3 + 1],
 //     flat_data_vertices[left_most_index as usize * 3 + 2]
@@ -206,7 +206,7 @@ pub fn find_right_most_point_index(flat_data_vertices: Vec<f64>, start: u32, end
 
 pub fn check_vertex_collision_with_flat_vertices(
   flat_data_vertices: Vec<f64>,
-  right_max_point: Vector3D,
+  right_max_point: Vector3,
   start: u32,
   end: u32
 ) -> Vec<Vec<u32>> {
@@ -261,17 +261,17 @@ pub fn check_vertex_collision_with_flat_vertices(
     let x = flat_data_vertices[a_index as usize];
     let y = flat_data_vertices[a_index as usize + 1];
     let z = flat_data_vertices[a_index as usize + 2];
-    let A = Vector3D::create(x, y, z);
+    let A = Vector3::new(x, y, z);
 
     let x1 = flat_data_vertices[b_index as usize];
     let y1 = flat_data_vertices[b_index as usize + 1];
     let z1 = flat_data_vertices[b_index as usize + 2];
-    let B = Vector3D::create(x1, y1, z1);
+    let B = Vector3::new(x1, y1, z1);
 
     // Check if the ray intersects with the edge and no obstacles
-    let right_ray_from_vertex = Vector3D::create(right_max_point.x + 1.0, right_max_point.y, right_max_point.z);
-    let ray = right_ray_from_vertex.subtract(&right_max_point);
-    let edge_vector = B.subtract(&A);
+    let mut right_ray_from_vertex = Vector3::new(right_max_point.x + 1.0, right_max_point.y, right_max_point.z);
+    let ray = right_ray_from_vertex.clone().subtract(&right_max_point);
+    let edge_vector = B.clone().subtract(&A);
     let cross_product = ray.cross(&edge_vector);
     let cross_product_length = cross_product.dot(&cross_product);
     let edge_vector_length = edge_vector.dot(&edge_vector);
@@ -308,7 +308,7 @@ pub fn check_vertex_collision_with_flat_vertices(
  */
 #[derive(Clone)]
 pub struct VertexNodeTricut {
-  pub vertex: Vector3D,
+  pub vertex: Vector3,
   pub index: u32,
   pub treated: bool,
   pub is_hole: bool,
@@ -320,7 +320,7 @@ pub struct VertexNodeTricut {
 
 
 impl VertexNodeTricut {
-  pub fn new(vertex: Vector3D, index: u32) -> Self {
+  pub fn new(vertex: Vector3, index: u32) -> Self {
     Self {
       vertex,
       index,
@@ -334,7 +334,7 @@ impl VertexNodeTricut {
   }
 }
 
-pub fn create_vertex_nodes(vertices: Vec<Vector3D>, start: u32, end: u32, is_hole: bool) -> Vec<VertexNodeTricut> {
+pub fn create_vertex_nodes(vertices: Vec<Vector3>, start: u32, end: u32, is_hole: bool) -> Vec<VertexNodeTricut> {
   let mut vertex_nodes: Vec<VertexNodeTricut> = Vec::new();
 
   let mut index = start;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { OGPolyLine, Vector3D } from '../../../opengeometry/pkg/opengeometry';
+import { OGPolyLine, Vector3 } from '../../../opengeometry/pkg/opengeometry';
 import { getUUID } from "../utils/randomizer";
 
 /**
@@ -7,7 +7,7 @@ import { getUUID } from "../utils/randomizer";
  */
 export class PolyLine extends THREE.Line {
   ogid: string;
-  points: Vector3D[] = [];
+  points: Vector3[] = [];
   isClosed: boolean = false;
 
   private polyline: OGPolyLine | null = null;
@@ -18,7 +18,7 @@ export class PolyLine extends THREE.Line {
     }
   }
 
-  constructor(points?: Vector3D[]) {
+  constructor(points?: Vector3[]) {
     super();
     this.ogid = getUUID();
     this.polyline = new OGPolyLine(this.ogid);
@@ -28,7 +28,7 @@ export class PolyLine extends THREE.Line {
     }
   }
 
-  addMultiplePoints(points: Vector3D[]) {
+  addMultiplePoints(points: Vector3[]) {
     this.points = points;
     if (!this.polyline) return;
     this.polyline.add_multiple_points(points);
@@ -36,18 +36,18 @@ export class PolyLine extends THREE.Line {
   }
 
   // TODO: This needs to be improved 
-  translate(translation: Vector3D) {
+  translate(translation: Vector3) {
     if (!this.polyline) return;
     this.polyline.translate(translation);
     this.generateGeometry();
   }
 
-  set_position(position: Vector3D) {
+  set_position(position: Vector3) {
     if (!this.polyline) return;
     this.polyline.set_position(position);
   }
 
-  addPoint(point: Vector3D) {
+  addPoint(point: Vector3) {
     this.points.push(point);
     if (!this.polyline) return;
     this.polyline.add_point(point);

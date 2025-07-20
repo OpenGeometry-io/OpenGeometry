@@ -3,10 +3,11 @@
  * Definition - A Polyline is a connected sequence of line segments created as a single object.
  */
 
-use crate::{operations::windingsort, utility::openmath};
+use crate::{operations::windingsort, utility::geometry};
 use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
-use crate::utility::openmath::{Geometry, Vector3D};
+use crate::utility::geometry::{Geometry};
+use openmaths::Vector3;
 
 /*
 * Data structure to hold the offset points and the flag indicating if the points are in counter-clockwise order
@@ -14,8 +15,8 @@ use crate::utility::openmath::{Geometry, Vector3D};
 */
 #[derive(Serialize)]
 struct Data {
-  untreated: Vec<openmath::Vector3D>,
-  treated: Vec<openmath::Vector3D>,
+  untreated: Vec<Vector3>,
+  treated: Vec<Vector3>,
   flag: bool,
 }
 
@@ -23,11 +24,11 @@ struct Data {
  #[derive(Clone, Serialize, Deserialize)]
 pub struct OGPolyLine {
   id: String,
-  points: Vec<openmath::Vector3D>,
-  backup_points: Vec<openmath::Vector3D>,
+  points: Vec<Vector3>,
+  backup_points: Vec<Vector3>,
   is_closed: bool,
   brep : Geometry,
-  position: openmath::Vector3D,
+  position: Vector3,
 }
 
 impl Drop for OGPolyLine {
@@ -60,7 +61,7 @@ impl OGPolyLine {
       backup_points: Vec::new(),
       is_closed: false,
       brep: Geometry::new(),
-      position: openmath::Vector3D { x: 0.0, y: 0.0, z: 0.0 },
+      position: Vector3 { x: 0.0, y: 0.0, z: 0.0 },
     }
   }
   
@@ -77,7 +78,7 @@ impl OGPolyLine {
   }
 
   #[wasm_bindgen]
-  pub fn translate(&mut self, translation: openmath::Vector3D) {
+  pub fn translate(&mut self, translation: Vector3) {
 
     self.points.clear();
 
@@ -96,12 +97,12 @@ impl OGPolyLine {
   }
 
   #[wasm_bindgen]
-  pub fn set_position(&mut self, position: openmath::Vector3D) {
+  pub fn set_position(&mut self, position: Vector3) {
     self.position = position;
   }
   
   #[wasm_bindgen]
-  pub fn add_multiple_points(&mut self, points: Vec<openmath::Vector3D>) {
+  pub fn add_multiple_points(&mut self, points: Vec<Vector3>) {
     self.points.clear();
     for point in points {
       self.points.push(point);
@@ -114,7 +115,7 @@ impl OGPolyLine {
   }
 
   #[wasm_bindgen]
-  pub fn add_point(&mut self, point: openmath::Vector3D) {
+  pub fn add_point(&mut self, point: Vector3) {
     self.points.push(point);
     self.backup_points.push(point);
     self.check_closed_test();
@@ -142,7 +143,7 @@ impl OGPolyLine {
     serde_json::to_string(&self.points).unwrap()
   }
 
-  pub fn get_raw_points(&self) -> Vec<openmath::Vector3D> {
+  pub fn get_raw_points(&self) -> Vec<Vector3> {
     self.points.clone()
   }
 
@@ -193,19 +194,19 @@ impl OGPolyLine {
   pub fn get_offset(&self, distance: f64) -> String {
     let n = self.points.len();
     if n < 2 {
-        return serde_json::to_string(&Vec::<openmath::Vector3D>::new()).unwrap();
+        return serde_json::to_string(&Vec::<Vector3>::new()).unwrap();
     }
 
     let mut offset_points = Vec::new();
 
     for i in 0..n {
-      let prev = if i == 0 {
+      let mut prev = if i == 0 {
         self.points[i]
       } else {
         self.points[i - 1]
       };
-      let curr = self.points[i];
-      let next = if i == n - 1 {
+      let mut curr = self.points[i];
+      let mut next = if i == n - 1 {
         self.points[i]
       } else {
         self.points[i + 1]
@@ -214,24 +215,24 @@ impl OGPolyLine {
       let v1 = curr.subtract(&prev).normalize();
       let v2 = next.subtract(&curr).normalize();
 
-      let perp1 = Vector3D { x: -v1.z, y: 0.0, z: v1.x };
-      let perp2 = Vector3D { x: -v2.z, y: 0.0, z: v2.x };
+      let mut perp1 = Vector3 { x: -v1.z, y: 0.0, z: v1.x };
+      let mut perp2 = Vector3 { x: -v2.z, y: 0.0, z: v2.x };
 
       let offset_point = if i == 0 {
         // Start point: move perpendicular to first segment
-        curr.add(&perp2.multiply(distance))
+        curr.clone().add(&perp2.clone().multiply_scalar(distance))
       } else if i == n - 1 {
         // End point: move perpendicular to last segment
-        curr.add(&perp1.multiply(distance))
+        curr.clone().add(&perp1.clone().multiply_scalar(distance))
       } else {
         // Middle: compute bisector intersection
-        let a1 = prev.add(&perp1.multiply(distance));
-        let a2 = curr.add(&perp1.multiply(distance));
-        let b1 = curr.add(&perp2.multiply(distance));
-        let b2 = next.add(&perp2.multiply(distance));
+        let a1 = prev.clone().add(&perp1.multiply_scalar(distance));
+        let a2 = curr.clone().add(&perp1.multiply_scalar(distance));
+        let b1 = curr.clone().add(&perp2.multiply_scalar(distance));
+        let b2 = next.clone().add(&perp2.multiply_scalar(distance));
 
         Self::calculate_2D_interesection(&a1, &a2, &b1, &b2)
-            .unwrap_or(curr.add(&perp1.multiply(distance)))
+            .unwrap_or(curr.clone().add(&perp1.multiply_scalar(distance)))
       };
 
       offset_points.push(offset_point);
@@ -249,11 +250,11 @@ impl OGPolyLine {
   }
 
   pub fn calculate_2D_interesection(
-    point_a: &Vector3D,
-    point_b: &Vector3D,
-    point_c: &Vector3D,
-    point_d: &Vector3D,
-  ) -> Option<Vector3D> {
+    point_a: &Vector3,
+    point_b: &Vector3,
+    point_c: &Vector3,
+    point_d: &Vector3,
+  ) -> Option<Vector3> {
     let dx1 = point_b.x - point_a.x;
     let dz1 = point_b.z - point_a.z;
     let dx2 = point_d.x - point_c.x;
@@ -269,7 +270,7 @@ impl OGPolyLine {
 
     let t = (dx * dz2 - dz * dx2) / det;
 
-    Some(Vector3D {
+    Some(Vector3 {
       x: point_a.x + t * dx1,
       y: 0.0,
       z: point_a.z + t * dz1,

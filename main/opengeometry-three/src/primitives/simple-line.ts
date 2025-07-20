@@ -1,4 +1,4 @@
-import { OGSimpleLine, Vector3D } from "./../../../opengeometry/pkg/opengeometry";
+import { OGSimpleLine, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 
@@ -7,7 +7,7 @@ import { getUUID } from "../utils/randomizer";
  */
 export class SimpleLine extends THREE.Line {
   ogid: string;
-  points: Vector3D[] = [];
+  points: Vector3[] = [];
 
   set color(color: number) {
     if (this.material instanceof THREE.LineBasicMaterial) {
@@ -16,8 +16,8 @@ export class SimpleLine extends THREE.Line {
   }
 
   constructor(
-    start: Vector3D = new Vector3D(1, 0, 0),
-    end: Vector3D = new Vector3D(-1, 0, 0)
+    start: Vector3 = new Vector3(1, 0, 0),
+    end: Vector3 = new Vector3(-1, 0, 0)
   ) {
     super();
     this.ogid = getUUID();
@@ -27,7 +27,7 @@ export class SimpleLine extends THREE.Line {
     this.generateGeometry();
   }
 
-  addPoint(point: Vector3D) {
+  addPoint(point: Vector3) {
     this.points.push(point);
     if (this.points.length > 2) {
       throw new Error("Simple Line can only have two points, clear points or use PolyLine");

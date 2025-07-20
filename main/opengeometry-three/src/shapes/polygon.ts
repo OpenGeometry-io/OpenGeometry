@@ -1,11 +1,11 @@
 import * as THREE from "three";
-import { OGPolygon, Vector3D } from "../../../opengeometry/pkg/opengeometry";
+import { OGPolygon, Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import { getUUID } from "../utils/randomizer";
 
 export class Polygon extends THREE.Mesh {
   ogid: string;
-  layerVertices: Vector3D[] = [];
-  layerBackVertices: Vector3D[] = [];
+  layerVertices: Vector3[] = [];
+  layerBackVertices: Vector3[] = [];
 
   polygon: OGPolygon | null = null;
   isTriangulated: boolean = false;
@@ -13,7 +13,7 @@ export class Polygon extends THREE.Mesh {
   #outlineMesh: THREE.Line | null = null;
   private _geometryCenterOffset = new THREE.Vector3();
 
-  constructor(vertices?: Vector3D[]) {
+  constructor(vertices?: Vector3[]) {
     super();
     this.ogid = getUUID();
     this.polygon = new OGPolygon(this.ogid);
@@ -47,7 +47,7 @@ export class Polygon extends THREE.Mesh {
     // };
   }
 
-  translate(translation: Vector3D) {
+  translate(translation: Vector3) {
     if (!this.polygon) return;
 
     console.log("Translating polygon by", translation.x, translation.y, translation.z);
@@ -63,7 +63,7 @@ export class Polygon extends THREE.Mesh {
     this.addFlushBufferToScene(bufFlush);
   }
 
-  addVertices(vertices: Vector3D[]) {
+  addVertices(vertices: Vector3[]) {
     if (!this.polygon) return;
     this.polygon.add_vertices(vertices);
     this.polygon?.triangulate();
@@ -79,7 +79,7 @@ export class Polygon extends THREE.Mesh {
     this.isTriangulated = false;
   }
 
-  addVertex(threeVertex: Vector3D) {
+  addVertex(threeVertex: Vector3) {
     if (this.isTriangulated) {
       this.layerVertices = [];
       this.geometry.dispose();
@@ -92,14 +92,14 @@ export class Polygon extends THREE.Mesh {
 
     };
 
-    const backupVertex = new Vector3D(
+    const backupVertex = new Vector3(
       parseFloat(threeVertex.x.toFixed(2)),
       0,
       parseFloat(threeVertex.z.toFixed(2))
     );
     this.layerBackVertices.push(backupVertex);
 
-    const vertex = new Vector3D(
+    const vertex = new Vector3(
       parseFloat(threeVertex.x.toFixed(2)),
       // when doing the parse operation getting -0 instead of 0
       0,
@@ -120,7 +120,7 @@ export class Polygon extends THREE.Mesh {
     }
   }
 
-  addHole(holeVertices: Vector3D[]) {
+  addHole(holeVertices: Vector3[]) {
     if (!this.polygon) return;
     this.polygon.add_holes(holeVertices);
     const triResult = JSON.parse(this.polygon.triangulate_with_holes());

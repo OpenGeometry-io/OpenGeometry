@@ -4,7 +4,9 @@ use std::clone;
 use crate::operations::extrude::{self, extrude_polygon_by_buffer_geometry};
 use crate::operations::triangulate::triangulate_polygon_by_face;
 use crate::operations::windingsort;
-use crate::utility::openmath::{Geometry, Vector3D};
+use crate::utility::geometry::{Geometry};
+use openmaths::Vector3;
+
 /**
  * Copyright (c) 2025, OpenGeometry. All rights reserved.
  * Cylinder primitive for OpenGeometry.
@@ -18,7 +20,7 @@ use crate::utility::openmath::{Geometry, Vector3D};
  * This class is used to create a cylinder primitive(2) using radius and height.
  *  */
 
-use crate::{utility::openmath};
+use crate::{utility::geometry};
 use crate::geometry::basegeometry;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
@@ -27,7 +29,7 @@ use serde::{Serialize, Deserialize};
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGCylinder {
   id: String,
-  center: openmath::Vector3D,
+  center: Vector3,
   radius: f64,
   height: f64,
   angle: f64,
@@ -53,7 +55,7 @@ impl OGCylinder {
   pub fn new(id: String) -> OGCylinder {
     OGCylinder {
       id: id.clone(),
-      center: openmath::Vector3D::create(0.0, 0.0, 0.0),
+      center: Vector3::new(0.0, 0.0, 0.0),
       radius: 1.0,
       height: 1.0,
       angle: 2.0 * std::f64::consts::PI,
@@ -65,7 +67,7 @@ impl OGCylinder {
   }
 
   #[wasm_bindgen]
-  pub fn set_config(&mut self, center: openmath::Vector3D, radius: f64, height: f64, angle: f64, segments: u32) {
+  pub fn set_config(&mut self, center: Vector3, radius: f64, height: f64, angle: f64, segments: u32) {
     self.center = center;
     self.radius = radius;
     self.height = height;
@@ -75,8 +77,8 @@ impl OGCylinder {
 
   #[wasm_bindgen]
   pub fn generate_geometry(&mut self) {
-    let mut points: Vec<openmath::Vector3D> = Vec::new();
-    let mut normals: Vec<openmath::Vector3D> = Vec::new();
+    let mut points: Vec<Vector3> = Vec::new();
+    let mut normals: Vec<Vector3> = Vec::new();
     // let mut uvs: Vec<openmath::Vector2D> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
 
@@ -87,7 +89,7 @@ impl OGCylinder {
     // If the end angle makes a full circle then we don't need to add a center point
     if self.angle < 2.0 * std::f64::consts::PI {
       // Add center point
-      points.push(openmath::Vector3D::create(self.center.x, self.center.y - half_height, self.center.z));
+      points.push(Vector3::new(self.center.x, self.center.y - half_height, self.center.z));
       actual_segments += 1;
     }
 
@@ -97,7 +99,7 @@ impl OGCylinder {
       let x = self.center.x + self.radius * start_angle.cos();
       let y = self.center.y - half_height;
       let z = self.center.z + self.radius * start_angle.sin();
-      points.push(openmath::Vector3D::create(x, y, z));
+      points.push(Vector3::new(x, y, z));
 
       // // Indices for the top circle
       // if i < self.segments - 1 {
@@ -139,7 +141,7 @@ impl OGCylinder {
     
     // let face = extrude_data.faces[0].clone();
     for face in extrude_data.faces.clone() {
-      let mut face_vertices: Vec<Vector3D> = Vec::new();
+      let mut face_vertices: Vec<Vector3> = Vec::new();
       for index in face.clone() {
         face_vertices.push(extrude_data.vertices[index as usize].clone());
       }

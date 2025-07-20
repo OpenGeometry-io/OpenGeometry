@@ -1,28 +1,31 @@
-use crate::utility::openmath::Vector3D;
+use openmaths::Vector3;
 
 #[derive(Clone)]
 pub struct Triangle {
-  pub a: Vector3D,
-  pub b: Vector3D,
-  pub c: Vector3D,
+  pub a: Vector3,
+  pub b: Vector3,
+  pub c: Vector3,
 }
 
 impl Triangle {
   pub fn new() -> Triangle {
     Triangle {
-      a: Vector3D::create(0.0, 0.0, 0.0),
-      b: Vector3D::create(0.0, 0.0, 0.0),
-      c: Vector3D::create(0.0, 0.0, 0.0),
+      a: Vector3::new(0.0, 0.0, 0.0),
+      b: Vector3::new(0.0, 0.0, 0.0),
+      c: Vector3::new(0.0, 0.0, 0.0),
     }
   }
 
-  pub fn set_vertices(&mut self, a: Vector3D, b: Vector3D, c: Vector3D) {
+  pub fn set_vertices(&mut self, a: Vector3, b: Vector3, c: Vector3) {
     self.a = a;
     self.b = b;
     self.c = c;
   }
 
-  pub fn is_point_in_triangle(&self, p : Vector3D) -> bool {
+  pub fn is_point_in_triangle(&self, p : Vector3) -> bool {
+    let v1 = Vector3::new(1.0, 0.0, 0.0);
+    let crso = v1.cross(&self.a);
+
     let ab = self.b.clone().subtract(&self.a);
     let bc = self.c.clone().subtract(&self.b);
     let ca = self.a.clone().subtract(&self.c);

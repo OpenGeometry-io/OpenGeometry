@@ -4,15 +4,15 @@
  * Created on XZ plane.
  */
 
-use crate::utility::openmath;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
+use openmaths::Vector3;
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGSimpleLine {
   id: String,
-  points: Vec<openmath::Vector3D>
+  points: Vec<Vector3>
 }
 
 #[wasm_bindgen]
@@ -45,7 +45,7 @@ impl OGSimpleLine {
   }
 
   #[wasm_bindgen]
-  pub fn set_config(&mut self, start: openmath::Vector3D, end: openmath::Vector3D) {
+  pub fn set_config(&mut self, start: Vector3, end: Vector3) {
     self.points.clear();
     self.points.push(start);
     self.points.push(end);
@@ -69,7 +69,7 @@ impl OGSimpleLine {
     serde_json::to_string(&self.points).unwrap()
   }
 
-  pub fn get_raw_points(&self) -> Vec<openmath::Vector3D> {
+  pub fn get_raw_points(&self) -> Vec<Vector3> {
     self.points.clone()
   }
 }

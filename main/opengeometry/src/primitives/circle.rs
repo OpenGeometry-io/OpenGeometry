@@ -6,20 +6,20 @@
 
 // TODO: What if we create the Circle using the Formula for Angles.
 
-use crate::utility::openmath;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
+use openmaths::Vector3;
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CircleArc {
   id: String,
-  center: openmath::Vector3D,
+  center: Vector3,
   radius: f64,
   start_angle: f64,
   end_angle: f64,
   segments: u32,
-  points: Vec<openmath::Vector3D>
+  points: Vec<Vector3>
 }
 
 #[wasm_bindgen]
@@ -38,7 +38,7 @@ impl CircleArc {
   pub fn new(id: String) -> CircleArc {
     CircleArc {
       id,
-      center: openmath::Vector3D::create(0.0, 0.0, 0.0),
+      center: Vector3::new(0.0, 0.0, 0.0),
       radius: 1.0,
       start_angle: 0.0,
       end_angle: 2.0 * std::f64::consts::PI,
@@ -61,7 +61,7 @@ impl CircleArc {
   }
 
   #[wasm_bindgen]
-  pub fn set_config(&mut self, center: openmath::Vector3D, radius: f64, start_angle: f64, end_angle: f64, segments: u32) {
+  pub fn set_config(&mut self, center: Vector3, radius: f64, start_angle: f64, end_angle: f64, segments: u32) {
     self.center = center;
     self.radius = radius;
     self.start_angle = start_angle;
@@ -77,7 +77,7 @@ impl CircleArc {
       let x = self.center.x + self.radius * angle.cos();
       let y = self.center.y;
       let z = self.center.z + self.radius * angle.sin();
-      self.points.push(openmath::Vector3D::create(x, y, z));
+      self.points.push(Vector3::new(x, y, z));
       angle += angle_diff;
     }
   }
@@ -89,7 +89,7 @@ impl CircleArc {
   }
 
   #[wasm_bindgen]
-  pub fn update_center(&mut self, center: openmath::Vector3D) {
+  pub fn update_center(&mut self, center: Vector3) {
     self.destroy();
     self.center = center;
   }
@@ -112,7 +112,7 @@ impl CircleArc {
     serde_json::to_string(&self.points).unwrap()
   }
 
-  pub fn get_raw_points(&self) -> Vec<openmath::Vector3D> {
+  pub fn get_raw_points(&self) -> Vec<Vector3> {
     self.points.clone()
   }
 }

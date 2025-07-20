@@ -1,4 +1,4 @@
-import { OGCylinder, Vector3D } from "./../../../opengeometry/pkg/opengeometry";
+import { OGCylinder, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 
@@ -7,7 +7,7 @@ interface ICylinderOptions {
   height: number;
   segments: number;
   angle: number;
-  center?: Vector3D;
+  center?: Vector3;
 }
 
 export class Cylinder extends THREE.Mesh {
@@ -42,7 +42,7 @@ export class Cylinder extends THREE.Mesh {
 
     const { radius, height, segments, angle, center } = this.options;
     this.cylinder.set_config(
-      center?.clone() || new Vector3D(0, 0, 0),
+      center?.clone() || new Vector3(0, 0, 0),
       radius,
       height,
       angle,

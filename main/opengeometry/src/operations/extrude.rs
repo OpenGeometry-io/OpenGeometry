@@ -1,5 +1,6 @@
-use crate::{geometry::basegeometry::BaseGeometry, utility::openmath::{Geometry, Geometry_Holes, Vector3D}};
+use crate::{geometry::basegeometry::BaseGeometry, utility::geometry::{Geometry, Geometry_Holes}};
 use super::{triangulate, windingsort};
+use openmaths::Vector3;
 
 pub fn extrude_polygon_by_buffer_geometry(geom_buf: BaseGeometry, height: f64) -> Geometry {
   if (geom_buf.get_vertices().len() < 3) {
@@ -30,7 +31,8 @@ pub fn extrude_polygon_by_buffer_geometry(geom_buf: BaseGeometry, height: f64) -
   buf_faces.push(face);
 
   for index in 0..ccw_vertices.len() {
-    let new_vertex = ccw_vertices[index].clone().add_extrude_in_up(height, Vector3D::create(0.0, 1.0, 0.0));
+    let up_vertex = Vector3::new(0.0, height, 0.0);
+    let new_vertex = ccw_vertices[index].clone().add(&up_vertex);
     buf_vertices.push(new_vertex);
 
     let edge = {
@@ -98,13 +100,13 @@ pub fn extrude_polygon_with_holes(mut geom_buf: BaseGeometry, height: f64) -> Ge
     start_hole_index = holes[0] * 3;
   }
 
-  let mut temp_vertices: Vec<Vector3D> = Vec::new();
+  let mut temp_vertices: Vec<Vector3> = Vec::new();
   let mut i: usize = 0;
   while i < start_hole_index as usize {
     let x = vertices[i];
     let y = vertices[i + 1];
     let z = vertices[i + 2];
-    let vertex = Vector3D::create(x, y, z);
+    let vertex = Vector3::new(x, y, z);
     temp_vertices.push(vertex);
     i += 3;
   }
@@ -113,7 +115,7 @@ pub fn extrude_polygon_with_holes(mut geom_buf: BaseGeometry, height: f64) -> Ge
   let mut buf_vertices = ccw_vertices.clone();
   let mut buf_edges: Vec<Vec<u8>> = Vec::new();
   let mut buf_faces: Vec<Vec<u8>> = Vec::new();
-  let mut buf_holes: Vec<Vec<Vector3D>> = Vec::new();
+  let mut buf_holes: Vec<Vec<Vector3>> = Vec::new();
   let mut face_holes_map: std::collections::HashMap<u8, Vec<u8>> = std::collections::HashMap::new();
 
   let mut hole_index = 0;
@@ -153,7 +155,8 @@ pub fn extrude_polygon_with_holes(mut geom_buf: BaseGeometry, height: f64) -> Ge
 
   // Side Face Refined
   for index in 0..ccw_vertices.len() {
-    let new_vertex = ccw_vertices[index].clone().add_extrude_in_up(height, Vector3D::create(0.0, 1.0, 0.0));
+    let up_vertex = Vector3::new(0.0, height, 0.0);
+    let new_vertex = ccw_vertices[index].clone().add(&up_vertex);
     buf_vertices.push(new_vertex);
 
     let edge = {
@@ -185,7 +188,7 @@ pub fn extrude_polygon_with_holes(mut geom_buf: BaseGeometry, height: f64) -> Ge
     let x = vertices[i];
     let y = vertices[i + 1];
     let z = vertices[i + 2];
-    let vertex = Vector3D::create(x, y, z);
+    let vertex = Vector3::new(x, y, z);
     buf_vertices.push(vertex);
     i += 3;
   }
@@ -226,7 +229,8 @@ pub fn extrude_polygon_with_holes(mut geom_buf: BaseGeometry, height: f64) -> Ge
 
       // Hole Side Face Edges Vertical
       for vertex in hole.clone() {
-        let new_vertex = vertex.clone().add_extrude_in_up(height, Vector3D::create(0.0, 1.0, 0.0));
+        let up_vertex = Vector3::new(0.0, height, 0.0);
+        let new_vertex = vertex.clone().add(&up_vertex);
         buf_vertices.push(new_vertex);
 
         let edge = {
@@ -275,7 +279,7 @@ pub fn extrude_polygon_with_holes(mut geom_buf: BaseGeometry, height: f64) -> Ge
 
   if geom_buf.get_holes().len() > 0 {
     for hole in geom_buf.get_holes() {
-      let mut extruded_hole: Vec<Vector3D> = Vec::new();
+      let mut extruded_hole: Vec<Vector3> = Vec::new();
       for i in 0..hole.len() {
         let index = hole_index_start + i;
         extruded_hole.push(buf_vertices[index as usize].clone());

@@ -2,9 +2,9 @@
  * Code for sorting the winding order of a given vertices
  */
 
-use crate::utility::openmath::Vector3D;
+use openmaths::Vector3;
 
-fn compute_signed_area(points: &[Vector3D]) -> f64 {
+fn compute_signed_area(points: &[Vector3]) -> f64 {
   let n = points.len();
   let mut sum = 0.0;
   for i in 0..n {
@@ -16,7 +16,7 @@ fn compute_signed_area(points: &[Vector3D]) -> f64 {
 }
 
 
-pub fn ccw_test(raw_points: Vec<Vector3D>) -> Vec<Vector3D> {
+pub fn ccw_test(raw_points: Vec<Vector3>) -> Vec<Vector3> {
   let mut points = raw_points;
   let area = compute_signed_area(&points);
   if area < 0.0 {
@@ -25,7 +25,7 @@ pub fn ccw_test(raw_points: Vec<Vector3D>) -> Vec<Vector3D> {
   points
 }
 
-pub fn is_ccw_need(raw_points: Vec<Vector3D>) -> ccw_and_flag {
+pub fn is_ccw_need(raw_points: Vec<Vector3>) -> ccw_and_flag {
   let mut points = raw_points;
   let area = compute_signed_area(&points);
   if area < 0.0 {
@@ -37,6 +37,6 @@ pub fn is_ccw_need(raw_points: Vec<Vector3D>) -> ccw_and_flag {
 }
 
 pub struct ccw_and_flag {
-  pub ccw: Vec<Vector3D>,
+  pub ccw: Vec<Vector3>,
   pub flag: bool,
 }
