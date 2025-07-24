@@ -220,19 +220,19 @@ impl OGPolyLine {
 
       let offset_point = if i == 0 {
         // Start point: move perpendicular to first segment
-        curr.clone().add(&perp2.clone().multiply_scalar(distance))
+        curr.add(&perp2.multiply_scalar(distance))
       } else if i == n - 1 {
         // End point: move perpendicular to last segment
-        curr.clone().add(&perp1.clone().multiply_scalar(distance))
+        curr.add(&perp1.multiply_scalar(distance))
       } else {
         // Middle: compute bisector intersection
-        let a1 = prev.clone().add(&perp1.multiply_scalar(distance));
-        let a2 = curr.clone().add(&perp1.multiply_scalar(distance));
-        let b1 = curr.clone().add(&perp2.multiply_scalar(distance));
-        let b2 = next.clone().add(&perp2.multiply_scalar(distance));
+        let a1 = prev.add(&perp1.multiply_scalar(distance));
+        let a2 = curr.add(&perp1.multiply_scalar(distance));
+        let b1 = curr.add(&perp2.multiply_scalar(distance));
+        let b2 = next.add(&perp2.multiply_scalar(distance));
 
         Self::calculate_2D_interesection(&a1, &a2, &b1, &b2)
-            .unwrap_or(curr.clone().add(&perp1.multiply_scalar(distance)))
+            .unwrap_or(curr.add(&perp1.multiply_scalar(distance)))
       };
 
       offset_points.push(offset_point);
