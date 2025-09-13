@@ -60,27 +60,27 @@ impl BasePolygon {
     }
   }
 
-  #[wasm_bindgen]
-  pub fn new_with_circle(circle_arc: primitives::circle::CircleArc) -> BasePolygon {
-    let mut polygon = BasePolygon::new(circle_arc.id());
-    // discard the last point as it is same as the first point
-    let mut circle_arc_points = circle_arc.get_raw_points();
-    circle_arc_points.pop();
-    polygon.add_vertices(circle_arc_points);
-    polygon.triangulate();
-    polygon
-  }
+  // #[wasm_bindgen]
+  // pub fn new_with_circle(circle_arc: primitives::circle::CircleArc) -> BasePolygon {
+  //   let mut polygon = BasePolygon::new(circle_arc.id());
+  //   // discard the last point as it is same as the first point
+  //   let mut circle_arc_points = circle_arc.get_raw_points();
+  //   circle_arc_points.pop();
+  //   polygon.add_vertices(circle_arc_points);
+  //   polygon.triangulate();
+  //   polygon
+  // }
 
-  #[wasm_bindgen]
-  pub fn new_with_rectangle(rectangle: primitives::rectangle::OGRectangle) -> BasePolygon {
-    let mut polygon = BasePolygon::new(rectangle.id());
-    // discard the last point as it is same as the first point
-    let mut rectangle_points = rectangle.get_raw_points();
-    rectangle_points.pop();
-    polygon.add_vertices(rectangle_points);
-    polygon.triangulate();
-    polygon
-  }
+  // #[wasm_bindgen]
+  // pub fn new_with_rectangle(rectangle: primitives::rectangle::OGRectangle) -> BasePolygon {
+  //   let mut polygon = BasePolygon::new(rectangle.id());
+  //   // discard the last point as it is same as the first point
+  //   let mut rectangle_points = rectangle.get_raw_points();
+  //   rectangle_points.pop();
+  //   polygon.add_vertices(rectangle_points);
+  //   polygon.triangulate();
+  //   polygon
+  // }
 
   #[wasm_bindgen]
   pub fn add_vertices(&mut self, vertices: Vec<Vector3>) {

@@ -1,68 +1,78 @@
 import { OGRectangle, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
-import { RectangeOptions } from "../base-types";
-import { BasePrimitive } from "./base-primitive";
+import { IRectangeOptions } from "../base-types";
+import { BaseLinePrimitive } from "./base-line-primitive";
 
-/**
- * Rectangle
- */
-export class Rectangle extends BasePrimitive {
-
-  private polyLineRectangle: OGRectangle;
-
-  options: RectangeOptions = {
+export class Rectangle extends BaseLinePrimitive {
+  ogid: string;
+  options: IRectangeOptions = {
     width: 1,
     breadth: 1,
     center: new Vector3(0, 0, 0),
-    color: 0x000000,
+    color: 0x00ff00,
   };
 
-  set width(width: number) {
-    this.options.width = width;
-    this.polyLineRectangle.update_width(width);
-    this.generateGeometry();
-  }
+  private polyLineRectangle: OGRectangle;
 
-  set breadth(breadth: number) {
-    this.options.breadth = breadth;
-    this.polyLineRectangle.update_breadth(breadth);
-    this.generateGeometry();
-  }
+  // set width(width: number) {
+  //   this.options.width = width;
+  //   this.polyLineRectangle.update_width(width);
+  //   this.generateGeometry();
+  // }
 
-  set center(center: Vector3) {
-    this.options.center = center;
-    this.polyLineRectangle.update_center(center);
-    this.generateGeometry();
-  }
+  // set breadth(breadth: number) {
+  //   this.options.breadth = breadth;
+  //   this.polyLineRectangle.update_breadth(breadth);
+  //   this.generateGeometry();
+  // }
+
+  // set center(center: Vector3) {
+  //   this.options.center = center;
+  //   this.polyLineRectangle.update_center(center);
+  //   this.generateGeometry();
+  // }
 
   set color(color: number) {
+    this.options.color = color;
     if (this.material instanceof THREE.LineBasicMaterial) {
       this.material.color.set(color);
-      this.options.color = color;
     }
   }
 
-  constructor(options?: RectangeOptions) {
+  // FINAL: This flow should be used for other primitives
+  constructor(options?: IRectangeOptions) {
     super();
 
     const ogid = options?.ogid ?? getUUID();
     this.polyLineRectangle = new OGRectangle(ogid);
 
-    const mergedOptions = { ...this.options, ...options, ogid };
-    this.setConfig(mergedOptions);
+    // const mergedOptions = { ...this.options, ...options, ogid };
+    if (options) {
+      this.options = { ...this.options, ...options };
+      this.ogid = options.ogid || getUUID();
+    } else {
+      this.ogid = getUUID();
+    }
 
+    this.setConfig();
     this.generateGeometry();
   }
 
-  setConfig(options: RectangeOptions) {
-    this.options = options;
-    console.log("Rectangle options set:", this.options);
-    const { breadth, width, center } = this.options;
+  validateOptions() {
+    if (!this.options) {
+      throw new Error("Options are not defined for Rectangle");
+    }
+  }
+
+  setConfig() {
+    this.validateOptions();
+
+    const { width, breadth, center, color } = this.options;
     this.polyLineRectangle.set_config(
-      center,
+      center.clone() || new Vector3(0, 0, 0),
       width,
-      breadth
+      breadth,
     );
   }
 
@@ -71,13 +81,27 @@ export class Rectangle extends BasePrimitive {
   }
 
   generateGeometry() {
-    this.polyLineRectangle.generate_points();
-    const bufRaw = this.polyLineRectangle.get_points();
-    const bufFlush = JSON.parse(bufRaw);
-    const line = new THREE.BufferGeometry().setFromPoints(bufFlush);
-    const material = new THREE.LineBasicMaterial({ color: this.options.color });
-    this.geometry = line;
-    this.material = material;
+    this.polyLineRectangle.generate_geometry();
+    const geometryData = this.polyLineRectangle.get_geometry_serialized();
+    const bufferData = JSON.parse(geometryData);
+    console.log(bufferData);
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(bufferData, 3)
+    );
+
+    this.geometry = geometry;
+    this.material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+  }
+
+  getBrep() {
+    const brepData = this.polyLineRectangle.get_brep_serialized();
+    if (!brepData) {
+      throw new Error("Brep data is not available for Rectangle");
+    }
+    return JSON.parse(brepData);
   }
 
   discardGeometry() {

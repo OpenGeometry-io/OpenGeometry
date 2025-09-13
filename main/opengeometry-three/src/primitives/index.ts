@@ -1,5 +1,5 @@
-export * from './simple-line';
-export * from './poly-line';
-export * from './circle';
+export * from './line';
+export * from './polyline';
+export * from './arc';
 export * from './rectangle';
 // export * from './simple-curve';

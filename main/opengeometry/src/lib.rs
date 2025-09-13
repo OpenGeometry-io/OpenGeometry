@@ -11,18 +11,32 @@ pub mod operations {
   pub mod triangulate;
   pub mod windingsort;
   pub mod extrude;
-  pub mod binary_tree;
 }
 
 pub mod utility {
   pub mod geometry;
+  pub mod bgeometry;
 }
 
 pub mod primitives {
-  pub mod circle;
-  pub mod simple_line;
-  pub mod poly_line;
+  pub mod arc;
+  pub mod line;
+  pub mod polyline;
   pub mod rectangle;
   pub mod cylinder;
   pub mod polygon;
+  pub mod cylinder2;
+  pub mod cube;
 }
+
+pub mod brep;
+
+// v0.3.0
+// mod brep_ds {
+//   mod vertex;
+//   // mod halfedge;
+//   mod edge;
+//   mod face;
+//   pub mod brep;
+// }
+

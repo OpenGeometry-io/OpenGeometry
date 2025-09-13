@@ -12,14 +12,15 @@ export class Pencil {
   private container: HTMLElement;
   private scene: THREE.Scene;
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
-  pencilMeshes: THREE.Mesh[] = [];
+  pencilMeshes: THREE.Object3D[] = [];
 
   cursor: CSS2DObject | undefined;
   onCursorDown: Event<THREE.Vector3> = new Event();
   onCursorMove: Event<THREE.Vector3> = new Event();
 
-  onElementHover: Event<THREE.Mesh> = new Event();
-  onElementSelected: Event<THREE.Mesh> = new Event();
+  onElementHover: Event<{ mesh: THREE.Mesh; point: THREE.Vector3 }> = new Event();
+  onElementSelected: Event<{ mesh: THREE.Mesh; point: THREE.Vector3 }> = new Event();
+  onElementUnselected: Event<{ mesh: THREE.Mesh; point: THREE.Vector3 }> = new Event();
 
   pencilMode: PencilMode = "cursor";
 
@@ -119,7 +120,10 @@ export class Pencil {
           return;
         }
         const intersect = intersects[0];
-        this.onElementHover.trigger(intersect.object as THREE.Mesh);
+        this.onElementHover.trigger({
+          mesh: intersect.object as THREE.Mesh,
+          point: intersect.point
+        });
       }
     });
 
@@ -138,7 +142,28 @@ export class Pencil {
       } else if (this.pencilMode === "select") {
         const intersects = this.raycaster.intersectObjects(this.pencilMeshes);
         const intersect = intersects[0];
-        this.onElementSelected.trigger(intersect.object as THREE.Mesh);
+        this.onElementSelected.trigger({
+          mesh: intersect.object as THREE.Mesh,
+          point: intersect.point
+        });
+      }
+    });
+
+    this.container.addEventListener("mouseup", (event) => {
+      if (this.pencilMode === "select") {
+        const rect = this.container.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
+        const intersects = this.raycaster.intersectObjects(this.pencilMeshes);
+        if (intersects.length > 0) {
+          const intersect = intersects[0];
+          this.onElementUnselected.trigger({
+            mesh: intersect.object as THREE.Mesh,
+            point: intersect.point
+          });
+        }
       }
     });
   }
@@ -154,6 +179,20 @@ export class Pencil {
     if (intersects.length > 0) {
       const point = intersects[0].point;
       this.onCursorDown.trigger(point);
+    }
+  }
+
+  fireCursorMove(mouse: MouseEvent) {
+    const rect = this.container.getBoundingClientRect();
+    const x = ((mouse.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((mouse.clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
+    const intersects = this.raycaster.intersectObjects([this.dummyPlane!]);
+    
+    if (intersects.length > 0) {
+      const point = intersects[0].point;
+      this.onCursorMove.trigger(point);
     }
   }
 }

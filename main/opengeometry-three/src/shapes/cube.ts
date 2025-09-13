@@ -1,29 +1,31 @@
-import { OGCylinder, Vector3 } from "../../../opengeometry/pkg/opengeometry";
+import { OGCube, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 
-interface ICylinderOptions {
-  radius: number;
+interface ICubeOptions {
+  width: number;
   height: number;
-  segments: number;
-  angle: number;
+  depth: number;
   center?: Vector3;
 }
 
-export class Cylinder extends THREE.Mesh {
+export class Cube extends THREE.Mesh {
   ogid: string;
-  options: ICylinderOptions;
-  cylinder: OGCylinder;
+  options: ICubeOptions;
+  cube: OGCube;
 
   #outlineMesh: THREE.Line | null = null;
 
-  constructor(options: ICylinderOptions) {
+  // Store local center offset to align outlines
+  // TODO: Can this be moved to Engine? It can increase performance | Needs to be used in other shapes too
+  private _geometryCenterOffset = new THREE.Vector3();
+
+  constructor(options: ICubeOptions) {
     super();
     this.ogid = getUUID();
     this.options = options;
 
-    this.cylinder = new OGCylinder(this.ogid);
-    
+    this.cube = new OGCube(this.ogid);
     this.setConfig();
     this.generateGeometry();
   }
@@ -37,22 +39,20 @@ export class Cylinder extends THREE.Mesh {
   setConfig() {
     this.validateOptions();
 
-    const { radius, height, segments, angle, center } = this.options;
-    this.cylinder.set_config(
+    const { width, height, depth, center } = this.options;
+    this.cube.set_config(
       center?.clone() || new Vector3(0, 0, 0),
-      radius,
+      width,
       height,
-      angle,
-      segments
+      depth
     );
   }
 
   generateGeometry() {
-    console.log("Generating cylinder geometry...");
-
-    this.cylinder.generate_geometry();
-    const geometryData = this.cylinder.get_geometry_serialized();
+    this.cube.generate_geometry();
+    const geometryData = this.cube.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
+    console.log(bufferData);
     
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
@@ -71,13 +71,11 @@ export class Cylinder extends THREE.Mesh {
 
     this.geometry = geometry;
     this.material = material;
-
-    console.log("Position", this.position);
   }
 
   set outline(enable: boolean) {
     if (enable && !this.#outlineMesh) {
-      const outline_buff = this.cylinder.get_outline_geometry_serialized();
+      const outline_buff = this.cube.get_outline_geometry_serialized();
       const outline_buf = JSON.parse(outline_buff);
 
       const outlineGeometry = new THREE.BufferGeometry();
@@ -102,11 +100,7 @@ export class Cylinder extends THREE.Mesh {
     }
   }
 
-  getBrep() {
-    const brepData = this.cylinder.get_brep_serialized();
-    if (!brepData) {
-      throw new Error("Brep data is not available for this cylinder.");
-    }
-    return JSON.parse(brepData);
+  get outlineMesh() {
+    return this.#outlineMesh;
   }
 }

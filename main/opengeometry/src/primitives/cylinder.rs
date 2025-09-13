@@ -19,15 +19,13 @@ use openmaths::Vector3;
  * 
  * This class is used to create a cylinder primitive(2) using radius and height.
  *  */
-
-use crate::{utility::geometry};
 use crate::geometry::basegeometry;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
-pub struct OGCylinder {
+pub struct OGCylinderOld {
   id: String,
   center: Vector3,
   radius: f64,
@@ -40,7 +38,7 @@ pub struct OGCylinder {
 }
 
 #[wasm_bindgen]
-impl OGCylinder {
+impl OGCylinderOld {
   #[wasm_bindgen(setter)]
   pub fn set_id(&mut self, id: String) {
     self.id = id;
@@ -52,8 +50,8 @@ impl OGCylinder {
   }
 
   #[wasm_bindgen(constructor)]
-  pub fn new(id: String) -> OGCylinder {
-    OGCylinder {
+  pub fn new(id: String) -> OGCylinderOld {
+    OGCylinderOld {
       id: id.clone(),
       center: Vector3::new(0.0, 0.0, 0.0),
       radius: 1.0,
