@@ -21,12 +21,11 @@ use uuid::Uuid;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGArc {
   id: String,
-  // center: Vector3,
+  center: Vector3,
   radius: f64,
   start_angle: f64,
   end_angle: f64,
   segments: u32,
-  geometry: BufferGeometry, // TODO: Use BufferGeometry to store the triangulated geometry
   brep: Brep
 }
 
@@ -49,19 +48,18 @@ impl OGArc {
 
     OGArc {
       id,
-      // center: Vector3::new(0.0, 0.0, 0.0),
+      center: Vector3::new(0.0, 0.0, 0.0),
       radius: 1.0,
       start_angle: 0.0,
       end_angle: 2.0 * std::f64::consts::PI,
       segments: 32,
-      geometry: BufferGeometry::new(internal_id),
       brep: Brep::new(internal_id),
     }
   }
 
   #[wasm_bindgen]
-  pub fn set_config(&mut self, radius: f64, start_angle: f64, end_angle: f64, segments: u32) {
-    // self.center = center;
+  pub fn set_config(&mut self, center: Vector3, radius: f64, start_angle: f64, end_angle: f64, segments: u32) {
+    self.center = center;
     self.radius = radius;
     self.start_angle = start_angle;
     self.end_angle = end_angle;
@@ -74,15 +72,25 @@ impl OGArc {
     let angle_diff = (self.end_angle - self.start_angle) / self.segments as f64;
 
     for _ in 0..self.segments + 1 {
-      // let x = self.center.x + self.radius * angle.cos();
-      // let y = self.center.y;
-      // let z = self.center.z + self.radius * angle.sin();
-      let x = self.radius * angle.cos();
-      let y = 0.0;
-      let z = self.radius * angle.sin();
+      let x = self.center.x + self.radius * angle.cos();
+      let y = self.center.y;
+      let z = self.center.z + self.radius * angle.sin();
       self.brep.vertices.push(Vertex::new(self.brep.get_vertex_count() as u32, Vector3::new(x, y, z)));
       angle += angle_diff;
     }
+  }
+
+  // Dispose
+  #[wasm_bindgen]
+  pub fn dispose_points(&mut self) {
+    self.brep.clear();
+  }
+
+  // Destroy and Free memory
+  #[wasm_bindgen]
+  pub fn destroy(&mut self) {
+    self.brep.clear();
+    self.id.clear();
   }
 
   #[wasm_bindgen]
@@ -107,29 +115,4 @@ impl OGArc {
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
   }
-  
-  // #[wasm_bindgen]
-  // pub fn generate_points(&mut self) {
-  //   let mut angle = self.start_angle;
-  //   let angle_diff = (self.end_angle - self.start_angle) / self.segments as f64;
-  //   for _ in 0..self.segments + 1 {
-  //     let x = self.center.x + self.radius * angle.cos();
-  //     let y = self.center.y;
-  //     let z = self.center.z + self.radius * angle.sin();
-  //     self.points.push(Vector3::new(x, y, z));
-  //     angle += angle_diff;
-  //   }
-  // }
-
-  // #[wasm_bindgen]
-  // pub fn update_radius(&mut self, radius: f64) {
-  //   self.destroy();
-  //   self.radius = radius;
-  // }
-
-  // #[wasm_bindgen]
-  // pub fn update_center(&mut self, center: Vector3) {
-  //   self.destroy();
-  //   self.center = center;
-  // }
 }

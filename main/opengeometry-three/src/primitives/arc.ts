@@ -1,17 +1,23 @@
-import { OGArc } from "../../../opengeometry/pkg/opengeometry";
+import { OGArc, Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
-import { IArcOptions } from "../base-types";
+// import { IArcOptions } from "../base-types";
 
-// TODO: What if user wants infintely smooth circle
+interface IArcOptions {
+  center: Vector3;
+  radius: number;
+  startAngle: number;
+  endAngle: number;
+  segments: number;
+}
+
 export class Arc extends THREE.Line {
   ogid: string;
-  arc: OGArc;
+  options: IArcOptions;
   
-  options: IArcOptions
-  // nodeChild: CirclePoly | null = null;
-  nodeOperation: String = "none";
+  private arc: OGArc;
 
+  // TODO: Create local properties for all Primitive classes
   #color: number = 0x00ff00;
 
   set color(color: number) {
@@ -24,6 +30,7 @@ export class Arc extends THREE.Line {
     super();
     this.ogid = getUUID();
     this.options = options;
+    
     this.arc = new OGArc(this.ogid);
 
     this.setConfig();
@@ -38,9 +45,10 @@ export class Arc extends THREE.Line {
 
   setConfig() {
     this.validateOptions();
-    const { radius, segments, startAngle, endAngle } = this.options;
+
+    const { center, radius, segments, startAngle, endAngle } = this.options;
     this.arc.set_config(
-      // position,
+      center.clone(),
       radius,
       startAngle,
       endAngle,
