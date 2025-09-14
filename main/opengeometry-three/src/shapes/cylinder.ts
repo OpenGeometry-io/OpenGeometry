@@ -48,8 +48,6 @@ export class Cylinder extends THREE.Mesh {
   }
 
   generateGeometry() {
-    console.log("Generating cylinder geometry...");
-
     this.cylinder.generate_geometry();
     const geometryData = this.cylinder.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
@@ -71,8 +69,6 @@ export class Cylinder extends THREE.Mesh {
 
     this.geometry = geometry;
     this.material = material;
-
-    console.log("Position", this.position);
   }
 
   set outline(enable: boolean) {

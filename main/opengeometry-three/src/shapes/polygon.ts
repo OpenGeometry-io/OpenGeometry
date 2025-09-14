@@ -23,13 +23,11 @@ export class Polygon extends THREE.Mesh {
     }
   }
 
-  layerVertices: Vector3[] = [];
-  layerBackVertices: Vector3[] = [];
-
-  isTriangulated: boolean = false;
-
-  private _placement: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
-  private _yaw: number = 0;
+  // private _placement: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  // private _yaw: number = 0;
+  // Store local center offset to align outlines
+  // TODO: Can this be moved to Engine? It can increase performance | Needs to be used in other shapes too
+  private _geometryCenterOffset = new THREE.Vector3();
 
   // TODO: Make Options Optional
   // constructor(vertices?: Vector3[]) // If no vertices are provided, it will be an empty polygon
@@ -38,7 +36,6 @@ export class Polygon extends THREE.Mesh {
     this.ogid = getUUID();
     if (options) {
       this.options = options;
-      console.log("Polygon options set:", this.options);
     }
     this.polygon = new OGPolygon(this.ogid);
     
@@ -73,63 +70,63 @@ export class Polygon extends THREE.Mesh {
     this.polygon.set_config(vertices);
   }
 
-  /**
-   * Sets the placement of the polygon in 3D space.
-   * @param x X-coordinate
-   * @param y Y-coordinate
-   * @param z Z-coordinate
-   */
-  placement(x: number, y: number, z: number) {
-    this._placement.set(x, y, z);
+  // /**
+  //  * Sets the placement of the polygon in 3D space.
+  //  * @param x X-coordinate
+  //  * @param y Y-coordinate
+  //  * @param z Z-coordinate
+  //  */
+  // placement(x: number, y: number, z: number) {
+  //   this._placement.set(x, y, z);
     
-    // Do the recalculation of position based on the placement
-    const clonedObject = this.clone();
-    clonedObject.rotation.set(0, 0, 0);
+  //   // Do the recalculation of position based on the placement
+  //   const clonedObject = this.clone();
+  //   clonedObject.rotation.set(0, 0, 0);
 
-    clonedObject.geometry.computeBoundingBox();
-    if (!clonedObject.geometry.boundingBox) return;
+  //   clonedObject.geometry.computeBoundingBox();
+  //   if (!clonedObject.geometry.boundingBox) return;
 
-    const center = new THREE.Vector3();
-    clonedObject.geometry.boundingBox.getCenter(center);
-    const min = clonedObject.geometry.boundingBox.min;
-    this.position.set(
-      center.x + this._placement.x - min.x,
-      // this._placement.y,
-      0.01, // Set Y to a small value to avoid z-fighting
-      center.z + this._placement.z - min.z
-    );
-  }
+  //   const center = new THREE.Vector3();
+  //   clonedObject.geometry.boundingBox.getCenter(center);
+  //   const min = clonedObject.geometry.boundingBox.min;
+  //   this.position.set(
+  //     center.x + this._placement.x - min.x,
+  //     // this._placement.y,
+  //     0.01, // Set Y to a small value to avoid z-fighting
+  //     center.z + this._placement.z - min.z
+  //   );
+  // }
 
-  positionToPlacement() {
-    const clonedObject = this.clone();
-    clonedObject.rotation.set(0, 0, 0);
-    clonedObject.geometry.computeBoundingBox();
-    if (!clonedObject.geometry.boundingBox) return;
-    const min = clonedObject.geometry.boundingBox.min;
+  // positionToPlacement() {
+  //   const clonedObject = this.clone();
+  //   clonedObject.rotation.set(0, 0, 0);
+  //   clonedObject.geometry.computeBoundingBox();
+  //   if (!clonedObject.geometry.boundingBox) return;
+  //   const min = clonedObject.geometry.boundingBox.min;
 
-    this._placement.set(
-      this.position.x + min.x,
-      this.position.y + min.y,
-      this.position.z + min.z
-    );
+  //   this._placement.set(
+  //     this.position.x + min.x,
+  //     this.position.y + min.y,
+  //     this.position.z + min.z
+  //   );
 
-    // console.log("Placement set to:", this._placement.x, this._placement.y, this._placement.z);
-  }
+  //   // console.log("Placement set to:", this._placement.x, this._placement.y, this._placement.z);
+  // }
 
-  /**
-   * Rotates the polygon around the Y-axis.
-   * @param angle Rotation angle in Degrees
-   */
-  set yaw(angle: number) {
-    this._yaw = angle;
+  // /**
+  //  * Rotates the polygon around the Y-axis.
+  //  * @param angle Rotation angle in Degrees
+  //  */
+  // set yaw(angle: number) {
+  //   this._yaw = angle;
     
-    this.rotation.set(0, 0, 0);
-    this.rotation.y = THREE.MathUtils.degToRad(this._yaw);
-  }
+  //   this.rotation.set(0, 0, 0);
+  //   this.rotation.y = THREE.MathUtils.degToRad(this._yaw);
+  // }
 
-  get yaw() {
-    return this._yaw;
-  }
+  // get yaw() {
+  //   return this._yaw;
+  // }
 
   generateGeometry() {
 
@@ -140,7 +137,6 @@ export class Polygon extends THREE.Mesh {
     this.polygon.generate_geometry();
     const geometryData = this.polygon.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
-    console.log("Buffer data for polygon geometry:", bufferData);
 
     // TODO: If The Geometry is empty, no need to adjust position
     if (bufferData.length === 0) {
@@ -160,10 +156,11 @@ export class Polygon extends THREE.Mesh {
       opacity: 0.6,
     });
 
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+
     this.geometry = geometry;
     this.material = material;
-
-    console.log("Original Position:", this.position.x, this.position.y, this.position.z);
 
     // this.geometry.computeBoundingBox();
     // const originalCenter = new THREE.Vector3();
@@ -186,7 +183,7 @@ export class Polygon extends THREE.Mesh {
     //   this.placement(this._placement.x, this._placement.y, this._placement.z);
     // }
 
-    console.log("New Position after centering:", this.position.x, this.position.y, this.position.z);
+    // console.log("New Position after centering:", this.position.x, this.position.y, this.position.z);
   }
 
   addVertices(vertices: Vector3[]) {
@@ -201,15 +198,15 @@ export class Polygon extends THREE.Mesh {
     if (!this.polygon) return;
   }
 
-  /**
-   * Rotates the object around the Y-axis.
-   * @param angle Rotation angle in Degrees
-   * @returns 
-   * @summary If rotation methods from threejs is used, it will rotate around the first vertex which might not be desired.
-   */
-  rotateOnYAxis(angle: number) {
-    if (!this.polygon) return;
-  }
+  // /**
+  //  * Rotates the object around the Y-axis.
+  //  * @param angle Rotation angle in Degrees
+  //  * @returns 
+  //  * @summary If rotation methods from threejs is used, it will rotate around the first vertex which might not be desired.
+  //  */
+  // rotateOnYAxis(angle: number) {
+  //   if (!this.polygon) return;
+  // }
 
   // resetVertices() {
   //   if (!this.polygon) return;
@@ -281,25 +278,25 @@ export class Polygon extends THREE.Mesh {
   //   this.generateExtrudedGeometry(extruded_buff);
   // }
 
-  generateExtrudedGeometry(extruded_buff: string) {
-    // THIS WORKS
-    const flushBuffer = JSON.parse(extruded_buff);
-    console.log(flushBuffer);
+  // generateExtrudedGeometry(extruded_buff: string) {
+  //   // THIS WORKS
+  //   const flushBuffer = JSON.parse(extruded_buff);
+  //   console.log(flushBuffer);
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
-    geometry.computeVertexNormals();
-    this.geometry = geometry;
+  //   const geometry = new THREE.BufferGeometry();
+  //   geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
+  //   geometry.computeVertexNormals();
+  //   this.geometry = geometry;
 
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x00ff00, 
-      side: THREE.FrontSide, 
-      transparent: true, 
-      opacity: 0.5, 
-      // wireframe: true
-    });
-    this.material = material;
-  }
+  //   const material = new THREE.MeshStandardMaterial({
+  //     color: 0x00ff00, 
+  //     side: THREE.FrontSide, 
+  //     transparent: true, 
+  //     opacity: 0.5, 
+  //     // wireframe: true
+  //   });
+  //   this.material = material;
+  // }
 
   getBrepData() {
     if (!this.polygon) return null;
@@ -337,7 +334,7 @@ export class Polygon extends THREE.Mesh {
         outlineMaterial
       );
 
-      this.#outlineMesh.geometry.center();
+      // this.#outlineMesh.geometry.center();
       // this.#outlineMesh.applyMatrix4(this.transformationMatrix);
 
       this.add(this.#outlineMesh);

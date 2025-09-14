@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use crate::brep::{Edge, Face, Brep, Vertex};
 use crate::operations::extrude::extrude_brep_face;
 use crate::operations::triangulate::triangulate_polygon_by_face;
-use crate::utility::bgeometry::BufferGeometry;
+// use crate::utility::bgeometry::BufferGeometry;
 use openmaths::Vector3;
 use uuid::Uuid;
 
@@ -30,7 +30,6 @@ pub struct OGCube {
   width: f64,
   height: f64,
   depth: f64,
-  geometry: BufferGeometry,
   brep: Brep,
 }
 
@@ -48,16 +47,21 @@ impl OGCube {
 
   #[wasm_bindgen(constructor)]
   pub fn new(id: String) -> OGCube {
+
     let internal_id = Uuid::new_v4();
+
     OGCube {
       id: id.clone(),
       center: Vector3::new(0.0, 0.0, 0.0),
       width: 1.0,
       height: 1.0,
       depth: 1.0,
-      geometry: BufferGeometry::new(internal_id),
       brep: Brep::new(internal_id),
     }
+  }
+
+  pub fn clean_geometry(&mut self) {
+    self.brep.clear();
   }
 
   #[wasm_bindgen]
@@ -73,6 +77,9 @@ impl OGCube {
     let half_width = self.width / 2.0;
     let half_height = self.height / 2.0;
     let half_depth = self.depth / 2.0;
+
+    // Clear the existing BREP data
+    self.clean_geometry();
 
     let mut bottom_face_brep = Brep::new(Uuid::new_v4());
     bottom_face_brep.vertices.push(Vertex::new(0, Vector3::new(self.center.x - half_width, self.center.y - half_height, self.center.z - half_depth)));

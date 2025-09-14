@@ -195,7 +195,7 @@ impl OGPolygon {
 
   #[wasm_bindgen]
   pub fn generate_geometry(&mut self) {
-    if (self.points.len() < 3) {
+    if self.points.len() < 3 {
       web_sys::console::log_1(&"Polygon must have at least 3 points to generate geometry.".into());
       return;
     }
