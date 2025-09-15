@@ -112,7 +112,7 @@ pub fn triangulate_polygon_by_face(face: Vec<Vector3>) -> Vec<Vec<u32>> {
 
   // print javascript console log of ccw_vertices
   for vertex in &ccw_vertices {
-    web_sys::console::log_1(&format!("Vertex: ({}, {}, {})", vertex.x, vertex.y, vertex.z).into());
+    // web_sys::console::log_1(&format!("Vertex: ({}, {}, {})", vertex.x, vertex.y, vertex.z).into());
   }  
 
   // let mut triangles_vertices: Vec<f64> = Vec::new();

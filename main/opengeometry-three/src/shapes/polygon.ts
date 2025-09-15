@@ -12,12 +12,12 @@ export class Polygon extends THREE.Mesh {
   polygon: OGPolygon;
   #outlineMesh: THREE.Line | null = null;
 
-  // #color: number = 0x00ff00;
+  #color: number = 0x00ff00;
 
   transformationMatrix: THREE.Matrix4 = new THREE.Matrix4();
 
   set color(color: number) {
-    // this.#color = color;
+    this.#color = color;
     if (this.material instanceof THREE.MeshStandardMaterial) {
       this.material.color.set(color);
     }
@@ -140,6 +140,7 @@ export class Polygon extends THREE.Mesh {
 
     // TODO: If The Geometry is empty, no need to adjust position
     if (bufferData.length === 0) {
+      console.warn("Geometry has no position attribute, skipping position adjustment.");
       return;
     }
 
@@ -148,61 +149,25 @@ export class Polygon extends THREE.Mesh {
       return;
     }
 
-    console.log(bufferData);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
       "position",
       new THREE.Float32BufferAttribute(bufferData, 3)
     );
 
-    // const material = new THREE.MeshStandardMaterial({
-    //   color: this.#color,
-    //   transparent: true,
-    //   opacity: 0.6,
-    // });
+    const material = new THREE.MeshStandardMaterial({
+      color: this.#color,
+      transparent: true,
+      opacity: 0.6,
+      // TODO: Enabling Double Side untill we have proper face normals from triangulation
+      side: THREE.DoubleSide,
+    });
 
     geometry.computeVertexNormals();
     geometry.computeBoundingBox();
 
     this.geometry = geometry;
-    // this.material = material;
-
-    // Add different color to each triangle in the geometry for better visualization of triangulation
-    const colors = [
-      0xff0000, // Red
-      0x00ff00, // Green
-      0x0000ff, // Blue
-      0xffff00, // Yellow
-      0xff00ff, // Magenta
-      0x00ffff, // Cyan
-      0x888888, // Gray
-      0xff8800, // Orange
-      0x0088ff, // Light Blue
-    ]
-    const positionAttribute = this.geometry.getAttribute('position');
-    const color = new THREE.Color();
-    
-    // Create color array with the same length as position attribute
-    const colorArray = new Float32Array(positionAttribute.count * 3);
-    
-    for (let i = 0; i < positionAttribute.count; i += 3) {
-      const faceColor = colors[(i / 3) % colors.length];
-      color.setHex(faceColor);
-      for (let j = 0; j < 3; j++) {
-        const vertexIndex = i + j;
-        colorArray[vertexIndex * 3] = color.r;
-        colorArray[vertexIndex * 3 + 1] = color.g;
-        colorArray[vertexIndex * 3 + 2] = color.b;
-      }
-    }
-    
-    // Set the color attribute once with the complete array
-    this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colorArray, 3));
-    
-    if (this.material instanceof THREE.MeshStandardMaterial) {
-      this.material.vertexColors = true;
-      this.material.needsUpdate = true;
-    }
+    this.material = material;
 
     // this.geometry.computeBoundingBox();
     // const originalCenter = new THREE.Vector3();

@@ -20,6 +20,12 @@ export class Cube extends THREE.Mesh {
   // TODO: Can this be moved to Engine? It can increase performance | Needs to be used in other shapes too
   private _geometryCenterOffset = new THREE.Vector3();
 
+  set width(value: number) {
+    this.options.width = value;
+    this.setConfig();
+    this.generateGeometry();
+  }
+
   constructor(options: ICubeOptions) {
     super();
     this.ogid = getUUID();
@@ -48,11 +54,23 @@ export class Cube extends THREE.Mesh {
     );
   }
 
+  cleanGeometry() {
+    this.geometry.dispose();
+    if (Array.isArray(this.material)) {
+      this.material.forEach(mat => mat.dispose());
+    } else {
+      this.material.dispose();
+    }
+  }
+
   generateGeometry() {
+    // Three.js cleanup
+    this.cleanGeometry();
+
+    // Kernel Geometry
     this.cube.generate_geometry();
     const geometryData = this.cube.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
-    console.log(bufferData);
     
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
@@ -71,10 +89,21 @@ export class Cube extends THREE.Mesh {
 
     this.geometry = geometry;
     this.material = material;
+
+    // outline
+    if (this.#outlineMesh) {
+      this.outline = true;
+    }
   }
 
   set outline(enable: boolean) {
-    if (enable && !this.#outlineMesh) {
+    if (this.#outlineMesh) {
+      this.remove(this.#outlineMesh);
+      this.#outlineMesh.geometry.dispose();
+      this.#outlineMesh = null;
+    }
+
+    if (enable) {
       const outline_buff = this.cube.get_outline_geometry_serialized();
       const outline_buf = JSON.parse(outline_buff);
 
