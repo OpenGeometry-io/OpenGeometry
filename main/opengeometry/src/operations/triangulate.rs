@@ -103,7 +103,6 @@ pub fn triangulate_polygon_buffer_geometry(geom_buf: BaseGeometry) -> Vec<Vec<u3
   tri_indices
 }
 
-
 //
 // Triangule by faces and vertices
 //
@@ -111,12 +110,16 @@ pub fn triangulate_polygon_by_face(face: Vec<Vector3>) -> Vec<Vec<u32>> {
   let raw_vertices = face.clone();
   let ccw_vertices = windingsort::ccw_test(raw_vertices.clone());
 
+  // print javascript console log of ccw_vertices
+  for vertex in &ccw_vertices {
+    web_sys::console::log_1(&format!("Vertex: ({}, {}, {})", vertex.x, vertex.y, vertex.z).into());
+  }  
+
   // let mut triangles_vertices: Vec<f64> = Vec::new();
   let tri_indices = tricut(ccw_vertices);
   
   tri_indices
 }
-
 
 pub struct FlattenData {
   pub vertices: Vec<f64>,

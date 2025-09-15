@@ -15,7 +15,6 @@ fn compute_signed_area(points: &[Vector3]) -> f64 {
   sum / 2.0
 }
 
-
 pub fn ccw_test(raw_points: Vec<Vector3>) -> Vec<Vector3> {
   let mut points = raw_points;
   let area = compute_signed_area(&points);
