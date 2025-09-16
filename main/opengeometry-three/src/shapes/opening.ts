@@ -1,0 +1,156 @@
+import { OGCube, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
+import * as THREE from "three";
+import { getUUID } from "../utils/randomizer";
+
+interface IOpeningOptions {
+  width: number;
+  height: number;
+  depth: number;
+  center?: Vector3;
+}
+
+export class Opening extends THREE.Mesh {
+  ogid: string;
+  options: IOpeningOptions;
+  cube: OGCube;
+
+  #outlineMesh: THREE.Line | null = null;
+  #color: number = 0xdad7cd;
+
+  // Store local center offset to align outlines
+  // TODO: Can this be moved to Engine? It can increase performance | Needs to be used in other shapes too
+  private _geometryCenterOffset = new THREE.Vector3();
+
+  set width(value: number) {
+    this.options.width = value;
+    this.setConfig();
+    this.generateGeometry();
+  }
+
+  set height(value: number) {
+    this.options.height = value;
+    this.setConfig();
+    this.generateGeometry();
+  }
+
+  set depth(value: number) {
+    this.options.depth = value;
+    this.setConfig();
+    this.generateGeometry();
+  }
+
+  get dimensions() {
+    return {
+      width: this.options.width,
+      height: this.options.height,
+      depth: this.options.depth,
+    };
+  }
+
+  constructor(options: IOpeningOptions) {
+    super();
+    this.ogid = getUUID();
+    this.options = options;
+
+    this.cube = new OGCube(this.ogid);
+    this.setConfig();
+    this.generateGeometry();
+  }
+
+  validateOptions() {
+    if (!this.options) {
+      throw new Error("Options are not defined for Opening");
+    }
+  }
+
+  setConfig() {
+    this.validateOptions();
+
+    const { width, height, depth, center } = this.options;
+    this.cube.set_config(
+      center?.clone() || new Vector3(0, 0, 0),
+      width,
+      height,
+      depth
+    );
+  }
+
+  cleanGeometry() {
+    this.geometry.dispose();
+    if (Array.isArray(this.material)) {
+      this.material.forEach(mat => mat.dispose());
+    } else {
+      this.material.dispose();
+    }
+  }
+
+  generateGeometry() {
+    // Three.js cleanup
+    this.cleanGeometry();
+
+    // Kernel Geometry
+    this.cube.generate_geometry();
+    const geometryData = this.cube.get_geometry_serialized();
+    const bufferData = JSON.parse(geometryData);
+    
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(bufferData, 3)
+    );
+
+    const material = new THREE.MeshStandardMaterial({
+      color: this.#color,
+      transparent: true,
+      opacity: 0.6,
+    });
+
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+
+    this.geometry = geometry;
+    this.material = material;
+
+    // outline
+    if (this.#outlineMesh) {
+      this.outline = true;
+    }
+  }
+
+  set outline(enable: boolean) {
+    if (this.#outlineMesh) {
+      this.remove(this.#outlineMesh);
+      this.#outlineMesh.geometry.dispose();
+      this.#outlineMesh = null;
+    }
+
+    if (enable) {
+      const outline_buff = this.cube.get_outline_geometry_serialized();
+      const outline_buf = JSON.parse(outline_buff);
+
+      const outlineGeometry = new THREE.BufferGeometry();
+      outlineGeometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(outline_buf, 3)
+      );
+
+      const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+      this.#outlineMesh = new THREE.LineSegments(
+        outlineGeometry,
+        outlineMaterial
+      );
+
+      this.add(this.#outlineMesh);
+    }
+
+    if (!enable && this.#outlineMesh) {
+      this.remove(this.#outlineMesh);
+      this.#outlineMesh.geometry.dispose();
+      this.#outlineMesh = null;
+    }
+  }
+
+  get outlineMesh() {
+    return this.#outlineMesh;
+  }
+}
