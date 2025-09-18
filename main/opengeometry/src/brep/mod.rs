@@ -69,6 +69,36 @@ impl Brep {
     vertices
   }
 
+  /**
+   * Get vertices and holes by face ID for triangulation
+   * @returns (Vec<Vector3>, Vec<Vec<Vector3>>) - Tuple of outer vertices and hole vertices
+   */
+  pub fn get_vertices_and_holes_by_face_id(&self, face_id: u32) -> (Vec<Vector3>, Vec<Vec<Vector3>>) {
+    let face = self.faces[face_id as usize].clone();
+    
+    // Get outer boundary vertices
+    let mut outer_vertices = Vec::new();
+    let face_index_count = face.get_indices_count();
+    for index in 0..face_index_count {
+      let vertex_id = face.face_indices[index as usize];
+      let vertex = self.vertices[vertex_id as usize].clone();
+      outer_vertices.push(vertex.position);
+    }
+    
+    // Get hole vertices
+    let mut holes = Vec::new();
+    for hole_indices in &face.holes {
+      let mut hole_vertices = Vec::new();
+      for &vertex_id in hole_indices {
+        let vertex = self.vertices[vertex_id as usize].clone();
+        hole_vertices.push(vertex.position);
+      }
+      holes.push(hole_vertices);
+    }
+    
+    (outer_vertices, holes)
+  }
+
   pub fn insert_vertex_at_face_by_id(&mut self, face_id: u32, vertex_id: u32) {
     if let Some(face) = self.faces.iter_mut().find(|f| f.id == face_id) {
       face.insert_vertex(vertex_id);

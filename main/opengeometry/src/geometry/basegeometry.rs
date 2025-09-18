@@ -77,7 +77,7 @@ impl BaseGeometry {
   }
 
   
-  pub fn get_holes(&mut self) -> Vec<Vec<Vector3>> {
+  pub fn get_holes(&self) -> Vec<Vec<Vector3>> {
     self.holes.clone()
   }
 

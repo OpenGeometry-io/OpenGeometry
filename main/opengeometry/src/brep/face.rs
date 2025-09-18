@@ -11,6 +11,7 @@ pub struct Face {
   pub id: u32,
   pub normal: Vector3,
   pub face_indices: Vec<u32>,
+  pub holes: Vec<Vec<u32>>, // Support for holes as vectors of vertex indices
   // TODO: Add support for halfedges
   // pub halfedge: HalfEdge,
 }
@@ -21,6 +22,7 @@ impl Face {
       id,
       normal: Vector3::new(0.0, 0.0, 0.0), // Default normal, should be calculated later
       face_indices,
+      holes: Vec::new(), // Initialize with no holes
       // halfedge: HalfEdge::new(0, 0, 0), // Placeholder for halfedge
     }
   }
@@ -39,5 +41,17 @@ impl Face {
 
   pub fn insert_vertex(&mut self, vertex_id: u32) {
     self.face_indices.push(vertex_id);
+  }
+
+  pub fn add_hole(&mut self, hole_indices: Vec<u32>) {
+    self.holes.push(hole_indices);
+  }
+
+  pub fn get_holes(&self) -> &Vec<Vec<u32>> {
+    &self.holes
+  }
+
+  pub fn has_holes(&self) -> bool {
+    !self.holes.is_empty()
   }
 }

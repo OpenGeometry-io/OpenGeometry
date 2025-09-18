@@ -68,6 +68,13 @@ export class Polygon extends THREE.Mesh {
     this.validateOptions();
     const { vertices } = this.options;
     this.polygon.set_config(vertices);
+
+    // this.polygon.add_hole([
+    //   new Vector3(-2, 0, -1),
+    //   new Vector3(-1, 0, -1),
+    //   new Vector3(-1, 0, 0),
+    //   new Vector3(-2, 0, 0),
+    // ]);
   }
 
   // /**
@@ -137,6 +144,8 @@ export class Polygon extends THREE.Mesh {
     this.polygon.generate_geometry();
     const geometryData = this.polygon.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
+
+    console.log(bufferData);
 
     // TODO: If The Geometry is empty, no need to adjust position
     if (bufferData.length === 0) {
@@ -367,6 +376,154 @@ export class Polygon extends THREE.Mesh {
   //   const parsedData = JSON.parse(bTree);
   //   console.log(parsedData);
   // }
+
+  /**
+   * Adds a hole to the polygon
+   * @param holeVertices Array of Vector3 vertices defining the hole
+   * @returns boolean indicating success
+   */
+  addHole(holeVertices: Vector3[]): boolean {
+    if (!this.polygon) {
+      console.log("DEBUG: Polygon not initialized");
+      return false;
+    }
+
+    if (holeVertices.length < 3) {
+      console.log("DEBUG: Hole must have at least 3 vertices");
+      return false;
+    }
+
+    try {
+      console.log("DEBUG: Adding hole with vertices:", holeVertices);
+      
+      // Ensure hole has opposite winding order to the main polygon
+      // For holes, we want clockwise winding (opposite of counter-clockwise main polygon)
+      const reversedHoleVertices = [...holeVertices].reverse();
+      console.log("DEBUG: Reversed hole vertices:", reversedHoleVertices);
+      
+      // Add hole to the polygon using the WASM binding
+      this.polygon.add_hole(reversedHoleVertices);
+      console.log("DEBUG: Hole added to WASM polygon");
+      
+      // Check if face has holes after adding
+      const brepData = this.polygon.get_brep_serialized();
+      console.log("DEBUG: BREP data after adding hole:", JSON.parse(brepData));
+      
+      // Regenerate the geometry to include the hole
+      this.disposeGeometryMaterial();
+      console.log("DEBUG: Disposed old geometry");
+      
+      // DON'T call generateGeometry() as it clears the BREP structure!
+      // Instead, directly get the geometry with holes
+      const geometryData = this.polygon.get_geometry_serialized();
+      const bufferData = JSON.parse(geometryData);
+
+      console.log("DEBUG: Buffer data with holes:", bufferData);
+
+      if (bufferData.length === 0) {
+        console.warn("Geometry has no position attribute after adding hole.");
+        return false;
+      }
+
+      // Ensure buffer data length is divisible by 3 (x, y, z)
+      if (bufferData.length % 3 !== 0) {
+        console.warn("Invalid buffer data length after adding hole.");
+        return false;
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(bufferData, 3)
+      );
+
+      const material = new THREE.MeshStandardMaterial({
+        color: this.#color,
+        transparent: true,
+        opacity: 0.6,
+        side: THREE.DoubleSide,
+      });
+
+      geometry.computeVertexNormals();
+      geometry.computeBoundingBox();
+
+      this.geometry = geometry;
+      this.material = material;
+      
+      console.log("DEBUG: Generated new geometry with holes");
+      
+      return true;
+    } catch (error) {
+      console.log("DEBUG: Error adding hole:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Adds multiple holes to the polygon
+   * @param holes Array of hole vertex arrays
+   * @returns boolean indicating if all holes were added successfully
+   */
+  addHoles(holes: Vector3[][]): boolean {
+    if (!this.polygon) {
+      return false;
+    }
+
+    let successCount = 0;
+    
+    for (let i = 0; i < holes.length; i++) {
+      if (this.addHole(holes[i])) {
+        successCount++;
+      }
+    }
+    
+    return successCount === holes.length;
+  }
+
+  /**
+   * Creates a rectangular hole in the polygon
+   * @param x X-coordinate of the bottom-left corner
+   * @param z Z-coordinate of the bottom-left corner
+   * @param width Width of the rectangle
+   * @param height Height of the rectangle
+   * @param y Y-coordinate (default: 0)
+   * @returns boolean indicating success
+   */
+  addRectangularHole(x: number, z: number, width: number, height: number, y: number = 0): boolean {
+    console.log("DEBUG: addRectangularHole called with:", { x, z, width, height, y });
+    
+    const holeVertices = [
+      new Vector3(x, y, z),
+      new Vector3(x + width, y, z),
+      new Vector3(x + width, y, z + height),
+      new Vector3(x, y, z + height)
+    ];
+    
+    console.log("DEBUG: Generated hole vertices:", holeVertices);
+    return this.addHole(holeVertices);
+  }
+
+  /**
+   * Creates a circular hole in the polygon
+   * @param centerX X-coordinate of the circle center
+   * @param centerZ Z-coordinate of the circle center
+   * @param radius Radius of the circle
+   * @param segments Number of segments (default: 12)
+   * @param y Y-coordinate (default: 0)
+   * @returns boolean indicating success
+   */
+  addCircularHole(centerX: number, centerZ: number, radius: number, segments: number = 12, y: number = 0): boolean {
+    const holeVertices: Vector3[] = [];
+    
+    for (let i = 0; i < segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const x = centerX + Math.cos(angle) * radius;
+      const z = centerZ + Math.sin(angle) * radius;
+      holeVertices.push(new Vector3(x, y, z));
+    }
+    
+    return this.addHole(holeVertices);
+  }
 
   disposeGeometryMaterial() {
     if (this.geometry) {

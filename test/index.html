@@ -19,7 +19,8 @@
     import {
       OpenGeometry,
       BasePoly,
-      Vector3D,
+      Polygon,
+      Vector3,
     } from './../main/opengeometry-three/';
     import * as THREE from 'three';
     import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -72,14 +73,23 @@
 
       // Vertices
       const vertices = [
-        new Vector3D(10, 0, -10),
-        new Vector3D(10, 0, 70),
-        new Vector3D(90, 0, 60),
-        new Vector3D(100, 0, 30),
-        new Vector3D(90, 0, 10),
+        new Vector3(10, 0, -10),
+        new Vector3(10, 0, 70),
+        new Vector3(90, 0, 60),
+        new Vector3(100, 0, 30),
+        new Vector3(90, 0, 10),
       ];
 
-      const ogPoly = new BasePoly(vertices);
+      const ogPoly = new Polygon({
+        vertices: vertices
+      });
+      
+      // Add a rectangular hole in the center
+      // addRectangularHole(x, z, width, height, y = 0)
+      console.log('Adding rectangular hole...');
+      const holeAdded = ogPoly.addRectangularHole(40, 10, 20, 15, 0);
+      console.log('Hole added successfully:', holeAdded);
+      
       const colors = new Float32Array(ogPoly.geometry.attributes.position.array.length);
       for (let i = 0; i < colors.length; i += 9) {
         const r = Math.random();

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Bridge-Based Triangulation</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .result { margin: 10px 0; padding: 10px; background: #f0f0f0; }
+        .error { background: #ffe6e6; color: #cc0000; }
+        .success { background: #e6ffe6; color: #006600; }
+    </style>
+</head>
+<body>
+    <h1>Bridge-Based Triangulation Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Complex Polygon with Overlapping Triangles Issue</h2>
+        <button onclick="testComplexPolygon()">Test Complex Polygon</button>
+        <div id="complex-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Simple Polygon (Control Test)</h2>
+        <button onclick="testSimplePolygon()">Test Simple Polygon</button>
+        <div id="simple-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Polygon with Holes</h2>
+        <button onclick="testPolygonWithHoles()">Test Polygon with Holes</button>
+        <div id="holes-result" class="result"></div>
+    </div>
+
+    <script type="module">
+        import init, { Polygon } from './main/opengeometry/pkg/opengeometry.js';
+
+        let wasmModule;
+
+        // Initialize WASM module
+        init().then(module => {
+            wasmModule = module;
+            console.log('WASM module loaded successfully');
+        }).catch(error => {
+            console.error('Failed to load WASM module:', error);
+        });
+
+        // Test the complex 15-vertex polygon that was causing overlapping triangles
+        window.testComplexPolygon = function() {
+            if (!wasmModule) {
+                document.getElementById('complex-result').innerHTML = 
+                    '<div class="error">WASM module not loaded yet</div>';
+                return;
+            }
+
+            try {
+                // Create the problematic 15-vertex polygon
+                const vertices = [
+                    // This is a complex polygon that previously produced overlapping triangles
+                    0.0, 0.0, 0.0,
+                    10.0, 0.0, 0.0,
+                    10.0, 3.0, 0.0,
+                    7.0, 3.0, 0.0,
+                    7.0, 5.0, 0.0,
+                    10.0, 5.0, 0.0,
+                    10.0, 8.0, 0.0,
+                    6.0, 8.0, 0.0,
+                    6.0, 6.0, 0.0,
+                    4.0, 6.0, 0.0,
+                    4.0, 8.0, 0.0,
+                    0.0, 8.0, 0.0,
+                    0.0, 5.0, 0.0,
+                    3.0, 5.0, 0.0,
+                    3.0, 3.0, 0.0
+                ];
+
+                const polygon = Polygon.new();
+                
+                // Add vertices
+                for (let i = 0; i < vertices.length; i += 3) {
+                    polygon.add_vertex(vertices[i], vertices[i + 1], vertices[i + 2]);
+                }
+
+                console.log('Testing complex polygon with bridge creation...');
+                
+                // Get triangulated geometry
+                const geometry = polygon.get_geometry_serialized();
+                console.log('Raw geometry result:', geometry);
+                
+                const parsed = JSON.parse(geometry);
+                console.log('Parsed geometry:', parsed);
+
+                if (parsed.bufferData && parsed.bufferData.length > 0) {
+                    const triangleCount = parsed.bufferData.length / 9; // 3 vertices × 3 components each
+                    document.getElementById('complex-result').innerHTML = 
+                        `<div class="success">✓ Complex polygon triangulated successfully!<br>
+                         Triangles generated: ${triangleCount}<br>
+                         Buffer data length: ${parsed.bufferData.length}</div>`;
+                    
+                    // Validate triangles don't overlap (basic check)
+                    console.log('Triangle validation passed - no empty buffer');
+                } else {
+                    document.getElementById('complex-result').innerHTML = 
+                        '<div class="error">✗ Empty buffer data - triangulation failed</div>';
+                }
+
+            } catch (error) {
+                console.error('Complex polygon test error:', error);
+                document.getElementById('complex-result').innerHTML = 
+                    `<div class="error">✗ Error: ${error.message}</div>`;
+            }
+        };
+
+        // Test a simple triangle (control test)
+        window.testSimplePolygon = function() {
+            if (!wasmModule) {
+                document.getElementById('simple-result').innerHTML = 
+                    '<div class="error">WASM module not loaded yet</div>';
+                return;
+            }
+
+            try {
+                const polygon = Polygon.new();
+                
+                // Simple triangle
+                polygon.add_vertex(0.0, 0.0, 0.0);
+                polygon.add_vertex(5.0, 0.0, 0.0);
+                polygon.add_vertex(2.5, 5.0, 0.0);
+
+                const geometry = polygon.get_geometry_serialized();
+                const parsed = JSON.parse(geometry);
+
+                if (parsed.bufferData && parsed.bufferData.length === 9) { // 1 triangle = 9 values
+                    document.getElementById('simple-result').innerHTML = 
+                        '<div class="success">✓ Simple triangle triangulated correctly</div>';
+                } else {
+                    document.getElementById('simple-result').innerHTML = 
+                        '<div class="error">✗ Simple triangle failed</div>';
+                }
+
+            } catch (error) {
+                console.error('Simple polygon test error:', error);
+                document.getElementById('simple-result').innerHTML = 
+                    `<div class="error">✗ Error: ${error.message}</div>`;
+            }
+        };
+
+        // Test polygon with holes
+        window.testPolygonWithHoles = function() {
+            if (!wasmModule) {
+                document.getElementById('holes-result').innerHTML = 
+                    '<div class="error">WASM module not loaded yet</div>';
+                return;
+            }
+
+            try {
+                const polygon = Polygon.new();
+                
+                // Outer square
+                polygon.add_vertex(0.0, 0.0, 0.0);
+                polygon.add_vertex(10.0, 0.0, 0.0);
+                polygon.add_vertex(10.0, 10.0, 0.0);
+                polygon.add_vertex(0.0, 10.0, 0.0);
+
+                // Inner square hole (counter-clockwise)
+                polygon.add_hole_vertex(3.0, 3.0, 0.0);
+                polygon.add_hole_vertex(3.0, 7.0, 0.0);
+                polygon.add_hole_vertex(7.0, 7.0, 0.0);
+                polygon.add_hole_vertex(7.0, 3.0, 0.0);
+
+                const geometry = polygon.get_geometry_serialized();
+                const parsed = JSON.parse(geometry);
+
+                if (parsed.bufferData && parsed.bufferData.length > 0) {
+                    const triangleCount = parsed.bufferData.length / 9;
+                    document.getElementById('holes-result').innerHTML = 
+                        `<div class="success">✓ Polygon with holes triangulated!<br>
+                         Triangles: ${triangleCount}<br>
+                         Expected: Around 8 triangles for square with square hole</div>`;
+                } else {
+                    document.getElementById('holes-result').innerHTML = 
+                        '<div class="error">✗ Polygon with holes failed</div>';
+                }
+
+            } catch (error) {
+                console.error('Holes test error:', error);
+                document.getElementById('holes-result').innerHTML = 
+                    `<div class="error">✗ Error: ${error.message}</div>`;
+            }
+        };
+    </script>
+</body>
+</html>

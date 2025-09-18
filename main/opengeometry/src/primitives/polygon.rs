@@ -29,7 +29,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::brep::{Edge, Face, Brep, Vertex};
 use crate::operations::extrude::extrude_brep_face;
-use crate::operations::triangulate::{self, flatten_buffer_geometry, triangulate_polygon_by_face};
+use crate::operations::triangulate::{triangulate_polygon_by_face_with_holes, triangulate_polygon_by_face_robust};
 use crate::operations::windingsort;
 use crate::utility::bgeometry::BufferGeometry;
 use openmaths::{Matrix4, Vector3};
@@ -172,6 +172,43 @@ impl OGPolygon {
 
     self.set_config(vertices.clone());
   }
+
+  /// Add a hole to the polygon face
+  /// The hole should be a closed loop of vertices defining the interior boundary
+  #[wasm_bindgen]
+  pub fn add_hole(&mut self, hole_vertices: Vec<Vector3>) {
+    if hole_vertices.len() < 3 {
+      web_sys::console::log_1(&"Hole must have at least 3 vertices.".into());
+      return;
+    }
+
+    // Add hole vertices to the BREP
+    let start_vertex_index = self.brep.get_vertex_count();
+    let mut hole_indices = Vec::new();
+
+    for (i, vertex) in hole_vertices.iter().enumerate() {
+      let vertex_id = start_vertex_index + i as u32;
+      let vertex_obj = Vertex::new(vertex_id, vertex.clone());
+      self.brep.vertices.push(vertex_obj);
+      hole_indices.push(vertex_id);
+
+      // Create edges for the hole
+      let next_vertex_id = start_vertex_index + ((i + 1) % hole_vertices.len()) as u32;
+      let edge = Edge::new(
+        self.brep.get_edge_count(),
+        vertex_id,
+        next_vertex_id,
+      );
+      self.brep.edges.push(edge);
+    }
+
+    // Add the hole to the first face (assuming single face polygon for now)
+    if !self.brep.faces.is_empty() {
+      self.brep.faces[0].add_hole(hole_indices);
+    } else {
+      web_sys::console::log_1(&"No face available to add hole. Generate geometry first.".into());
+    }
+  }
   
   // #[wasm_bindgen]
   // pub fn add_vertex(&mut self, vertex: Vector3) {
@@ -201,12 +238,14 @@ impl OGPolygon {
       return;
     }
 
+    web_sys::console::log_1(&format!("Generating geometry for {} points", self.points.len()).into());
+
     // Clear the BREP structure before generating new geometry
     self.clean_geometry();
 
-    // Create Face for the polygon
+    // Create Face for the polygon (use 0 as face ID since it's the first face)
     self.brep.faces.push(Face::new(
-      self.brep.get_face_count() as u32,
+      0,  // Always use 0 for the first face
       Vec::new(),
     ));
 
@@ -227,6 +266,11 @@ impl OGPolygon {
 
       self.brep.insert_vertex_at_face_by_id(0, vertex.id);
     }
+
+    web_sys::console::log_1(&format!("BREP created with {} vertices, {} edges, {} faces", 
+      self.brep.get_vertex_count(), 
+      self.brep.get_edge_count(), 
+      self.brep.get_face_count()).into());
   }
 
   #[wasm_bindgen]
@@ -240,23 +284,62 @@ impl OGPolygon {
     let mut vertex_buffer: Vec<f64> = Vec::new();
     let faces = self.brep.faces.clone();
 
+    web_sys::console::log_1(&format!("Starting geometry serialization with {} faces", faces.len()).into());
+
     for i in 0..faces.len() {
       let face = faces[i].clone();
-      let face_vertices = self.brep.get_vertices_by_face_id(face.id);
-      // Triangulate the face vertices
-      let triangulated_face_indices = triangulate_polygon_by_face(face_vertices.clone());
       
-      let ccw_vertices = windingsort::ccw_test(face_vertices.clone());
+      web_sys::console::log_1(&format!("Processing face {} with {} vertices", face.id, face.get_indices_count()).into());
+      
+      // Check if the face has holes
+      if face.has_holes() {
+        web_sys::console::log_1(&"Face has holes - using triangulation with holes".into());
+        // Get vertices and holes using the new BREP method
+        let (face_vertices, holes) = self.brep.get_vertices_and_holes_by_face_id(face.id);
+        
+        web_sys::console::log_1(&format!("Face vertices: {}, Holes: {}", face_vertices.len(), holes.len()).into());
+        
+        // Use the new robust triangulation with holes
+        let triangulated_face_indices = triangulate_polygon_by_face_with_holes(face_vertices.clone(), holes);
+        
+        web_sys::console::log_1(&format!("Generated {} triangles", triangulated_face_indices.len()).into());
+        
+        let ccw_vertices = windingsort::ccw_test(face_vertices.clone());
 
-      for index in triangulated_face_indices {
-        for vertex_id in index {
-          let vertex = ccw_vertices[vertex_id as usize].clone();
-          vertex_buffer.push(vertex.x);
-          vertex_buffer.push(vertex.y);
-          vertex_buffer.push(vertex.z);
+        for index in triangulated_face_indices {
+          for vertex_id in index {
+            let vertex = ccw_vertices[vertex_id as usize].clone();
+            vertex_buffer.push(vertex.x);
+            vertex_buffer.push(vertex.y);
+            vertex_buffer.push(vertex.z);
+          }
+        }
+      } else {
+        web_sys::console::log_1(&"Face has no holes - using robust triangulation".into());
+        // Use existing logic for faces without holes
+        let face_vertices = self.brep.get_vertices_by_face_id(face.id);
+        
+        web_sys::console::log_1(&format!("Face vertices: {}", face_vertices.len()).into());
+        
+        // Use the robust triangulation for backward compatibility
+        let triangulated_face_indices = triangulate_polygon_by_face_robust(face_vertices.clone());
+        
+        web_sys::console::log_1(&format!("Generated {} triangles", triangulated_face_indices.len()).into());
+        
+        let ccw_vertices = windingsort::ccw_test(face_vertices.clone());
+
+        for index in triangulated_face_indices {
+          for vertex_id in index {
+            let vertex = ccw_vertices[vertex_id as usize].clone();
+            vertex_buffer.push(vertex.x);
+            vertex_buffer.push(vertex.y);
+            vertex_buffer.push(vertex.z);
+          }
         }
       }
     }
+
+    web_sys::console::log_1(&format!("Final vertex buffer size: {}", vertex_buffer.len()).into());
 
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
@@ -285,6 +368,41 @@ impl OGPolygon {
 
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
+  }
+
+  /// Test function to create a polygon with holes for validation
+  #[wasm_bindgen]
+  pub fn test_polygon_with_holes() -> String {
+    let mut polygon = OGPolygon::new("test_polygon".to_string());
+    
+    // Create outer square
+    let outer_vertices = vec![
+      Vector3::new(0.0, 0.0, 0.0),
+      Vector3::new(10.0, 0.0, 0.0),
+      Vector3::new(10.0, 10.0, 0.0),
+      Vector3::new(0.0, 10.0, 0.0),
+    ];
+    
+    polygon.add_vertices(outer_vertices);
+    polygon.generate_geometry();
+    
+    // Add a hole (inner square)
+    let hole_vertices = vec![
+      Vector3::new(3.0, 3.0, 0.0),
+      Vector3::new(7.0, 3.0, 0.0),
+      Vector3::new(7.0, 7.0, 0.0),
+      Vector3::new(3.0, 7.0, 0.0),
+    ];
+    
+    polygon.add_hole(hole_vertices);
+    
+    // Get triangulated geometry
+    let triangulated = polygon.get_geometry_serialized();
+    
+    format!(
+      "Polygon with holes test completed.\nTriangles generated: {}",
+      triangulated.matches("[").count() / 3  // Rough count of triangles
+    )
   }
 
   // pub fn new_triangulate(&mut self) -> String {
