@@ -4,7 +4,7 @@
  * Potientally, it will be used for Creation of Walls and Other 2D Meshes
  */
 
-use crate::{operations::{triangulate::triangulate_polygon_buffer_geometry, windingsort}, utility::geometry};
+use crate::operations::triangulate::triangulate_polygon_buffer_geometry;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use super::basegeometry;
