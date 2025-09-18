@@ -27,10 +27,8 @@
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
-use crate::brep::{Edge, Face, Brep, Vertex};
-use crate::operations::extrude::extrude_brep_face;
-use crate::operations::triangulate::{self, flatten_buffer_geometry, triangulate_polygon_by_face};
-use crate::operations::windingsort;
+use crate::brep::{Brep, Edge, Face, Vertex};
+use crate::operations::triangulate::triangulate_polygon_with_holes;
 use crate::utility::bgeometry::BufferGeometry;
 use openmaths::{Matrix4, Vector3};
 use uuid::Uuid;
@@ -104,7 +102,7 @@ impl OGPolygon {
     }
 
     // Set the transformation matrix in the geometry
-    let mut transformation_matrix: Matrix4 = Matrix4::set(
+    let transformation_matrix: Matrix4 = Matrix4::set(
       transformation[0], transformation[4], transformation[8], transformation[12],
       transformation[1], transformation[5], transformation[9], transformation[13],
       transformation[2], transformation[6], transformation[10], transformation[14],
@@ -240,26 +238,44 @@ impl OGPolygon {
     let mut vertex_buffer: Vec<f64> = Vec::new();
     let faces = self.brep.faces.clone();
 
-    for i in 0..faces.len() {
-      let face = faces[i].clone();
-      let face_vertices = self.brep.get_vertices_by_face_id(face.id);
-      // Triangulate the face vertices
-      let triangulated_face_indices = triangulate_polygon_by_face(face_vertices.clone());
-      
-      let ccw_vertices = windingsort::ccw_test(face_vertices.clone());
+    web_sys::console::log_1(&format!("Starting geometry serialization with {} faces", faces.len()).into());
 
-      for index in triangulated_face_indices {
-        for vertex_id in index {
-          let vertex = ccw_vertices[vertex_id as usize].clone();
-          vertex_buffer.push(vertex.x);
-          vertex_buffer.push(vertex.y);
-          vertex_buffer.push(vertex.z);
+    for face in &faces {
+        web_sys::console::log_1(&format!("Processing face {} with {} vertices", face.id, face.get_indices_count()).into());
+
+        // 1. Get all vertices for the face and its holes from the B-Rep
+        let (face_vertices, holes_vertices) = self.brep.get_vertices_and_holes_by_face_id(face.id);
+
+        if face_vertices.len() < 3 {
+            web_sys::console::log_1(&"Face has less than 3 vertices, skipping triangulation.".into());
+            continue;
         }
-      }
+
+        // 2. Call the new triangulation function
+        let triangles = triangulate_polygon_with_holes(&face_vertices, &holes_vertices);
+        web_sys::console::log_1(&format!("Generated {} triangles", triangles.len()).into());
+
+
+        // 3. Combine outer and hole vertices into a single list for easy lookup
+        let all_vertices: Vec<Vector3> = face_vertices
+            .into_iter()
+            .chain(holes_vertices.into_iter().flatten())
+            .collect();
+
+        // 4. Build the final vertex buffer for rendering
+        for triangle in triangles {
+            for vertex_index in triangle {
+                // The indices from earcutr correspond to our combined `all_vertices` list
+                let vertex = &all_vertices[vertex_index];
+                vertex_buffer.push(vertex.x);
+                vertex_buffer.push(vertex.y);
+                vertex_buffer.push(vertex.z);
+            }
+        }
     }
 
-    let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
-    vertex_serialized
+    web_sys::console::log_1(&format!("Final vertex buffer size: {}", vertex_buffer.len()).into());
+    serde_json::to_string(&vertex_buffer).unwrap()
   }
 
   #[wasm_bindgen]

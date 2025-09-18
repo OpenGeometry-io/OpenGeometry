@@ -83,4 +83,32 @@ impl Brep {
   pub fn get_flattened_vertices(&self) -> Vec<Vector3> {
     self.vertices.iter().map(|v| v.position).collect()
   }
+
+  /**
+   * Get vertices and holes by face ID
+   * @param face_id - The ID of the face to get vertices and holes for
+   * @returns (Vec<Vector3>, Vec<Vec<Vector3>>) - A tuple containing face vertices and hole vertices
+   */
+  pub fn get_vertices_and_holes_by_face_id(&self, face_id: u32) -> (Vec<Vector3>, Vec<Vec<Vector3>>) {
+    // Find the face by ID
+    if let Some(face) = self.faces.iter().find(|f| f.id == face_id) {
+      // Get the main face vertices
+      let mut face_vertices = Vec::new();
+      for &vertex_index in &face.face_indices {
+        if let Some(vertex) = self.vertices.get(vertex_index as usize) {
+          face_vertices.push(vertex.position);
+        }
+      }
+      
+      // For now, return empty holes vector since the current Face structure doesn't support holes
+      // TODO: Implement proper hole support in Face structure when needed
+      let holes_vertices = Vec::new();
+      
+      (face_vertices, holes_vertices)
+    } else {
+      // Face not found, return empty vectors
+      eprintln!("Face with id {} not found", face_id);
+      (Vec::new(), Vec::new())
+    }
+  }
 }

@@ -1,10 +1,116 @@
-use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::wasm_bindgen;
-
-use crate::geometry::{self, basegeometry::BaseGeometry, triangle::Triangle};
+use crate::geometry::{basegeometry::BaseGeometry, triangle::Triangle};
 use crate::operations::windingsort;
 use std::collections::HashMap;
 use openmaths::Vector3;
+
+// 00000000000000
+
+pub fn triangulate_polygon_with_holes(
+    face_vertices: &Vec<Vector3>,
+    holes: &Vec<Vec<Vector3>>,
+) -> Vec<[usize; 3]> {
+    if face_vertices.len() < 3 {
+        return Vec::new();
+    }
+
+    // --- 1. Projection to 2D ---
+    // First, determine the best 2D plane to project onto by finding the
+    // dominant axis of the face's normal.
+    let normal = calculate_normal(face_vertices);
+
+    let (axis_u, axis_v) = if normal.z.abs() > normal.x.abs() && normal.z.abs() > normal.y.abs() {
+        // Project to XY plane
+        (0, 1) // Corresponds to (x, y)
+    } else if normal.x.abs() > normal.y.abs() {
+        // Project to YZ plane
+        (1, 2) // Corresponds to (y, z)
+    } else {
+        // Project to XZ plane
+        (0, 2) // Corresponds to (x, z)
+    };
+
+    // --- 2. Flatten Data for earcutr ---
+    // earcutr needs a flat list of 2D coordinates and a list of indices
+    // where the holes begin.
+
+    let mut vertices_2d = Vec::with_capacity((face_vertices.len() + holes.iter().map(|h| h.len()).sum::<usize>()) * 2);
+    let mut hole_indices = Vec::with_capacity(holes.len());
+
+    // Add outer loop vertices
+    for v in face_vertices {
+        let coord_u = match axis_u {
+            0 => v.x,
+            1 => v.y,
+            2 => v.z,
+            _ => unreachable!("Invalid axis_u"),
+        };
+        let coord_v = match axis_v {
+            0 => v.x,
+            1 => v.y,
+            2 => v.z,
+            _ => unreachable!("Invalid axis_v"),
+        };
+        vertices_2d.push(coord_u);
+        vertices_2d.push(coord_v);
+    }
+
+    // Add hole vertices
+    if !holes.is_empty() {
+        let mut current_index = face_vertices.len();
+        for hole in holes {
+            hole_indices.push(current_index);
+            for v in hole {
+                let coord_u = match axis_u {
+                    0 => v.x,
+                    1 => v.y,
+                    2 => v.z,
+                    _ => unreachable!("Invalid axis_u"),
+                };
+                let coord_v = match axis_v {
+                    0 => v.x,
+                    1 => v.y,
+                    2 => v.z,
+                    _ => unreachable!("Invalid axis_v"),
+                };
+                vertices_2d.push(coord_u);
+                vertices_2d.push(coord_v);
+                current_index += 1;
+            }
+        }
+    }
+
+    // --- 3. Run Earcut Algorithm ---
+    let triangle_indices = earcutr::earcut(&vertices_2d, &hole_indices, 2);
+
+    // --- 4. Reshape the Result ---
+    // The result is a flat list of indices. Group them into triangles.
+    triangle_indices
+        .chunks_exact(3)
+        .map(|chunk| [chunk[0], chunk[1], chunk[2]])
+        .collect()
+}
+
+/**
+ * Calculates the average normal of a polygon.
+ * This is used to determine the best projection plane.
+ */
+fn calculate_normal(vertices: &[Vector3]) -> Vector3 {
+    if vertices.len() < 3 {
+        return Vector3::new(0.0, 0.0, 1.0); // Default to Z-axis
+    }
+    let mut normal = Vector3::new(0.0, 0.0, 0.0);
+    for i in 0..vertices.len() {
+        let p1 = &vertices[i];
+        let p2 = &vertices[(i + 1) % vertices.len()];
+        normal.x += (p1.y - p2.y) * (p1.z + p2.z);
+        normal.y += (p1.z - p2.z) * (p1.x + p2.x);
+        normal.z += (p1.x - p2.x) * (p1.y + p2.y);
+    }
+    normal.normalize();
+    normal
+}
+
+// 00000000000000
 
 pub fn ear_triangle_test(
   vertices: HashMap<u32, Vec<f64>>,
@@ -12,12 +118,12 @@ pub fn ear_triangle_test(
   b_index: u32,
   c_index: u32,
 ) -> bool {
-  let mut point_a = Vector3::new(
+  let point_a = Vector3::new(
     vertices[&(a_index)][0],
     vertices[&(a_index)][1],
     vertices[&(a_index)][2]
   );
-  let mut point_b = Vector3::new(
+  let point_b = Vector3::new(
     vertices[&(b_index)][0],
     vertices[&(b_index)][1],
     vertices[&(b_index)][2]
@@ -92,7 +198,7 @@ pub fn triangulate_polygon_buffer_geometry(geom_buf: BaseGeometry) -> Vec<Vec<u3
 
   let vertices;
 
-  if (geom_buf.ccw) {
+  if geom_buf.ccw {
     vertices = raw_vertices;
   } else {
     vertices = windingsort::ccw_test(raw_vertices.clone());
@@ -111,7 +217,7 @@ pub fn triangulate_polygon_by_face(face: Vec<Vector3>) -> Vec<Vec<u32>> {
   let ccw_vertices = windingsort::ccw_test(raw_vertices.clone());
 
   // print javascript console log of ccw_vertices
-  for vertex in &ccw_vertices {
+  for _vertex in &ccw_vertices {
     // web_sys::console::log_1(&format!("Vertex: ({}, {}, {})", vertex.x, vertex.y, vertex.z).into());
   }  
 
@@ -220,31 +326,31 @@ pub fn check_vertex_collision_with_flat_vertices(
   while i < end {
     // This while loop will check from A to B, and B to C
     if (i + 6) < end {
-      let x = flat_data_vertices[i as usize];
-      let y = flat_data_vertices[i as usize + 1];
+      let _x = flat_data_vertices[i as usize];
+      let _y = flat_data_vertices[i as usize + 1];
       let z = flat_data_vertices[i as usize + 2];
 
-      let x1 = flat_data_vertices[i as usize + 3];
-      let y1 = flat_data_vertices[i as usize + 4];
+      let _x1 = flat_data_vertices[i as usize + 3];
+      let _y1 = flat_data_vertices[i as usize + 4];
       let z1 = flat_data_vertices[i as usize + 5];
 
       // Check if z of A is more than z of right_max_point and z of B is less than z of right_max_point
-      if (z <= right_max_point.z && z1 >= right_max_point.z) {
+      if z <= right_max_point.z && z1 >= right_max_point.z {
         let edge_index = vec![i, i + 3];
         potential_edge.push(edge_index);
       }
     } else {
       // This is for last edge
-      let x = flat_data_vertices[i as usize];
-      let y = flat_data_vertices[i as usize + 1];
+      let _x = flat_data_vertices[i as usize];
+      let _y = flat_data_vertices[i as usize + 1];
       let z = flat_data_vertices[i as usize + 2];
 
-      let x1 = flat_data_vertices[start as usize];
-      let y1 = flat_data_vertices[start as usize + 1];
+      let _x1 = flat_data_vertices[start as usize];
+      let _y1 = flat_data_vertices[start as usize + 1];
       let z1 = flat_data_vertices[start as usize + 2];
 
       // Check if z of A is more than z of right_max_point and z of B is less than z of right_max_point
-      if (z <= right_max_point.z && z1 >= right_max_point.z) {
+      if z <= right_max_point.z && z1 >= right_max_point.z {
         let edge_index = vec![i, start];
         potential_edge.push(edge_index);
       }
@@ -264,17 +370,17 @@ pub fn check_vertex_collision_with_flat_vertices(
     let x = flat_data_vertices[a_index as usize];
     let y = flat_data_vertices[a_index as usize + 1];
     let z = flat_data_vertices[a_index as usize + 2];
-    let A = Vector3::new(x, y, z);
+    let a = Vector3::new(x, y, z);
 
     let x1 = flat_data_vertices[b_index as usize];
     let y1 = flat_data_vertices[b_index as usize + 1];
     let z1 = flat_data_vertices[b_index as usize + 2];
-    let B = Vector3::new(x1, y1, z1);
+    let b = Vector3::new(x1, y1, z1);
 
     // Check if the ray intersects with the edge and no obstacles
-    let mut right_ray_from_vertex = Vector3::new(right_max_point.x + 1.0, right_max_point.y, right_max_point.z);
+    let right_ray_from_vertex = Vector3::new(right_max_point.x + 1.0, right_max_point.y, right_max_point.z);
     let ray = right_ray_from_vertex.clone().subtract(&right_max_point);
-    let edge_vector = B.clone().subtract(&A);
+    let edge_vector = b.clone().subtract(&a);
     let cross_product = ray.cross(&edge_vector);
     let cross_product_length = cross_product.dot(&cross_product);
     let edge_vector_length = edge_vector.dot(&edge_vector);
@@ -337,7 +443,7 @@ impl VertexNodeTricut {
   }
 }
 
-pub fn create_vertex_nodes(vertices: Vec<Vector3>, start: u32, end: u32, is_hole: bool) -> Vec<VertexNodeTricut> {
+pub fn create_vertex_nodes(vertices: Vec<Vector3>, start: u32, end: u32, _is_hole: bool) -> Vec<VertexNodeTricut> {
   let mut vertex_nodes: Vec<VertexNodeTricut> = Vec::new();
 
   let mut index = start;

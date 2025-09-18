@@ -14,7 +14,7 @@
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
-use crate::brep::{Edge, Face, Brep, Vertex};
+use crate::brep::{Brep, Vertex};
 use crate::operations::extrude::extrude_brep_face;
 use crate::operations::triangulate::triangulate_polygon_by_face;
 use crate::utility::bgeometry::BufferGeometry;
