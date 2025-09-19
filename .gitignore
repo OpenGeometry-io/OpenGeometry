@@ -27,3 +27,6 @@ dist
 .DS_Store
 .vscode/
 settings.json
+
+# Copilot
+.github/*.md
