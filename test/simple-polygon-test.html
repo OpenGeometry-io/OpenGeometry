@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Polygon Test</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        #viewer {
+            width: 100vw;
+            height: 100vh;
+        }
+        #log {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="log"></div>
+    <div id="viewer"></div>
+
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+        import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+        import { Vector3, Polygon } from '../dist/index.js';
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        async function init() {
+            log('Starting simple polygon test...');
+
+            const viewer = document.getElementById('viewer');
+
+            // Setup Three.js
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f0f0);
+            
+            const camera = new THREE.PerspectiveCamera(75, viewer.clientWidth / viewer.clientHeight, 0.1, 1000);
+            camera.position.set(5, 5, 5);
+            
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+            viewer.appendChild(renderer.domElement);
+
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Add lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 5);
+            scene.add(directionalLight);
+
+            // Add grid
+            const gridHelper = new THREE.GridHelper(10, 10);
+            scene.add(gridHelper);
+
+            log('Three.js setup complete');
+
+            try {
+                // Test basic Vector3 creation
+                log('Testing Vector3 creation...');
+                const v1 = new Vector3(-2.0, 0.0, -2.0);
+                const v2 = new Vector3(2.0, 0.0, -2.0);
+                const v3 = new Vector3(2.0, 0.0, 2.0);
+                const v4 = new Vector3(-2.0, 0.0, 2.0);
+                log(`Vector3 objects created: v1=(${v1.x}, ${v1.y}, ${v1.z})`);
+
+                // Test Polygon creation
+                log('Testing Polygon creation...');
+                const polygon = new Polygon({ vertices: [v1, v2, v3, v4] });
+                polygon.color = 0xff4444;
+                log('Polygon object created');
+
+                // Generate geometry
+                log('Generating polygon geometry...');
+                polygon.generateGeometry();
+                log('Geometry generation complete');
+
+                // Check if geometry was created
+                if (polygon.geometry && polygon.geometry.attributes.position) {
+                    const vertexCount = polygon.geometry.attributes.position.count;
+                    log(`Polygon has ${vertexCount} vertices in geometry`);
+                    
+                    scene.add(polygon);
+                    log('Polygon added to scene');
+                } else {
+                    log('ERROR: Polygon geometry is empty or invalid');
+                }
+
+                // Add a reference cube for comparison
+                const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+                const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+                const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+                cube.position.set(-4, 0.5, 0);
+                scene.add(cube);
+                log('Reference cube added');
+
+            } catch (error) {
+                log(`ERROR: ${error.message}`);
+                console.error('Full error:', error);
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                renderer.render(scene, camera);
+            }
+
+            animate();
+            log('Animation loop started');
+        }
+
+        init().catch(error => {
+            log(`Initialization failed: ${error.message}`);
+            console.error('Initialization error:', error);
+        });
+    </script>
+</body>
+</html>

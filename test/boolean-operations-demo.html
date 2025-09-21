@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OpenGeometry Boolean Operations Demo</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+    }
+    #app {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+    }
+    #controls {
+      width: 300px;
+      padding: 20px;
+      background: white;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+      overflow-y: auto;
+    }
+    #viewer {
+      flex: 1;
+      position: relative;
+    }
+    .control-group {
+      margin-bottom: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    .control-group h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    button {
+      padding: 10px 15px;
+      margin: 5px 0;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      width: 100%;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    #log {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .success {
+      color: #28a745;
+    }
+    .error {
+      color: #dc3545;
+    }
+    .info {
+      color: #007bff;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="controls">
+      <h2>Boolean Operations Demo</h2>
+      
+      <div class="control-group">
+        <h3>Basic Operations</h3>
+        <button id="test-union">Test Union</button>
+        <button id="test-intersection">Test Intersection</button>
+        <button id="test-difference">Test Difference</button>
+        <button id="test-symmetric-diff">Test Symmetric Difference</button>
+      </div>
+      
+      <div class="control-group">
+        <h3>Advanced Tests</h3>
+        <button id="test-all">Run All Tests</button>
+        <button id="test-wasm-direct">Test WASM Direct</button>
+        <button id="create-demo">Create Visual Demo</button>
+      </div>
+      
+      <div class="control-group">
+        <h3>Scene Controls</h3>
+        <button id="clear-scene">Clear Scene</button>
+        <button id="reset-camera">Reset Camera</button>
+      </div>
+      
+      <div class="control-group">
+        <h3>Log Output</h3>
+        <div id="log"></div>
+      </div>
+    </div>
+    
+    <div id="viewer"></div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+    import {
+      OpenGeometry,
+      BooleanOperations,
+      OGBooleanEngine,
+      OGBrep,
+      Vector3,
+      Polygon
+    } from '../dist/index.js';
+
+    let scene, camera, renderer, controls, openGeometry, booleanOperations;
+    let testShapes = [];
+
+    // Logging utilities
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      const className = type;
+      logDiv.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+      console.log(`[${type.toUpperCase()}] ${message}`);
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+    }
+
+    // Initialize the 3D scene
+    async function init() {
+      log('Initializing OpenGeometry Boolean Operations Demo...', 'info');
+      
+      const viewer = document.getElementById('viewer');
+
+      // Setup Three.js
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf0f0f0);
+      
+      camera = new THREE.PerspectiveCamera(75, viewer.clientWidth / viewer.clientHeight, 0.1, 1000);
+      camera.position.set(10, 10, 10);
+      
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      viewer.appendChild(renderer.domElement);
+
+      // Add orbit controls
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      // Add lighting
+      const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+      scene.add(ambientLight);
+      
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(10, 10, 5);
+      directionalLight.castShadow = true;
+      scene.add(directionalLight);
+
+      // Add grid
+      const gridHelper = new THREE.GridHelper(20, 20);
+      scene.add(gridHelper);
+
+      // Initialize OpenGeometry
+      try {
+        openGeometry = new OpenGeometry(viewer, scene, camera);
+        await openGeometry.init();
+        
+        booleanOperations = new BooleanOperations();
+        
+        log('OpenGeometry initialized successfully!', 'success');
+      } catch (error) {
+        log(`Failed to initialize OpenGeometry: ${error}`, 'error');
+        return;
+      }
+
+      // Setup event listeners
+      setupEventListeners();
+      
+      // Start render loop
+      animate();
+      
+      // Create initial demo shapes automatically
+      await createInitialShapes();
+      
+      log('Demo ready! Try the boolean operations.', 'success');
+    }
+
+    function setupEventListeners() {
+      // Basic operations
+      document.getElementById('test-union').addEventListener('click', testUnion);
+      document.getElementById('test-intersection').addEventListener('click', testIntersection);
+      document.getElementById('test-difference').addEventListener('click', testDifference);
+      document.getElementById('test-symmetric-diff').addEventListener('click', testSymmetricDifference);
+      
+      // Advanced tests
+      document.getElementById('test-all').addEventListener('click', testAllOperations);
+      document.getElementById('test-wasm-direct').addEventListener('click', testWasmDirect);
+      document.getElementById('create-demo').addEventListener('click', createVisualDemo);
+      
+      // Scene controls
+      document.getElementById('clear-scene').addEventListener('click', clearScene);
+      document.getElementById('reset-camera').addEventListener('click', resetCamera);
+      
+      // Handle window resize
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    // Helper function to create a rectangular polygon
+    function createRectanglePolygon(width, height, center, color = 0x4CAF50) {
+      try {
+        // Create vertices for a rectangle centered at the given point
+        const halfWidth = width / 2;
+        const halfHeight = height / 2;
+        
+        const vertices = [
+          new Vector3(center.x - halfWidth, center.y, center.z - halfHeight),
+          new Vector3(center.x + halfWidth, center.y, center.z - halfHeight),
+          new Vector3(center.x + halfWidth, center.y, center.z + halfHeight),
+          new Vector3(center.x - halfWidth, center.y, center.z + halfHeight)
+        ];
+        
+        log(`Creating polygon with ${vertices.length} vertices`, 'info');
+        
+        const polygon = new Polygon({ vertices });
+        polygon.color = color;
+        
+        // Ensure geometry is generated for boolean operations
+        polygon.generate_geometry();
+        
+        log(`Polygon created with ${polygon.geometry?.attributes?.position?.count || 0} vertices`, 'info');
+        
+        return polygon;
+      } catch (error) {
+        log(`Failed to create rectangle polygon: ${error}`, 'error');
+        return null;
+      }
+    }
+
+    function createTestRectangle(width, height, center, color = 0x4CAF50) {
+      return createRectanglePolygon(width, height, center, color);
+    }
+
+    // Create initial shapes to show something on load
+    async function createInitialShapes() {
+      log('Creating initial demo shapes...', 'info');
+      
+      try {
+        // First, create a simple Three.js cube to verify the 3D scene is working
+        const cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
+        const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        cube.position.set(-5, 1, 0);
+        scene.add(cube);
+        testShapes.push(cube);
+        log('Test cube created at (-5, 1, 0)', 'success');
+        
+        // Now try to create OpenGeometry polygons
+        const rect1 = createTestRectangle(4.0, 4.0, new Vector3(-1.0, 0.0, -1.0), 0xff4444);
+        const rect2 = createTestRectangle(4.0, 4.0, new Vector3(1.0, 0.0, 1.0), 0x4444ff);
+        
+        if (rect1 && rect2) {
+          // Make them semi-transparent so we can see overlap
+          rect1.material.opacity = 0.7;
+          rect2.material.opacity = 0.7;
+          rect1.material.transparent = true;
+          rect2.material.transparent = true;
+          
+          scene.add(rect1);
+          scene.add(rect2);
+          testShapes.push(rect1, rect2);
+          
+          log('OpenGeometry polygons created successfully!', 'success');
+          log('Click "Create Visual Demo" to see more examples, or test individual boolean operations.', 'info');
+        } else {
+          throw new Error('Failed to create OpenGeometry rectangles');
+        }
+        
+      } catch (error) {
+        log(`Failed to create initial shapes: ${error}`, 'error');
+        
+        // Fallback: create simple Three.js shapes if OpenGeometry fails
+        try {
+          const planeGeometry = new THREE.PlaneGeometry(4, 4);
+          const planeMaterial1 = new THREE.MeshStandardMaterial({ 
+            color: 0xff4444, 
+            transparent: true, 
+            opacity: 0.7,
+            side: THREE.DoubleSide
+          });
+          const planeMaterial2 = new THREE.MeshStandardMaterial({ 
+            color: 0x4444ff, 
+            transparent: true, 
+            opacity: 0.7,
+            side: THREE.DoubleSide
+          });
+          
+          const plane1 = new THREE.Mesh(planeGeometry, planeMaterial1);
+          const plane2 = new THREE.Mesh(planeGeometry.clone(), planeMaterial2);
+          
+          plane1.position.set(-1, 0, -1);
+          plane2.position.set(1, 0, 1);
+          plane1.rotation.x = -Math.PI / 2; // Rotate to lie flat
+          plane2.rotation.x = -Math.PI / 2;
+          
+          scene.add(plane1);
+          scene.add(plane2);
+          testShapes.push(plane1, plane2);
+          
+          log('Fallback Three.js planes created as backup', 'info');
+        } catch (fallbackError) {
+          log(`Fallback creation also failed: ${fallbackError}`, 'error');
+        }
+      }
+    }
+
+    async function testUnion() {
+      log('Testing Union operation...', 'info');
+      
+      try {
+        const rect1 = createTestRectangle(4.0, 4.0, new Vector3(-1.0, 0.0, -1.0), 0xff0000);
+        const rect2 = createTestRectangle(4.0, 4.0, new Vector3(1.0, 0.0, 1.0), 0x0000ff);
+        
+        if (!rect1 || !rect2) {
+          throw new Error('Failed to create test rectangles');
+        }
+        
+        // Add original shapes to scene for reference
+        rect1.position.set(-8, 0, 0);
+        rect2.position.set(-4, 0, 0);
+        scene.add(rect1);
+        scene.add(rect2);
+        testShapes.push(rect1, rect2);
+        
+        // Perform union
+        const result = await booleanOperations.union(
+          createTestRectangle(4.0, 4.0, new Vector3(-1.0, 0.0, -1.0), 0xff0000),
+          createTestRectangle(4.0, 4.0, new Vector3(1.0, 0.0, 1.0), 0x0000ff)
+        );
+        
+        if (result.success && result.geometry) {
+          result.geometry.position.set(0, 0, 0);
+          result.geometry.material.color.set(0x00ff00);
+          scene.add(result.geometry);
+          testShapes.push(result.geometry);
+          log('Union operation completed successfully!', 'success');
+        } else {
+          throw new Error(result.error || 'Unknown error');
+        }
+        
+      } catch (error) {
+        log(`Union operation failed: ${error}`, 'error');
+      }
+    }
+
+    async function testIntersection() {
+      log('Testing Intersection operation...', 'info');
+      
+      try {
+        // Create intersecting rectangles
+        const result = await booleanOperations.intersection(
+          createTestRectangle(6.0, 6.0, new Vector3(0.0, 0.0, 0.0), 0xff0000),
+          createTestRectangle(4.0, 4.0, new Vector3(1.0, 0.0, 1.0), 0x0000ff)
+        );
+        
+        if (result.success && result.geometry) {
+          result.geometry.position.set(4, 0, 0);
+          result.geometry.material.color.set(0xffff00);
+          scene.add(result.geometry);
+          testShapes.push(result.geometry);
+          log('Intersection operation completed successfully!', 'success');
+        } else {
+          throw new Error(result.error || 'Unknown error');
+        }
+        
+      } catch (error) {
+        log(`Intersection operation failed: ${error}`, 'error');
+      }
+    }
+
+    async function testDifference() {
+      log('Testing Difference operation...', 'info');
+      
+      try {
+        const result = await booleanOperations.difference(
+          createTestRectangle(8.0, 8.0, new Vector3(0.0, 0.0, 0.0), 0xff0000),
+          createTestRectangle(4.0, 4.0, new Vector3(2.0, 0.0, 2.0), 0x0000ff)
+        );
+        
+        if (result.success && result.geometry) {
+          result.geometry.position.set(8, 0, 0);
+          result.geometry.material.color.set(0xff00ff);
+          scene.add(result.geometry);
+          testShapes.push(result.geometry);
+          log('Difference operation completed successfully!', 'success');
+        } else {
+          throw new Error(result.error || 'Unknown error');
+        }
+        
+      } catch (error) {
+        log(`Difference operation failed: ${error}`, 'error');
+      }
+    }
+
+    async function testSymmetricDifference() {
+      log('Testing Symmetric Difference operation...', 'info');
+      
+      try {
+        const result = await booleanOperations.symmetricDifference(
+          createTestRectangle(6.0, 6.0, new Vector3(0.0, 0.0, 0.0), 0xff0000),
+          createTestRectangle(6.0, 6.0, new Vector3(3.0, 0.0, 3.0), 0x0000ff)
+        );
+        
+        if (result.success && result.geometry) {
+          result.geometry.position.set(12, 0, 0);
+          result.geometry.material.color.set(0x00ffff);
+          scene.add(result.geometry);
+          testShapes.push(result.geometry);
+          log('Symmetric Difference operation completed successfully!', 'success');
+        } else {
+          throw new Error(result.error || 'Unknown error');
+        }
+        
+      } catch (error) {
+        log(`Symmetric Difference operation failed: ${error}`, 'error');
+      }
+    }
+
+    async function testWasmDirect() {
+      log('Testing direct WASM boolean engine...', 'info');
+      
+      try {
+        // Test engine creation and configuration
+        const engine = new OGBooleanEngine(1e-6);
+        log(`Boolean engine created with tolerance: ${engine.tolerance}`, 'success');
+        
+        // Test Brep creation
+        const brep1 = new OGBrep("rectangle");
+        const brep2 = new OGBrep("rectangle");
+        
+        log(`Created Breps with IDs: ${brep1.id}, ${brep2.id}`, 'success');
+        log('Direct WASM test completed successfully!', 'success');
+        
+      } catch (error) {
+        log(`Direct WASM test failed: ${error}`, 'error');
+      }
+    }
+
+    async function testAllOperations() {
+      log('Running all boolean operation tests...', 'info');
+      clearScene();
+      
+      await testUnion();
+      await testIntersection();
+      await testDifference();
+      await testSymmetricDifference();
+      await testWasmDirect();
+      
+      log('All tests completed!', 'success');
+    }
+
+    async function createVisualDemo() {
+      log('Creating visual demonstration...', 'info');
+      clearScene();
+      
+      try {
+        // Create a grid of boolean operation examples
+        const operations = [
+          { name: 'Union', position: [-6, 0, -6], color: 0x00ff00 },
+          { name: 'Intersection', position: [0, 0, -6], color: 0xffff00 },
+          { name: 'Difference', position: [6, 0, -6], color: 0xff00ff },
+          { name: 'Symmetric Diff', position: [-6, 0, 0], color: 0x00ffff }
+        ];
+        
+        for (const op of operations) {
+          // Create original shapes
+          const shape1 = createTestRectangle(3.0, 3.0, new Vector3(-1.0, 0.0, -1.0), 0xff0000);
+          const shape2 = createTestRectangle(3.0, 3.0, new Vector3(1.0, 0.0, 1.0), 0x0000ff);
+          
+          if (shape1 && shape2) {
+            shape1.position.set(op.position[0] - 2, op.position[1], op.position[2]);
+            shape2.position.set(op.position[0] + 2, op.position[1], op.position[2]);
+            shape1.material.opacity = 0.7;
+            shape2.material.opacity = 0.7;
+            shape1.material.transparent = true;
+            shape2.material.transparent = true;
+            
+            scene.add(shape1);
+            scene.add(shape2);
+            testShapes.push(shape1, shape2);
+            
+            // Add label
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'label';
+            labelDiv.textContent = op.name;
+            labelDiv.style.color = `#${op.color.toString(16).padStart(6, '0')}`;
+            
+            log(`Created ${op.name} demo at position [${op.position.join(', ')}]`, 'info');
+          }
+        }
+        
+        log('Visual demonstration created successfully!', 'success');
+        
+      } catch (error) {
+        log(`Failed to create visual demo: ${error}`, 'error');
+      }
+    }
+
+    function clearScene() {
+      // Remove test shapes
+      testShapes.forEach(shape => {
+        scene.remove(shape);
+        if (shape.geometry) shape.geometry.dispose();
+        if (shape.material) shape.material.dispose();
+      });
+      testShapes = [];
+      
+      log('Scene cleared', 'info');
+    }
+
+    function resetCamera() {
+      camera.position.set(10, 10, 10);
+      controls.reset();
+      log('Camera reset', 'info');
+    }
+
+    function onWindowResize() {
+      const viewer = document.getElementById('viewer');
+      camera.aspect = viewer.clientWidth / viewer.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Start the demo
+    init().catch(error => {
+      log(`Failed to initialize demo: ${error}`, 'error');
+    });
+  </script>
+</body>
+</html>

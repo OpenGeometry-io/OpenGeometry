@@ -234,6 +234,51 @@ impl OGPolygon {
   }
 
   #[wasm_bindgen]
+  pub fn get_triangulated_brep(&mut self) -> crate::operations::boolean::wasm_bindings::OGBrep {
+    use crate::geometry::triangle::Triangle;
+    
+    // Create a copy of the brep with triangulation
+    let mut triangulated_brep = self.brep.clone();
+    
+    // Get triangulation data
+    let faces = self.brep.faces.clone();
+    let mut triangulation_data = Vec::new();
+    
+    for face in &faces {
+      // Get vertices for this face
+      let (face_vertices, holes_vertices) = self.brep.get_vertices_and_holes_by_face_id(face.id);
+      
+      if face_vertices.len() >= 3 {
+        // Triangulate the face
+        let triangles = triangulate_polygon_with_holes(&face_vertices, &holes_vertices);
+        
+        // Convert indices to actual triangles
+        let all_vertices: Vec<Vector3> = face_vertices
+          .into_iter()
+          .chain(holes_vertices.into_iter().flatten())
+          .collect();
+          
+        for triangle_indices in triangles {
+          if triangle_indices.len() >= 3 {
+            let triangle = Triangle::new_with_vertices(
+              all_vertices[triangle_indices[0]].clone(),
+              all_vertices[triangle_indices[1]].clone(),
+              all_vertices[triangle_indices[2]].clone(),
+            );
+            triangulation_data.push(triangle);
+          }
+        }
+      }
+    }
+    
+    // Set triangulation on the brep
+    triangulated_brep.triangulation = triangulation_data.into();
+    
+    // Create and return OGBrep
+    crate::operations::boolean::wasm_bindings::OGBrep::from_brep(triangulated_brep)
+  }
+
+  #[wasm_bindgen]
   pub fn get_geometry_serialized(&mut self) -> String {
     let mut vertex_buffer: Vec<f64> = Vec::new();
     let faces = self.brep.faces.clone();

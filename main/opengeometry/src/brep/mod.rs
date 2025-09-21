@@ -7,6 +7,7 @@ pub mod face;
 use openmaths::Vector3;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
+use crate::geometry::triangle::Triangle;
 
 // Import and re-export types
 pub use vertex::Vertex;
@@ -20,6 +21,8 @@ pub struct Brep {
   pub edges: Vec<Edge>,
   // pub halfedges: Vec<HalfEdge>,
   pub faces: Vec<Face>,
+  pub triangulation: Option<Vec<Triangle>>,
+  pub geometry_type: String,
 }
 
 impl Brep {
@@ -30,6 +33,20 @@ impl Brep {
       edges: Vec::new(),
       // halfedges: Vec::new(),
       faces: Vec::new(),
+      triangulation: None,
+      geometry_type: "unknown".to_string(),
+    }
+  }
+
+  pub fn new_with_type(id: Uuid, geometry_type: String) -> Self {
+    Brep {
+      id,
+      vertices: Vec::new(),
+      edges: Vec::new(),
+      // halfedges: Vec::new(),
+      faces: Vec::new(),
+      triangulation: None,
+      geometry_type,
     }
   }
 

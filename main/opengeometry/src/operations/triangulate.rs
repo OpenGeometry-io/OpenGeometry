@@ -1,7 +1,48 @@
 use crate::geometry::{basegeometry::BaseGeometry, triangle::Triangle};
 use crate::operations::windingsort;
+use crate::brep::Brep;
 use std::collections::HashMap;
 use openmaths::Vector3;
+
+// Helper functions for boolean operations
+/// Ensures a Brep has triangulation data
+pub fn ensure_triangulated(brep: &mut Brep) -> Result<(), String> {
+    if brep.triangulation.is_none() {
+        return Err("Brep triangulation is required but not present. Call generate_geometry() first.".to_string());
+    }
+    Ok(())
+}
+
+/// Creates triangulation from face data
+pub fn triangulate_brep_faces(brep: &mut Brep) -> Result<(), String> {
+    let mut all_triangles = Vec::new();
+    
+    for face in &brep.faces {
+        let face_vertices = brep.get_vertices_by_face_id(face.id);
+        if face_vertices.len() < 3 {
+            continue; // Skip degenerate faces
+        }
+        
+        let triangle_indices = triangulate_polygon_with_holes(&face_vertices, &vec![]);
+        
+        // Convert indices to actual triangles
+        for triangle_idx in triangle_indices {
+            if triangle_idx[0] < face_vertices.len() &&
+               triangle_idx[1] < face_vertices.len() &&
+               triangle_idx[2] < face_vertices.len() {
+                let triangle = Triangle::new_with_vertices(
+                    face_vertices[triangle_idx[0]],
+                    face_vertices[triangle_idx[1]],
+                    face_vertices[triangle_idx[2]],
+                );
+                all_triangles.push(triangle);
+            }
+        }
+    }
+    
+    brep.triangulation = Some(all_triangles);
+    Ok(())
+}
 
 // 00000000000000
 

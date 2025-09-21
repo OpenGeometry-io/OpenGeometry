@@ -1,6 +1,7 @@
 use openmaths::Vector3;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Triangle {
   pub a: Vector3,
   pub b: Vector3,
@@ -14,6 +15,10 @@ impl Triangle {
       b: Vector3::new(0.0, 0.0, 0.0),
       c: Vector3::new(0.0, 0.0, 0.0),
     }
+  }
+
+  pub fn new_with_vertices(a: Vector3, b: Vector3, c: Vector3) -> Triangle {
+    Triangle { a, b, c }
   }
 
   pub fn set_vertices(&mut self, a: Vector3, b: Vector3, c: Vector3) {

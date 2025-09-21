@@ -1,5 +1,6 @@
 {
   "rust-analyzer.linkedProjects": [
       "./main/opengeometry/Cargo.toml"
-  ]
+  ],
+  "liveServer.settings.port": 5502
 }

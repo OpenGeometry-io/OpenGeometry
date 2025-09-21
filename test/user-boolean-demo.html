@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OpenGeometry | Boolean Operations Demo</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+    }
+    
+    #app {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px;
+      border-radius: 5px;
+      z-index: 1000;
+      max-width: 300px;
+    }
+    
+    #controls h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      color: #00ff00;
+    }
+    
+    .control-group {
+      margin-bottom: 15px;
+    }
+    
+    .control-group button {
+      background: #333;
+      color: white;
+      border: 1px solid #555;
+      padding: 8px 12px;
+      margin: 2px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    
+    .control-group button:hover {
+      background: #555;
+    }
+    
+    .control-group button:active {
+      background: #00ff00;
+      color: black;
+    }
+    
+    #log {
+      background: rgba(0, 0, 0, 0.9);
+      color: #00ff00;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      max-height: 150px;
+      overflow-y: auto;
+      padding: 10px;
+      border-radius: 3px;
+      margin-top: 10px;
+    }
+    
+    .log-info { color: #00ff00; }
+    .log-success { color: #00ffff; }
+    .log-error { color: #ff4444; }
+    .log-warning { color: #ffaa00; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="controls">
+      <h3>Boolean Operations Demo</h3>
+      
+      <div class="control-group">
+        <h4>Basic Operations</h4>
+        <button id="test-union">Union</button>
+        <button id="test-intersection">Intersection</button>
+        <button id="test-difference">Difference</button>
+        <button id="test-symmetric-diff">Symmetric Diff</button>
+      </div>
+      
+      <div class="control-group">
+        <h4>Shape Creation</h4>
+        <button id="create-rectangles">Create Rectangles</button>
+        <button id="create-complex">Create Complex</button>
+        <button id="create-extruded">Create Extruded</button>
+      </div>
+      
+      <div class="control-group">
+        <h4>Scene Controls</h4>
+        <button id="clear-scene">Clear Scene</button>
+        <button id="reset-camera">Reset Camera</button>
+        <button id="toggle-wireframe">Toggle Wireframe</button>
+      </div>
+      
+      <div class="control-group">
+        <h4>Log Output</h4>
+        <div id="log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      OpenGeometry,
+      BooleanOperations,
+      OGBrep,
+      Vector3,
+      Polygon
+    } from './../dist/index.js';
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+    import { VertexNormalsHelper } from 'three/addons/helpers/VertexNormalsHelper.js';
+    
+    let scene, camera, renderer, controls;
+    let openGeometry, booleanOperations;
+    let testShapes = [];
+    let wireframeMode = false;
+
+    // Logging utilities
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      const className = `log-${type}`;
+      logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+      console.log(`[${type.toUpperCase()}] ${message}`);
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+    }
+
+    // Initialize the 3D scene based on your external example
+    async function init() {
+      log('Initializing OpenGeometry Boolean Operations Demo...', 'info');
+      
+      const app = document.getElementById('app');
+
+      // Setup Three.js scene
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf0f0f0);
+      
+      camera = new THREE.PerspectiveCamera(75, app.clientWidth / app.clientHeight, 0.1, 1000);
+      camera.position.set(20, 20, 20);
+      
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(app.clientWidth, app.clientHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      app.appendChild(renderer.domElement);
+
+      // Initialize OpenGeometry
+      try {
+        openGeometry = await OpenGeometry.create({
+          container: app,
+          scene: scene,
+          camera: camera,
+          wasmURL: './../dist/opengeometry_bg.wasm'
+        });
+        
+        booleanOperations = new BooleanOperations();
+        
+        log('OpenGeometry initialized successfully!', 'success');
+      } catch (error) {
+        log(`Failed to initialize OpenGeometry: ${error}`, 'error');
+        return;
+      }
+
+      // Setup orbit controls
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      // Add grid helper
+      const gridHelper = new THREE.GridHelper(40, 40);
+      scene.add(gridHelper);
+
+      // Add lighting (following your external example)
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(0, 50, 2);
+      directionalLight.castShadow = true;
+      scene.add(directionalLight);
+
+      const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight2.position.set(-20, 50, 2);
+      scene.add(directionalLight2);
+
+      // Handle window resize
+      window.addEventListener('resize', () => {
+        camera.aspect = app.clientWidth / app.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(app.clientWidth, app.clientHeight);
+      });
+
+      // Setup event listeners
+      setupEventListeners();
+      
+      // Create initial demo shapes
+      await createInitialShapes();
+      
+      // Start render loop
+      animate();
+      
+      log('Demo ready! Try the boolean operations.', 'success');
+    }
+
+    function setupEventListeners() {
+      // Basic operations
+      document.getElementById('test-union').addEventListener('click', testUnion);
+      document.getElementById('test-intersection').addEventListener('click', testIntersection);
+      document.getElementById('test-difference').addEventListener('click', testDifference);
+      document.getElementById('test-symmetric-diff').addEventListener('click', testSymmetricDifference);
+      
+      // Shape creation
+      document.getElementById('create-rectangles').addEventListener('click', createRectangles);
+      document.getElementById('create-complex').addEventListener('click', createComplexShapes);
+      document.getElementById('create-extruded').addEventListener('click', createExtrudedShapes);
+      
+      // Scene controls
+      document.getElementById('clear-scene').addEventListener('click', clearScene);
+      document.getElementById('reset-camera').addEventListener('click', resetCamera);
+      document.getElementById('toggle-wireframe').addEventListener('click', toggleWireframe);
+    }
+
+    // Helper function to create a rectangular polygon (following your pattern)
+    function createRectanglePolygon(width, height, center, color = 0x4CAF50) {
+      try {
+        const halfWidth = width / 2;
+        const halfHeight = height / 2;
+        
+        const vertices = [
+          new Vector3(center.x - halfWidth, center.y, center.z - halfHeight),
+          new Vector3(center.x + halfWidth, center.y, center.z - halfHeight),
+          new Vector3(center.x + halfWidth, center.y, center.z + halfHeight),
+          new Vector3(center.x - halfWidth, center.y, center.z + halfHeight)
+        ];
+        
+        const polygon = new Polygon({ vertices });
+        polygon.color = color;
+        polygon.generate_geometry();
+        
+        log(`Created polygon with ${vertices.length} vertices`, 'info');
+        return polygon;
+      } catch (error) {
+        log(`Failed to create rectangle polygon: ${error}`, 'error');
+        return null;
+      }
+    }
+
+    // Create initial shapes (similar to your external example)
+    async function createInitialShapes() {
+      log('Creating initial demo shapes...', 'info');
+      
+      try {
+        // Create two overlapping rectangles for demonstration
+        const rect1 = createRectanglePolygon(6.0, 6.0, new Vector3(-2.0, 0.0, -2.0), 0xff4444);
+        const rect2 = createRectanglePolygon(6.0, 6.0, new Vector3(2.0, 0.0, 2.0), 0x4444ff);
+        
+        if (rect1 && rect2) {
+          // Make them semi-transparent to see overlap
+          rect1.material.opacity = 0.7;
+          rect2.material.opacity = 0.7;
+          rect1.material.transparent = true;
+          rect2.material.transparent = true;
+          
+          scene.add(rect1);
+          scene.add(rect2);
+          testShapes.push(rect1, rect2);
+          
+          log('Initial rectangles created successfully!', 'success');
+        }
+        
+      } catch (error) {
+        log(`Failed to create initial shapes: ${error}`, 'error');
+      }
+    }
+
+    function createRectangles() {
+      clearScene();
+      createInitialShapes();
+    }
+
+    async function createComplexShapes() {
+      log('Creating complex polygon shapes...', 'info');
+      clearScene();
+      
+      try {
+        // Create a complex polygon similar to your external example
+        const complexVertices = [
+          new Vector3(-3, 0, -1),
+          new Vector3(0, 0, -3),
+          new Vector3(2, 0, -1),
+          new Vector3(4, 0, -1),
+          new Vector3(2, 0, 0),
+          new Vector3(1.5, 0, 2),
+          new Vector3(0.5, 0, 2),
+          new Vector3(0, 0, 0),
+          new Vector3(0, 0, 2),
+          new Vector3(1, 0, 4),
+          new Vector3(-2, 0, 2),
+        ];
+
+        const complexPoly = new Polygon({ vertices: complexVertices });
+        complexPoly.color = 0x00ff44;
+        complexPoly.generate_geometry();
+        
+        scene.add(complexPoly);
+        testShapes.push(complexPoly);
+
+        // Create a simple rectangle to perform boolean operations with
+        const rect = createRectanglePolygon(4.0, 4.0, new Vector3(1.0, 0.0, 1.0), 0xff4444);
+        if (rect) {
+          rect.material.opacity = 0.7;
+          rect.material.transparent = true;
+          scene.add(rect);
+          testShapes.push(rect);
+        }
+        
+        log('Complex shapes created successfully!', 'success');
+        
+      } catch (error) {
+        log(`Failed to create complex shapes: ${error}`, 'error');
+      }
+    }
+
+    async function createExtrudedShapes() {
+      log('Creating extruded polygon shapes...', 'info');
+      clearScene();
+      
+      try {
+        // Create extruded shapes similar to your external example
+        const vertices = [
+          new Vector3(1, 0, -1),
+          new Vector3(1, 0, 7),
+          new Vector3(9, 0, 6),
+          new Vector3(10, 0, 3),
+          new Vector3(9, 0, 1),
+        ];
+        
+        const extrudedPoly = new Polygon({ vertices });
+        extrudedPoly.color = 0x44ff44;
+        extrudedPoly.generate_geometry();
+        
+        // Add to scene first
+        scene.add(extrudedPoly);
+        testShapes.push(extrudedPoly);
+        
+        // Add vertex normals helper
+        if (extrudedPoly.geometry) {
+          extrudedPoly.geometry.computeVertexNormals();
+          const helper = new VertexNormalsHelper(extrudedPoly, 1, 0xff0000);
+          scene.add(helper);
+          testShapes.push(helper);
+        }
+        
+        log('Extruded shapes created successfully!', 'success');
+        
+      } catch (error) {
+        log(`Failed to create extruded shapes: ${error}`, 'error');
+      }
+    }
+
+    // Boolean operation functions
+    function testUnion() {
+      log('Testing Union operation...', 'info');
+      
+      if (testShapes.length < 2) {
+        log('Need at least 2 shapes for boolean operations. Create shapes first.', 'warning');
+        return;
+      }
+      
+      try {
+        // Get the first two shapes that are polygons
+        const polygons = testShapes.filter(shape => shape instanceof Polygon);
+        if (polygons.length < 2) {
+          log('Need at least 2 polygons for boolean operations.', 'warning');
+          return;
+        }
+        
+        log(`Performing union on polygon with ${polygons[0].geometry?.attributes.position.count} vertices`, 'info');
+        
+        const result = booleanOperations.union(polygons[0], polygons[1]);
+        
+        // Position the result mesh
+        result.mesh.position.set(10.5, 0, 0);
+        result.mesh.material.color.set(0x00ff00);
+        scene.add(result.mesh);
+        testShapes.push(result.mesh);
+        
+        log(`Union operation completed! Result has ${result.geometry.attributes.position.count} vertices`, 'success');
+        
+      } catch (error) {
+        log(`Union operation failed: ${error}`, 'error');
+      }
+    }
+
+    function testIntersection() {
+      log('Testing Intersection operation...', 'info');
+      
+      if (testShapes.length < 2) {
+        log('Need at least 2 shapes for boolean operations. Create shapes first.', 'warning');
+        return;
+      }
+      
+      try {
+        const polygons = testShapes.filter(shape => shape instanceof Polygon);
+        if (polygons.length < 2) {
+          log('Need at least 2 polygons for boolean operations.', 'warning');
+          return;
+        }
+        
+        log(`Performing intersection on polygons`, 'info');
+        
+        const result = booleanOperations.intersection(polygons[0], polygons[1]);
+        
+        // Position the result mesh
+        result.mesh.position.set(10, 0, 0);
+        result.mesh.material.color.set(0x00ff00);
+        scene.add(result.mesh);
+        testShapes.push(result.mesh);
+        
+        log(`Intersection operation completed! Result has ${result.geometry.attributes.position.count} vertices`, 'success');
+        
+      } catch (error) {
+        log(`Intersection operation failed: ${error}`, 'error');
+      }
+    }
+
+    function testDifference() {
+      log('Testing Difference operation...', 'info');
+      
+      if (testShapes.length < 2) {
+        log('Need at least 2 shapes for boolean operations. Create shapes first.', 'warning');
+        return;
+      }
+      
+      try {
+        const polygons = testShapes.filter(shape => shape instanceof Polygon);
+        if (polygons.length < 2) {
+          log('Need at least 2 polygons for boolean operations.', 'warning');
+          return;
+        }
+        
+        log(`Performing difference on polygons`, 'info');
+        
+        const result = booleanOperations.difference(polygons[0], polygons[1]);
+        
+        // Position the result mesh
+        result.mesh.position.set(-5, 0, 5);
+        result.mesh.material.color.set(0xff8000);
+        scene.add(result.mesh);
+        testShapes.push(result.mesh);
+        
+        log(`Difference operation completed! Result has ${result.geometry.attributes.position.count} vertices`, 'success');
+        
+      } catch (error) {
+        log(`Difference operation failed: ${error}`, 'error');
+      }
+    }
+
+    function testSymmetricDifference() {
+      log('Testing Symmetric Difference operation...', 'info');
+      
+      if (testShapes.length < 2) {
+        log('Need at least 2 shapes for boolean operations. Create shapes first.', 'warning');
+        return;
+      }
+      
+      try {
+        const polygons = testShapes.filter(shape => shape instanceof Polygon);
+        if (polygons.length < 2) {
+          log('Need at least 2 polygons for boolean operations.', 'warning');
+          return;
+        }
+        
+        log(`Performing symmetric difference on polygons`, 'info');
+        
+        const result = booleanOperations.symmetricDifference(polygons[0], polygons[1]);
+        
+        // Position the result mesh
+        result.mesh.position.set(0, 0, -10);
+        result.mesh.material.color.set(0x00ffff);
+        scene.add(result.mesh);
+        testShapes.push(result.mesh);
+        
+        log(`Symmetric Difference operation completed! Result has ${result.geometry.attributes.position.count} vertices`, 'success');
+        
+      } catch (error) {
+        log(`Symmetric Difference operation failed: ${error}`, 'error');
+      }
+    }
+
+    function clearScene() {
+      testShapes.forEach(shape => {
+        scene.remove(shape);
+        if (shape.geometry) shape.geometry.dispose();
+        if (shape.material) shape.material.dispose();
+      });
+      testShapes = [];
+      log('Scene cleared', 'info');
+    }
+
+    function resetCamera() {
+      camera.position.set(20, 20, 20);
+      controls.reset();
+      log('Camera reset', 'info');
+    }
+
+    function toggleWireframe() {
+      wireframeMode = !wireframeMode;
+      testShapes.forEach(shape => {
+        if (shape.material && typeof shape.material.wireframe !== 'undefined') {
+          shape.material.wireframe = wireframeMode;
+        }
+      });
+      log(`Wireframe mode: ${wireframeMode ? 'ON' : 'OFF'}`, 'info');
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+      
+      // Update OpenGeometry if available
+      if (openGeometry && openGeometry.update) {
+        openGeometry.update(scene, camera);
+      }
+    }
+
+    // Start the demo
+    init().catch(error => {
+      log(`Failed to initialize demo: ${error}`, 'error');
+    });
+  </script>
+</body>
+</html>

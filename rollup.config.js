@@ -11,6 +11,7 @@ export default {
     name: 'opengeometry',
     sourcemap: true,
   },
+  external: ['three', 'three/examples/jsm/renderers/CSS2DRenderer.js'],
   plugins: [
     nodeResolve(),
     commonjs(),

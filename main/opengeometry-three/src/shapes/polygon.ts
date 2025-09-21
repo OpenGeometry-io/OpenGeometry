@@ -1,12 +1,13 @@
 import * as THREE from "three";
-import { OGPolygon, Vector3 } from "../../../opengeometry/pkg/opengeometry";
+import { OGPolygon, Vector3, OGBrep } from "../../../opengeometry/pkg/opengeometry";
 import { getUUID } from "../utils/randomizer";
+import { BooleanCompatible } from "../operations/boolean";
 
 interface IPolygonOptions {
   vertices: Vector3[];
 }
 
-export class Polygon extends THREE.Mesh {
+export class Polygon extends THREE.Mesh implements BooleanCompatible {
   ogid: string;
   options: IPolygonOptions = { vertices: [] };
   polygon: OGPolygon;
@@ -309,6 +310,26 @@ export class Polygon extends THREE.Mesh {
     if (!this.polygon) return null;
     const brepData = this.polygon.get_brep_serialized();
     return brepData;
+  }
+
+  // Implement BooleanCompatible interface
+  getOGBrep(): OGBrep {
+    // Ensure the geometry is generated first
+    this.generate_geometry();
+    
+    // Get the triangulated BRep from the polygon
+    try {
+      const ogBrep = this.polygon.get_triangulated_brep();
+      console.log(ogBrep);
+      return ogBrep;
+    } catch (error) {
+      throw new Error(`Failed to get triangulated BRep from polygon: ${error}`);
+    }
+  }
+
+  // Ensure geometry is generated for boolean operations  
+  generate_geometry(): void {
+    this.generateGeometry();
   }
 
   set outlineColor(color: number) {

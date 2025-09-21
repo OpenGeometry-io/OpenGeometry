@@ -6,6 +6,7 @@ import init, {
   OGPolyline,
   OGRectangle,
   OGPolygon,
+  OGBrep,
   Vector3
 } from "../opengeometry/pkg/opengeometry";
 // Vector3 is also available in opengeometry package
@@ -18,6 +19,7 @@ import { SpotLabel } from "./src/markup/spotMarker";
 import { OPEN_GEOMETRY_THREE_VERSION, OpenGeometryOptions } from "./src/base-types";
 import { Arc } from "./src/primitives/arc";
 import { Rectangle } from "./src/primitives/rectangle";
+import { BooleanOperations } from "./src/operations/boolean";
 
 export type OUTLINE_TYPE = "front" | "side" | "top";
 
@@ -742,6 +744,8 @@ export class FlatMesh extends THREE.Mesh {
 export {
   Vector3,
   SpotLabel,
+  BooleanOperations,
+  OGBrep,
 }
 
 export * from './src/primitives/';

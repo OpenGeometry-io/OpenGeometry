@@ -19,3 +19,10 @@ web-sys = { version = "0.3", features = ["console"] }
 openmaths = "0.2.4"
 uuid = { version = "1.17.0", features = ["v4", "serde", "js"] }
 earcutr = "=0.3.0"
+truck-modeling = "0.4"
+truck-topology = "0.4"
+truck-meshalgo = "0.4"
+truck-polymesh = "0.4"
+
+[features]
+default = []

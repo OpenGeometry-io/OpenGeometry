@@ -1,4 +1,4 @@
-import { OGRectangle, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
+import { OGRectangle, Vector3, OGBrep } from "./../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 import { IRectangeOptions } from "../base-types";
@@ -102,6 +102,18 @@ export class Rectangle extends BaseLinePrimitive {
       throw new Error("Brep data is not available for Rectangle");
     }
     return JSON.parse(brepData);
+  }
+
+  // Implement BooleanCompatible interface  
+  getOGBrep(): OGBrep {
+    // For now, return a basic OGBrep since Rectangle is a polyline, not a filled shape
+    // This method exists for interface compliance but shouldn't be used for boolean operations
+    return new OGBrep("rectangle");
+  }
+
+  // Ensure geometry is generated for boolean operations
+  generate_geometry(): void {
+    this.generateGeometry();
   }
 
   discardGeometry() {
