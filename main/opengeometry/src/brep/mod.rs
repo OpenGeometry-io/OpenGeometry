@@ -1,4 +1,10 @@
-// Export out
+/**
+ * BRep Module/Structure
+ * References - https://en.wikipedia.org/wiki/Boundary_representation
+ * References - https://en.wikipedia.org/wiki/Doubly_connected_edge_list
+ * References - https://en.wikipedia.org/wiki/Polygon_mesh
+ * References - https://www.cs.cmu.edu/~./quake/robust.html
+ */
 pub mod vertex;
 pub mod edge;
 // pub mod halfedge;
@@ -20,6 +26,8 @@ pub struct Brep {
   pub edges: Vec<Edge>,
   // pub halfedges: Vec<HalfEdge>,
   pub faces: Vec<Face>,
+  pub holes: Vec<u32>,
+  pub hole_edges: Vec<Edge>
 }
 
 impl Brep {
@@ -30,6 +38,8 @@ impl Brep {
       edges: Vec::new(),
       // halfedges: Vec::new(),
       faces: Vec::new(),
+      holes: Vec::new(),
+      hole_edges: Vec::new()
     }
   }
 
@@ -50,6 +60,10 @@ impl Brep {
 
   pub fn get_face_count(&self) -> u32 {
     self.faces.len() as u32
+  }
+
+  pub fn get_hole_edge_count(&self) -> u32 {
+    self.hole_edges.len() as u32
   }
 
   /**
@@ -100,10 +114,26 @@ impl Brep {
         }
       }
       
-      // For now, return empty holes vector since the current Face structure doesn't support holes
-      // TODO: Implement proper hole support in Face structure when needed
-      let holes_vertices = Vec::new();
-      
+      let mut holes_vertices = Vec::new();
+  
+      if self.holes.len() > 0 {
+        for &hole_start_index in &self.holes {
+          let mut hole_vertices = Vec::new();
+          let next_hole_start_index = self.holes.iter()
+            .filter(|&&idx| idx > hole_start_index)
+            .min()
+            .cloned()
+            .unwrap_or(self.vertices.len() as u32);
+          
+          for i in hole_start_index..next_hole_start_index {
+            if let Some(vertex) = self.vertices.get(i as usize) {
+              hole_vertices.push(vertex.position);
+            }
+          }
+          holes_vertices.push(hole_vertices);
+        }
+      }
+
       (face_vertices, holes_vertices)
     } else {
       // Face not found, return empty vectors

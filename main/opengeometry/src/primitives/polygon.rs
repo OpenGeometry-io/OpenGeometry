@@ -3,26 +3,9 @@
  * Polygon Primitive for OpenGeometry.
  * 
  * Base polygon created by default on XY plane with no vertices.
- * Polygon points are treated as is, i.e. no CCW or CW check is done.
- * But if the polygon is triangulated, then the vertices are sorted in CCW order.
- * 
- * Polygon points can be tested for CCW using `is_ccw` method.
- * If needed they can be treated in CCW using `.make_ccw()` method.
+ * Polygon Points should be in CCW order based on viewing Axis
+ * Holes should be in CW order
  */
-
-// use std::collections::HashMap;
-
-// use crate::operations::extrude::{extrude_polygon_by_buffer_geometry, extrude_polygon_with_holes};
-// use crate::operations::triangulate::triangulate_polygon_buffer_geometry;
-// use crate::operations::{self, windingsort};
-// use crate::{geometry, primitives};
-// use crate::utility::geometry::{Geometry};
-// use crate::{operations::triangulate};
-// use crate::geometry::basegeometry::{self, BaseGeometry};
-// use serde_json::ser;
-// use wasm_bindgen::prelude::*;
-// use serde::{Serialize, Deserialize};
-// use openmaths::Vector3;
 
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
@@ -91,6 +74,8 @@ impl OGPolygon {
   #[wasm_bindgen]
   pub fn set_config(&mut self, points: Vec<Vector3>) {
     self.points = points;
+
+    self.generate_brep();
   }
 
   #[wasm_bindgen]
@@ -181,10 +166,31 @@ impl OGPolygon {
   //   }
   // }
 
-  // #[wasm_bindgen]
-  // pub fn add_holes(&mut self, holes: Vec<Vector3>) {
-  //   self.geometry.add_holes(holes);
-  // }
+  #[wasm_bindgen]
+  pub fn add_holes(&mut self, holes: Vec<Vector3>) {
+    let current_index = self.brep.get_vertex_count();
+    self.brep.holes.push(current_index);
+
+    for (i, point) in holes.iter().enumerate() {
+      let vertex = Vertex::new((current_index + i as u32) as u32, point.clone());
+      self.brep.vertices.push(vertex);
+
+      // TODO - Can we merge Face Edges with Hole Edges, would it be wise to do so?
+      // For now, keep it separate
+      let edge = {
+        let holes_len_u32 = holes.len() as u32;
+        vec![
+          current_index + i as u32,
+          current_index + ((i as u32 + 1) % holes_len_u32)
+        ]
+      };
+      self.brep.hole_edges.push(Edge::new(
+        self.brep.get_hole_edge_count() as u32,
+        edge[0],
+        edge[1],
+      ));
+    }
+  }
 
   #[wasm_bindgen]
   pub fn clean_geometry(&mut self) {
@@ -193,12 +199,12 @@ impl OGPolygon {
   }
 
   #[wasm_bindgen]
-  pub fn generate_geometry(&mut self) {
+  pub fn generate_brep(&mut self) {
     if self.points.len() < 3 {
       web_sys::console::log_1(&"Polygon must have at least 3 points to generate geometry.".into());
       return;
     }
-
+    
     // Clear the BREP structure before generating new geometry
     self.clean_geometry();
 
@@ -228,6 +234,14 @@ impl OGPolygon {
   }
 
   #[wasm_bindgen]
+  pub fn generate_geometry(&mut self) {
+    if self.points.len() < 3 {
+      web_sys::console::log_1(&"Polygon must have at least 3 points to generate geometry.".into());
+      return;
+    }
+  }
+
+  #[wasm_bindgen]
   pub fn get_brep_serialized(&self) -> String {
     let serialized = serde_json::to_string(&self.brep).unwrap();
     serialized
@@ -238,43 +252,33 @@ impl OGPolygon {
     let mut vertex_buffer: Vec<f64> = Vec::new();
     let faces = self.brep.faces.clone();
 
-    web_sys::console::log_1(&format!("Starting geometry serialization with {} faces", faces.len()).into());
-
     for face in &faces {
-        web_sys::console::log_1(&format!("Processing face {} with {} vertices", face.id, face.get_indices_count()).into());
+      let (face_vertices, holes_vertices) = self.brep.get_vertices_and_holes_by_face_id(face.id);
 
-        // 1. Get all vertices for the face and its holes from the B-Rep
-        let (face_vertices, holes_vertices) = self.brep.get_vertices_and_holes_by_face_id(face.id);
+      if face_vertices.len() < 3 {
+        continue;
+      }
 
-        if face_vertices.len() < 3 {
-            web_sys::console::log_1(&"Face has less than 3 vertices, skipping triangulation.".into());
-            continue;
+      let triangles = triangulate_polygon_with_holes(&face_vertices, &holes_vertices);
+
+      // Combine outer and hole vertices into a single list for easy lookup
+      let all_vertices: Vec<Vector3> = face_vertices
+        .into_iter()
+        .chain(holes_vertices.into_iter().flatten())
+        .collect();
+
+      // Build the final vertex buffer for rendering
+      for triangle in triangles {
+        for vertex_index in triangle {
+          // The indices from earcutr correspond to our combined `all_vertices` list
+          let vertex = &all_vertices[vertex_index];
+          vertex_buffer.push(vertex.x);
+          vertex_buffer.push(vertex.y);
+          vertex_buffer.push(vertex.z);
         }
-
-        // 2. Call the new triangulation function
-        let triangles = triangulate_polygon_with_holes(&face_vertices, &holes_vertices);
-        web_sys::console::log_1(&format!("Generated {} triangles", triangles.len()).into());
-
-
-        // 3. Combine outer and hole vertices into a single list for easy lookup
-        let all_vertices: Vec<Vector3> = face_vertices
-            .into_iter()
-            .chain(holes_vertices.into_iter().flatten())
-            .collect();
-
-        // 4. Build the final vertex buffer for rendering
-        for triangle in triangles {
-            for vertex_index in triangle {
-                // The indices from earcutr correspond to our combined `all_vertices` list
-                let vertex = &all_vertices[vertex_index];
-                vertex_buffer.push(vertex.x);
-                vertex_buffer.push(vertex.y);
-                vertex_buffer.push(vertex.z);
-            }
-        }
+      }
     }
 
-    web_sys::console::log_1(&format!("Final vertex buffer size: {}", vertex_buffer.len()).into());
     serde_json::to_string(&vertex_buffer).unwrap()
   }
 
@@ -299,500 +303,27 @@ impl OGPolygon {
       vertex_buffer.push(end_vertex.position.z);
     }
 
+    if self.brep.hole_edges.len() > 0 {
+      for edge in self.brep.hole_edges.clone() {
+        let start_index = edge.v1 as usize;
+        let end_index = edge.v2 as usize;
+
+        let start_vertex = self.brep.vertices[start_index].clone();
+        let end_vertex = self.brep.vertices[end_index].clone();
+
+        vertex_buffer.push(start_vertex.position.x);
+        vertex_buffer.push(start_vertex.position.y);
+        vertex_buffer.push(start_vertex.position.z);
+
+        vertex_buffer.push(end_vertex.position.x);
+        vertex_buffer.push(end_vertex.position.y);
+        vertex_buffer.push(end_vertex.position.z);
+      }
+    }
+
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
   }
-
-  // pub fn new_triangulate(&mut self) -> String {
-  //   // Step 1 - Flatten the geometry - Works
-  //   let flat_data = flatten_buffer_geometry(self.geometry.clone());
-  //   let vertices = flat_data.vertices.clone();
-  //   let holes = flat_data.holes;
-  //   let dimension = flat_data.dimension;
-
-  //   // Step 2 - Find the left most point in the first hole
-  //   let start_index_in_vertices = holes[0] * 3;
-  //   let mut end_index_in_vertices = 0;
-
-  //   // TODO: Handle multiple holes - Later
-  //   if holes.len() > 1 {
-  //     end_index_in_vertices = holes[1] * 3;
-  //   } else {
-  //     // if only one hole is present
-  //     end_index_in_vertices = vertices.len() as u32;
-  //   }
-
-  //   let right_most_index = triangulate::find_right_most_point_index(vertices.clone(), start_index_in_vertices, end_index_in_vertices);
-
-  //   // Step 3 - Find Ray Casting with the outer edges
-  //   let right_point = Vector3::new(
-  //     vertices[right_most_index as usize],
-  //     vertices[right_most_index as usize + 1],
-  //     vertices[right_most_index as usize + 2]
-  //   );
-    
-  //   // Step 4 is inside
-  //   let ray_edge = triangulate::check_vertex_collision_with_flat_vertices(
-  //     vertices.clone(),
-  //     right_point,
-  //     0,
-  //     start_index_in_vertices + 1
-  //   );
-
-  //   let mut new_vertices_processed: Vec<f64> = Vec::new();
-  //   // Step 5 - Create Bridge
-  //   let bridge_start_index = ray_edge[0][0];
-  //   let bridge_end_index = right_most_index;
-  //   let bridge_start = Vector3::new(
-  //     vertices[bridge_start_index as usize],
-  //     vertices[bridge_start_index as usize + 1],
-  //     vertices[bridge_start_index as usize + 2]
-  //   );
-  //   let bridge_end = Vector3::new(
-  //     vertices[bridge_end_index as usize],
-  //     vertices[bridge_end_index as usize + 1],
-  //     vertices[bridge_end_index as usize + 2]
-  //   );
-
-  //   let hole_one = self.geometry.get_holes()[0].clone();
-  //   let hole_vertex_nodes = triangulate::create_vertex_nodes(hole_one.clone(), start_index_in_vertices, end_index_in_vertices - 1, true);
-
-  //   // Before Bridge Vertices
-  //   for i in 0..bridge_start_index+3 {
-  //     let vertex = vertices[i as usize];
-  //     new_vertices_processed.push(vertex);
-  //   }
-
-  //   // Insert Bridge Vertices
-  //   let mut vertex_nodes_data: Vec<f64> = Vec::new();
-  //   let mut vertex_next_nodes_data: Vec<f64> = Vec::new();
-  //   for node in hole_vertex_nodes {
-  //     vertex_nodes_data.push(node.vertex.x);
-  //     vertex_nodes_data.push(node.vertex.y);
-  //     vertex_nodes_data.push(node.vertex.z);
-
-  //     vertex_next_nodes_data.push(node.next_index as f64);
-  //   }
-  //   for i in vertex_next_nodes_data.iter() {
-  //     let index = *i as usize;
-  //     let x = vertices[index];
-  //     let y = vertices[index + 1];
-  //     let z = vertices[index + 2];
-
-  //     new_vertices_processed.push(x);
-  //     new_vertices_processed.push(y);
-  //     new_vertices_processed.push(z);
-  //   }
-
-  //   // Start Index Of Hole-Bridge again to complete the loop, i.e. vertex_next_nodes
-  //   let start_index_of_bridge_to_hole = vertex_next_nodes_data[0] as usize;
-  //   let bridge_to_hole_x = vertices[start_index_of_bridge_to_hole];
-  //   let bridge_to_hole_y = vertices[start_index_of_bridge_to_hole + 1];
-  //   let bridge_to_hole_z = vertices[start_index_of_bridge_to_hole + 2];
-  //   new_vertices_processed.push(bridge_to_hole_x);
-  //   new_vertices_processed.push(bridge_to_hole_y);
-  //   new_vertices_processed.push(bridge_to_hole_z);
-
-  //   // // Back To Bridge
-  //   let bridge_x = vertices[bridge_start_index as usize];
-  //   let bridge_y = vertices[bridge_start_index as usize + 1];
-  //   let bridge_z = vertices[bridge_start_index as usize + 2];
-  //   new_vertices_processed.push(bridge_x);
-  //   new_vertices_processed.push(bridge_y);
-  //   new_vertices_processed.push(bridge_z);
-
-  //   // After Bridge Vertices
-  //   let before_hole_start_index = holes[0] * 3;
-  //   for i in bridge_start_index..before_hole_start_index as u32 {
-  //     let vertex = vertices[i as usize];
-  //     new_vertices_processed.push(vertex);
-  //   }
-
-
-  //   let mut new_buffergeometry = basegeometry::BaseGeometry::new("new_buffergeometry".to_string());
-  //   let og_vertices: Vec<Vector3> = new_vertices_processed.chunks(3)
-  //     .map(|chunk| Vector3::new(chunk[0], chunk[1], chunk[2]))
-  //     .collect();
-  //   new_buffergeometry.add_vertices(og_vertices);
-  //   let new_tricut = triangulate_polygon_buffer_geometry(new_buffergeometry.clone());
-  //   let ccw_vertices = windingsort::ccw_test(new_buffergeometry.get_vertices());
-  //   let mut new_buffer: Vec<f64> = Vec::new();
-    
-  //   for index in new_tricut {
-  //     for i in index {
-  //       let vertex = ccw_vertices[i as usize];
-  //       new_buffer.push(vertex.x);
-  //       new_buffer.push(vertex.y);
-  //       new_buffer.push(vertex.z);
-  //     }
-  //   }
-
-
-  //   let mut data = HashMap::new();
-  //   data.insert("vertices", vertices);
-  //   data.insert("holes", holes.into_iter().map(|x| x as f64).collect());
-  //   data.insert("dimension", vec![dimension as f64]);
-  //   data.insert("start_index_in_vertices", vec![start_index_in_vertices as f64]);
-  //   data.insert("end_index_in_vertices", vec![end_index_in_vertices as f64]);
-  //   data.insert("right_most_index", vec![right_most_index as f64]);
-  //   data.insert("right_point", vec![right_point.x, right_point.y, right_point.z]);
-  //   data.insert("bridge_start", vec![bridge_start.x, bridge_start.y, bridge_start.z]);
-  //   data.insert("bridge_end", vec![bridge_end.x, bridge_end.y, bridge_end.z]);
-    
-  //   data.insert("new_vertices_processed", new_vertices_processed);
-  //   data.insert("vertex_nodes", vertex_nodes_data);
-  //   data.insert("vertex_next_nodes", vertex_next_nodes_data);
-
-  //   data.insert("new_buffer", new_buffer);
-
-  //   let mut edge_data: Vec<f64> = Vec::new();
-  //   for edge in ray_edge {
-  //     for i in edge {
-  //       edge_data.push(i as f64);
-  //     }
-  //   }
-  //   data.insert("ray_edge", edge_data);
-
-  //   serde_json::to_string(&data).unwrap()
-  // }
-
-
-  // #[wasm_bindgen]
-  // pub fn triangulate_with_holes_variable_geometry(&mut self, is_ccw: bool) -> String {
-  //   // Step 1 - Flatten the geometry - Works
-  //   let flat_data = triangulate::flatten_buffer_geometry(self.variable_geometry.clone());
-  //   let vertices = flat_data.vertices.clone();
-  //   let holes = flat_data.holes;
-  //   let dimension = flat_data.dimension;
-
-  //   // Step 2 - Find the left most point in the first hole
-  //   let start_index_in_vertices = holes[0] * 3;
-  //   let mut end_index_in_vertices = 0;
-
-  //   if holes.len() > 1 {
-  //     end_index_in_vertices = holes[1] * 3;
-  //   } else {
-  //     // if only one hole is present
-  //     end_index_in_vertices = vertices.len() as u32;
-  //   }
-
-  //   let right_most_index = triangulate::find_right_most_point_index(vertices.clone(), start_index_in_vertices, end_index_in_vertices);
-
-  //   // Step 3 - Find Ray Casting with the outer edges
-  //   let right_point = Vector3::new(
-  //     vertices[right_most_index as usize],
-  //     vertices[right_most_index as usize + 1],
-  //     vertices[right_most_index as usize + 2]
-  //   );
-    
-  //   // Step 4 is inside
-  //   let ray_edge = triangulate::check_vertex_collision_with_flat_vertices(
-  //     vertices.clone(),
-  //     right_point,
-  //     0,
-  //     start_index_in_vertices + 1
-  //   );
-
-  //   let mut new_vertices_processed: Vec<f64> = Vec::new();
-  //   // Step 5 - Create Bridge
-  //   let bridge_start_index = ray_edge[0][0];
-  //   let bridge_end_index = right_most_index;
-  //   let bridge_start = Vector3::new(
-  //     vertices[bridge_start_index as usize],
-  //     vertices[bridge_start_index as usize + 1],
-  //     vertices[bridge_start_index as usize + 2]
-  //   );
-  //   let bridge_end = Vector3::new(
-  //     vertices[bridge_end_index as usize],
-  //     vertices[bridge_end_index as usize + 1],
-  //     vertices[bridge_end_index as usize + 2]
-  //   );
-
-  //   let hole_one = self.variable_geometry.get_holes()[0].clone();
-  //   let hole_vertex_nodes = triangulate::create_vertex_nodes(hole_one.clone(), start_index_in_vertices, end_index_in_vertices - 1, true);
-
-  //   // Before Bridge Vertices
-  //   for i in 0..bridge_start_index+3 {
-  //     let vertex = vertices[i as usize];
-  //     new_vertices_processed.push(vertex);
-  //   }
-  //   // Insert Bridge Vertices
-  //   let mut vertex_nodes_data: Vec<f64> = Vec::new();
-  //   let mut vertex_next_nodes_data: Vec<f64> = Vec::new();
-  //   for node in hole_vertex_nodes {
-  //     vertex_nodes_data.push(node.vertex.x);
-  //     vertex_nodes_data.push(node.vertex.y);
-  //     vertex_nodes_data.push(node.vertex.z);
-
-  //     vertex_next_nodes_data.push(node.next_index as f64);
-  //   }
-  //   for i in vertex_next_nodes_data.iter() {
-  //     let index = *i as usize;
-  //     let x = vertices[index];
-  //     let y = vertices[index + 1];
-  //     let z = vertices[index + 2];
-
-  //     new_vertices_processed.push(x);
-  //     new_vertices_processed.push(y);
-  //     new_vertices_processed.push(z);
-  //   }
-  //   // Start Index Of Hole-Bridge again to complete the loop, i.e. vertex_next_nodes
-  //   let start_index_of_bridge_to_hole = vertex_next_nodes_data[0] as usize;
-  //   let bridge_to_hole_x = vertices[start_index_of_bridge_to_hole];
-  //   let bridge_to_hole_y = vertices[start_index_of_bridge_to_hole + 1];
-  //   let bridge_to_hole_z = vertices[start_index_of_bridge_to_hole + 2];
-  //   new_vertices_processed.push(bridge_to_hole_x);
-  //   new_vertices_processed.push(bridge_to_hole_y);
-  //   new_vertices_processed.push(bridge_to_hole_z);
-  //   // // Back To Bridge
-  //   let bridge_x = vertices[bridge_start_index as usize];
-  //   let bridge_y = vertices[bridge_start_index as usize + 1];
-  //   let bridge_z = vertices[bridge_start_index as usize + 2];
-  //   new_vertices_processed.push(bridge_x);
-  //   new_vertices_processed.push(bridge_y);
-  //   new_vertices_processed.push(bridge_z);
-  //   // After Bridge Vertices
-  //   let before_hole_start_index = holes[0] * 3;
-  //   for i in bridge_start_index..before_hole_start_index as u32 {
-  //     let vertex = vertices[i as usize];
-  //     new_vertices_processed.push(vertex);
-  //   }
-  //   let mut new_buffergeometry = basegeometry::BaseGeometry::new("new_buffergeometry".to_string());
-  //   let og_vertices: Vec<Vector3> = new_vertices_processed.chunks(3)
-  //     .map(|chunk| Vector3::new(chunk[0], chunk[1], chunk[2]))
-  //     .collect();
-  //   new_buffergeometry.add_vertices(og_vertices);
-  //   let new_tricut = triangulate_polygon_buffer_geometry(new_buffergeometry.clone());
-  //   // let ccw_vertices = windingsort::ccw_test(new_buffergeometry.get_vertices());
-  //   let mut new_buffer: Vec<f64> = Vec::new();
-  //   for index in new_tricut {
-  //     for i in index {
-  //       // let vertex = ccw_vertices[i as usize];
-  //       let vertex = new_buffergeometry.get_vertices()[i as usize];
-  //       new_buffer.push(vertex.x);
-  //       new_buffer.push(vertex.y);
-  //       new_buffer.push(vertex.z);
-  //     }
-  //   }
-
-  //   let mut reverse_triangles:Vec<f64> = Vec::new();
-  //   if is_ccw {
-  //     // read the triangles in reverse order but in start from end - 3 to end then push them and 
-  //     let mut rev_buf = new_buffer.clone();
-  //     rev_buf.reverse();
-  //     let index = 3;
-  //     let mut i = 0;
-
-  //     while i < rev_buf.len() {
-  //       let x = rev_buf[i + 2];
-  //       let y = rev_buf[i + 1];
-  //       let z = rev_buf[i];
-  //       reverse_triangles.push(x);
-  //       reverse_triangles.push(y);
-  //       reverse_triangles.push(z);
-
-  //       i += index;
-  //     }
-
-  //     new_buffer = reverse_triangles;
-  //   }
-
-  //   let mut data = HashMap::new();
-  //   data.insert("vertices", vertices);
-  //   data.insert("holes", holes.into_iter().map(|x| x as f64).collect());
-  //   data.insert("dimension", vec![dimension as f64]);
-  //   data.insert("start_index_in_vertices", vec![start_index_in_vertices as f64]);
-  //   data.insert("end_index_in_vertices", vec![end_index_in_vertices as f64]);
-  //   data.insert("right_most_index", vec![right_most_index as f64]);
-  //   data.insert("right_point", vec![right_point.x, right_point.y, right_point.z]);
-  //   data.insert("bridge_start", vec![bridge_start.x, bridge_start.y, bridge_start.z]);
-  //   data.insert("bridge_end", vec![bridge_end.x, bridge_end.y, bridge_end.z]);
-  //   data.insert("new_vertices_processed", new_vertices_processed);
-  //   data.insert("vertex_nodes", vertex_nodes_data);
-  //   data.insert("vertex_next_nodes", vertex_next_nodes_data);
-  //   data.insert("new_buffer", new_buffer);
-  //   let mut edge_data: Vec<f64> = Vec::new();
-  //   for edge in ray_edge {
-  //     for i in edge {
-  //       edge_data.push(i as f64);
-  //     }
-  //   }
-  //   data.insert("ray_edge", edge_data);
-  //   let string_data = serde_json::to_string(&data).unwrap();
-  //   string_data
-  // }
-
-  // #[wasm_bindgen]
-  // pub fn triangulate_with_holes(&mut self) -> String {
-  //   // Step 1 - Flatten the geometry - Works
-  //   let flat_data = triangulate::flatten_buffer_geometry(self.geometry.clone());
-  //   let vertices = flat_data.vertices.clone();
-  //   let holes = flat_data.holes;
-  //   let dimension = flat_data.dimension;
-
-  //   // Step 2 - Find the left most point in the first hole
-  //   let start_index_in_vertices = holes[0] * 3;
-  //   let mut end_index_in_vertices = 0;
-
-  //   if holes.len() > 1 {
-  //     end_index_in_vertices = holes[1] * 3;
-  //   } else {
-  //     // if only one hole is present
-  //     end_index_in_vertices = vertices.len() as u32;
-  //   }
-
-  //   let right_most_index = triangulate::find_right_most_point_index(vertices.clone(), start_index_in_vertices, end_index_in_vertices);
-
-  //   // Step 3 - Find Ray Casting with the outer edges
-  //   let right_point = Vector3::new(
-  //     vertices[right_most_index as usize],
-  //     vertices[right_most_index as usize + 1],
-  //     vertices[right_most_index as usize + 2]
-  //   );
-    
-  //   // Step 4 is inside
-  //   let ray_edge = triangulate::check_vertex_collision_with_flat_vertices(
-  //     vertices.clone(),
-  //     right_point,
-  //     0,
-  //     start_index_in_vertices + 1
-  //   );
-
-  //   let mut new_vertices_processed: Vec<f64> = Vec::new();
-  //   // Step 5 - Create Bridge
-  //   let bridge_start_index = ray_edge[0][0];
-  //   let bridge_end_index = right_most_index;
-  //   let bridge_start = Vector3::new(
-  //     vertices[bridge_start_index as usize],
-  //     vertices[bridge_start_index as usize + 1],
-  //     vertices[bridge_start_index as usize + 2]
-  //   );
-  //   let bridge_end = Vector3::new(
-  //     vertices[bridge_end_index as usize],
-  //     vertices[bridge_end_index as usize + 1],
-  //     vertices[bridge_end_index as usize + 2]
-  //   );
-
-  //   let hole_one = self.geometry.get_holes()[0].clone();
-  //   let hole_vertex_nodes = triangulate::create_vertex_nodes(hole_one.clone(), start_index_in_vertices, end_index_in_vertices - 1, true);
-
-  //   // Before Bridge Vertices
-  //   for i in 0..bridge_start_index+3 {
-  //     let vertex = vertices[i as usize];
-  //     new_vertices_processed.push(vertex);
-  //   }
-
-  //   // Insert Bridge Vertices
-  //   let mut vertex_nodes_data: Vec<f64> = Vec::new();
-  //   let mut vertex_next_nodes_data: Vec<f64> = Vec::new();
-  //   for node in hole_vertex_nodes {
-  //     vertex_nodes_data.push(node.vertex.x);
-  //     vertex_nodes_data.push(node.vertex.y);
-  //     vertex_nodes_data.push(node.vertex.z);
-
-  //     vertex_next_nodes_data.push(node.next_index as f64);
-  //   }
-  //   for i in vertex_next_nodes_data.iter() {
-  //     let index = *i as usize;
-  //     let x = vertices[index];
-  //     let y = vertices[index + 1];
-  //     let z = vertices[index + 2];
-
-  //     new_vertices_processed.push(x);
-  //     new_vertices_processed.push(y);
-  //     new_vertices_processed.push(z);
-  //   }
-
-  //   // Start Index Of Hole-Bridge again to complete the loop, i.e. vertex_next_nodes
-  //   let start_index_of_bridge_to_hole = vertex_next_nodes_data[0] as usize;
-  //   let bridge_to_hole_x = vertices[start_index_of_bridge_to_hole];
-  //   let bridge_to_hole_y = vertices[start_index_of_bridge_to_hole + 1];
-  //   let bridge_to_hole_z = vertices[start_index_of_bridge_to_hole + 2];
-  //   new_vertices_processed.push(bridge_to_hole_x);
-  //   new_vertices_processed.push(bridge_to_hole_y);
-  //   new_vertices_processed.push(bridge_to_hole_z);
-
-  //   // // Back To Bridge
-  //   let bridge_x = vertices[bridge_start_index as usize];
-  //   let bridge_y = vertices[bridge_start_index as usize + 1];
-  //   let bridge_z = vertices[bridge_start_index as usize + 2];
-  //   new_vertices_processed.push(bridge_x);
-  //   new_vertices_processed.push(bridge_y);
-  //   new_vertices_processed.push(bridge_z);
-
-  //   // After Bridge Vertices
-  //   let before_hole_start_index = holes[0] * 3;
-  //   for i in bridge_start_index..before_hole_start_index as u32 {
-  //     let vertex = vertices[i as usize];
-  //     new_vertices_processed.push(vertex);
-  //   }
-
-  //   let mut new_buffergeometry = basegeometry::BaseGeometry::new("new_buffergeometry".to_string());
-  //   let og_vertices: Vec<Vector3> = new_vertices_processed.chunks(3)
-  //     .map(|chunk| Vector3::new(chunk[0], chunk[1], chunk[2]))
-  //     .collect();
-  //   new_buffergeometry.add_vertices(og_vertices);
-  //   let new_tricut = triangulate_polygon_buffer_geometry(new_buffergeometry.clone());
-  //   let ccw_vertices = windingsort::ccw_test(new_buffergeometry.get_vertices());
-  //   let mut new_buffer: Vec<f64> = Vec::new();
-    
-  //   for index in new_tricut {
-  //     for i in index {
-  //       let vertex = ccw_vertices[i as usize];
-  //       new_buffer.push(vertex.x);
-  //       new_buffer.push(vertex.y);
-  //       new_buffer.push(vertex.z);
-  //     }
-  //   }
-
-  //   let mut data = HashMap::new();
-  //   data.insert("vertices", vertices);
-  //   data.insert("holes", holes.into_iter().map(|x| x as f64).collect());
-  //   data.insert("dimension", vec![dimension as f64]);
-  //   data.insert("start_index_in_vertices", vec![start_index_in_vertices as f64]);
-  //   data.insert("end_index_in_vertices", vec![end_index_in_vertices as f64]);
-  //   data.insert("right_most_index", vec![right_most_index as f64]);
-  //   data.insert("right_point", vec![right_point.x, right_point.y, right_point.z]);
-  //   data.insert("bridge_start", vec![bridge_start.x, bridge_start.y, bridge_start.z]);
-  //   data.insert("bridge_end", vec![bridge_end.x, bridge_end.y, bridge_end.z]);
-    
-  //   data.insert("new_vertices_processed", new_vertices_processed);
-  //   data.insert("vertex_nodes", vertex_nodes_data);
-  //   data.insert("vertex_next_nodes", vertex_next_nodes_data);
-
-  //   data.insert("new_buffer", new_buffer);
-
-  //   let mut edge_data: Vec<f64> = Vec::new();
-  //   for edge in ray_edge {
-  //     for i in edge {
-  //       edge_data.push(i as f64);
-  //     }
-  //   }
-  //   data.insert("ray_edge", edge_data);
-
-  //   serde_json::to_string(&data).unwrap()
-  // }
-
-  // #[wasm_bindgen]
-  // pub fn get_buffer_flush(&self) -> String {
-  //   serde_json::to_string(&self.buffer).unwrap()
-  // }
-
-  // #[wasm_bindgen]
-  // pub fn clear_buffer(&mut self) {
-  //   self.buffer.clear();
-  // }
-
-  // #[wasm_bindgen]
-  // pub fn clear_vertices(&mut self) {
-  //   self.buffer.clear();
-  //   self.geometry.reset_geometry();
-  // }
-
-  // #[wasm_bindgen]
-  // pub fn reset_polygon(&mut self) {
-  //   // Reset the geometry
-  // }
 
   // pub fn extrude_by_height_with_holes(&mut self, height: f64) -> String {
   //   // Create a new buffer geometry
@@ -957,83 +488,5 @@ impl OGPolygon {
   //   // }
 
   //   // serde_json::to_string(&outline_data).unwrap()
-  // }
-
-  // #[wasm_bindgen]
-  // pub fn get_outlines(&self) -> String {
-  //   let height = self.extruded_height;
-  //   if height == 0.0 {
-  //     return "Please extrude the polygon first".to_string();
-  //   }
-
-  //   let mut outline_data: Vec<Vec<Vector3>> = Vec::new();
-  //   let extruded_raw = extrude_polygon_by_buffer_geometry(self.geometry.clone(), height);
-  //   let faces = extruded_raw.faces;
-  //   let vertices = extruded_raw.vertices;
-
-  //   for face in faces {
-  //     let mut face_vertices: Vec<Vector3> = Vec::new();
-  //     for index in face {
-  //       let v_face = vertices[index as usize].clone();
-  //       face_vertices.push(v_face);
-  //     }
-  //     outline_data.push(face_vertices);
-  //   }
-  //   serde_json::to_string(&outline_data).unwrap()
-  // }
-
-  // #[wasm_bindgen]
-  // pub fn get_geometry(&self) -> String {
-  //   let geometry = self.geometry.get_geometry();
-  //   geometry
-  // }
-
-  // #[wasm_bindgen]
-  // pub fn get_brep_data(&self) -> String {
-  //   let geometry = self.brep.get_geometry();
-  //   geometry
-  // }
-
-  // // pub fn get_brep(&self) -> Vec<Vec<u8>> {
-  // //   let faces = self.brep.get_faces();
-  // //   faces
-  // // }
-
-  // #[wasm_bindgen]
-  // pub fn outline_edges(&mut self) -> String {
-  //   let mut outline_points: Vec<f64> = Vec::new();
-
-  //   for edge in self.brep.edges.clone() {
-  //     let start_index = edge[0] as usize;
-  //     let end_index = edge[1] as usize;
-
-  //     let start_point = self.brep.vertices[start_index].clone();
-  //     let end_point = self.brep.vertices[end_index].clone();
-
-  //     outline_points.push(start_point.x);
-  //     outline_points.push(start_point.y);
-  //     outline_points.push(start_point.z);
-
-  //     outline_points.push(end_point.x);
-  //     outline_points.push(end_point.y);
-  //     outline_points.push(end_point.z);
-  //   }
-
-  //   let outline_data_string = serde_json::to_string(&outline_points).unwrap();
-  //   outline_data_string
-  // }
-
-  // // Test Binary Tree
-  // #[wasm_bindgen]
-  // pub fn binary_tree(&self) -> String {
-  //   let mut b_tree = operations::binary_tree::Binary2DTree::new();
-  //   b_tree.add_polygon(self.clone());
-
-  //   b_tree.build_tree();
-
-  //   let mid = b_tree.get_middle_index(&self);
-    
-  //   let mid_string = serde_json::to_string(&mid).unwrap();
-  //   mid_string
   // }
 }

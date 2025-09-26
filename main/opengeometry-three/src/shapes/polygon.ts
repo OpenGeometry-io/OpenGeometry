@@ -264,19 +264,18 @@ export class Polygon extends THREE.Mesh {
   //   }
   // }
 
-  // addHole(holeVertices: Vector3[]) {
-  //   if (!this.polygon) return;
-  //   this.polygon.add_holes(holeVertices);
-  //   const triResult = JSON.parse(this.polygon.triangulate_with_holes());
-  //   console.log(triResult);
-  //   const newBufferFlush = triResult.new_buffer;
-  //   const geometry = new THREE.BufferGeometry();
-  //   geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(newBufferFlush), 3));
-  //   this.geometry = geometry;
+  addHole(holeVertices: Vector3[]) {
+    if (!this.polygon) return;
+    this.polygon.add_holes(holeVertices);
+    
+    this.disposeGeometryMaterial();
+    this.generateGeometry();
 
-  //   // const bufFlush = this.polygon.get_buffer_flush();
-  //   // this.addFlushBufferToScene(bufFlush);
-  // }
+    // We end up calling the outline method again with creation of geometry
+    if (this.outline) {
+      this.outline = true;
+    }
+  }
 
   // extrude(height: number) {
   //   if (!this.polygon) return;
@@ -324,7 +323,14 @@ export class Polygon extends THREE.Mesh {
     return 0x000000; // Default color if outline mesh is not present
   }
 
+  // TODO: Do we need a separate method for Hole Outlines?
   set outline(enable: boolean) {
+    if (this.#outlineMesh) {
+      this.remove(this.#outlineMesh);
+      this.#outlineMesh.geometry.dispose();
+      this.#outlineMesh = null;
+    }
+
     if (enable && !this.#outlineMesh) {
       const outline_buff = this.polygon.get_outline_geometry_serialized();
       const outline_buf = JSON.parse(outline_buff);
