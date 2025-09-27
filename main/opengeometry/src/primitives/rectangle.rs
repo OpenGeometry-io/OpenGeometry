@@ -6,7 +6,7 @@
  * It can be used to create rectangular shapes in 3D space.
  * Created with a center, width, and breadth.
  */
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
 use crate::brep::{Edge, Face, Brep, Vertex};
@@ -14,7 +14,7 @@ use crate::utility::bgeometry::BufferGeometry;
 use openmaths::Vector3;
 use uuid::Uuid;
 
-#[wasm_bindgen]
+#[cfg_attr(feature="wasm", wasm_bindgen)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGRectangle {
   id: String,
@@ -25,19 +25,15 @@ pub struct OGRectangle {
   brep: Brep,
 }
 
-#[wasm_bindgen]
 impl OGRectangle {
-  #[wasm_bindgen(setter)]
   pub fn set_id(&mut self, id: String) {
     self.id = id;
   }
 
-  #[wasm_bindgen(getter)]
   pub fn id(&self) -> String {
     self.id.clone()
   }
 
-  #[wasm_bindgen(constructor)]
   pub fn new(id: String) -> OGRectangle {
 
     let internal_id = Uuid::new_v4();
@@ -64,14 +60,12 @@ impl OGRectangle {
   //   }
   // }
 
-  #[wasm_bindgen]
   pub fn set_config(&mut self, center: Vector3, width: f64, breadth: f64) {
     self.center = center;
     self.width = width;
     self.breadth = breadth;
   }
 
-  #[wasm_bindgen]
   pub fn generate_geometry(&mut self) {
     let half_width = self.width / 2.0;
     let half_breadth = self.breadth / 2.0;
@@ -88,13 +82,11 @@ impl OGRectangle {
     self.brep.vertices.push(Vertex::new(3, p4));
   }
 
-  #[wasm_bindgen]
   pub fn get_brep_serialized(&self) -> String {
     let serialized = serde_json::to_string(&self.brep).unwrap();
     serialized
   }
 
-  #[wasm_bindgen]
   pub fn get_geometry_serialized(&self) -> String {
     let mut vertex_buffer: Vec<f64> = Vec::new();
 
@@ -132,4 +124,32 @@ impl OGRectangle {
   // pub fn destroy(&mut self) {
   //   self.points.clear();
   // }
+}
+
+// Re-export wasm methods when wasm feature is enabled by wrapping in a shim impl block
+#[cfg(feature="wasm")]
+#[wasm_bindgen]
+impl OGRectangle {
+  #[wasm_bindgen(constructor)]
+  pub fn wasm_new(id: String) -> OGRectangle { OGRectangle::new(id) }
+  pub fn wasm_set_config(&mut self, center: Vector3, width: f64, breadth: f64) { self.set_config(center, width, breadth); }
+  pub fn wasm_generate_geometry(&mut self) { self.generate_geometry(); }
+  pub fn wasm_get_brep_serialized(&self) -> String { self.get_brep_serialized() }
+  pub fn wasm_get_geometry_serialized(&self) -> String { self.get_geometry_serialized() }
+}
+
+// Mesh conversion
+use crate::geometry::mesh::{ToMesh, MeshBuffers};
+
+impl ToMesh for OGRectangle {
+  fn to_mesh(&self) -> MeshBuffers {
+    // Expect 4 vertices (rectangle plane). Build 2 triangles: (0,1,2) (0,2,3)
+    if self.brep.vertices.len() < 4 { return MeshBuffers::empty(); }
+    let normal = [0.0f32, 1.0f32, 0.0f32];
+    let mut positions = Vec::with_capacity(4);
+    let mut normals = Vec::with_capacity(4);
+    for v in &self.brep.vertices { positions.push([v.position.x as f32, v.position.y as f32, v.position.z as f32]); normals.push(normal); }
+    let indices = vec![0u32,1,2, 0,2,3];
+    MeshBuffers { positions, normals, indices }
+  }
 }

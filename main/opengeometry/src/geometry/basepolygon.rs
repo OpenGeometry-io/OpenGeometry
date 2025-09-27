@@ -9,10 +9,10 @@ use crate::geometry::basegeometry;
 use serde_json::ser;
 
 use openmaths::Vector3;
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
-#[wasm_bindgen]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BasePolygon {
   id: String,
@@ -30,22 +30,18 @@ pub struct BasePolygon {
  * A Polygon created with a `id` will have a BaseGeometry with same `id`. Feels like a good decision as of now.
  */
 
-#[wasm_bindgen]
 impl BasePolygon {
   // Why Getter and Setter - https://github.com/rustwasm/wasm-bindgen/issues/1775
-  #[wasm_bindgen(setter)]
   pub fn set_id(&mut self, id: String) {
     self.id = id;
   }
 
-  #[wasm_bindgen(getter)]
   pub fn id(&self) -> String {
     self.id.clone()
   }
 
   // Add the ability to create polygon with list of verticies passed in constructor itself
   // as of now use add_vertices method to push all vertices at once
-  #[wasm_bindgen(constructor)]
   pub fn new(id: String) -> BasePolygon {
     BasePolygon {
       id: id.clone(),
@@ -82,12 +78,12 @@ impl BasePolygon {
   //   polygon
   // }
 
-  #[wasm_bindgen]
+
   pub fn add_vertices(&mut self, vertices: Vec<Vector3>) {
     self.geometry.add_vertices(vertices);
   }
   
-  #[wasm_bindgen]
+
   pub fn add_vertex(&mut self, vertex: Vector3) {
     self.geometry.add_vertex(vertex);
     
@@ -97,12 +93,12 @@ impl BasePolygon {
     }
   }
 
-  #[wasm_bindgen]
+
   pub fn add_holes(&mut self, holes: Vec<Vector3>) {
     self.geometry.add_holes(holes);
   }
 
-  #[wasm_bindgen]
+
   pub fn triangulate(&mut self) -> String {
     self.is_polygon = true;
     
@@ -279,22 +275,22 @@ impl BasePolygon {
     serde_json::to_string(&data).unwrap()
   }
 
-  #[wasm_bindgen]
+
   pub fn get_buffer_flush(&self) -> String {
     serde_json::to_string(&self.buffer).unwrap()
   }
 
-  #[wasm_bindgen]
+
   pub fn clear_vertices(&mut self) {
     self.geometry.reset_geometry();
   }
 
-  #[wasm_bindgen]
+
   pub fn reset_polygon(&mut self) {
     // Reset the geometry
   }
 
-  #[wasm_bindgen]
+
   pub fn extrude_by_height(&mut self, height: f64) -> String {
     self.extruded = true;
     self.extruded_height = height;
@@ -356,7 +352,7 @@ impl BasePolygon {
     // serde_json::to_string(&outline_data).unwrap()
   }
 
-  #[wasm_bindgen]
+
   pub fn get_outlines(&self) -> String {
     let height = self.extruded_height;
     if height == 0.0 {
@@ -379,9 +375,77 @@ impl BasePolygon {
     serde_json::to_string(&outline_data).unwrap()
   }
 
-  #[wasm_bindgen]
+
   pub fn get_geometry(&self) -> String {
     let geometry = self.geometry.get_geometry();
     geometry
+  }
+
+  pub fn generate_geometry(&mut self) {
+    // Add basic geometry generation logic here
+  }
+
+  pub fn generate_extruded_geometry(&mut self) {
+    // Add extruded geometry generation logic here
+  }
+}
+
+// WASM-specific implementation
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl BasePolygon {
+  #[wasm_bindgen(constructor)]
+  pub fn new_wasm(id: String) -> BasePolygon {
+    BasePolygon::new(id)
+  }
+
+  #[wasm_bindgen(setter)]
+  pub fn set_id_wasm(&mut self, id: String) {
+    self.id = id;
+  }
+
+  #[wasm_bindgen(getter)]
+  pub fn id_wasm(&self) -> String {
+    self.id.clone()
+  }
+
+  #[wasm_bindgen]
+  pub fn add_vertices_wasm(&mut self, vertices: Vec<Vector3>) {
+    self.geometry.add_vertices(vertices);
+  }
+
+  #[wasm_bindgen]
+  pub fn set_extrude_height_wasm(&mut self, height: f64) {
+    self.extruded_height = height;
+  }
+
+  #[wasm_bindgen]
+  pub fn get_extrude_height_wasm(&self) -> f64 {
+    self.extruded_height
+  }
+
+  #[wasm_bindgen]
+  pub fn set_extrude_wasm(&mut self, extrude: bool) {
+    self.extruded = extrude;
+  }
+
+  #[wasm_bindgen]
+  pub fn generate_geometry_wasm(&mut self) {
+    self.generate_geometry();
+  }
+
+  #[wasm_bindgen]
+  pub fn generate_extruded_geometry_wasm(&mut self) {
+    self.generate_extruded_geometry();
+  }
+
+  #[wasm_bindgen]
+  pub fn set_polygon_wasm(&mut self, is_polygon: bool) {
+    self.is_polygon = is_polygon;
+  }
+
+  #[wasm_bindgen]
+  pub fn get_geometry_wasm(&self) -> String {
+    self.geometry.get_geometry()
   }
 }

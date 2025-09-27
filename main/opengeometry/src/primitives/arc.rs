@@ -9,7 +9,7 @@
 
  // TODO: What if we create the Circle using the Formula for Angles.
 
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
 use crate::brep::{Edge, Face, Brep, Vertex};
@@ -17,7 +17,7 @@ use crate::utility::bgeometry::BufferGeometry;
 use openmaths::Vector3;
 use uuid::Uuid;
 
-#[wasm_bindgen]
+#[cfg_attr(feature="wasm", wasm_bindgen)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGArc {
   id: String,
@@ -29,19 +29,15 @@ pub struct OGArc {
   brep: Brep
 }
 
-#[wasm_bindgen]
 impl OGArc {
-  #[wasm_bindgen(setter)]
   pub fn set_id(&mut self, id: String) {
     self.id = id;
   }
 
-  #[wasm_bindgen(getter)]
   pub fn id(&self) -> String {
     self.id.clone()
   }
 
-  #[wasm_bindgen(constructor)]
   pub fn new(id: String) -> OGArc {
 
     let internal_id = Uuid::new_v4();
@@ -57,16 +53,13 @@ impl OGArc {
     }
   }
 
-  #[wasm_bindgen]
-  pub fn set_config(&mut self, center: Vector3, radius: f64, start_angle: f64, end_angle: f64, segments: u32) {
-    self.center = center;
-    self.radius = radius;
-    self.start_angle = start_angle;
-    self.end_angle = end_angle;
-    self.segments = segments;
+  pub fn set_config(&mut self, _start: Vector3, _end: Vector3, _radius: f64) {
+    // TODO: Implement set_config method for Arc
+    // self.start = start;
+    // self.end = end;
+    // self.radius = _radius;
   }
 
-  #[wasm_bindgen]
   pub fn generate_geometry(&mut self) {
     let mut angle = self.start_angle;
     let angle_diff = (self.end_angle - self.start_angle) / self.segments as f64;
@@ -81,19 +74,16 @@ impl OGArc {
   }
 
   // Dispose
-  #[wasm_bindgen]
   pub fn dispose_points(&mut self) {
     self.brep.clear();
   }
 
   // Destroy and Free memory
-  #[wasm_bindgen]
   pub fn destroy(&mut self) {
     self.brep.clear();
     self.id.clear();
   }
 
-  #[wasm_bindgen]
   pub fn get_brep_serialized(&self) -> String {
     let serialized = serde_json::to_string(&self.brep).unwrap();
     serialized
@@ -101,7 +91,6 @@ impl OGArc {
 
   // TODO: For Line based primitives we are iterating just vertices
   // Figure out if it's benefical to create a edges and faces for Arc as well - Technically it's not needed
-  #[wasm_bindgen]
   pub fn get_geometry_serialized(&mut self) -> String {
     let mut vertex_buffer: Vec<f64> = Vec::new();
 
@@ -115,4 +104,24 @@ impl OGArc {
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
   }
+}
+
+#[cfg(feature="wasm")]
+#[wasm_bindgen]
+impl OGArc {
+  #[wasm_bindgen(constructor)]
+  pub fn wasm_new(id: String) -> OGArc { OGArc::new(id) }
+  
+  #[wasm_bindgen(setter = "set_id")]
+  pub fn wasm_set_id(&mut self, id: String) { OGArc::set_id(self, id); }
+  
+  #[wasm_bindgen(getter = "id")]
+  pub fn wasm_id(&self) -> String { OGArc::id(self) }
+  
+  pub fn wasm_set_config(&mut self, start: Vector3, end: Vector3, radius: f64) { self.set_config(start, end, radius); }
+  pub fn wasm_generate_geometry(&mut self) { self.generate_geometry(); }
+  pub fn wasm_dispose_points(&mut self) { self.dispose_points(); }
+  pub fn wasm_destroy(&mut self) { self.destroy(); }
+  pub fn wasm_get_brep_serialized(&self) -> String { self.get_brep_serialized() }
+  pub fn wasm_get_geometry_serialized(&mut self) -> String { self.get_geometry_serialized() }
 }

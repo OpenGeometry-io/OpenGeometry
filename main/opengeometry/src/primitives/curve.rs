@@ -12,7 +12,7 @@
 
 use crate::brep::{Edge, Face, Brep, Vertex};
 use crate::utility::bgeometry::BufferGeometry;
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use openmaths::Vector3;
 use uuid::Uuid; 

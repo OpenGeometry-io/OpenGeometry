@@ -1,5 +1,5 @@
 use core::str;
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
 use crate::brep::{Edge, Face, Brep, Vertex};
@@ -22,7 +22,7 @@ use uuid::Uuid;
  * This class is used to create a box primitive(2) using width, height, and depth.
  */
 
-#[wasm_bindgen]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGCube {
   id: String,
@@ -33,19 +33,19 @@ pub struct OGCube {
   brep: Brep,
 }
 
-#[wasm_bindgen]
+
 impl OGCube {
-  #[wasm_bindgen(setter)]
+  
   pub fn set_id(&mut self, id: String) {
     self.id = id;
   }
 
-  #[wasm_bindgen(getter)]
+  
   pub fn id(&self) -> String {
     self.id.clone()
   }
 
-  #[wasm_bindgen(constructor)]
+  
   pub fn new(id: String) -> OGCube {
 
     let internal_id = Uuid::new_v4();
@@ -64,7 +64,7 @@ impl OGCube {
     self.brep.clear();
   }
 
-  #[wasm_bindgen]
+  
   pub fn set_config(&mut self, center: Vector3, width: f64, height: f64, depth: f64) {
     self.center = center;
     self.width = width;
@@ -72,7 +72,7 @@ impl OGCube {
     self.depth = depth;
   }
 
-  #[wasm_bindgen]
+  
   pub fn generate_geometry(&mut self) {
     let half_width = self.width / 2.0;
     let half_height = self.height / 2.0;
@@ -99,12 +99,12 @@ impl OGCube {
     self.brep = extruded_brep.clone();
   }
 
-  #[wasm_bindgen]
+  
   pub fn get_brep_dump(&self) -> String {
     serde_json::to_string(&self.brep).unwrap()
   }
 
-  #[wasm_bindgen]
+  
   pub fn get_geometry_serialized(&self) -> String {
     let mut vertex_buffer: Vec<f64> = Vec::new();
     let faces = self.brep.faces.clone();
@@ -128,7 +128,7 @@ impl OGCube {
     vertex_serialized
   }
 
-    #[wasm_bindgen]
+    
   pub fn get_outline_geometry_serialized(&mut self) -> String {
     let mut vertex_buffer: Vec<f64> = Vec::new();
 
@@ -151,5 +151,40 @@ impl OGCube {
 
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
+  }
+}
+
+// WASM-specific implementation
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl OGCube {
+  #[wasm_bindgen(constructor)]
+  pub fn new_wasm(id: String) -> OGCube {
+    OGCube::new(id)
+  }
+
+  #[wasm_bindgen(setter)]
+  pub fn set_id_wasm(&mut self, id: String) {
+    self.id = id;
+  }
+
+  #[wasm_bindgen(getter)]
+  pub fn id_wasm(&self) -> String {
+    self.id.clone()
+  }
+
+  #[wasm_bindgen]
+  pub fn set_config_wasm(&mut self, center: Vector3, width: f64, height: f64, depth: f64) {
+    self.set_config(center, width, height, depth);
+  }
+
+  #[wasm_bindgen]
+  pub fn generate_geometry_wasm(&mut self) {
+    self.generate_geometry();
+  }
+
+  #[wasm_bindgen]
+  pub fn get_geometry_serialized_wasm(&self) -> String {
+    self.get_geometry_serialized()
   }
 }

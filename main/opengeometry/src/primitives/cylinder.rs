@@ -20,10 +20,10 @@ use openmaths::Vector3;
  * This class is used to create a cylinder primitive(2) using radius and height.
  *  */
 use crate::geometry::basegeometry;
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
-#[wasm_bindgen]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGCylinderOld {
   id: String,
@@ -37,19 +37,19 @@ pub struct OGCylinderOld {
   brep: Geometry,
 }
 
-#[wasm_bindgen]
+
 impl OGCylinderOld {
-  #[wasm_bindgen(setter)]
+  
   pub fn set_id(&mut self, id: String) {
     self.id = id;
   }
 
-  #[wasm_bindgen(getter)]
+  
   pub fn id(&self) -> String {
     self.id.clone()
   }
 
-  #[wasm_bindgen(constructor)]
+  
   pub fn new(id: String) -> OGCylinderOld {
     OGCylinderOld {
       id: id.clone(),
@@ -64,7 +64,7 @@ impl OGCylinderOld {
     }
   }
 
-  #[wasm_bindgen]
+  
   pub fn set_config(&mut self, center: Vector3, radius: f64, height: f64, angle: f64, segments: u32) {
     self.center = center;
     self.radius = radius;
@@ -73,7 +73,7 @@ impl OGCylinderOld {
     self.segments = segments;
   }
 
-  #[wasm_bindgen]
+  
   pub fn generate_geometry(&mut self) {
     let mut points: Vec<Vector3> = Vec::new();
     let mut normals: Vec<Vector3> = Vec::new();
@@ -129,7 +129,7 @@ impl OGCylinderOld {
     extrude_data
   }
 
-  #[wasm_bindgen]
+  
   pub fn get_geometry(&mut self) -> String {
     let geometry = self.geometry.get_geometry();
     // geometry
@@ -167,12 +167,12 @@ impl OGCylinderOld {
     string_data
   }
   
-  #[wasm_bindgen]
+  
   pub fn discard_geometry(&mut self) {
     // self.geometry.discard_geometry();
   }
 
-  #[wasm_bindgen]
+  
   pub fn outline_edges(&mut self) -> String {
     let mut outline_points: Vec<f64> = Vec::new();
 
@@ -196,9 +196,53 @@ impl OGCylinderOld {
     outline_data_string
   }
 
-  #[wasm_bindgen]
+  
   pub fn get_brep_dump(&mut self) -> String {
     let brep_data_string = serde_json::to_string(&self.brep).unwrap();
     brep_data_string
+  }
+
+  pub fn get_geometry_serialized(&self) -> String {
+    // Basic implementation for now
+    "[]".to_string()
+  }
+
+  pub fn get_brep(&mut self) -> String {
+    self.get_brep_dump()
+  }
+}
+
+// WASM-specific implementation
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl OGCylinderOld {
+  #[wasm_bindgen(constructor)]
+  pub fn new_wasm(id: String) -> OGCylinderOld {
+    OGCylinderOld::new(id)
+  }
+
+  #[wasm_bindgen]
+  pub fn set_config_wasm(&mut self, center: Vector3, radius: f64, height: f64, angle: f64, segments: u32) {
+    self.set_config(center, radius, height, angle, segments);
+  }
+
+  #[wasm_bindgen]
+  pub fn generate_geometry_wasm(&mut self) {
+    self.generate_geometry();
+  }
+
+  #[wasm_bindgen]
+  pub fn get_geometry_serialized_wasm(&self) -> String {
+    self.get_geometry_serialized()
+  }
+
+  #[wasm_bindgen]
+  pub fn get_brep_wasm(&mut self) -> String {
+    self.get_brep()
+  }
+
+  #[wasm_bindgen]
+  pub fn get_brep_dump_wasm(&mut self) -> String {
+    self.get_brep_dump()
   }
 }

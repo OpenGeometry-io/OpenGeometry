@@ -7,7 +7,7 @@
  * Holes should be in CW order
  */
 
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
 use crate::brep::{Brep, Edge, Face, Vertex};
@@ -16,7 +16,7 @@ use crate::utility::bgeometry::BufferGeometry;
 use openmaths::{Matrix4, Vector3};
 use uuid::Uuid;
 
-#[wasm_bindgen]
+#[cfg_attr(feature="wasm", wasm_bindgen)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGPolygon {
   id: String,
@@ -43,22 +43,18 @@ pub struct OGPolygon {
 //   }
 // }
 
-#[wasm_bindgen]
 impl OGPolygon {
   // Why Getter and Setter - https://github.com/rustwasm/wasm-bindgen/issues/1775
-  #[wasm_bindgen(setter)]
   pub fn set_id(&mut self, id: String) {
     self.id = id;
   }
 
-  #[wasm_bindgen(getter)]
   pub fn id(&self) -> String {
     self.id.clone()
   }
 
   // Add the ability to create polygon with list of verticies passed in constructor itself
   // as of now use add_vertices method to push all vertices at once
-  #[wasm_bindgen(constructor)]
   pub fn new(id: String) -> OGPolygon {
 
     let internal_id = Uuid::new_v4();
@@ -71,17 +67,15 @@ impl OGPolygon {
     }
   }
 
-  #[wasm_bindgen]
   pub fn set_config(&mut self, points: Vec<Vector3>) {
     self.points = points;
 
     self.generate_brep();
   }
 
-  #[wasm_bindgen]
-  #[wasm_bindgen]
   pub fn set_transformation(&mut self, transformation: Vec<f64>) {
     if transformation.len() != 16 {
+      #[cfg(feature="wasm")]
       web_sys::console::log_1(&"Transformation matrix must have 16 elements.".into());
       return;
     }
@@ -148,7 +142,6 @@ impl OGPolygon {
   // }
 
   // Add Set of new Vertices to the polygon
-  #[wasm_bindgen]
   pub fn add_vertices(&mut self, vertices: Vec<Vector3>) {
     self.points.clear();
     self.brep.clear();
@@ -166,7 +159,6 @@ impl OGPolygon {
   //   }
   // }
 
-  #[wasm_bindgen]
   pub fn add_holes(&mut self, holes: Vec<Vector3>) {
     let current_index = self.brep.get_vertex_count();
     self.brep.holes.push(current_index);
@@ -192,15 +184,14 @@ impl OGPolygon {
     }
   }
 
-  #[wasm_bindgen]
   pub fn clean_geometry(&mut self) {
     self.brep.clear();
     self.geometry.clear();
   }
 
-  #[wasm_bindgen]
   pub fn generate_brep(&mut self) {
     if self.points.len() < 3 {
+      #[cfg(feature="wasm")]
       web_sys::console::log_1(&"Polygon must have at least 3 points to generate geometry.".into());
       return;
     }
@@ -233,21 +224,19 @@ impl OGPolygon {
     }
   }
 
-  #[wasm_bindgen]
   pub fn generate_geometry(&mut self) {
     if self.points.len() < 3 {
+      #[cfg(feature="wasm")]
       web_sys::console::log_1(&"Polygon must have at least 3 points to generate geometry.".into());
       return;
     }
   }
 
-  #[wasm_bindgen]
   pub fn get_brep_serialized(&self) -> String {
     let serialized = serde_json::to_string(&self.brep).unwrap();
     serialized
   }
 
-  #[wasm_bindgen]
   pub fn get_geometry_serialized(&mut self) -> String {
     let mut vertex_buffer: Vec<f64> = Vec::new();
     let faces = self.brep.faces.clone();
@@ -282,7 +271,6 @@ impl OGPolygon {
     serde_json::to_string(&vertex_buffer).unwrap()
   }
 
-  #[wasm_bindgen]
   pub fn get_outline_geometry_serialized(&mut self) -> String {
     let mut vertex_buffer: Vec<f64> = Vec::new();
 
@@ -324,6 +312,30 @@ impl OGPolygon {
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
   }
+}
+
+#[cfg(feature="wasm")]
+#[wasm_bindgen]
+impl OGPolygon {
+  #[wasm_bindgen(constructor)]
+  pub fn wasm_new(id: String) -> OGPolygon { OGPolygon::new(id) }
+  
+  #[wasm_bindgen(setter = "set_id")]
+  pub fn wasm_set_id(&mut self, id: String) { OGPolygon::set_id(self, id); }
+  
+  #[wasm_bindgen(getter = "id")]
+  pub fn wasm_id(&self) -> String { OGPolygon::id(self) }
+  
+  pub fn wasm_set_config(&mut self, points: Vec<Vector3>) { self.set_config(points); }
+  pub fn wasm_set_transformation(&mut self, transformation: Vec<f64>) { self.set_transformation(transformation); }
+  pub fn wasm_add_vertices(&mut self, vertices: Vec<Vector3>) { self.add_vertices(vertices); }
+  pub fn wasm_add_holes(&mut self, holes: Vec<Vector3>) { self.add_holes(holes); }
+  pub fn wasm_clean_geometry(&mut self) { self.clean_geometry(); }
+  pub fn wasm_generate_brep(&mut self) { self.generate_brep(); }
+  pub fn wasm_generate_geometry(&mut self) { self.generate_geometry(); }
+  pub fn wasm_get_brep_serialized(&self) -> String { self.get_brep_serialized() }
+  pub fn wasm_get_geometry_serialized(&mut self) -> String { self.get_geometry_serialized() }
+  pub fn wasm_get_outline_geometry_serialized(&mut self) -> String { self.get_outline_geometry_serialized() }
 
   // pub fn extrude_by_height_with_holes(&mut self, height: f64) -> String {
   //   // Create a new buffer geometry

@@ -7,12 +7,12 @@
  */
 
 use crate::brep::{Edge, Face, Brep, Vertex};
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use openmaths::Vector3;
 use uuid::Uuid;
 
-#[wasm_bindgen]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGPolyline {
   id: String,
@@ -29,23 +29,24 @@ impl Drop for OGPolyline {
     self.is_closed = false;
     self.brep.clear();
     self.id.clear();
+    #[cfg(feature="wasm")]
     web_sys::console::log_1(&"Clearing Polyline...".into());
   }
 }
  
-#[wasm_bindgen]
+
 impl OGPolyline {
-  #[wasm_bindgen(setter)]
+  
   pub fn set_id(&mut self, id: String) {
     self.id = id;
   }
  
-  #[wasm_bindgen(getter)]
+  
   pub fn id(&self) -> String {
     self.id.clone()
   }
  
-  #[wasm_bindgen(constructor)]
+  
   pub fn new(id: String) -> OGPolyline {
     OGPolyline {
       id,
@@ -55,7 +56,7 @@ impl OGPolyline {
     }
   }
   
-  #[wasm_bindgen]
+  
   pub fn clone(&self) -> OGPolyline {
     OGPolyline {
       id: self.id.clone(),
@@ -65,7 +66,7 @@ impl OGPolyline {
     }
   }
 
-  // #[wasm_bindgen]
+  // 
   // pub fn translate(&mut self, translation: Vector3) {
 
   //   self.points.clear();
@@ -84,7 +85,7 @@ impl OGPolyline {
   //   self.generate_brep();
   // }
 
-  // #[wasm_bindgen]
+  // 
   // pub fn set_position(&mut self, position: Vector3) {
   //   self.position = position;
   // }
@@ -101,12 +102,12 @@ impl OGPolyline {
     self.check_closed_test();
   }
   
-  #[wasm_bindgen]
+  
   pub fn generate_geometry(&mut self) {
 
   }
 
-  #[wasm_bindgen]
+  
   pub fn add_multiple_points(&mut self, points: Vec<Vector3>) {
     self.points.clear();
     self.brep.clear();
@@ -119,7 +120,7 @@ impl OGPolyline {
     self.check_closed_test();
   }
 
-  #[wasm_bindgen]
+  
   pub fn add_point(&mut self, point: Vector3) {
     self.points.push(point);
     self.brep.vertices.push(Vertex::new(self.brep.get_vertex_count() as u32, point));
@@ -127,7 +128,7 @@ impl OGPolyline {
   }
   
   // Get Points for the Circle
-  #[wasm_bindgen]
+  
   pub fn get_points(&self) -> String {
     serde_json::to_string(&self.points).unwrap()
   }
@@ -136,7 +137,7 @@ impl OGPolyline {
     self.points.clone()
   }
 
-  #[wasm_bindgen]
+  
   pub fn is_closed(&self) -> bool {
     self.is_closed
   }
@@ -153,13 +154,13 @@ impl OGPolyline {
     }
   }
 
-  #[wasm_bindgen]
+  
   pub fn get_brep_serialized(&self) -> String {
     let serialized = serde_json::to_string(&self.brep).unwrap();
     serialized
   }
 
-  #[wasm_bindgen]
+  
   pub fn get_geometry_serialized(&self) -> String {
     let mut vertex_buffer: Vec<f64> = Vec::new();
 
@@ -176,7 +177,7 @@ impl OGPolyline {
 
   // // Paper - https://seant23.wordpress.com/wp-content/uploads/2010/11/anoffsetalgorithm.pdf
   // // Paper has coverage for curves as well, but we will only implement for polylines
-  // #[wasm_bindgen]
+  // 
   // pub fn get_offset(&self, distance: f64) -> String {
   //   let n = self.points.len();
   //   if n < 2 {
@@ -262,4 +263,55 @@ impl OGPolyline {
   //     z: point_a.z + t * dz1,
   //   })
   // }
+}
+
+// WASM-specific implementation  
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl OGPolyline {
+  #[wasm_bindgen(constructor)]
+  pub fn new_wasm(id: String) -> OGPolyline {
+    OGPolyline::new(id)
+  }
+
+  #[wasm_bindgen(setter)]
+  pub fn set_id_wasm(&mut self, id: String) {
+    self.id = id;
+  }
+
+  #[wasm_bindgen(getter)]
+  pub fn id_wasm(&self) -> String {
+    self.id.clone()
+  }
+
+  #[wasm_bindgen]
+  pub fn set_config_wasm(&mut self, points: Vec<Vector3>) {
+    self.points = points;
+    self.brep.clear();
+  }
+
+  #[wasm_bindgen]
+  pub fn add_point_wasm(&mut self, point: Vector3) {
+    self.points.push(point);
+  }
+
+  #[wasm_bindgen]
+  pub fn set_closed_wasm(&mut self, is_closed: bool) {
+    self.is_closed = is_closed;
+  }
+
+  #[wasm_bindgen]
+  pub fn is_closed_wasm(&self) -> bool {
+    self.is_closed
+  }
+
+  #[wasm_bindgen]
+  pub fn generate_geometry_wasm(&mut self) {
+    self.generate_geometry();
+  }
+
+  #[wasm_bindgen]
+  pub fn get_geometry_serialized_wasm(&self) -> String {
+    self.get_geometry_serialized()
+  }
 }

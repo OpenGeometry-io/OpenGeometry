@@ -5,12 +5,12 @@
  */
 
 use crate::operations::triangulate::triangulate_polygon_buffer_geometry;
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use super::basegeometry;
 use openmaths::Vector3;
 
-#[wasm_bindgen]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BaseFlatMesh {
   id: String,
@@ -23,20 +23,20 @@ pub struct BaseFlatMesh {
   buffer: Vec<f64>
 }
 
-#[wasm_bindgen]
+
 impl BaseFlatMesh {
   // Why Getter and Setter - https://github.com/rustwasm/wasm-bindgen/issues/1775
-  #[wasm_bindgen(setter)]
+  
   pub fn set_id(&mut self, id: String) {
     self.id = id;
   }
 
-  #[wasm_bindgen(getter)]
+  
   pub fn id(&self) -> String {
     self.id.clone()
   }
 
-  #[wasm_bindgen(constructor)]
+  
   pub fn new(id: String) -> BaseFlatMesh {
     let geometry_id = id.clone();
     BaseFlatMesh {
@@ -51,12 +51,12 @@ impl BaseFlatMesh {
     }
   }
 
-  #[wasm_bindgen]
+
   pub fn add_vertices(&mut self, vertices: Vec<Vector3>) {
     self.geometry.add_vertices(vertices);
   }
 
-  #[wasm_bindgen]
+
   pub fn add_vertex(&mut self, vertex: Vector3) {
     self.geometry.add_vertex(vertex);
     
@@ -65,7 +65,7 @@ impl BaseFlatMesh {
     }
   }
 
-  #[wasm_bindgen]
+
   pub fn triangulate(&mut self) -> String {
     self.is_mesh = true;
 
@@ -88,16 +88,66 @@ impl BaseFlatMesh {
     serde_json::to_string(&merged_vertices).unwrap()
   }
 
-  #[wasm_bindgen]
+
   pub fn get_buffer_flush(&self) -> String {
     serde_json::to_string(&self.buffer).unwrap()
   }
 
-  #[wasm_bindgen]
+
   pub fn reset_mesh(&mut self) {
     self.is_mesh = false;
     self.geometry.reset_geometry();
     self.buffer.clear();
   }
- 
+
+  pub fn generate_geometry(&mut self) {
+    // Add basic geometry generation logic here
+  }
+}
+
+// WASM-specific implementation
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl BaseFlatMesh {
+  #[wasm_bindgen(constructor)]
+  pub fn new_wasm(id: String) -> BaseFlatMesh {
+    BaseFlatMesh::new(id)
+  }
+
+  #[wasm_bindgen(setter)]
+  pub fn set_id_wasm(&mut self, id: String) {
+    self.id = id;
+  }
+
+  #[wasm_bindgen(getter)]
+  pub fn id_wasm(&self) -> String {
+    self.id.clone()
+  }
+
+  #[wasm_bindgen]
+  pub fn add_vertices_wasm(&mut self, vertices: Vec<Vector3>) {
+    self.geometry.add_vertices(vertices);
+  }
+
+  #[wasm_bindgen]
+  pub fn set_mesh_wasm(&mut self, is_mesh: bool) {
+    self.is_mesh = is_mesh;
+  }
+
+  #[wasm_bindgen]
+  pub fn generate_geometry_wasm(&mut self) {
+    self.generate_geometry();
+  }
+
+  #[wasm_bindgen]
+  pub fn get_geometry_wasm(&self) -> String {
+    self.geometry.get_geometry()
+  }
+
+  #[wasm_bindgen]
+  pub fn reset_mesh_wasm(&mut self) {
+    self.is_mesh = false;
+    self.geometry.reset_geometry();
+    self.buffer.clear();
+  }
 }

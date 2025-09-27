@@ -1,7 +1,7 @@
 use core::num;
 use std::{collections::HashMap, hash::Hash, ptr::null};
 
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
 use openmaths::Vector3;
@@ -27,7 +27,7 @@ use openmaths::Vector3;
 // }
 
 
-#[wasm_bindgen]
+#[cfg_attr(feature="wasm", wasm_bindgen)]
 #[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct ColorRGB {
   pub r: u8,
@@ -35,9 +35,7 @@ pub struct ColorRGB {
   pub b: u8,
 }
 
-#[wasm_bindgen]
 impl ColorRGB {
-  #[wasm_bindgen(constructor)]
   pub fn new(r: u8, g: u8, b: u8) -> ColorRGB {
     ColorRGB { r, g, b }
   }
@@ -47,19 +45,16 @@ impl ColorRGB {
   }
 }
 
-#[wasm_bindgen]
+#[cfg_attr(feature="wasm", wasm_bindgen)]
 pub struct Color {
   hex: String
 }
 
-#[wasm_bindgen]
 impl Color {
-  #[wasm_bindgen(constructor)]
   pub fn new(hex: String) -> Color {
     Color { hex }
   }
 
-  #[wasm_bindgen]
   pub fn to_rgba(&self) -> Result<ColorRGB, String> {
     let hex = self.hex.trim_start_matches('#');
     let len = hex.len();
@@ -148,4 +143,19 @@ impl Geometry_Holes {
     let serialized = serde_json::to_string(&self).unwrap();
     serialized
   }
+}
+
+#[cfg(feature="wasm")]
+#[wasm_bindgen]
+impl ColorRGB {
+  #[wasm_bindgen(constructor)]
+  pub fn wasm_new(r: u8, g: u8, b: u8) -> ColorRGB { ColorRGB::new(r, g, b) }
+}
+
+#[cfg(feature="wasm")]
+#[wasm_bindgen]
+impl Color {
+  #[wasm_bindgen(constructor)]
+  pub fn wasm_new(hex: String) -> Color { Color::new(hex) }
+  pub fn wasm_to_rgba(&self) -> Result<ColorRGB, String> { self.to_rgba() }
 }

@@ -5,6 +5,7 @@ pub mod geometry {
   pub mod basegroup;
   pub mod triangle;
   pub mod baseflatmesh;
+  pub mod mesh;
 }
 
 pub mod operations {
@@ -30,6 +31,9 @@ pub mod primitives {
 }
 
 pub mod brep;
+
+#[cfg(feature = "c-api")]
+pub mod c_api;
 
 // v0.3.0
 // mod brep_ds {

@@ -11,7 +11,7 @@
  * This class is used to create a cylinder primitive(2) using radius and height.
  **/
 
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
 use crate::brep::{Brep, Vertex};
@@ -21,7 +21,7 @@ use crate::utility::bgeometry::BufferGeometry;
 use openmaths::Vector3;
 use uuid::Uuid;
 
-#[wasm_bindgen]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGCylinder {
   id: String,
@@ -34,19 +34,19 @@ pub struct OGCylinder {
   brep: Brep,
 }
 
-#[wasm_bindgen]
+
 impl OGCylinder {
-  #[wasm_bindgen(setter)]
+  
   pub fn set_id(&mut self, id: String) {
     self.id = id;
   }
 
-  #[wasm_bindgen(getter)]
+  
   pub fn id(&self) -> String {
     self.id.clone()
   }
 
-  #[wasm_bindgen(constructor)]
+  
   pub fn new(id: String) -> OGCylinder {
 
     let internal_id = Uuid::new_v4();
@@ -64,7 +64,7 @@ impl OGCylinder {
     }
   }
 
-  #[wasm_bindgen]
+  
   pub fn set_config(&mut self, center: Vector3, radius: f64, height: f64, angle: f64, segments: u32) {
     self.center = center;
     self.radius = radius;
@@ -73,7 +73,7 @@ impl OGCylinder {
     self.segments = segments;
   }
 
-  #[wasm_bindgen]
+  
   pub fn generate_geometry(&mut self) {
     let half_height = self.height / 2.0;
     let mut segment_count: u32 = self.segments;
@@ -119,14 +119,14 @@ impl OGCylinder {
 
   }
 
-  #[wasm_bindgen]
+  
   pub fn get_brep_serialized(&self) -> String {
     // Serialize the BREP geometry to JSON
     let serialized = serde_json::to_string(&self.brep).unwrap();
     serialized
   }
 
-  #[wasm_bindgen]
+  
   pub fn get_geometry_serialized(&mut self) -> String {
     let mut vertex_buffer: Vec<f64> = Vec::new();
     let faces = self.brep.faces.clone();
@@ -150,7 +150,7 @@ impl OGCylinder {
     vertex_serialized
   }
 
-  #[wasm_bindgen]
+  
   pub fn get_outline_geometry_serialized(&mut self) -> String {
     let mut vertex_buffer: Vec<f64> = Vec::new();
 
@@ -173,5 +173,40 @@ impl OGCylinder {
 
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
+  }
+}
+
+// WASM-specific implementation
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl OGCylinder {
+  #[wasm_bindgen(constructor)]
+  pub fn new_wasm(id: String) -> OGCylinder {
+    OGCylinder::new(id)
+  }
+
+  #[wasm_bindgen(setter)]
+  pub fn set_id_wasm(&mut self, id: String) {
+    self.id = id;
+  }
+
+  #[wasm_bindgen(getter)]
+  pub fn id_wasm(&self) -> String {
+    self.id.clone()
+  }
+
+  #[wasm_bindgen]
+  pub fn set_config_wasm(&mut self, center: Vector3, radius: f64, height: f64, angle: f64, segments: u32) {
+    self.set_config(center, radius, height, angle, segments);
+  }
+
+  #[wasm_bindgen]
+  pub fn generate_geometry_wasm(&mut self) {
+    self.generate_geometry();
+  }
+
+  #[wasm_bindgen]
+  pub fn get_geometry_serialized_wasm(&mut self) -> String {
+    self.get_geometry_serialized()
   }
 }

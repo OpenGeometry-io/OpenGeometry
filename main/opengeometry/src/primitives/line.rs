@@ -8,12 +8,12 @@
  */
 
 use crate::brep::{Edge, Face, Brep, Vertex};
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use openmaths::Vector3;
 use uuid::Uuid;
 
-#[wasm_bindgen]
+#[cfg_attr(feature="wasm", wasm_bindgen)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGLine {
   id: String,
@@ -22,19 +22,15 @@ pub struct OGLine {
   end: Vector3,
 }
 
-#[wasm_bindgen]
 impl OGLine {
-  #[wasm_bindgen(setter)]
   pub fn set_id(&mut self, id: String) {
     self.id = id;
   }
 
-  #[wasm_bindgen(getter)]
   pub fn id(&self) -> String {
     self.id.clone()
   }
 
-  #[wasm_bindgen(constructor)]
   pub fn new(id: String) -> OGLine {
 
     let internal_id = Uuid::new_v4();
@@ -47,14 +43,12 @@ impl OGLine {
     }
   }
 
-  #[wasm_bindgen]
   pub fn set_config(&mut self, start: Vector3, end: Vector3) {
     self.brep.clear();
     self.start = start;
     self.end = end;
   }
 
-  #[wasm_bindgen]
   pub fn generate_geometry(&mut self) {
     // Create vertices for the start and end points
     let start_vertex = Vertex::new(0, self.start);
@@ -65,26 +59,22 @@ impl OGLine {
   }
 
   // Dispose
-  #[wasm_bindgen]
   pub fn dispose_points(&mut self) {
     self.brep.clear();
   }
 
   // Destroy and Free memory
-  #[wasm_bindgen]
   pub fn destroy(&mut self) {
     self.brep.clear();
     self.id.clear();
   }
 
-  #[wasm_bindgen]
   pub fn get_brep_serialized(&self) -> String {
     // Serialize the BREP geometry
     let serialized = serde_json::to_string(&self.brep).unwrap();
     serialized
   }
 
-  #[wasm_bindgen]
   pub fn get_geometry_serialized(&self) -> String {
     let mut vertex_buffer: Vec<f64> = Vec::new();
 
@@ -98,4 +88,24 @@ impl OGLine {
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
   }
+}
+
+#[cfg(feature="wasm")]
+#[wasm_bindgen]
+impl OGLine {
+  #[wasm_bindgen(constructor)]
+  pub fn wasm_new(id: String) -> OGLine { OGLine::new(id) }
+  
+  #[wasm_bindgen(setter = "set_id")]
+  pub fn wasm_set_id(&mut self, id: String) { OGLine::set_id(self, id); }
+  
+  #[wasm_bindgen(getter = "id")]
+  pub fn wasm_id(&self) -> String { OGLine::id(self) }
+  
+  pub fn wasm_set_config(&mut self, start: Vector3, end: Vector3) { self.set_config(start, end); }
+  pub fn wasm_generate_geometry(&mut self) { self.generate_geometry(); }
+  pub fn wasm_dispose_points(&mut self) { self.dispose_points(); }
+  pub fn wasm_destroy(&mut self) { self.destroy(); }
+  pub fn wasm_get_brep_serialized(&self) -> String { self.get_brep_serialized() }
+  pub fn wasm_get_geometry_serialized(&self) -> String { self.get_geometry_serialized() }
 }

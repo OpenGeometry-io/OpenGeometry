@@ -1,10 +1,10 @@
 use crate::utility::geometry::{self, Geometry};
-use wasm_bindgen::prelude::*;
+#[cfg(feature="wasm")] use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use openmaths::Vector3;
 use super::basegeometry;
 
-#[wasm_bindgen]
+#[cfg_attr(feature="wasm", wasm_bindgen)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BaseMesh {
   id: String,
@@ -18,19 +18,15 @@ pub struct BaseMesh {
   buffer: Vec<f64>
 }
 
-#[wasm_bindgen]
 impl BaseMesh {
-  #[wasm_bindgen(setter)]
   pub fn set_id(&mut self, id: String) {
     self.id = id;
   }
 
-  #[wasm_bindgen(getter)]
   pub fn id(&self) -> String {
     self.id.clone()
   }
 
-  #[wasm_bindgen(constructor)]
   pub fn new(id: String) -> BaseMesh {
     let geometry_id = id.clone();
     BaseMesh {
@@ -77,6 +73,39 @@ impl BaseMesh {
     }
 
     serde_json::to_string(&outline_data).unwrap()
+  }
+
+  pub fn generate_geometry(&mut self) {}
+}
+
+// WASM-specific implementation
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl BaseMesh {
+  #[wasm_bindgen(constructor)]
+  pub fn new_wasm(id: String) -> BaseMesh {
+    BaseMesh::new(id)
+  }
+
+  #[wasm_bindgen(setter)]
+  pub fn set_id_wasm(&mut self, id: String) {
+    self.id = id;
+  }
+
+  #[wasm_bindgen(getter)]
+  pub fn id_wasm(&self) -> String {
+    self.id.clone()
+  }
+
+  #[wasm_bindgen]
+  pub fn generate_geometry_wasm(&mut self) {
+    self.generate_geometry();
+  }
+
+  #[wasm_bindgen]
+  pub fn get_geometry_serialized_wasm(&self) -> String {
+    // Return empty serialized geometry for now
+    "[]".to_string()
   }
 }
 
