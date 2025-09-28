@@ -1,10 +1,6 @@
 pub mod geometry {
   pub mod basegeometry;
-  pub mod basemesh;
-  pub mod basepolygon;
-  pub mod basegroup;
   pub mod triangle;
-  pub mod baseflatmesh;
 }
 
 pub mod operations {
@@ -23,9 +19,9 @@ pub mod primitives {
   pub mod line;
   pub mod polyline;
   pub mod rectangle;
-  pub mod cylinder;
+  pub mod cylinderOld;
   pub mod polygon;
-  pub mod cylinder2;
+  pub mod cylinder;
   pub mod cube;
 }
 

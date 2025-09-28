@@ -6,7 +6,6 @@
  * Polygon Points should be in CCW order based on viewing Axis
  * Holes should be in CW order
  */
-
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
@@ -78,7 +77,6 @@ impl OGPolygon {
     self.generate_brep();
   }
 
-  #[wasm_bindgen]
   #[wasm_bindgen]
   pub fn set_transformation(&mut self, transformation: Vec<f64>) {
     if transformation.len() != 16 {

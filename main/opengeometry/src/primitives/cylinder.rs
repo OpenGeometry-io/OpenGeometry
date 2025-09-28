@@ -1,15 +1,6 @@
-use core::str;
-use std::clone;
-
-use crate::operations::extrude::{self, extrude_polygon_by_buffer_geometry};
-use crate::operations::triangulate::triangulate_polygon_by_face;
-use crate::operations::windingsort;
-use crate::utility::geometry::{Geometry};
-use openmaths::Vector3;
-
 /**
  * Copyright (c) 2025, OpenGeometry. All rights reserved.
- * Cylinder primitive for OpenGeometry.
+ * Cylinder Primitive for OpenGeometry.
  * 
  * Base created by default on XZ plane and etruded along Y axis.
  * 
@@ -18,27 +9,31 @@ use openmaths::Vector3;
  * 2. By creating a cylinder primitive with a given radius and height
  * 
  * This class is used to create a cylinder primitive(2) using radius and height.
- *  */
-use crate::geometry::basegeometry;
+ **/
+
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
+use crate::brep::{Brep, Vertex};
+use crate::operations::extrude::extrude_brep_face;
+use crate::operations::triangulate::triangulate_polygon_with_holes;
+use openmaths::Vector3;
+use uuid::Uuid;
+
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
-pub struct OGCylinderOld {
+pub struct OGCylinder {
   id: String,
   center: Vector3,
   radius: f64,
   height: f64,
   angle: f64,
   segments: u32,
-  geometry: basegeometry::BaseGeometry,
-  buffer: Vec<f64>,
-  brep: Geometry,
+  brep: Brep,
 }
 
 #[wasm_bindgen]
-impl OGCylinderOld {
+impl OGCylinder {
   #[wasm_bindgen(setter)]
   pub fn set_id(&mut self, id: String) {
     self.id = id;
@@ -50,17 +45,18 @@ impl OGCylinderOld {
   }
 
   #[wasm_bindgen(constructor)]
-  pub fn new(id: String) -> OGCylinderOld {
-    OGCylinderOld {
+  pub fn new(id: String) -> OGCylinder {
+
+    let internal_id = Uuid::new_v4();
+
+    OGCylinder {
       id: id.clone(),
       center: Vector3::new(0.0, 0.0, 0.0),
       radius: 1.0,
       height: 1.0,
       angle: 2.0 * std::f64::consts::PI,
       segments: 32,
-      geometry: basegeometry::BaseGeometry::new(id.clone()),
-      buffer: Vec::new(),
-      brep: Geometry::new(),
+      brep: Brep::new(internal_id),
     }
   }
 
@@ -75,130 +71,114 @@ impl OGCylinderOld {
 
   #[wasm_bindgen]
   pub fn generate_geometry(&mut self) {
-    let mut points: Vec<Vector3> = Vec::new();
-    let mut normals: Vec<Vector3> = Vec::new();
-    // let mut uvs: Vec<openmath::Vector2D> = Vec::new();
-    let mut indices: Vec<u32> = Vec::new();
-
-
     let half_height = self.height / 2.0;
-    let mut actual_segments: u32 = self.segments;
+    let mut segment_count: u32 = self.segments;
+
+    // Create Bottom BREP Circle
+    // A good idea create BREP library for corresponding Primitives, e.g. like Below
+    // let bottom_circle_brep = Brep::new_circle(
+    //   self.center.x, 
+    //   self.center.y - half_height, 
+    //   self.center.z, 
+    //   self.radius, 
+    //   segment_count, 
+    //   0.0, 
+    //   2.0 * std::f64::consts::PI
+    // );
+    let mut bottom_circle_brep = Brep::new(Uuid::new_v4());
 
     // If the end angle makes a full circle then we don't need to add a center point
     if self.angle < 2.0 * std::f64::consts::PI {
-      // Add center point
-      points.push(Vector3::new(self.center.x, self.center.y - half_height, self.center.z));
-      actual_segments += 1;
+      // TODO: Not sure if I should push edges and faces when creating temporary BREP
+      bottom_circle_brep.vertices.push(Vertex::new(
+        bottom_circle_brep.get_vertex_count() as u32,
+        Vector3::new(self.center.x, self.center.y - half_height, self.center.z)));
+      segment_count += 1;
     }
 
     let mut start_angle: f64 = 0.0;
     let angle_step = self.angle / self.segments as f64;
-    for _ in 0..actual_segments {
+    for _ in 0..segment_count {
       let x = self.center.x + self.radius * start_angle.cos();
       let y = self.center.y - half_height;
       let z = self.center.z + self.radius * start_angle.sin();
-      points.push(Vector3::new(x, y, z));
-
-      // // Indices for the top circle
-      // if i < self.segments - 1 {
-      //   indices.push(i);
-      //   indices.push(i + 1);
-      //   indices.push(self.segments);
-      // } else {
-      //   indices.push(i);
-      //   indices.push(0);
-      //   indices.push(self.segments);
-      // }
-
+      
+      bottom_circle_brep.vertices.push(Vertex::new(
+        bottom_circle_brep.get_vertex_count() as u32,
+        Vector3::new(x, y, z)));
       start_angle += angle_step;
     }
-    
-    // Side Faces Indices
 
-    // let ccw_points = windingsort::ccw_test(points.clone());
-    // self.geometry.add_vertices(ccw_points.clone());
-    let mut clonedpoints = points.clone();
-    clonedpoints.reverse();
-    self.geometry.add_vertices(clonedpoints);
-    self.geometry.add_indices(indices);
-  }
+    // Extrude the points to create the top circle
+    let brep_data = extrude_brep_face(bottom_circle_brep, self.height);
+    self.brep = brep_data.clone();
 
-  fn generate_brep(&mut self) -> Geometry {
-    let extrude_data = extrude_polygon_by_buffer_geometry(self.geometry.clone(), self.height);
-    self.brep = extrude_data.clone();
-    extrude_data
   }
 
   #[wasm_bindgen]
-  pub fn get_geometry(&mut self) -> String {
-    let geometry = self.geometry.get_geometry();
-    // geometry
-    let extrude_data = self.generate_brep();
-    
-    let mut local_geometry = Vec::new();
-    
-    // let face = extrude_data.faces[0].clone();
-    for face in extrude_data.faces.clone() {
-      let mut face_vertices: Vec<Vector3> = Vec::new();
-      for index in face.clone() {
-        face_vertices.push(extrude_data.vertices[index as usize].clone());
+  pub fn get_brep_serialized(&self) -> String {
+    // Serialize the BREP geometry to JSON
+    let serialized = serde_json::to_string(&self.brep).unwrap();
+    serialized
+  }
+
+  #[wasm_bindgen]
+  pub fn get_geometry_serialized(&mut self) -> String {
+let mut vertex_buffer: Vec<f64> = Vec::new();
+    let faces = self.brep.faces.clone();
+
+    for face in &faces {
+      let (face_vertices, holes_vertices) = self.brep.get_vertices_and_holes_by_face_id(face.id);
+
+      if face_vertices.len() < 3 {
+        continue;
       }
 
-      let triangulated_face = triangulate_polygon_by_face(face_vertices.clone());
-      // let ccw_vertices = windingsort::ccw_test(face_vertices.clone());
-      for index in triangulated_face {
-        for i in index {
-          let vertex = face_vertices[i as usize].clone();
-          // let vertex = ccw_vertices[i as usize];
-          local_geometry.push(vertex.x);
-          local_geometry.push(vertex.y);
-          local_geometry.push(vertex.z);
+      let triangles = triangulate_polygon_with_holes(&face_vertices, &holes_vertices);
+
+      // Combine outer and hole vertices into a single list for easy lookup
+      let all_vertices: Vec<Vector3> = face_vertices
+        .into_iter()
+        .chain(holes_vertices.into_iter().flatten())
+        .collect();
+
+      // Build the final vertex buffer for rendering
+      for triangle in triangles {
+        for vertex_index in triangle {
+          // The indices from earcutr correspond to our combined `all_vertices` list
+          let vertex = &all_vertices[vertex_index];
+          vertex_buffer.push(vertex.x);
+          vertex_buffer.push(vertex.y);
+          vertex_buffer.push(vertex.z);
         }
       }
     }
-    
-    // let face_data_string = serde_json::to_string(&face).unwrap(); // Serialize face_data
-    // face_data_string
 
-    // let extrude_data_string = serde_json::to_string(&extrude_data).unwrap(); // Serialize extrude_data
-    // extrude_data_string
-
-    let string_data = serde_json::to_string(&local_geometry).unwrap();
-    string_data
-  }
-  
-  #[wasm_bindgen]
-  pub fn discard_geometry(&mut self) {
-    // self.geometry.discard_geometry();
+    serde_json::to_string(&vertex_buffer).unwrap()
   }
 
   #[wasm_bindgen]
-  pub fn outline_edges(&mut self) -> String {
-    let mut outline_points: Vec<f64> = Vec::new();
+  pub fn get_outline_geometry_serialized(&mut self) -> String {
+    let mut vertex_buffer: Vec<f64> = Vec::new();
 
-    for edge in self.brep.edges.clone() {
-      let start_index = edge[0] as usize;
-      let end_index = edge[1] as usize;
+    let edges = self.brep.edges.clone();
+    for edge in edges {
+      let start_index = edge.v1 as usize;
+      let end_index = edge.v2 as usize;
 
-      let start_point = self.brep.vertices[start_index].clone();
-      let end_point = self.brep.vertices[end_index].clone();
+      let start_vertex = self.brep.vertices[start_index].clone();
+      let end_vertex = self.brep.vertices[end_index].clone();
 
-      outline_points.push(start_point.x);
-      outline_points.push(start_point.y);
-      outline_points.push(start_point.z);
+      vertex_buffer.push(start_vertex.position.x);
+      vertex_buffer.push(start_vertex.position.y);
+      vertex_buffer.push(start_vertex.position.z);
 
-      outline_points.push(end_point.x);
-      outline_points.push(end_point.y);
-      outline_points.push(end_point.z);
+      vertex_buffer.push(end_vertex.position.x);
+      vertex_buffer.push(end_vertex.position.y);
+      vertex_buffer.push(end_vertex.position.z);
     }
 
-    let outline_data_string = serde_json::to_string(&outline_points).unwrap();
-    outline_data_string
-  }
-
-  #[wasm_bindgen]
-  pub fn get_brep_dump(&mut self) -> String {
-    let brep_data_string = serde_json::to_string(&self.brep).unwrap();
-    brep_data_string
+    let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
+    vertex_serialized
   }
 }

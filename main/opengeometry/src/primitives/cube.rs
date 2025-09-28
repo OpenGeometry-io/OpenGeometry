@@ -1,14 +1,3 @@
-use core::str;
-use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
-
-use crate::brep::{Edge, Face, Brep, Vertex};
-use crate::operations::extrude::extrude_brep_face;
-use crate::operations::triangulate::triangulate_polygon_by_face;
-// use crate::utility::bgeometry::BufferGeometry;
-use openmaths::Vector3;
-use uuid::Uuid;
-
 /**
  * Copyright (c) 2025, OpenGeometry. All rights reserved.
  * Box primitive for OpenGeometry.
@@ -21,6 +10,14 @@ use uuid::Uuid;
  * 
  * This class is used to create a box primitive(2) using width, height, and depth.
  */
+use wasm_bindgen::prelude::*;
+use serde::{Serialize, Deserialize};
+
+use crate::brep::{Edge, Face, Brep, Vertex};
+use crate::operations::extrude::extrude_brep_face;
+use crate::operations::triangulate::triangulate_polygon_with_holes;
+use openmaths::Vector3;
+use uuid::Uuid;
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
@@ -60,16 +57,23 @@ impl OGCube {
     }
   }
 
-  pub fn clean_geometry(&mut self) {
-    self.brep.clear();
-  }
-
   #[wasm_bindgen]
   pub fn set_config(&mut self, center: Vector3, width: f64, height: f64, depth: f64) {
     self.center = center;
     self.width = width;
     self.height = height;
     self.depth = depth;
+
+    self.generate_brep();
+  }
+
+  pub fn generate_brep(&mut self) {
+    self.clean_geometry();
+    self.generate_geometry();
+  }
+
+  pub fn clean_geometry(&mut self) {
+    self.brep.clear();
   }
 
   #[wasm_bindgen]
@@ -109,14 +113,26 @@ impl OGCube {
     let mut vertex_buffer: Vec<f64> = Vec::new();
     let faces = self.brep.faces.clone();
 
-    for i in 0..faces.len() {
-      let face = faces[i].clone();
-      let face_vertices = self.brep.get_vertices_by_face_id(face.id);
-      // Triangulate the face vertices
-      let triangulated_face_indices = triangulate_polygon_by_face(face_vertices.clone());
-      for index in triangulated_face_indices {
-        for vertex_id in index {
-          let vertex = face_vertices[vertex_id as usize].clone();
+    for face in &faces {
+      let (face_vertices, holes_vertices) = self.brep.get_vertices_and_holes_by_face_id(face.id);
+
+      if face_vertices.len() < 3 {
+        continue;
+      }
+
+      let triangles = triangulate_polygon_with_holes(&face_vertices, &holes_vertices);
+
+      // Combine outer and hole vertices into a single list for easy lookup
+      let all_vertices: Vec<Vector3> = face_vertices
+        .into_iter()
+        .chain(holes_vertices.into_iter().flatten())
+        .collect();
+
+      // Build the final vertex buffer for rendering
+      for triangle in triangles {
+        for vertex_index in triangle {
+          // The indices from earcutr correspond to our combined `all_vertices` list
+          let vertex = &all_vertices[vertex_index];
           vertex_buffer.push(vertex.x);
           vertex_buffer.push(vertex.y);
           vertex_buffer.push(vertex.z);
@@ -124,8 +140,7 @@ impl OGCube {
       }
     }
 
-    let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
-    vertex_serialized
+    serde_json::to_string(&vertex_buffer).unwrap()
   }
 
     #[wasm_bindgen]
@@ -147,6 +162,24 @@ impl OGCube {
       vertex_buffer.push(end_vertex.position.x);
       vertex_buffer.push(end_vertex.position.y);
       vertex_buffer.push(end_vertex.position.z);
+    }
+
+    if self.brep.hole_edges.len() > 0 {
+      for edge in self.brep.hole_edges.clone() {
+        let start_index = edge.v1 as usize;
+        let end_index = edge.v2 as usize;
+
+        let start_vertex = self.brep.vertices[start_index].clone();
+        let end_vertex = self.brep.vertices[end_index].clone();
+
+        vertex_buffer.push(start_vertex.position.x);
+        vertex_buffer.push(start_vertex.position.y);
+        vertex_buffer.push(start_vertex.position.z);
+
+        vertex_buffer.push(end_vertex.position.x);
+        vertex_buffer.push(end_vertex.position.y);
+        vertex_buffer.push(end_vertex.position.z);
+      }
     }
 
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
