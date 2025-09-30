@@ -7,7 +7,7 @@
  */
 pub mod vertex;
 pub mod edge;
-// pub mod halfedge;
+pub mod halfedge;
 pub mod face;
 
 use openmaths::Vector3;
