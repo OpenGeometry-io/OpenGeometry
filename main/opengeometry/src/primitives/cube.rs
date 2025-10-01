@@ -104,8 +104,9 @@ impl OGCube {
   }
 
   #[wasm_bindgen]
-  pub fn get_brep_dump(&self) -> String {
-    serde_json::to_string(&self.brep).unwrap()
+  pub fn get_brep_serialized(&self) -> String {
+    let serialized = serde_json::to_string(&self.brep).unwrap();
+    serialized
   }
 
   #[wasm_bindgen]

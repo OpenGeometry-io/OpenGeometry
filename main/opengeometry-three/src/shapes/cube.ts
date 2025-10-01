@@ -96,6 +96,12 @@ export class Cube extends THREE.Mesh {
     }
   }
 
+  getBrepData() {
+    if (!this.cube) return null;
+    const brepData = this.cube.get_brep_serialized();
+    return brepData;
+  }
+
   set outline(enable: boolean) {
     if (this.#outlineMesh) {
       this.remove(this.#outlineMesh);
