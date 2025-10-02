@@ -29,7 +29,6 @@ impl Drop for OGPolyline {
     self.is_closed = false;
     self.brep.clear();
     self.id.clear();
-    web_sys::console::log_1(&"Clearing Polyline...".into());
   }
 }
  

@@ -3,10 +3,6 @@ import init, {
 } from "../opengeometry/pkg/opengeometry";
 // Vector3 is also available in opengeometry package
 // import { Vector3 } from "@opengeometry/openmaths";
-import * as THREE from "three";
-import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import { getUUID } from "./src/utils/randomizer";
-import { Pencil } from "./src/pencil";
 import { SpotLabel } from "./src/markup/spotMarker";
 import { OPEN_GEOMETRY_THREE_VERSION, OpenGeometryOptions } from "./src/base-types";
 
@@ -15,31 +11,7 @@ export type OUTLINE_TYPE = "front" | "side" | "top";
 export class OpenGeometry {
   static version = OPEN_GEOMETRY_THREE_VERSION;
 
-  protected scene: THREE.Scene | undefined;
-  protected container: HTMLElement | undefined;
-  private _pencil: Pencil | undefined;
-  private _labelRenderer: CSS2DRenderer | undefined;
-
   private _enableDebug: boolean = false;
-
-  set enablePencil(value: boolean) {
-    if (value && !this._pencil) {
-      if (!this.container || !this.scene) {
-        throw new Error("Container or Scene is not defined");
-      }
-      this._pencil = new Pencil(this.container, this.scene, this.camera);
-    } else if (!value && this._pencil) {
-      // TODO: Disable The Pencil Usage and Dispose it
-    }
-  }
-
-  get pencil() {
-    return this._pencil;
-  }
-
-  get labelRenderer() {
-    return this._labelRenderer;
-  }
 
   get enableDebug() {
     return this._enableDebug;
@@ -61,10 +33,7 @@ export class OpenGeometry {
     }
   }
 
-  constructor(container:HTMLElement, threeScene: THREE.Scene, private camera: THREE.Camera) {
-    this.scene = threeScene;
-    this.container = container;
-  }
+  constructor() {}
 
   /**
    * Asynchronously creates and initializes an instance of OpenGeometry.
@@ -88,52 +57,14 @@ export class OpenGeometry {
    * ```
    */
   static async create(options: OpenGeometryOptions) {
-    const { container, scene, camera } = options;
-    if (!container || !scene || !camera) {
-      throw new Error("Missing required options");
-    }
-    const openGeometry = new OpenGeometry(container, scene, camera);
+
+    const openGeometry = new OpenGeometry();
     await openGeometry.setup(options.wasmURL);
     return openGeometry;
   }
 
   private async setup(wasmURL: string) {
     await init(wasmURL);
-    this.setuplabelRenderer();
-    this.setupEvent();
-  }
-
-  private setuplabelRenderer() {
-    if (!this.container || !this.scene) {
-      throw new Error("Container or Scene is not defined");
-    }
-
-    const labelRenderer = new CSS2DRenderer();
-    labelRenderer.setSize(this.container.clientWidth, this.container.clientHeight);
-    labelRenderer.domElement.style.position = "absolute";
-    labelRenderer.domElement.style.top = "0";
-    this.container.appendChild(labelRenderer.domElement);
-    this._labelRenderer = labelRenderer;
-  }
-
-  private setupEvent() {
-    // NOTE: The responsibility to resize normal rendererer lies with the user
-    // but the label renderer should be resized automatically
-    window.addEventListener("resize", () => {
-      if (!this.container) return;
-      this._labelRenderer?.setSize(this.container?.clientWidth, this.container?.clientHeight);
-    });
-  }
-
-  // TODO: Can this be handled inside the OpenGeometry class itself?
-  /**
-   * Updates the label renderer to render the scene with the given camera.
-   * This method should be called in the animation loop or render loop of your application.
-   * @param scene - The Three.js scene containing the objects to be rendered.
-   * @param camera - The Three.js camera used for rendering the scene.
-   */
-  update(scene: THREE.Scene, camera: THREE.Camera) {
-    this._labelRenderer?.render(scene, camera);
   }
 }
 
