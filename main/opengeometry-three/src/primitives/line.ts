@@ -2,7 +2,7 @@ import { OGLine, Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 
-interface ILineOptions {
+export interface ILineOptions {
   start: Vector3;
   end: Vector3;
 }
@@ -16,20 +16,27 @@ export class Line extends THREE.Line {
   
   private line: OGLine;
 
+  #color: number = 0x000000;
+
   set color(color: number) {
+    this.#color = color;
     if (this.material instanceof THREE.LineBasicMaterial) {
       this.material.color.set(color);
     }
   }
-  constructor(options: ILineOptions) {
+
+  constructor(options?: ILineOptions) {
     super();
     this.ogid = getUUID();
-    this.options = options;
 
     this.line = new OGLine(this.ogid);
 
-    this.setConfig();
-    this.generateGeometry();
+    this.options = options || {
+      start: new Vector3(0, 0, 0.5),
+      end: new Vector3(1, 0, 0.5)
+    };
+
+    this.setConfig(this.options);
   }
 
   validateOptions() {
@@ -38,11 +45,13 @@ export class Line extends THREE.Line {
     }
   }
 
-  setConfig() {
+  setConfig(options: ILineOptions) {
     this.validateOptions();
 
-    const { start, end } = this.options;
+    const { start, end } = options;
     this.line.set_config(start.clone(), end.clone());
+
+    this.generateGeometry();
   }
 
   private generateGeometry() {
@@ -57,6 +66,6 @@ export class Line extends THREE.Line {
     );
 
     this.geometry = geometry;
-    this.material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+    this.material = new THREE.LineBasicMaterial({ color: this.#color });
   }
 }

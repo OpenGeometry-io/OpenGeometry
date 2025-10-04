@@ -10,6 +10,7 @@ export type OUTLINE_TYPE = "front" | "side" | "top";
 
 export class OpenGeometry {
   static version = OPEN_GEOMETRY_THREE_VERSION;
+  static instance: OpenGeometry | null = null;
 
   private _enableDebug: boolean = false;
 
@@ -57,13 +58,15 @@ export class OpenGeometry {
    * ```
    */
   static async create(options: OpenGeometryOptions) {
-
-    const openGeometry = new OpenGeometry();
-    await openGeometry.setup(options.wasmURL);
-    return openGeometry;
+    if (!OpenGeometry.instance) {
+      const og = new OpenGeometry();
+      await og.setup(options.wasmURL);
+      OpenGeometry.instance = og;
+    }
+    return OpenGeometry.instance;
   }
 
-  private async setup(wasmURL: string) {
+  private async setup(wasmURL?: string) {
     await init(wasmURL);
   }
 }

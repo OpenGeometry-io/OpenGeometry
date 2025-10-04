@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 // import { IArcOptions } from "../base-types";
 
-interface IArcOptions {
+export interface IArcOptions {
   center: Vector3;
   radius: number;
   startAngle: number;
@@ -21,20 +21,27 @@ export class Arc extends THREE.Line {
   #color: number = 0x00ff00;
 
   set color(color: number) {
+    this.#color = color;
     if (this.material instanceof THREE.LineBasicMaterial) {
       this.material.color.set(color);
     }
   }
 
-  constructor(options: IArcOptions) {
+  constructor(options?: IArcOptions) {
     super();
     this.ogid = getUUID();
-    this.options = options;
-    
+  
     this.arc = new OGArc(this.ogid);
 
-    this.setConfig();
-    this.generateGeometry();
+    this.options = options || {
+      center: new Vector3(0, 0, 0),
+      radius: 3.5,
+      startAngle: 0,
+      endAngle: Math.PI * 2,
+      segments: 4,
+    };
+
+    this.setConfig(this.options);
   }
 
   validateOptions() {
@@ -43,10 +50,10 @@ export class Arc extends THREE.Line {
     }
   }
 
-  setConfig() {
+  setConfig(options: IArcOptions) {
     this.validateOptions();
 
-    const { center, radius, segments, startAngle, endAngle } = this.options;
+    const { center, radius, segments, startAngle, endAngle } = options;
     this.arc.set_config(
       center.clone(),
       radius,
@@ -54,12 +61,21 @@ export class Arc extends THREE.Line {
       endAngle,
       segments
     );
+
+    // If Config changes we need to regenerate geometry
+    // TODO: can geometry generation be made optional
+    this.generateGeometry();
   }
 
   private generateGeometry() {
+    if (this.geometry) {
+      this.geometry.dispose();
+    }
+
     this.arc.generate_geometry();
     const geometryData = this.arc.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
+    // console.log(bufferData);
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(

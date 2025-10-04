@@ -68,6 +68,8 @@ impl OGArc {
 
   #[wasm_bindgen]
   pub fn generate_geometry(&mut self) {
+    self.dispose_points();
+
     let mut angle = self.start_angle;
     let angle_diff = (self.end_angle - self.start_angle) / self.segments as f64;
 
