@@ -9,7 +9,7 @@
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
-use crate::brep::{Edge, Face, Brep, Vertex};
+use crate::brep::{Brep, Vertex};
 use crate::utility::bgeometry::BufferGeometry;
 use openmaths::Vector3;
 use uuid::Uuid;
@@ -73,6 +73,8 @@ impl OGRectangle {
 
   #[wasm_bindgen]
   pub fn generate_geometry(&mut self) {
+    self.brep.clear();
+
     let half_width = self.width / 2.0;
     let half_breadth = self.breadth / 2.0;
     let center = self.center.clone();

@@ -3,8 +3,10 @@ import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 
 export interface ILineOptions {
+  ogid?: string;
   start: Vector3;
   end: Vector3;
+  color: number;
 }
 
 /**
@@ -12,14 +14,16 @@ export interface ILineOptions {
  */
 export class Line extends THREE.Line {
   ogid: string;
-  options: ILineOptions;
+  options: ILineOptions = {
+    start: new Vector3(0, 0, 0.5),
+    end: new Vector3(1, 0, 0.5),
+    color: 0x000000
+  };
   
   private line: OGLine;
 
-  #color: number = 0x000000;
-
   set color(color: number) {
-    this.#color = color;
+    this.options.color = color;
     if (this.material instanceof THREE.LineBasicMaterial) {
       this.material.color.set(color);
     }
@@ -27,15 +31,13 @@ export class Line extends THREE.Line {
 
   constructor(options?: ILineOptions) {
     super();
-    this.ogid = getUUID();
 
+    this.ogid = options?.ogid ?? getUUID();
     this.line = new OGLine(this.ogid);
 
-    this.options = options || {
-      start: new Vector3(0, 0, 0.5),
-      end: new Vector3(1, 0, 0.5)
-    };
-
+    this.options = { ...this.options, ...options };
+    this.options.ogid = this.ogid;
+    
     this.setConfig(this.options);
   }
 
@@ -54,7 +56,17 @@ export class Line extends THREE.Line {
     this.generateGeometry();
   }
 
+  /**
+   * Every time there are property changes, geometry needs to be discarded and regenerated.
+   * This is to ensure that the geometry is always up-to-date with the current state.
+   */
+  discardGeometry() {
+    this.geometry.dispose();
+  }
+
   private generateGeometry() {
+    this.discardGeometry();
+
     this.line.generate_geometry();
     const geometryData = this.line.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
@@ -66,6 +78,6 @@ export class Line extends THREE.Line {
     );
 
     this.geometry = geometry;
-    this.material = new THREE.LineBasicMaterial({ color: this.#color });
+    this.material = new THREE.LineBasicMaterial({ color: this.options.color });
   }
 }

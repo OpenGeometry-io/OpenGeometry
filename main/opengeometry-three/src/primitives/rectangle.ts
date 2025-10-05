@@ -1,15 +1,21 @@
 import { OGRectangle, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
-import { IRectangeOptions } from "../base-types";
-import { BaseLinePrimitive } from "./base-line-primitive";
 
-export class Rectangle extends BaseLinePrimitive {
+export interface IRectangleOptions {
+  ogid?: string;
+  center: Vector3;
+  width: number;
+  breadth: number;
+  color: number;
+}
+
+export class Rectangle extends THREE.Line {
   ogid: string;
-  options: IRectangeOptions = {
+  options: IRectangleOptions = {
+    center: new Vector3(0, 0, 0),
     width: 1,
     breadth: 1,
-    center: new Vector3(0, 0, 0),
     color: 0x00ff00,
   };
 
@@ -41,22 +47,16 @@ export class Rectangle extends BaseLinePrimitive {
   }
 
   // FINAL: This flow should be used for other primitives
-  constructor(options?: IRectangeOptions) {
+  constructor(options?: IRectangleOptions) {
     super();
 
-    const ogid = options?.ogid ?? getUUID();
-    this.polyLineRectangle = new OGRectangle(ogid);
+    this.ogid = options?.ogid ?? getUUID();
+    this.polyLineRectangle = new OGRectangle(this.ogid);
 
-    // const mergedOptions = { ...this.options, ...options, ogid };
-    if (options) {
-      this.options = { ...this.options, ...options };
-      this.ogid = options.ogid || getUUID();
-    } else {
-      this.ogid = getUUID();
-    }
+    this.options = { ...this.options, ...options };
+    this.options.ogid = this.ogid;
 
-    this.setConfig();
-    this.generateGeometry();
+    this.setConfig(this.options);
   }
 
   validateOptions() {
@@ -65,26 +65,29 @@ export class Rectangle extends BaseLinePrimitive {
     }
   }
 
-  setConfig() {
+  setConfig(options: IRectangleOptions) {
     this.validateOptions();
 
-    const { width, breadth, center, color } = this.options;
+    const { width, breadth, center } = options;
     this.polyLineRectangle.set_config(
       center.clone() || new Vector3(0, 0, 0),
       width,
       breadth,
     );
+
+    this.generateGeometry();
   }
 
   getConfig() {
     return this.options;
   }
 
-  generateGeometry() {
+  private generateGeometry() {
+    this.discardGeometry();
+
     this.polyLineRectangle.generate_geometry();
     const geometryData = this.polyLineRectangle.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
-    console.log(bufferData);
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
@@ -93,7 +96,7 @@ export class Rectangle extends BaseLinePrimitive {
     );
 
     this.geometry = geometry;
-    this.material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+    this.material = new THREE.LineBasicMaterial({ color: this.options.color });
   }
 
   getBrep() {

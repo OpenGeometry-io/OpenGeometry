@@ -4,6 +4,7 @@ import { getUUID } from "../utils/randomizer";
 // import { IArcOptions } from "../base-types";
 
 export interface IArcOptions {
+  ogid?: string;
   center: Vector3;
   radius: number;
   startAngle: number;
@@ -13,7 +14,13 @@ export interface IArcOptions {
 
 export class Arc extends THREE.Line {
   ogid: string;
-  options: IArcOptions;
+  options: IArcOptions = {
+    center: new Vector3(0, 0, 0),
+    radius: 3.5,
+    startAngle: 0,
+    endAngle: Math.PI * 2,
+    segments: 32,
+  };
   
   private arc: OGArc;
 
@@ -29,17 +36,12 @@ export class Arc extends THREE.Line {
 
   constructor(options?: IArcOptions) {
     super();
-    this.ogid = getUUID();
-  
+
+    this.ogid = options?.ogid ?? getUUID();
     this.arc = new OGArc(this.ogid);
 
-    this.options = options || {
-      center: new Vector3(0, 0, 0),
-      radius: 3.5,
-      startAngle: 0,
-      endAngle: Math.PI * 2,
-      segments: 4,
-    };
+    this.options = { ...this.options, ...options };
+    this.options.ogid = this.ogid;
 
     this.setConfig(this.options);
   }
@@ -67,6 +69,10 @@ export class Arc extends THREE.Line {
     this.generateGeometry();
   }
 
+  getConfig() {
+    return this.options;
+  }
+
   private generateGeometry() {
     if (this.geometry) {
       this.geometry.dispose();
@@ -75,7 +81,6 @@ export class Arc extends THREE.Line {
     this.arc.generate_geometry();
     const geometryData = this.arc.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
-    // console.log(bufferData);
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
@@ -87,7 +92,15 @@ export class Arc extends THREE.Line {
     this.material = new THREE.LineBasicMaterial({ color: this.#color });
   }
 
-  discardGeoemtry() {
+  getBrep() {
+    const brepData = this.arc.get_brep_serialized();
+    if (!brepData) {
+      throw new Error("Brep data is not available for Arc");
+    }
+    return JSON.parse(brepData);
+  }
+
+  discardGeometry() {
     this.geometry.dispose();
   }
 }

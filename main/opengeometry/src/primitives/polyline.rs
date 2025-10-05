@@ -6,7 +6,7 @@
  * It can be open or closed, and is defined by a series of points.
  */
 
-use crate::brep::{Edge, Face, Brep, Vertex};
+use crate::brep::{Brep, Vertex};
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use openmaths::Vector3;
@@ -16,10 +16,10 @@ use uuid::Uuid;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGPolyline {
   id: String,
-  brep: Brep,
   // TODO: Figure out if we can solely rely on Brep for points
   points: Vec<Vector3>,
   is_closed: bool,
+  brep: Brep,
 }
 
 // TODO: Implement Drop for all Primitives

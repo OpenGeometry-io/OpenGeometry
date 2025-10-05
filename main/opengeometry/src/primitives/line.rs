@@ -7,7 +7,7 @@
  * Created with two arbitrary points, start and end.
  */
 
-use crate::brep::{Edge, Face, Brep, Vertex};
+use crate::brep::{Brep, Vertex};
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use openmaths::Vector3;
@@ -20,6 +20,16 @@ pub struct OGLine {
   brep: Brep,
   start: Vector3,
   end: Vector3,
+}
+
+impl Drop for OGLine {
+  fn drop(&mut self) {
+    // TODO: Add dispose for Vector3 in OpenMaths
+    // self.start.dispose();
+    // self.end.dispose();
+    self.brep.clear();
+    self.id.clear();
+  }
 }
 
 #[wasm_bindgen]
@@ -36,14 +46,11 @@ impl OGLine {
 
   #[wasm_bindgen(constructor)]
   pub fn new(id: String) -> OGLine {
-
-    let internal_id = Uuid::new_v4();
-
     OGLine {
       id,
-      brep: Brep::new(internal_id),
       start: Vector3::new(1.0, 0.0, 0.0),
       end: Vector3::new(-1.0, 0.0, 0.0),
+      brep: Brep::new(Uuid::new_v4()),
     }
   }
 
@@ -56,7 +63,6 @@ impl OGLine {
 
   #[wasm_bindgen]
   pub fn generate_geometry(&mut self) {
-    // Create vertices for the start and end points
     let start_vertex = Vertex::new(0, self.start);
     let end_vertex = Vertex::new(1, self.end);
 
