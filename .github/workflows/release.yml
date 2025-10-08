@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+  packages: write
+  issues: read
+  pull-requests: read
+
 jobs:
   check-version:
     runs-on: ubuntu-latest
@@ -211,19 +217,17 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.final-npm-check.outputs.exists == 'false'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-version.outputs.current-version }}
-          release_name: Release v${{ needs.check-version.outputs.current-version }}
+          name: Release v${{ needs.check-version.outputs.current-version }}
           body: |
             ## Changes in v${{ needs.check-version.outputs.current-version }}
             
-            Version bumped from ${{ needs.check-version.outputs.previous-version }} to ${{ needs.check-version.outputs.current-version }}
+            ${{ needs.check-version.outputs.version-changed == 'true' && format('Version bumped from {0} to {1}', needs.check-version.outputs.previous-version, needs.check-version.outputs.current-version) || format('Recovery publish for version {0}', needs.check-version.outputs.current-version) }}
             
             ### Package Information
-            - **Package Name**: opengeometry
+            - **Package Name**: opengeometry  
             - **Version**: ${{ needs.check-version.outputs.current-version }}
             - **NPM**: https://www.npmjs.com/package/opengeometry
             
@@ -231,8 +235,14 @@ jobs:
             ```bash
             npm install opengeometry@${{ needs.check-version.outputs.current-version }}
             ```
+            
+            ### Build Information
+            - **Commit**: ${{ github.sha }}
+            - **Workflow**: ${{ github.run_id }}
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Summary
         if: steps.final-npm-check.outputs.exists == 'false'
