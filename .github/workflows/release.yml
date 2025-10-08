@@ -14,6 +14,8 @@ jobs:
       current-version: ${{ steps.version-check.outputs.current-version }}
       previous-version: ${{ steps.version-check.outputs.previous-version }}
       is-valid-increment: ${{ steps.version-check.outputs.is-valid-increment }}
+      npm-exists: ${{ steps.npm-check.outputs.exists }}
+      should-publish: ${{ steps.publish-decision.outputs.should-publish }}
     
     steps:
       - name: Checkout current commit
@@ -40,6 +42,22 @@ jobs:
           # Get package.json from previous commit
           PREV_VERSION=$(git show $PREV_COMMIT:package.json | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version")
           echo "version=$PREV_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if current version exists on NPM
+        id: npm-check
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          CURRENT_VERSION="${{ steps.current-version.outputs.version }}"
+          
+          echo "Checking if $PACKAGE_NAME@$CURRENT_VERSION exists on NPM..."
+          
+          if npm view "$PACKAGE_NAME@$CURRENT_VERSION" version 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Version $CURRENT_VERSION already exists on NPM"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "❌ Version $CURRENT_VERSION does not exist on NPM"
+          fi
 
       - name: Check version change and validate increment
         id: version-check
@@ -72,10 +90,39 @@ jobs:
             echo "Version unchanged: $CURRENT"
           fi
 
+      - name: Decide whether to publish
+        id: publish-decision
+        run: |
+          VERSION_CHANGED="${{ steps.version-check.outputs.changed }}"
+          IS_VALID_INCREMENT="${{ steps.version-check.outputs.is-valid-increment }}"
+          NPM_EXISTS="${{ steps.npm-check.outputs.exists }}"
+          CURRENT_VERSION="${{ steps.current-version.outputs.version }}"
+          
+          echo "🔍 Publishing Decision Matrix:"
+          echo "  Version Changed: $VERSION_CHANGED"
+          echo "  Valid Increment: $IS_VALID_INCREMENT"  
+          echo "  Exists on NPM: $NPM_EXISTS"
+          echo "  Current Version: $CURRENT_VERSION"
+          
+          # Publish if:
+          # 1. Version changed AND it's a valid increment, OR
+          # 2. Current version doesn't exist on NPM (failed previous build)
+          if [[ "$VERSION_CHANGED" == "true" && "$IS_VALID_INCREMENT" == "true" ]] || [[ "$NPM_EXISTS" == "false" ]]; then
+            echo "should-publish=true" >> $GITHUB_OUTPUT
+            if [[ "$VERSION_CHANGED" == "true" ]]; then
+              echo "✅ Will publish: Version increment detected"
+            else
+              echo "✅ Will publish: Version missing from NPM (likely failed previous build)"
+            fi
+          else
+            echo "should-publish=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Will skip: Version unchanged and already exists on NPM"
+          fi
+
   build-and-publish:
     needs: check-version
     runs-on: ubuntu-latest
-    if: needs.check-version.outputs.version-changed == 'true' && needs.check-version.outputs.is-valid-increment == 'true'
+    if: needs.check-version.outputs.should-publish == 'true'
     
     steps:
       - name: Checkout code
@@ -139,22 +186,23 @@ jobs:
         run: npm test
         continue-on-error: true
 
-      - name: Check if package already exists on NPM
-        id: npm-check
+      - name: Final NPM existence check
+        id: final-npm-check
         run: |
           PACKAGE_NAME=$(node -p "require('./dist/package.json').name")
           VERSION="${{ needs.check-version.outputs.current-version }}"
           
+          echo "🔍 Final check before publishing..."
           if npm view "$PACKAGE_NAME@$VERSION" version 2>/dev/null; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "❌ Version $VERSION already exists on NPM"
+            echo "⚠️ Version $VERSION now exists on NPM (may have been published by another process)"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "✅ Version $VERSION does not exist on NPM, safe to publish"
+            echo "✅ Version $VERSION confirmed not on NPM, proceeding with publish"
           fi
 
       - name: Publish to NPM
-        if: steps.npm-check.outputs.exists == 'false'
+        if: steps.final-npm-check.outputs.exists == 'false'
         run: |
           cd dist
           npm publish --access public
@@ -162,7 +210,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
-        if: steps.npm-check.outputs.exists == 'false'
+        if: steps.final-npm-check.outputs.exists == 'false'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -187,31 +235,50 @@ jobs:
           prerelease: false
 
       - name: Summary
+        if: steps.final-npm-check.outputs.exists == 'false'
         run: |
           echo "## 🚀 Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Version**: ${{ needs.check-version.outputs.previous-version }} → ${{ needs.check-version.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: ${{ needs.check-version.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
           echo "**Status**: ✅ Successfully published to NPM" >> $GITHUB_STEP_SUMMARY
           echo "**Package**: [opengeometry@${{ needs.check-version.outputs.current-version }}](https://www.npmjs.com/package/opengeometry)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Publish Reason" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.check-version.outputs.version-changed }}" == "true" ]]; then
+            echo "- 📈 Version increment: ${{ needs.check-version.outputs.previous-version }} → ${{ needs.check-version.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- 🔄 Recovery publish: Version was missing from NPM registry" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "- Check the [NPM package page](https://www.npmjs.com/package/opengeometry)" >> $GITHUB_STEP_SUMMARY
           echo "- Verify the [GitHub release](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY
 
+      - name: Already Published Summary
+        if: steps.final-npm-check.outputs.exists == 'true'
+        run: |
+          echo "## ⚠️ Publish Skipped" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason**: Version ${{ needs.check-version.outputs.current-version }} already exists on NPM" >> $GITHUB_STEP_SUMMARY
+          echo "**Package**: [opengeometry@${{ needs.check-version.outputs.current-version }}](https://www.npmjs.com/package/opengeometry)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This likely means the package was published by another process while this build was running." >> $GITHUB_STEP_SUMMARY
+
   skip-build:
     needs: check-version
     runs-on: ubuntu-latest
-    if: needs.check-version.outputs.version-changed == 'false'
+    if: needs.check-version.outputs.should-publish == 'false'
     
     steps:
       - name: Skip message
         run: |
           echo "## ⏭️ Build Skipped" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Reason**: No version change detected" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason**: No version change and package already exists on NPM" >> $GITHUB_STEP_SUMMARY
           echo "**Current Version**: ${{ needs.check-version.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**NPM Status**: ✅ Already published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "To trigger a release, update the version in package.json using:" >> $GITHUB_STEP_SUMMARY
+          echo "### To trigger a new release:" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo 'npm version patch  # for bug fixes' >> $GITHUB_STEP_SUMMARY
           echo 'npm version minor  # for new features' >> $GITHUB_STEP_SUMMARY
