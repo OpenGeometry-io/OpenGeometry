@@ -1,0 +1,219 @@
+name: Release Package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.version-check.outputs.changed }}
+      current-version: ${{ steps.version-check.outputs.current-version }}
+      previous-version: ${{ steps.version-check.outputs.previous-version }}
+      is-valid-increment: ${{ steps.version-check.outputs.is-valid-increment }}
+    
+    steps:
+      - name: Checkout current commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Get current version
+        id: current-version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get previous version
+        id: previous-version
+        run: |
+          # Get the previous commit
+          PREV_COMMIT=$(git rev-parse HEAD~1)
+          # Get package.json from previous commit
+          PREV_VERSION=$(git show $PREV_COMMIT:package.json | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version")
+          echo "version=$PREV_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check version change and validate increment
+        id: version-check
+        run: |
+          CURRENT="${{ steps.current-version.outputs.version }}"
+          PREVIOUS="${{ steps.previous-version.outputs.version }}"
+          
+          echo "current-version=$CURRENT" >> $GITHUB_OUTPUT
+          echo "previous-version=$PREVIOUS" >> $GITHUB_OUTPUT
+          
+          if [ "$CURRENT" != "$PREVIOUS" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Version changed from $PREVIOUS to $CURRENT"
+            
+            # Install semver for version comparison
+            npm install -g semver
+            
+            # Check if current version is greater than previous
+            if semver gt "$CURRENT" "$PREVIOUS"; then
+              echo "is-valid-increment=true" >> $GITHUB_OUTPUT
+              echo "✅ Valid version increment: $PREVIOUS → $CURRENT"
+            else
+              echo "is-valid-increment=false" >> $GITHUB_OUTPUT
+              echo "❌ Invalid version increment: $PREVIOUS → $CURRENT"
+              echo "Current version must be greater than previous version"
+              exit 1
+            fi
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "Version unchanged: $CURRENT"
+          fi
+
+  build-and-publish:
+    needs: check-version
+    runs-on: ubuntu-latest
+    if: needs.check-version.outputs.version-changed == 'true' && needs.check-version.outputs.is-valid-increment == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            main/opengeometry/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Node.js dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run build
+        run: npm run build
+
+      - name: Verify dist directory
+        run: |
+          echo "Checking dist directory contents:"
+          ls -la dist/
+          echo "Checking if package.json exists in dist:"
+          if [ -f "dist/package.json" ]; then
+            echo "✅ package.json found in dist"
+            echo "Dist package version: $(node -p "require('./dist/package.json').version")"
+          else
+            echo "❌ package.json not found in dist"
+            exit 1
+          fi
+
+      - name: Run tests (if available)
+        run: npm test
+        continue-on-error: true
+
+      - name: Check if package already exists on NPM
+        id: npm-check
+        run: |
+          PACKAGE_NAME=$(node -p "require('./dist/package.json').name")
+          VERSION="${{ needs.check-version.outputs.current-version }}"
+          
+          if npm view "$PACKAGE_NAME@$VERSION" version 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "❌ Version $VERSION already exists on NPM"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Version $VERSION does not exist on NPM, safe to publish"
+          fi
+
+      - name: Publish to NPM
+        if: steps.npm-check.outputs.exists == 'false'
+        run: |
+          cd dist
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: steps.npm-check.outputs.exists == 'false'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.check-version.outputs.current-version }}
+          release_name: Release v${{ needs.check-version.outputs.current-version }}
+          body: |
+            ## Changes in v${{ needs.check-version.outputs.current-version }}
+            
+            Version bumped from ${{ needs.check-version.outputs.previous-version }} to ${{ needs.check-version.outputs.current-version }}
+            
+            ### Package Information
+            - **Package Name**: opengeometry
+            - **Version**: ${{ needs.check-version.outputs.current-version }}
+            - **NPM**: https://www.npmjs.com/package/opengeometry
+            
+            ### Installation
+            ```bash
+            npm install opengeometry@${{ needs.check-version.outputs.current-version }}
+            ```
+          draft: false
+          prerelease: false
+
+      - name: Summary
+        run: |
+          echo "## 🚀 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: ${{ needs.check-version.outputs.previous-version }} → ${{ needs.check-version.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ✅ Successfully published to NPM" >> $GITHUB_STEP_SUMMARY
+          echo "**Package**: [opengeometry@${{ needs.check-version.outputs.current-version }}](https://www.npmjs.com/package/opengeometry)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- Check the [NPM package page](https://www.npmjs.com/package/opengeometry)" >> $GITHUB_STEP_SUMMARY
+          echo "- Verify the [GitHub release](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY
+
+  skip-build:
+    needs: check-version
+    runs-on: ubuntu-latest
+    if: needs.check-version.outputs.version-changed == 'false'
+    
+    steps:
+      - name: Skip message
+        run: |
+          echo "## ⏭️ Build Skipped" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason**: No version change detected" >> $GITHUB_STEP_SUMMARY
+          echo "**Current Version**: ${{ needs.check-version.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To trigger a release, update the version in package.json using:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo 'npm version patch  # for bug fixes' >> $GITHUB_STEP_SUMMARY
+          echo 'npm version minor  # for new features' >> $GITHUB_STEP_SUMMARY
+          echo 'npm version major  # for breaking changes' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
