@@ -11,12 +11,10 @@
     "lint:check": "eslint main/opengeometry-three/src/**/*.ts",
     "build-three": "rollup -c rollup.config.js",
     "build-core": "cd main/opengeometry && wasm-pack build --target web && cargo build --release",
-    "cpy-wasm-dist": "cpy main/opengeometry/pkg/opengeometry_bg.wasm dist --flat",
-    "cpy-wasm-dt-dist": "cpy main/opengeometry/pkg/opengeometry_bg.wasm.d.ts dist --flat",
-    "cpy-package-json": "cpy package.json dist --flat",
-    "build": "npm run build-core && npm run build-three && npm run cpy-wasm-dist && npm run cpy-wasm-dt-dist && npm run cpy-package-json",
-    "build-local": "npm run build && cpy dist/* ./../openplans/src/kernel/",
-    "make-examples": "cpy . ./../../../OpenGeometry-Examples/core/ --cwd=dist"
+    "copy-files": "mkdir -p dist && cp main/opengeometry/pkg/opengeometry_bg.wasm dist/ && cp main/opengeometry/pkg/opengeometry_bg.wasm.d.ts dist/ && cp package.json dist/",
+    "build": "npm run build-core && npm run build-three && npm run copy-files",
+    "build-local": "npm run build && cp -r dist/* ./../openplans/src/kernel/",
+    "make-examples": "cp -r dist/* ./../../../OpenGeometry-Examples/core/"
   },
   "repository": {
     "type": "git",
@@ -52,7 +50,6 @@
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
-    "cpy": "^12.0.1",
     "eslint": "^9.35.0",
     "rollup": "^4.21.3",
     "tslib": "^2.7.0",
