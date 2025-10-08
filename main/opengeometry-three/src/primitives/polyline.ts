@@ -54,7 +54,7 @@ export class Polyline extends THREE.Line {
     this.validateOptions();
 
     const { points } = options;
-    this.polyline.set_config(points);
+    this.polyline.set_config(points.map(p => p.clone()));
 
     this.generateGeometry();
   }
@@ -62,13 +62,11 @@ export class Polyline extends THREE.Line {
   addPoint(point: Vector3) {
     if (!this.polyline) return;
 
-    this.polyline.add_point(point);
-    if (this.options.points.length < 2) return;
-    
     const { points } = this.options;
     points.push(point);
 
-    this.setConfig({ ...this.options, points });
+    if (this.options.points.length < 2) return;
+    this.setConfig(this.options);
   }
 
   /**

@@ -1,21 +1,28 @@
-import { OGCube, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
+import { OGCuboid, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 
 interface IOpeningOptions {
+  ogid?: string;
+  center: Vector3;
   width: number;
   height: number;
   depth: number;
-  center?: Vector3;
+  color: number;
 }
 
 export class Opening extends THREE.Mesh {
   ogid: string;
-  options: IOpeningOptions;
-  cube: OGCube;
-
+  options: IOpeningOptions = {
+    center: new Vector3(0, 0, 0),
+    width: 1,
+    height: 1,
+    depth: 0.2,
+    color: 0xdad7cd,
+  }
+  
+  private opening: OGCuboid;
   #outlineMesh: THREE.Line | null = null;
-  #color: number = 0xdad7cd;
 
   // Store local center offset to align outlines
   // TODO: Can this be moved to Engine? It can increase performance | Needs to be used in other shapes too
@@ -23,20 +30,17 @@ export class Opening extends THREE.Mesh {
 
   set width(value: number) {
     this.options.width = value;
-    this.setConfig();
-    this.generateGeometry();
+    this.setConfig(this.options);
   }
 
   set height(value: number) {
     this.options.height = value;
-    this.setConfig();
-    this.generateGeometry();
+    this.setConfig(this.options);
   }
 
   set depth(value: number) {
     this.options.depth = value;
-    this.setConfig();
-    this.generateGeometry();
+    this.setConfig(this.options);
   }
 
   get dimensions() {
@@ -47,14 +51,15 @@ export class Opening extends THREE.Mesh {
     };
   }
 
-  constructor(options: IOpeningOptions) {
+  constructor(options?: IOpeningOptions) {
     super();
-    this.ogid = getUUID();
-    this.options = options;
+    this.ogid = options?.ogid ?? getUUID();
+    this.opening = new OGCuboid(this.ogid);
 
-    this.cube = new OGCube(this.ogid);
-    this.setConfig();
-    this.generateGeometry();
+    this.options = { ...this.options, ...options };
+    this.options.ogid = this.ogid;
+
+    this.setConfig(this.options);
   }
 
   validateOptions() {
@@ -63,16 +68,18 @@ export class Opening extends THREE.Mesh {
     }
   }
 
-  setConfig() {
+  setConfig(options: IOpeningOptions) {
     this.validateOptions();
 
-    const { width, height, depth, center } = this.options;
-    this.cube.set_config(
-      center?.clone() || new Vector3(0, 0, 0),
+    const { width, height, depth, center } = options;
+    this.opening.set_config(
+      center?.clone(),
       width,
       height,
       depth
     );
+
+    this.generateGeometry();
   }
 
   cleanGeometry() {
@@ -89,8 +96,8 @@ export class Opening extends THREE.Mesh {
     this.cleanGeometry();
 
     // Kernel Geometry
-    this.cube.generate_geometry();
-    const geometryData = this.cube.get_geometry_serialized();
+    this.opening.generate_geometry();
+    const geometryData = this.opening.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
     
     const geometry = new THREE.BufferGeometry();
@@ -100,7 +107,7 @@ export class Opening extends THREE.Mesh {
     );
 
     const material = new THREE.MeshStandardMaterial({
-      color: this.#color,
+      color: this.options.color,
       transparent: true,
       opacity: 0.6,
     });
@@ -117,6 +124,15 @@ export class Opening extends THREE.Mesh {
     }
   }
 
+  getBrepData() {
+    if (!this.opening) return null;
+    const brepData = this.opening.get_brep_serialized();
+    if (!brepData) {
+      throw new Error("Brep data is not available for this opening.");
+    }
+    return JSON.parse(brepData);
+  }
+
   set outline(enable: boolean) {
     if (this.#outlineMesh) {
       this.remove(this.#outlineMesh);
@@ -125,7 +141,7 @@ export class Opening extends THREE.Mesh {
     }
 
     if (enable) {
-      const outline_buff = this.cube.get_outline_geometry_serialized();
+      const outline_buff = this.opening.get_outline_geometry_serialized();
       const outline_buf = JSON.parse(outline_buff);
 
       const outlineGeometry = new THREE.BufferGeometry();
@@ -152,5 +168,9 @@ export class Opening extends THREE.Mesh {
 
   get outlineMesh() {
     return this.#outlineMesh;
+  }
+
+  discardGeometry() {
+    this.geometry.dispose();
   }
 }

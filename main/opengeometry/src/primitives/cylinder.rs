@@ -67,6 +67,17 @@ impl OGCylinder {
     self.height = height;
     self.angle = angle;
     self.segments = segments;
+
+    self.generate_brep();
+  }
+
+  pub fn generate_brep(&mut self) {
+    self.clean_geometry();
+    self.generate_geometry();
+  }
+
+  pub fn clean_geometry(&mut self) {
+    self.brep.clear();
   }
 
   #[wasm_bindgen]
@@ -124,7 +135,7 @@ impl OGCylinder {
 
   #[wasm_bindgen]
   pub fn get_geometry_serialized(&mut self) -> String {
-let mut vertex_buffer: Vec<f64> = Vec::new();
+    let mut vertex_buffer: Vec<f64> = Vec::new();
     let faces = self.brep.faces.clone();
 
     for face in &faces {

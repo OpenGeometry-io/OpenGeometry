@@ -2,30 +2,51 @@ import { OGCylinder, Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 
-interface ICylinderOptions {
+export interface ICylinderOptions {
+  ogid?: string;
+  center: Vector3;
   radius: number;
   height: number;
   segments: number;
   angle: number;
-  center?: Vector3;
+  color: number;
 }
 
 export class Cylinder extends THREE.Mesh {
   ogid: string;
-  options: ICylinderOptions;
-  cylinder: OGCylinder;
-
+  options: ICylinderOptions = {
+    center: new Vector3(0, 0, 0),
+    radius: 1,
+    height: 1,
+    segments: 32,
+    angle: 2 * Math.PI,
+    color: 0x00ff00,
+  };
+  
+  private cylinder: OGCylinder;
   #outlineMesh: THREE.Line | null = null;
 
-  constructor(options: ICylinderOptions) {
-    super();
-    this.ogid = getUUID();
-    this.options = options;
+  set radius(value: number) {
+    this.options.radius = value;
+    this.setConfig(this.options);
+  }
 
+  set color(color: number) {
+    this.options.color = color;
+    if (this.material instanceof THREE.LineBasicMaterial) {
+      this.material.color.set(color);
+    }
+  }
+
+  constructor(options?: ICylinderOptions) {
+    super();
+    this.ogid = options?.ogid ?? getUUID();
     this.cylinder = new OGCylinder(this.ogid);
-    
-    this.setConfig();
-    this.generateGeometry();
+
+    this.options = { ...this.options, ...options };
+    this.options.ogid = this.ogid;
+
+    this.setConfig(this.options);
   }
 
   validateOptions() {
@@ -34,21 +55,37 @@ export class Cylinder extends THREE.Mesh {
     }
   }
 
-  setConfig() {
+  setConfig(options: ICylinderOptions) {
     this.validateOptions();
 
-    const { radius, height, segments, angle, center } = this.options;
+    const { radius, height, segments, angle, center } = options;
     this.cylinder.set_config(
-      center?.clone() || new Vector3(0, 0, 0),
+      center?.clone(),
       radius,
       height,
       angle,
       segments
     );
+
+    this.generateGeometry();
+  }
+
+  cleanGeometry() {
+    this.geometry.dispose();
+    if (Array.isArray(this.material)) {
+      this.material.forEach(mat => mat.dispose());
+    } else {
+      this.material.dispose();
+    }
   }
 
   generateGeometry() {
-    this.cylinder.generate_geometry();
+    this.cleanGeometry();
+
+    // Kernel Geometry
+    // Since geometry is already generated in set_config, we don't need to call it again
+    // this.cylinder.generate_geometry();
+
     const geometryData = this.cylinder.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
     
@@ -59,7 +96,7 @@ export class Cylinder extends THREE.Mesh {
     );
 
     const material = new THREE.MeshStandardMaterial({
-      color: 0x00ff00,
+      color: this.options.color,
       transparent: true,
       opacity: 0.6,
     });
@@ -69,10 +106,30 @@ export class Cylinder extends THREE.Mesh {
 
     this.geometry = geometry;
     this.material = material;
+
+    // outline
+    if (this.#outlineMesh) {
+      this.outline = true;
+    }
+  }
+
+  getBrep() {
+    if (!this.cylinder) return null;
+    const brepData = this.cylinder.get_brep_serialized();
+    if (!brepData) {
+      throw new Error("Brep data is not available for this cylinder.");
+    }
+    return JSON.parse(brepData);
   }
 
   set outline(enable: boolean) {
-    if (enable && !this.#outlineMesh) {
+    if (this.#outlineMesh) {
+      this.remove(this.#outlineMesh);
+      this.#outlineMesh.geometry.dispose();
+      this.#outlineMesh = null;
+    }
+
+    if (enable) {
       const outline_buff = this.cylinder.get_outline_geometry_serialized();
       const outline_buf = JSON.parse(outline_buff);
 
@@ -98,11 +155,7 @@ export class Cylinder extends THREE.Mesh {
     }
   }
 
-  getBrep() {
-    const brepData = this.cylinder.get_brep_serialized();
-    if (!brepData) {
-      throw new Error("Brep data is not available for this cylinder.");
-    }
-    return JSON.parse(brepData);
+  discardGeometry() {
+    this.geometry.dispose();
   }
 }

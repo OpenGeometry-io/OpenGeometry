@@ -19,10 +19,9 @@ pub mod primitives {
   pub mod line;
   pub mod polyline;
   pub mod rectangle;
-  pub mod cylinderOld;
   pub mod polygon;
   pub mod cylinder;
-  pub mod cube;
+  pub mod cuboid;
 }
 
 pub mod brep;

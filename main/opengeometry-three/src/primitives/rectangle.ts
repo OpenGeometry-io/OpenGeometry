@@ -49,7 +49,6 @@ export class Rectangle extends THREE.Line {
   // FINAL: This flow should be used for other primitives
   constructor(options?: IRectangleOptions) {
     super();
-
     this.ogid = options?.ogid ?? getUUID();
     this.polyLineRectangle = new OGRectangle(this.ogid);
 
@@ -70,7 +69,7 @@ export class Rectangle extends THREE.Line {
 
     const { width, breadth, center } = options;
     this.polyLineRectangle.set_config(
-      center.clone() || new Vector3(0, 0, 0),
+      center.clone(),
       width,
       breadth,
     );

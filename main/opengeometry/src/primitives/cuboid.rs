@@ -21,7 +21,7 @@ use uuid::Uuid;
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
-pub struct OGCube {
+pub struct OGCuboid {
   id: String,
   center: Vector3,
   width: f64,
@@ -31,7 +31,7 @@ pub struct OGCube {
 }
 
 #[wasm_bindgen]
-impl OGCube {
+impl OGCuboid {
   #[wasm_bindgen(setter)]
   pub fn set_id(&mut self, id: String) {
     self.id = id;
@@ -43,11 +43,11 @@ impl OGCube {
   }
 
   #[wasm_bindgen(constructor)]
-  pub fn new(id: String) -> OGCube {
+  pub fn new(id: String) -> OGCuboid {
 
     let internal_id = Uuid::new_v4();
 
-    OGCube {
+    OGCuboid {
       id: id.clone(),
       center: Vector3::new(0.0, 0.0, 0.0),
       width: 1.0,
@@ -81,9 +81,6 @@ impl OGCube {
     let half_width = self.width / 2.0;
     let half_height = self.height / 2.0;
     let half_depth = self.depth / 2.0;
-
-    // Clear the existing BREP data
-    self.clean_geometry();
 
     let mut bottom_face_brep = Brep::new(Uuid::new_v4());
     bottom_face_brep.vertices.push(Vertex::new(0, Vector3::new(self.center.x - half_width, self.center.y - half_height, self.center.z - half_depth)));

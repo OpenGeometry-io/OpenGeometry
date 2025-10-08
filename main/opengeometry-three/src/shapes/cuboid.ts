@@ -1,19 +1,27 @@
-import { OGCube, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
+import { OGCuboid, Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 
-interface ICubeOptions {
+export interface ICuboidOptions {
+  ogid?: string;
+  center: Vector3;
   width: number;
   height: number;
   depth: number;
-  center?: Vector3;
+  color: number;
 }
 
-export class Cube extends THREE.Mesh {
+export class Cuboid extends THREE.Mesh {
   ogid: string;
-  options: ICubeOptions;
-  cube: OGCube;
+  options: ICuboidOptions = {
+    center: new Vector3(0, 0, 0),
+    width: 1,
+    height: 1,
+    depth: 1,
+    color: 0x00ff00,
+  };
 
+  private cuboid: OGCuboid;
   #outlineMesh: THREE.Line | null = null;
 
   // Store local center offset to align outlines
@@ -22,18 +30,25 @@ export class Cube extends THREE.Mesh {
 
   set width(value: number) {
     this.options.width = value;
-    this.setConfig();
-    this.generateGeometry();
+    this.setConfig(this.options);
   }
 
-  constructor(options: ICubeOptions) {
-    super();
-    this.ogid = getUUID();
-    this.options = options;
+  set color(color: number) {
+    this.options.color = color;
+    if (this.material instanceof THREE.LineBasicMaterial) {
+      this.material.color.set(color);
+    }
+  }
 
-    this.cube = new OGCube(this.ogid);
-    this.setConfig();
-    this.generateGeometry();
+  constructor(options?: ICuboidOptions) {
+    super();
+    this.ogid = options?.ogid ?? getUUID();
+    this.cuboid = new OGCuboid(this.ogid);
+
+    this.options = { ...this.options, ...options };
+    this.options.ogid = this.ogid;
+
+    this.setConfig(this.options);
   }
 
   validateOptions() {
@@ -42,16 +57,18 @@ export class Cube extends THREE.Mesh {
     }
   }
 
-  setConfig() {
+  setConfig(options: ICuboidOptions) {
     this.validateOptions();
 
-    const { width, height, depth, center } = this.options;
-    this.cube.set_config(
-      center?.clone() || new Vector3(0, 0, 0),
+    const { width, height, depth, center } = options;
+    this.cuboid.set_config(
+      center.clone(),
       width,
       height,
       depth
     );
+
+    this.generateGeometry();
   }
 
   cleanGeometry() {
@@ -64,12 +81,12 @@ export class Cube extends THREE.Mesh {
   }
 
   generateGeometry() {
-    // Three.js cleanup
     this.cleanGeometry();
 
     // Kernel Geometry
-    this.cube.generate_geometry();
-    const geometryData = this.cube.get_geometry_serialized();
+    // Since geometry is already generated in set_config, we don't need to call it again
+    // this.cuboid.generate_geometry();
+    const geometryData = this.cuboid.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
     
     const geometry = new THREE.BufferGeometry();
@@ -79,7 +96,7 @@ export class Cube extends THREE.Mesh {
     );
 
     const material = new THREE.MeshStandardMaterial({
-      color: 0x00ff00,
+      color: this.options.color,
       transparent: true,
       opacity: 0.6,
     });
@@ -97,9 +114,12 @@ export class Cube extends THREE.Mesh {
   }
 
   getBrepData() {
-    if (!this.cube) return null;
-    const brepData = this.cube.get_brep_serialized();
-    return brepData;
+    if (!this.cuboid) return null;
+    const brepData = this.cuboid.get_brep_serialized();
+    if (!brepData) {
+      throw new Error("Brep data is not available for this cuboid.");
+    }
+    return JSON.parse(brepData);
   }
 
   set outline(enable: boolean) {
@@ -110,7 +130,7 @@ export class Cube extends THREE.Mesh {
     }
 
     if (enable) {
-      const outline_buff = this.cube.get_outline_geometry_serialized();
+      const outline_buff = this.cuboid.get_outline_geometry_serialized();
       const outline_buf = JSON.parse(outline_buff);
 
       const outlineGeometry = new THREE.BufferGeometry();
@@ -137,5 +157,9 @@ export class Cube extends THREE.Mesh {
 
   get outlineMesh() {
     return this.#outlineMesh;
+  }
+
+  discardGeometry() {
+    this.geometry.dispose();
   }
 }
