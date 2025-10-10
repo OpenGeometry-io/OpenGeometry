@@ -13,8 +13,7 @@
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
-use crate::brep::{Edge, Face, Brep, Vertex};
-use crate::operations::extrude::extrude_brep_face;
+use crate::brep::Brep;
 use crate::operations::triangulate::triangulate_polygon_with_holes;
 use openmaths::Vector3;
 use uuid::Uuid;
@@ -82,22 +81,34 @@ impl OGCuboid {
     let half_height = self.height / 2.0;
     let half_depth = self.depth / 2.0;
 
-    let mut bottom_face_brep = Brep::new(Uuid::new_v4());
-    bottom_face_brep.vertices.push(Vertex::new(0, Vector3::new(self.center.x - half_width, self.center.y - half_height, self.center.z - half_depth)));
-    bottom_face_brep.vertices.push(Vertex::new(1, Vector3::new(self.center.x + half_width, self.center.y - half_height, self.center.z - half_depth)));
-    bottom_face_brep.vertices.push(Vertex::new(2, Vector3::new(self.center.x + half_width, self.center.y - half_height, self.center.z + half_depth)));
-    bottom_face_brep.vertices.push(Vertex::new(3, Vector3::new(self.center.x - half_width, self.center.y - half_height, self.center.z + half_depth)));
+    // Create vertices using new half-edge system
+    let v0 = self.brep.add_vertex(Vector3::new(self.center.x - half_width, self.center.y - half_height, self.center.z - half_depth));
+    let v1 = self.brep.add_vertex(Vector3::new(self.center.x + half_width, self.center.y - half_height, self.center.z - half_depth));
+    let v2 = self.brep.add_vertex(Vector3::new(self.center.x + half_width, self.center.y - half_height, self.center.z + half_depth));
+    let v3 = self.brep.add_vertex(Vector3::new(self.center.x - half_width, self.center.y - half_height, self.center.z + half_depth));
+    let v4 = self.brep.add_vertex(Vector3::new(self.center.x - half_width, self.center.y + half_height, self.center.z - half_depth));
+    let v5 = self.brep.add_vertex(Vector3::new(self.center.x + half_width, self.center.y + half_height, self.center.z - half_depth));
+    let v6 = self.brep.add_vertex(Vector3::new(self.center.x + half_width, self.center.y + half_height, self.center.z + half_depth));
+    let v7 = self.brep.add_vertex(Vector3::new(self.center.x - half_width, self.center.y + half_height, self.center.z + half_depth));
 
-    bottom_face_brep.edges.push(Edge::new(0, 0, 1));
-    bottom_face_brep.edges.push(Edge::new(1, 1, 2));
-    bottom_face_brep.edges.push(Edge::new(2, 2, 3));
-    bottom_face_brep.edges.push(Edge::new(3, 3, 0));
-
-    bottom_face_brep.faces.push(Face::new(0, vec![0, 1, 2, 3]));
-
-    // Extrude the bottom face to create the box
-    let extruded_brep = extrude_brep_face(bottom_face_brep, self.height);
-    self.brep = extruded_brep.clone();
+    // Create faces with proper half-edge connectivity using vertex indices
+    // Bottom face (v0, v1, v2, v3)
+    let _bottom_face = self.brep.create_polygon_face_from_indices(&[v0, v1, v2, v3]).unwrap_or(0);
+    
+    // Top face (v4, v7, v6, v5) - note the winding order
+    let _top_face = self.brep.create_polygon_face_from_indices(&[v4, v7, v6, v5]).unwrap_or(1);
+    
+    // Front face (v0, v4, v5, v1)
+    let _front_face = self.brep.create_polygon_face_from_indices(&[v0, v4, v5, v1]).unwrap_or(2);
+    
+    // Back face (v2, v6, v7, v3)
+    let _back_face = self.brep.create_polygon_face_from_indices(&[v2, v6, v7, v3]).unwrap_or(3);
+    
+    // Left face (v3, v7, v4, v0)
+    let _left_face = self.brep.create_polygon_face_from_indices(&[v3, v7, v4, v0]).unwrap_or(4);
+    
+    // Right face (v1, v5, v6, v2)
+    let _right_face = self.brep.create_polygon_face_from_indices(&[v1, v5, v6, v2]).unwrap_or(5);
   }
 
   #[wasm_bindgen]
