@@ -13,8 +13,9 @@ use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
 use crate::brep::{Edge, Face, Brep, Vertex};
+use crate::geometry::path::Path;
 use crate::utility::bgeometry::BufferGeometry;
-use openmaths::Vector3;
+use openmaths::{Vector3, Matrix4};
 use uuid::Uuid;
 
 #[wasm_bindgen]
@@ -117,4 +118,56 @@ impl OGArc {
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
   }
+}
+
+impl Path for OGArc {
+    fn get_points(&self) -> Vec<Vector3> {
+        // Sample points along the arc. Here we use the number of segments for sampling.
+        let mut points = Vec::new();
+        let segments = self.segments.max(8); // Ensure minimum segments for quality
+        
+        for i in 0..=segments {
+            let angle = self.start_angle + (self.end_angle - self.start_angle) * (i as f64 / segments as f64);
+            let x = self.center.x + self.radius * angle.cos();
+            let y = self.center.y;
+            let z = self.center.z + self.radius * angle.sin();
+            points.push(Vector3::new(x, y, z));
+        }
+        points
+    }
+
+    fn get_frames(&self) -> Vec<Matrix4> {
+        let mut frames = Vec::new();
+        let segments = self.segments.max(8); // Ensure minimum segments for quality
+        
+        for i in 0..=segments {
+            let angle = self.start_angle + (self.end_angle - self.start_angle) * (i as f64 / segments as f64);
+            let x = self.center.x + self.radius * angle.cos();
+            let y = self.center.y;
+            let z = self.center.z + self.radius * angle.sin();
+            let position = Vector3::new(x, y, z);
+            
+            // Calculate tangent vector (perpendicular to radius in XZ plane)
+            let radius_x = position.x - self.center.x;
+            let radius_z = position.z - self.center.z;
+            let tangent = Vector3::new(-radius_z, 0.0, radius_x).normalize();
+            
+            // Up vector for arc (assuming arc is on XY plane or parallel to it)
+            let up = Vector3::new(0.0, 1.0, 0.0);
+            
+            // Right vector
+            let right = tangent.cross(&up).normalize();
+
+            // Create transformation matrix
+            let matrix = Matrix4::set(
+                right.x, up.x, tangent.x, position.x,
+                right.y, up.y, tangent.y, position.y,
+                right.z, up.z, tangent.z, position.z,
+                0.0, 0.0, 0.0, 1.0,
+            );
+
+            frames.push(matrix);
+        }
+        frames
+    }
 }

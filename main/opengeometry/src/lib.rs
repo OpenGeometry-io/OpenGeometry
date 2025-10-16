@@ -1,12 +1,14 @@
 pub mod geometry {
   pub mod basegeometry;
   pub mod triangle;
+  pub mod path;
 }
 
 pub mod operations {
   pub mod triangulate;
   pub mod windingsort;
   pub mod extrude;
+  pub mod sweep;
 }
 
 pub mod utility {
@@ -22,6 +24,7 @@ pub mod primitives {
   pub mod polygon;
   pub mod cylinder;
   pub mod cuboid;
+  pub mod swept_shape;
 }
 
 pub mod brep;

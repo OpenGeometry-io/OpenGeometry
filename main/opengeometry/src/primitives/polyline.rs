@@ -7,9 +7,10 @@
  */
 
 use crate::brep::{Brep, Vertex};
+use crate::geometry::path::Path;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
-use openmaths::Vector3;
+use openmaths::{Vector3, Matrix4};
 use uuid::Uuid;
 
 #[wasm_bindgen]
@@ -261,4 +262,48 @@ impl OGPolyline {
   //     z: point_a.z + t * dz1,
   //   })
   // }
+}
+
+impl Path for OGPolyline {
+    fn get_points(&self) -> Vec<Vector3> {
+        self.points.clone()
+    }
+
+    fn get_frames(&self) -> Vec<Matrix4> {
+        let mut frames = Vec::new();
+        if self.points.len() < 2 {
+            return frames;
+        }
+
+        for i in 0..self.points.len() {
+            let position = self.points[i];
+            let tangent = if i < self.points.len() - 1 {
+                let next_pos = self.points[i + 1];
+                next_pos.clone().subtract(&position).normalize()
+            } else {
+                let prev_pos = self.points[i - 1];
+                position.clone().subtract(&prev_pos).normalize()
+            };
+
+            // A simple approach for up vector. This can be improved to handle vertical tangents.
+            let mut up = Vector3::new(0.0, 1.0, 0.0);
+            if tangent.y.abs() > 0.999 {
+                up = Vector3::new(0.0, 0.0, 1.0);
+            }
+
+            let right = tangent.cross(&up).normalize();
+            let new_up = right.cross(&tangent).normalize();
+
+            // Create transformation matrix using the basis vectors and position
+            let matrix = Matrix4::set(
+                right.x, new_up.x, tangent.x, position.x,
+                right.y, new_up.y, tangent.y, position.y,
+                right.z, new_up.z, tangent.z, position.z,
+                0.0, 0.0, 0.0, 1.0,
+            );
+
+            frames.push(matrix);
+        }
+        frames
+    }
 }

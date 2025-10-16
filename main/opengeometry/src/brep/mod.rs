@@ -141,4 +141,38 @@ impl Brep {
       (Vec::new(), Vec::new())
     }
   }
+
+  /**
+   * Add a vertex to the BREP structure
+   * @param vertex - The position of the vertex to add
+   * @returns The index of the newly added vertex
+   */
+  pub fn add_vertex(&mut self, vertex: Vector3) -> u32 {
+    let vertex_id = self.get_vertex_count();
+    self.vertices.push(Vertex::new(vertex_id, vertex));
+    vertex_id
+  }
+
+  /**
+   * Add a face to the BREP structure
+   * @param indices - The vertex indices that define the face
+   * @returns The index of the newly added face
+   */
+  pub fn add_face(&mut self, indices: Vec<u32>) -> u32 {
+    let face_id = self.get_face_count();
+    self.faces.push(Face::new(face_id, indices));
+    face_id
+  }
+
+  /**
+   * Add an edge to the BREP structure
+   * @param start_vertex - Start vertex index
+   * @param end_vertex - End vertex index
+   * @returns The index of the newly added edge
+   */
+  pub fn add_edge(&mut self, start_vertex: u32, end_vertex: u32) -> u32 {
+    let edge_id = self.get_edge_count();
+    self.edges.push(Edge::new(edge_id, start_vertex, end_vertex));
+    edge_id
+  }
 }
