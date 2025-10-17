@@ -14,7 +14,7 @@
     "copy-wasm": "mkdir -p dist && cp main/opengeometry/pkg/opengeometry_bg.wasm dist/ && cp main/opengeometry/pkg/opengeometry_bg.wasm.d.ts dist/ && cp package.json dist/",
     "build": "npm run build-core && npm run build-three && npm run copy-wasm",
     "build-local": "npm run build && cp -r dist/* ./../openplans/src/kernel/",
-    "make-examples": "cp -r dist/* ./../../../OpenGeometry-Examples/core/"
+    "make-examples": "cp -r dist/* ./../OpenGeometry-Examples/core/"
   },
   "repository": {
     "type": "git",
