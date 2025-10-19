@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sweep Operation Example - OpenGeometry</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+        #container {
+            width: 100%;
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 100;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 350px;
+        }
+        #info h3 {
+            margin: 0 0 15px 0;
+            color: #667eea;
+        }
+        #info p {
+            margin: 8px 0;
+            line-height: 1.5;
+        }
+        #info code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        .button {
+            display: inline-block;
+            margin: 5px 5px 5px 0;
+            padding: 8px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: #764ba2;
+        }
+        .button.active {
+            background: #4caf50;
+        }
+        .button.active:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>🔷 OpenGeometry Sweep Operation</h3>
+        <p><strong>What it does:</strong> Sweeps a 2D profile along a 3D path to create a solid shape.</p>
+        <p><strong>Examples:</strong></p>
+        <button class="button" id="btn-square">Square Path</button>
+        <button class="button" id="btn-spiral">Circle Spiral</button>
+        <button class="button" id="btn-wave">Star Wave</button>
+        <br>
+        <button class="button" id="btn-clear">Clear Scene</button>
+        <button class="button" id="btn-toggle-outline">Toggle Outlines</button>
+        <p style="margin-top: 15px; font-size: 12px; color: #666;">
+            <strong>Controls:</strong><br>
+            • Left Mouse: Rotate<br>
+            • Right Mouse: Pan<br>
+            • Scroll: Zoom
+        </p>
+    </div>
+    <div id="container"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.168.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.168.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        
+        // Import OpenGeometry - need to initialize WASM first
+        import { OpenGeometry, SweptShape, Vector3 } from './dist/index.js';
+
+        let scene, camera, renderer, controls;
+        let sweptShapes = [];
+
+        async function initApp() {
+            // Initialize WASM module first - this is required!
+            await OpenGeometry.create({ wasmURL: './dist/opengeometry_bg.wasm' });
+            console.log('✅ OpenGeometry WASM initialized');
+
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+
+            // Create camera
+            camera = new THREE.PerspectiveCamera(
+                60, 
+                window.innerWidth / window.innerHeight, 
+                0.1, 
+                1000
+            );
+            camera.position.set(8, 8, 8);
+
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            // Add lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 10);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+
+            const pointLight = new THREE.PointLight(0x667eea, 1, 100);
+            pointLight.position.set(-5, 5, -5);
+            scene.add(pointLight);
+
+            // Add controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Add grid
+            const gridHelper = new THREE.GridHelper(20, 20, 0x667eea, 0x444444);
+            scene.add(gridHelper);
+
+            // Add axes helper
+            const axesHelper = new THREE.AxesHelper(5);
+            scene.add(axesHelper);
+
+            // Start animation loop
+            animate();
+
+            // Setup button event listeners
+            document.getElementById('btn-square').addEventListener('click', createSquareAlongPath);
+            document.getElementById('btn-spiral').addEventListener('click', createCircleAlongSpiral);
+            document.getElementById('btn-wave').addEventListener('click', createStarAlongWave);
+            document.getElementById('btn-clear').addEventListener('click', clearScene);
+            document.getElementById('btn-toggle-outline').addEventListener('click', toggleOutlines);
+
+            // Create initial example
+            createSquareAlongPath();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener('resize', onWindowResize);
+
+        // EXAMPLE 1: Square profile swept along an L-shaped path
+        function createSquareAlongPath() {
+            console.log('Creating square swept along path...');
+
+            // Define a square profile (2D, in XY plane)
+            const profileVertices = [
+                new Vector3(-0.5, -0.5, 0),
+                new Vector3(0.5, -0.5, 0),
+                new Vector3(0.5, 0.5, 0),
+                new Vector3(-0.5, 0.5, 0)
+            ];
+
+            // Define an L-shaped path (3D)
+            const pathPoints = [
+                new Vector3(0, 0, 0),
+                new Vector3(3, 0, 0),
+                new Vector3(3, 3, 0),
+                new Vector3(0, 3, 0)
+            ];
+
+            createSweptShape(profileVertices, pathPoints, 0x3a86ff);
+        }
+
+        // EXAMPLE 2: Circle profile swept along a spiral
+        function createCircleAlongSpiral() {
+            console.log('Creating circle swept along spiral...');
+
+            // Define a circular profile
+            const profileVertices = [];
+            const segments = 20;
+            const radius = 0.3;
+            for (let i = 0; i < segments; i++) {
+                const angle = (i / segments) * Math.PI * 2;
+                profileVertices.push(new Vector3(
+                    Math.cos(angle) * radius,
+                    Math.sin(angle) * radius,
+                    0
+                ));
+            }
+
+            // Define a spiral path
+            const pathPoints = [];
+            const spiralSegments = 50;
+            const spiralRadius = 2;
+            const spiralHeight = 5;
+            for (let i = 0; i <= spiralSegments; i++) {
+                const t = i / spiralSegments;
+                const angle = t * Math.PI * 4; // 2 full rotations
+                pathPoints.push(new Vector3(
+                    Math.cos(angle) * spiralRadius,
+                    t * spiralHeight,
+                    Math.sin(angle) * spiralRadius
+                ));
+            }
+
+            createSweptShape(profileVertices, pathPoints, 0xff006e);
+        }
+
+        // EXAMPLE 3: Star profile swept along a wave
+        function createStarAlongWave() {
+            console.log('Creating star swept along wave...');
+
+            // Define a star profile
+            const profileVertices = [];
+            const points = 5;
+            const outerRadius = 0.5;
+            const innerRadius = 0.2;
+            for (let i = 0; i < points * 2; i++) {
+                const angle = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+                const r = i % 2 === 0 ? outerRadius : innerRadius;
+                profileVertices.push(new Vector3(
+                    Math.cos(angle) * r,
+                    Math.sin(angle) * r,
+                    0
+                ));
+            }
+
+            // Define a wave path
+            const pathPoints = [];
+            const waveSegments = 40;
+            const waveLength = 6;
+            for (let i = 0; i <= waveSegments; i++) {
+                const t = (i / waveSegments) * waveLength;
+                pathPoints.push(new Vector3(
+                    t - waveLength / 2,
+                    Math.sin(t) * 1.5,
+                    Math.cos(t * 0.5) * 1
+                ));
+            }
+
+            createSweptShape(profileVertices, pathPoints, 0xffd60a);
+        }
+
+        function createSweptShape(profileVertices, pathPoints, color = 0x3a86ff) {
+            try {
+                // Create the swept shape using the Three.js wrapper
+                const sweptShape = new SweptShape({
+                    color: color,
+                    profileVertices: profileVertices,
+                    pathPoints: pathPoints
+                });
+
+                // Add to scene
+                scene.add(sweptShape);
+                sweptShapes.push(sweptShape);
+
+                console.log('✅ Swept shape created successfully!');
+                console.log('  - Profile vertices:', profileVertices.length);
+                console.log('  - Path points:', pathPoints.length);
+                console.log('  - Total triangles:', vertexBuffer.length / 9);
+
+            } catch (error) {
+                console.error('❌ Error creating swept shape:', error);
+            }
+        }
+
+        function clearScene() {
+            console.log('Clearing scene...');
+            sweptShapes.forEach((sweptShape) => {
+                scene.remove(sweptShape);
+                sweptShape.dispose();
+            });
+            sweptShapes = [];
+            console.log('✅ Scene cleared');
+        }
+
+        function toggleOutlines() {
+            const button = document.getElementById('btn-toggle-outline');
+            const showOutlines = !button.classList.contains('active');
+            
+            sweptShapes.forEach((sweptShape) => {
+                sweptShape.outline = showOutlines;
+            });
+
+            if (showOutlines) {
+                button.classList.add('active');
+                button.textContent = 'Hide Outlines';
+                console.log('✅ Outlines shown');
+            } else {
+                button.classList.remove('active');
+                button.textContent = 'Show Outlines';
+                console.log('✅ Outlines hidden');
+            }
+        }
+
+        // Initialize the application
+        initApp().catch(error => {
+            console.error('Failed to initialize:', error);
+        });
+    </script>
+</body>
+</html>

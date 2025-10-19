@@ -11,6 +11,39 @@ interface IOpeningOptions {
   color: number;
 }
 
+/**
+ * Opening shape class representing a cuboidal opening in 3D space.
+ * Useful for creating windows, doors, or other rectangular openings in architectural models.
+ * This class extends THREE.Mesh and provides full geometry management including outlines.
+ * 
+ * Doors, Windows or any architectural openings should extend this class.
+ * 
+ * @example Basic Usage
+ * ```typescript
+ * import { Opening } from 'opengeometry-three/shapes/opening';
+ * import { Vector3 } from 'opengeometry-three';
+ * 
+ * const opening = new Opening({
+ *   center: new Vector3(0, 1.5, 0),
+ *   width: 2,
+ *   height: 3,
+ *   depth: 0.2,
+ *   color: 0xffcc00,
+ * });
+ * scene.add(opening);
+ * 
+ * // Enable outline
+ * opening.outline = true;
+ * 
+ * // Update dimensions
+ * opening.width = 2.5;
+ * 
+ * // Clean up when done
+ * opening.discardGeometry();
+ * ```
+ * 
+ * @category Shapes
+ */
 export class Opening extends THREE.Mesh {
   ogid: string;
   options: IOpeningOptions = {

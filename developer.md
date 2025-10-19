@@ -34,12 +34,12 @@ OpenGeometry/
 ├── main/
 │   ├── opengeometry/
 │   └── opengeometry-three/
-├── OpenGeometry-Examples/
-│   ├── core/
-│   └── src/
-└── OpenPlans/
-    ├── src/
-    └── kernel/
+OpenGeometry-Examples/
+├── core/
+└── src/
+OpenPlans/
+├── src/
+└── kernel/
 ```
 
 ### Release Process
