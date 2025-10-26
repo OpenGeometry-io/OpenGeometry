@@ -109,7 +109,9 @@ export class Opening extends THREE.Mesh {
     const material = new THREE.MeshStandardMaterial({
       color: this.options.color,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0,
+      // Disable depth writing for transparent materials, so that we can see through openings and elements behind them
+      depthWrite: false,
     });
 
     geometry.computeVertexNormals();

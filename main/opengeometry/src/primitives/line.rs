@@ -12,6 +12,8 @@ use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use openmaths::Vector3;
 use uuid::Uuid;
+use dxf::Drawing;
+use dxf::entities::*;
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
@@ -103,5 +105,12 @@ impl OGLine {
 
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
+  }
+
+  pub fn get_dxf_serialized(&self) -> String {
+    let mut drawing = Drawing::new();
+    let added_entity_ref = drawing.add_entity(Entity::new(EntityType::Line(Line::default())));
+    // `added_entity_ref` is a reference to the newly added entity
+    let data = drawing.
   }
 }

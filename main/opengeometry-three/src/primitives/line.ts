@@ -80,4 +80,9 @@ export class Line extends THREE.Line {
     this.geometry = geometry;
     this.material = new THREE.LineBasicMaterial({ color: this.options.color });
   }
+
+  getDXF() {
+    const dxfData = this.line.get_dxf_serialized();
+    return dxfData;
+  }
 }
