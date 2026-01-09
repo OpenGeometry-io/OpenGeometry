@@ -3,21 +3,21 @@ import { OGPolygon, Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import { getUUID } from "../utils/randomizer";
 
 interface IPolygonOptions {
+  ogid?: string;
   vertices: Vector3[];
+  color: number;
 }
 
 export class Polygon extends THREE.Mesh {
   ogid: string;
-  options: IPolygonOptions = { vertices: [] };
+  options: IPolygonOptions = { vertices: [], color: 0x00ff00 };
   polygon: OGPolygon;
   #outlineMesh: THREE.Line | null = null;
-
-  #color: number = 0x00ff00;
 
   transformationMatrix: THREE.Matrix4 = new THREE.Matrix4();
 
   set color(color: number) {
-    this.#color = color;
+    this.options.color = color;
     if (this.material instanceof THREE.MeshStandardMaterial) {
       this.material.color.set(color);
     }
@@ -33,14 +33,13 @@ export class Polygon extends THREE.Mesh {
   // constructor(vertices?: Vector3[]) // If no vertices are provided, it will be an empty polygon
   constructor(options?: IPolygonOptions) {
     super();
-    this.ogid = getUUID();
-    if (options) {
-      this.options = options;
-    }
+    this.ogid = options?.ogid ?? getUUID();
     this.polygon = new OGPolygon(this.ogid);
+
+    this.options = { ...this.options, ...options };
+    this.options.ogid = this.ogid;
     
-    this.setConfig();
-    this.generateGeometry();
+    this.setConfig(this.options);
 
     // TODO: THIS MIGHT HELP WITH SHARING THE POSITION with KERNEL when something is changed
     // const originalSet = this.position.set.bind(this.position);
@@ -64,10 +63,15 @@ export class Polygon extends THREE.Mesh {
     }
   }
 
-  setConfig() {
+  setConfig(options: IPolygonOptions) {
     this.validateOptions();
-    const { vertices } = this.options;
+
+    const { vertices, color } = options;
     this.polygon.set_config(vertices);
+
+    this.options.color = color;
+
+    this.generateGeometry();
   }
 
   // /**
@@ -128,7 +132,17 @@ export class Polygon extends THREE.Mesh {
   //   return this._yaw;
   // }
 
+  cleanGeometry() {
+    this.geometry.dispose();
+    if (Array.isArray(this.material)) {
+      this.material.forEach(mat => mat.dispose());
+    } else {
+      this.material.dispose();
+    }
+  }
+
   generateGeometry() {
+    this.cleanGeometry();
 
     // this.updateMatrix();
     // this.transformationMatrix.copy(this.matrix);
@@ -155,10 +169,10 @@ export class Polygon extends THREE.Mesh {
       new THREE.Float32BufferAttribute(bufferData, 3)
     );
 
-    const material = new THREE.MeshStandardMaterial({
-      color: this.#color,
-      transparent: true,
-      opacity: 0.6,
+    const material = new THREE.MeshBasicMaterial({
+      color: this.options.color,
+      // transparent: true,
+      // opacity: 1,
       // TODO: Enabling Double Side untill we have proper face normals from triangulation
       side: THREE.DoubleSide,
     });

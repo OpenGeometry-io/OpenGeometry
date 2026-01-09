@@ -108,9 +108,7 @@ impl OGLine {
   }
 
   pub fn get_dxf_serialized(&self) -> String {
-    let mut drawing = Drawing::new();
-    let added_entity_ref = drawing.add_entity(Entity::new(EntityType::Line(Line::default())));
-    // `added_entity_ref` is a reference to the newly added entity
-    let data = drawing.
+    // TODO: Implement DXF serialization for line
+    String::new()
   }
 }
