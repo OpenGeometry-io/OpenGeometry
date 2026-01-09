@@ -12,6 +12,8 @@ use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use openmaths::Vector3;
 use uuid::Uuid;
+use dxf::Drawing;
+use dxf::entities::*;
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
@@ -103,5 +105,10 @@ impl OGLine {
 
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
+  }
+
+  pub fn get_dxf_serialized(&self) -> String {
+    // TODO: Implement DXF serialization for line
+    String::new()
   }
 }

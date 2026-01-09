@@ -60,13 +60,15 @@ export class Cuboid extends THREE.Mesh {
   setConfig(options: ICuboidOptions) {
     this.validateOptions();
 
-    const { width, height, depth, center } = options;
+    const { width, height, depth, center, color } = options;
     this.cuboid.set_config(
       center.clone(),
       width,
       height,
       depth
     );
+
+    this.options.color = color;
 
     this.generateGeometry();
   }
