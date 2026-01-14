@@ -21,12 +21,8 @@ export class Polyline extends THREE.Line {
 
   transformationMatrix: THREE.Matrix4 = new THREE.Matrix4();
 
-  // Properties that can be set externally but are not part of the constructor
-  // TODO: Consider making these properties part of the constructor options
-  #color: number = 0x00ff00;
-
   set color(color: number) {
-    this.#color = color;
+    this.options.color = color;
     if (this.material instanceof THREE.LineBasicMaterial) {
       this.material.color.set(color);
     }
@@ -40,7 +36,7 @@ export class Polyline extends THREE.Line {
 
     this.options = { ...this.options, ...options };
     this.options.ogid = this.ogid;
-    
+
     this.setConfig(this.options);
   }
 
@@ -91,8 +87,8 @@ export class Polyline extends THREE.Line {
     );
 
     this.geometry = geometry;
-    this.material = new THREE.LineBasicMaterial({ color: this.#color });
-    
+    this.material = new THREE.LineBasicMaterial({ color: this.options.color });
+
     this.isClosed = this.polyline.is_closed();
   }
 

@@ -10,6 +10,7 @@ export interface IArcOptions {
   startAngle: number;
   endAngle: number;
   segments: number;
+  color: number;
 }
 
 export class Arc extends THREE.Line {
@@ -20,15 +21,13 @@ export class Arc extends THREE.Line {
     startAngle: 0,
     endAngle: Math.PI * 2,
     segments: 32,
+    color: 0x00ff00,
   };
   
   private arc: OGArc;
 
-  // TODO: Create local properties for all Primitive classes
-  #color: number = 0x00ff00;
-
   set color(color: number) {
-    this.#color = color;
+    this.options.color = color;
     if (this.material instanceof THREE.LineBasicMaterial) {
       this.material.color.set(color);
     }
@@ -64,7 +63,6 @@ export class Arc extends THREE.Line {
       segments
     );
 
-    // If Config changes we need to regenerate geometry
     // TODO: can geometry generation be made optional
     this.generateGeometry();
   }
@@ -89,7 +87,7 @@ export class Arc extends THREE.Line {
     );
 
     this.geometry = geometry;
-    this.material = new THREE.LineBasicMaterial({ color: this.#color });
+    this.material = new THREE.LineBasicMaterial({ color: this.options.color });
   }
 
   getBrep() {
