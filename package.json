@@ -1,6 +1,6 @@
 {
   "name": "opengeometry",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "CAD Kernel for Web with OpenGeometry",
   "type": "module",
   "main": "index.js",
