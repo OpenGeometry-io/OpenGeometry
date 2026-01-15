@@ -18,9 +18,13 @@ export class Polygon extends THREE.Mesh {
 
   set color(color: number) {
     this.options.color = color;
-    if (this.material instanceof THREE.MeshStandardMaterial) {
+    if (this.material instanceof THREE.MeshBasicMaterial) {
       this.material.color.set(color);
     }
+  }
+
+  get color() {
+    return this.options.color;
   }
 
   // private _placement: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
