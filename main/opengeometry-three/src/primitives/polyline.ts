@@ -52,6 +52,8 @@ export class Polyline extends THREE.Line {
     const { points } = options;
     this.polyline.set_config(points.map(p => p.clone()));
 
+    this.color = options.color;
+
     this.generateGeometry();
   }
 
