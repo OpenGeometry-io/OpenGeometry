@@ -1,23 +1,31 @@
 import * as THREE from 'three';
 import { OGPolyline, Vector3 } from '../../../opengeometry/pkg/opengeometry';
 import { getUUID } from "../utils/randomizer";
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 
 export interface IPolylineOptions {
   ogid?: string;
   color: number;
   points: Vector3[];
+  fatLines?: boolean;
+  width?: number;
 }
 
 export class Polyline extends THREE.Line {
   ogid: string;
-  options: IPolylineOptions = { 
+  options: IPolylineOptions = {
     points: [],
-    color: 0x00ff00
+    color: 0x00ff00,
+    fatLines: false,
+    width: 20
   };
 
   isClosed: boolean = false;
 
   private polyline: OGPolyline;
+  private fatLine: Line2 | null = null;
 
   transformationMatrix: THREE.Matrix4 = new THREE.Matrix4();
 
@@ -25,6 +33,9 @@ export class Polyline extends THREE.Line {
     this.options.color = color;
     if (this.material instanceof THREE.LineBasicMaterial) {
       this.material.color.set(color);
+    }
+    if (this.fatLine && this.fatLine.material instanceof LineMaterial) {
+      this.fatLine.material.color.set(color);
     }
   }
 
@@ -54,6 +65,8 @@ export class Polyline extends THREE.Line {
 
     this.color = options.color;
 
+    this.options = { ...this.options, ...options };
+
     this.generateGeometry();
   }
 
@@ -78,9 +91,34 @@ export class Polyline extends THREE.Line {
   private generateGeometry() {
     this.discardGeometry();
 
+
     this.polyline.generate_geometry();
     const geometryData = this.polyline.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
+
+    // Handle fat lines
+    if (this.options.fatLines) {
+      if (!this.fatLine) {
+        this.fatLine = new Line2(new LineGeometry(), new LineMaterial({ color: this.options.color, linewidth: this.options.width, resolution: new THREE.Vector2(window.innerWidth, window.innerHeight) }));
+        this.add(this.fatLine);
+      }
+
+      const positions = [];
+      for (let i = 0; i < bufferData.length; i += 3) {
+        positions.push(bufferData[i], bufferData[i + 1], bufferData[i + 2]);
+      }
+
+      this.fatLine.geometry.setPositions(positions);
+      (this.fatLine.material as LineMaterial).color.set(this.options.color);
+      (this.fatLine.material as LineMaterial).linewidth = this.options.width ?? 5;
+      (this.fatLine.material as LineMaterial).resolution.set(window.innerWidth, window.innerHeight); // This might need global update handler
+
+      this.fatLine.visible = true;
+    } else {
+      if (this.fatLine) {
+        this.fatLine.visible = false;
+      }
+    }
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
@@ -90,6 +128,12 @@ export class Polyline extends THREE.Line {
 
     this.geometry = geometry;
     this.material = new THREE.LineBasicMaterial({ color: this.options.color });
+
+    if (this.options.fatLines) {
+      this.material.visible = false;
+    } else {
+      this.material.visible = true;
+    }
 
     this.isClosed = this.polyline.is_closed();
   }

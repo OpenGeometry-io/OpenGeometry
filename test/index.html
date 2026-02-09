@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>OpenGeometry</title>
   <meta charset="utf-8">
@@ -10,24 +11,26 @@
     }
   </style>
 </head>
+
 <body>
-  <div id="app"
-    style="width: 100vw; height: 100vh;"
-  ></div>
+  <div id="app" style="width: 100vw; height: 100vh;"></div>
 
   <script type="module">
     import {
       OpenGeometry,
       BasePoly,
       Vector3D,
+      Arc,
+      Polyline,
+      Line
     } from './../main/opengeometry-three/';
     import * as THREE from 'three';
     import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-  
+
     let scene, camera, renderer;
     let openGeometry;
 
-    async function init(){
+    async function init() {
       const app = document.getElementById('app');
 
       scene = new THREE.Scene();
@@ -37,10 +40,10 @@
       });
       renderer.setSize(app.clientWidth, app.clientHeight);
       app.appendChild(renderer.domElement);
-      
+
       openGeometry = await OpenGeometry.create({
         container: app,
-        scene, 
+        scene,
         camera
       });
 
@@ -52,7 +55,7 @@
 
       camera.position.z = 5;
       camera.position.y = 5;
-    
+
       // ambient light
       const ambientLight = new THREE.AmbientLight(0xffffff, 1);
       scene.add(ambientLight);
@@ -94,18 +97,55 @@
         colors[i + 6] = r;
         colors[i + 7] = g;
         colors[i + 8] = b;
+        colors[i + 6] = r;
+        colors[i + 7] = g;
+        colors[i + 8] = b;
       }
       ogPoly.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      const material = new THREE.MeshPhongMaterial( {
-          color: 0xffffff,
-          flatShading: true,
-          vertexColors: true,
-          shininess: 0,
-          side: THREE.DoubleSide
+      const material = new THREE.MeshPhongMaterial({
+        color: 0xffffff,
+        flatShading: true,
+        vertexColors: true,
+        shininess: 0,
+        side: THREE.DoubleSide
       });
       ogPoly.material = material;
 
       scene.add(ogPoly);
+
+      // Fat Line Examples
+
+      const fatArc = new Arc({
+        center: new Vector3D(20, 0, 20),
+        radius: 10,
+        startAngle: 0,
+        endAngle: Math.PI * 1.5,
+        color: 0xff0000,
+        fatLines: true,
+        width: 10
+      });
+      scene.add(fatArc);
+
+      const fatPoly = new Polyline({
+        points: [
+          new Vector3D(40, 0, 0),
+          new Vector3D(50, 0, 10),
+          new Vector3D(60, 0, 0)
+        ],
+        color: 0x0000ff,
+        fatLines: true,
+        width: 15
+      });
+      scene.add(fatPoly);
+
+      const fatLine = new Line({
+        start: new Vector3D(70, 0, 0),
+        end: new Vector3D(80, 0, 10),
+        color: 0x00ff00,
+        fatLines: true,
+        width: 8
+      });
+      scene.add(fatLine);
 
       initGUI();
       animate();
@@ -120,8 +160,9 @@
     init();
 
     function initGUI() {
-      
+
     }
   </script>
 </body>
+
 </html>
