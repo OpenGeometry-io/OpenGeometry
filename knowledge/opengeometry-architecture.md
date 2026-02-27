@@ -29,25 +29,25 @@ OpenGeometry/
 
 ```mermaid
 flowchart LR
-    A[App Code<br/>Browser / Node] --> B[@opengeometry/kernel-three<br/>TS wrappers]
-    B --> C[wasm-bindgen JS glue<br/>main/opengeometry/pkg]
-    C --> D[opengeometry_bg.wasm<br/>Rust kernel]
+    app["App Code<br/>Browser / Node"] --> wrapper["kernel-three wrapper<br/>TypeScript adapter"]
+    wrapper --> glue["wasm-bindgen JS glue<br/>main/opengeometry/pkg"]
+    glue --> wasm["opengeometry_bg.wasm<br/>Rust kernel"]
 
-    subgraph D1[Rust kernel modules]
-      D --> E[primitives/*<br/>construct Brep]
-      D --> F[operations/*<br/>triangulate + extrude + winding]
-      D --> G[scenegraph.rs<br/>OGSceneManager]
-      D --> H[export/projection.rs<br/>Camera + HLR -> Scene2D]
-      D --> I[export/pdf.rs<br/>native PDF only]
+    subgraph kernel["Rust kernel modules"]
+      wasm --> primitives["primitives/*<br/>construct BRep"]
+      wasm --> operations["operations/*<br/>triangulate + extrude + winding"]
+      wasm --> scenegraph["scenegraph.rs<br/>OGSceneManager"]
+      wasm --> projection["export/projection.rs<br/>Camera + HLR -> Scene2D"]
+      wasm --> pdf["export/pdf.rs<br/>native PDF only"]
     end
 
-    E --> J[brep/*<br/>Vertex Edge Face Brep]
-    F --> J
-    G --> J
-    H --> J
-    G --> H
-    H --> K[Scene2D / Scene2DLines JSON]
-    I --> L[PDF file output]
+    primitives --> brep["brep/*<br/>Vertex Edge Face BRep"]
+    operations --> brep
+    scenegraph --> brep
+    projection --> brep
+    scenegraph --> projection
+    projection --> scene2d["Scene2D / Scene2DLines JSON"]
+    pdf --> pdfout["PDF file output"]
 ```
 
 ## 3) Runtime Flow (What Drives the Engine)
