@@ -10,6 +10,7 @@ use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
 use crate::brep::{Brep, Vertex};
+use crate::drawing::{Path2D, Vec2};
 use crate::utility::bgeometry::BufferGeometry;
 use openmaths::Vector3;
 use uuid::Uuid;
@@ -134,4 +135,68 @@ impl OGRectangle {
   // pub fn destroy(&mut self) {
   //   self.points.clear();
   // }
+}
+
+/// Pure Rust methods for drawing/export (not exposed to WASM)
+impl OGRectangle {
+  /// Convert the rectangle to a 2D path for export.
+  /// Projects from 3D to 2D using the X-Z plane (ignores Y coordinate).
+  /// Returns a closed rectangular path.
+  pub fn to_path2d(&self) -> Path2D {
+    let mut path = Path2D::with_closed(true);
+    
+    let vertices = &self.brep.vertices;
+    if vertices.len() < 4 {
+      return path;
+    }
+    
+    // Convert rectangle vertices to 2D and create line segments
+    for i in 0..vertices.len() {
+      let start = Vec2::new(vertices[i].position.x, vertices[i].position.z);
+      let end = Vec2::new(
+        vertices[(i + 1) % vertices.len()].position.x,
+        vertices[(i + 1) % vertices.len()].position.z
+      );
+      path.add_line(start, end);
+    }
+    
+    path
+  }
+  
+  /// Convert the rectangle to a 2D path with custom projection.
+  /// 
+  /// # Arguments
+  /// * `x_axis` - Which 3D axis becomes 2D X: 0 = X, 1 = Y, 2 = Z
+  /// * `y_axis` - Which 3D axis becomes 2D Y: 0 = X, 1 = Y, 2 = Z
+  pub fn to_path2d_with_projection(&self, x_axis: u8, y_axis: u8) -> Path2D {
+    let mut path = Path2D::with_closed(true);
+    
+    let vertices = &self.brep.vertices;
+    if vertices.len() < 4 {
+      return path;
+    }
+    
+    let get_axis = |p: &Vector3, axis: u8| -> f64 {
+      match axis {
+        0 => p.x,
+        1 => p.y,
+        2 => p.z,
+        _ => p.x,
+      }
+    };
+    
+    for i in 0..vertices.len() {
+      let start = Vec2::new(
+        get_axis(&vertices[i].position, x_axis),
+        get_axis(&vertices[i].position, y_axis)
+      );
+      let end = Vec2::new(
+        get_axis(&vertices[(i + 1) % vertices.len()].position, x_axis),
+        get_axis(&vertices[(i + 1) % vertices.len()].position, y_axis)
+      );
+      path.add_line(start, end);
+    }
+    
+    path
+  }
 }

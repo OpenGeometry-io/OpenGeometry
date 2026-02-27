@@ -10,6 +10,7 @@ use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
 use crate::brep::{Brep, Edge, Face, Vertex};
+use crate::drawing::{Path2D, Vec2};
 use crate::operations::triangulate::triangulate_polygon_with_holes;
 use crate::utility::bgeometry::BufferGeometry;
 use openmaths::{Matrix4, Vector3};
@@ -487,4 +488,113 @@ impl OGPolygon {
 
   //   // serde_json::to_string(&outline_data).unwrap()
   // }
+}
+
+/// Pure Rust methods for drawing/export (not exposed to WASM)
+impl OGPolygon {
+  /// Convert the polygon outline to a 2D path for export.
+  /// Projects from 3D to 2D using the X-Z plane (ignores Y coordinate).
+  /// Returns a closed path representing the polygon boundary.
+  /// Note: Holes are not included in the main path - use to_path2d_with_holes for that.
+  pub fn to_path2d(&self) -> Path2D {
+    let mut path = Path2D::with_closed(true);
+    
+    if self.points.len() < 3 {
+      return path;
+    }
+    
+    // Convert polygon points to 2D and create line segments
+    let points_2d: Vec<Vec2> = self.points
+      .iter()
+      .map(|p| Vec2::new(p.x, p.z))
+      .collect();
+    
+    for i in 0..points_2d.len() {
+      path.add_line(points_2d[i], points_2d[(i + 1) % points_2d.len()]);
+    }
+    
+    path
+  }
+  
+  /// Convert the polygon to a 2D path with custom projection.
+  /// 
+  /// # Arguments
+  /// * `x_axis` - Which 3D axis becomes 2D X: 0 = X, 1 = Y, 2 = Z
+  /// * `y_axis` - Which 3D axis becomes 2D Y: 0 = X, 1 = Y, 2 = Z
+  pub fn to_path2d_with_projection(&self, x_axis: u8, y_axis: u8) -> Path2D {
+    let mut path = Path2D::with_closed(true);
+    
+    if self.points.len() < 3 {
+      return path;
+    }
+    
+    let get_axis = |p: &Vector3, axis: u8| -> f64 {
+      match axis {
+        0 => p.x,
+        1 => p.y,
+        2 => p.z,
+        _ => p.x,
+      }
+    };
+    
+    let points_2d: Vec<Vec2> = self.points
+      .iter()
+      .map(|p| Vec2::new(get_axis(p, x_axis), get_axis(p, y_axis)))
+      .collect();
+    
+    for i in 0..points_2d.len() {
+      path.add_line(points_2d[i], points_2d[(i + 1) % points_2d.len()]);
+    }
+    
+    path
+  }
+  
+  /// Convert the polygon outline AND holes to multiple 2D paths for export.
+  /// The first path is the outer boundary, followed by paths for each hole.
+  /// Projects from 3D to 2D using the X-Z plane (ignores Y coordinate).
+  pub fn to_paths2d_with_holes(&self) -> Vec<Path2D> {
+    let mut paths = Vec::new();
+    
+    // Add main polygon outline
+    paths.push(self.to_path2d());
+    
+    // Add holes as separate paths
+    if self.brep.holes.len() > 0 {
+      let vertices = &self.brep.vertices;
+      let hole_edges = &self.brep.hole_edges;
+      
+      // Group hole edges by their starting hole index
+      let mut current_hole_path = Path2D::with_closed(true);
+      let mut last_end_index: Option<u32> = None;
+      
+      for edge in hole_edges {
+        // If this edge doesn't connect to the previous one, start a new hole path
+        if let Some(last_end) = last_end_index {
+          if edge.v1 != last_end {
+            if current_hole_path.segment_count() > 0 {
+              paths.push(current_hole_path);
+            }
+            current_hole_path = Path2D::with_closed(true);
+          }
+        }
+        
+        let start = &vertices[edge.v1 as usize].position;
+        let end = &vertices[edge.v2 as usize].position;
+        
+        current_hole_path.add_line(
+          Vec2::new(start.x, start.z),
+          Vec2::new(end.x, end.z)
+        );
+        
+        last_end_index = Some(edge.v2);
+      }
+      
+      // Don't forget the last hole path
+      if current_hole_path.segment_count() > 0 {
+        paths.push(current_hole_path);
+      }
+    }
+    
+    paths
+  }
 }

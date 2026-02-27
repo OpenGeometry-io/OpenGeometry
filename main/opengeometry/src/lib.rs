@@ -26,6 +26,12 @@ pub mod primitives {
 
 pub mod brep;
 
+// Drawing abstraction for exports (PDF, SVG, DXF)
+pub mod drawing;
+
+// Export modules
+pub mod export;
+
 // v0.3.0
 // mod brep_ds {
 //   mod vertex;

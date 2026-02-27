@@ -12,8 +12,8 @@
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 
-use crate::brep::{Edge, Face, Brep, Vertex};
-use crate::utility::bgeometry::BufferGeometry;
+use crate::brep::{Brep, Vertex};
+use crate::drawing::{Path2D, Vec2};
 use openmaths::Vector3;
 use uuid::Uuid;
 
@@ -116,5 +116,77 @@ impl OGArc {
 
     let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
     vertex_serialized
+  }
+}
+
+/// Pure Rust methods for drawing/export (not exposed to WASM)
+impl OGArc {
+  /// Convert the arc to a 2D path for export.
+  /// Projects from 3D to 2D using the X-Z plane (ignores Y coordinate).
+  /// The arc is tessellated into line segments based on the segments count.
+  pub fn to_path2d(&self) -> Path2D {
+    let mut path = Path2D::new();
+    
+    let vertices = &self.brep.vertices;
+    if vertices.len() < 2 {
+      return path;
+    }
+    
+    // Convert consecutive vertices into line segments
+    for i in 0..vertices.len() - 1 {
+      let start = Vec2::new(vertices[i].position.x, vertices[i].position.z);
+      let end = Vec2::new(vertices[i + 1].position.x, vertices[i + 1].position.z);
+      path.add_line(start, end);
+    }
+    
+    // Check if it's a full circle (start_angle to end_angle is 2π)
+    let angle_range = (self.end_angle - self.start_angle).abs();
+    if (angle_range - 2.0 * std::f64::consts::PI).abs() < 0.001 {
+      path.closed = true;
+    }
+    
+    path
+  }
+  
+  /// Convert the arc to a 2D path with custom projection.
+  /// 
+  /// # Arguments
+  /// * `x_axis` - Which 3D axis becomes 2D X: 0 = X, 1 = Y, 2 = Z
+  /// * `y_axis` - Which 3D axis becomes 2D Y: 0 = X, 1 = Y, 2 = Z
+  pub fn to_path2d_with_projection(&self, x_axis: u8, y_axis: u8) -> Path2D {
+    let mut path = Path2D::new();
+    
+    let vertices = &self.brep.vertices;
+    if vertices.len() < 2 {
+      return path;
+    }
+    
+    let get_axis = |p: &Vector3, axis: u8| -> f64 {
+      match axis {
+        0 => p.x,
+        1 => p.y,
+        2 => p.z,
+        _ => p.x,
+      }
+    };
+    
+    for i in 0..vertices.len() - 1 {
+      let start = Vec2::new(
+        get_axis(&vertices[i].position, x_axis),
+        get_axis(&vertices[i].position, y_axis)
+      );
+      let end = Vec2::new(
+        get_axis(&vertices[i + 1].position, x_axis),
+        get_axis(&vertices[i + 1].position, y_axis)
+      );
+      path.add_line(start, end);
+    }
+    
+    let angle_range = (self.end_angle - self.start_angle).abs();
+    if (angle_range - 2.0 * std::f64::consts::PI).abs() < 0.001 {
+      path.closed = true;
+    }
+    
+    path
   }
 }

@@ -8,12 +8,11 @@
  */
 
 use crate::brep::{Brep, Vertex};
+use crate::drawing::{Path2D, Vec2};
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use openmaths::Vector3;
 use uuid::Uuid;
-use dxf::Drawing;
-use dxf::entities::*;
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
@@ -110,5 +109,44 @@ impl OGLine {
   pub fn get_dxf_serialized(&self) -> String {
     // TODO: Implement DXF serialization for line
     String::new()
+  }
+}
+
+/// Pure Rust methods for drawing/export (not exposed to WASM)
+impl OGLine {
+  /// Convert the line to a 2D path for export.
+  /// Projects from 3D to 2D using the X-Z plane (ignores Y coordinate).
+  pub fn to_path2d(&self) -> Path2D {
+    let mut path = Path2D::new();
+    
+    let start_2d = Vec2::new(self.start.x, self.start.z);
+    let end_2d = Vec2::new(self.end.x, self.end.z);
+    
+    path.add_line(start_2d, end_2d);
+    path
+  }
+  
+  /// Convert the line to a 2D path with custom projection.
+  /// 
+  /// # Arguments
+  /// * `x_axis` - Which 3D axis becomes 2D X: 0 = X, 1 = Y, 2 = Z
+  /// * `y_axis` - Which 3D axis becomes 2D Y: 0 = X, 1 = Y, 2 = Z
+  pub fn to_path2d_with_projection(&self, x_axis: u8, y_axis: u8) -> Path2D {
+    let mut path = Path2D::new();
+    
+    let get_axis = |p: &Vector3, axis: u8| -> f64 {
+      match axis {
+        0 => p.x,
+        1 => p.y,
+        2 => p.z,
+        _ => p.x,
+      }
+    };
+    
+    let start_2d = Vec2::new(get_axis(&self.start, x_axis), get_axis(&self.start, y_axis));
+    let end_2d = Vec2::new(get_axis(&self.end, x_axis), get_axis(&self.end, y_axis));
+    
+    path.add_line(start_2d, end_2d);
+    path
   }
 }

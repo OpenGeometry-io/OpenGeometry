@@ -21,3 +21,4 @@ uuid = { version = "1.17.0", features = ["v4", "serde", "js"] }
 getrandom = { version = "0.2", features = ["js"] }
 earcutr = "=0.3.0"
 dxf = "0.6.0"
+printpdf = "0.7"

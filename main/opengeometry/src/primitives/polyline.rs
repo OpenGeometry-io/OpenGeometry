@@ -7,6 +7,7 @@
  */
 
 use crate::brep::{Brep, Vertex};
+use crate::drawing::{Path2D, Vec2};
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use openmaths::Vector3;
@@ -261,4 +262,80 @@ impl OGPolyline {
   //     z: point_a.z + t * dz1,
   //   })
   // }
+}
+
+/// Pure Rust methods for drawing/export (not exposed to WASM)
+impl OGPolyline {
+  /// Convert the polyline to a 2D path for export.
+  /// Projects from 3D to 2D using the X-Z plane (ignores Y coordinate).
+  /// This is suitable for plan view exports (looking down from above).
+  pub fn to_path2d(&self) -> Path2D {
+    let mut path = Path2D::with_closed(self.is_closed);
+    
+    if self.points.len() < 2 {
+      return path;
+    }
+    
+    // Convert 3D points to 2D by projecting onto X-Z plane
+    let points_2d: Vec<Vec2> = self.points
+      .iter()
+      .map(|p| Vec2::new(p.x, p.z)) // X stays X, Z becomes Y in 2D
+      .collect();
+    
+    // Create line segments between consecutive points
+    for i in 0..points_2d.len() - 1 {
+      path.add_line(points_2d[i], points_2d[i + 1]);
+    }
+    
+    // Add closing segment if the polyline is closed
+    if self.is_closed && points_2d.len() > 2 {
+      path.add_line(
+        points_2d[points_2d.len() - 1],
+        points_2d[0]
+      );
+    }
+    
+    path
+  }
+  
+  /// Convert the polyline to a 2D path with custom projection.
+  /// Allows specifying which 3D axes map to 2D X and Y.
+  /// 
+  /// # Arguments
+  /// * `x_axis` - Which 3D axis becomes 2D X: 0 = X, 1 = Y, 2 = Z
+  /// * `y_axis` - Which 3D axis becomes 2D Y: 0 = X, 1 = Y, 2 = Z
+  pub fn to_path2d_with_projection(&self, x_axis: u8, y_axis: u8) -> Path2D {
+    let mut path = Path2D::with_closed(self.is_closed);
+    
+    if self.points.len() < 2 {
+      return path;
+    }
+    
+    let get_axis = |p: &Vector3, axis: u8| -> f64 {
+      match axis {
+        0 => p.x,
+        1 => p.y,
+        2 => p.z,
+        _ => p.x,
+      }
+    };
+    
+    let points_2d: Vec<Vec2> = self.points
+      .iter()
+      .map(|p| Vec2::new(get_axis(p, x_axis), get_axis(p, y_axis)))
+      .collect();
+    
+    for i in 0..points_2d.len() - 1 {
+      path.add_line(points_2d[i], points_2d[i + 1]);
+    }
+    
+    if self.is_closed && points_2d.len() > 2 {
+      path.add_line(
+        points_2d[points_2d.len() - 1],
+        points_2d[0]
+      );
+    }
+    
+    path
+  }
 }
