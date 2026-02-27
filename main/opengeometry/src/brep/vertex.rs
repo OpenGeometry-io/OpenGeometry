@@ -5,21 +5,20 @@ use serde::{de, Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Vertex {
-  pub id: u32,
-  pub position: Vector3,
-  
-  // TODO: Add support for halfedges
-  // pub edges: Vec<u32>,
-  // pub halfedges: Vec<u32>,
+    pub id: u32,
+    pub position: Vector3,
+    // TODO: Add support for halfedges
+    // pub edges: Vec<u32>,
+    // pub halfedges: Vec<u32>,
 }
 
 impl Vertex {
-  pub fn new(id: u32, position: Vector3) -> Self {
-    Vertex {
-      id,
-      position,
-      // edges: Vec::new(),
-      // halfedges: Vec::new(),
+    pub fn new(id: u32, position: Vector3) -> Self {
+        Vertex {
+            id,
+            position,
+            // edges: Vec::new(),
+            // halfedges: Vec::new(),
+        }
     }
-  }
 }

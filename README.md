@@ -23,3 +23,9 @@ Documentation is available at [OpenGeometry Documentation](https://docs.opengeom
 - Extrusion
 - Offset
 - Boolean Operations (In Progress)
+
+## AI Agent Docs Policy
+
+- Repository-level AI agent instructions are in [AGENTS.md](./AGENTS.md).
+- All AI-generated documentation must live under [`AI-DOCs/`](./AI-DOCs/).
+- AI-generated docs should not be added under app/code folders unless explicitly requested.

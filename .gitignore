@@ -30,3 +30,7 @@ settings.json
 
 # Copilot
 .github/*.md
+
+# CAD export artifacts
+*.pdf
+*.dxf

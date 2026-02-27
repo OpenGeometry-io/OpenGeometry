@@ -8,8 +8,6 @@ pub fn triangulate_polygon_with_holes(
         return Vec::new();
     }
 
-
-
     // --- 1. Projection to 2D ---
     // First, determine the best 2D plane to project onto by finding the
     // dominant axis of the face's normal.
@@ -30,7 +28,9 @@ pub fn triangulate_polygon_with_holes(
     // earcutr needs a flat list of 2D coordinates and a list of indices
     // where the holes begin.
 
-    let mut vertices_2d = Vec::with_capacity((face_vertices.len() + holes.iter().map(|h| h.len()).sum::<usize>()) * 2);
+    let mut vertices_2d = Vec::with_capacity(
+        (face_vertices.len() + holes.iter().map(|h| h.len()).sum::<usize>()) * 2,
+    );
     let mut hole_indices = Vec::with_capacity(holes.len());
 
     // Add outer loop vertices
