@@ -1,30 +1,32 @@
 pub mod geometry {
-  pub mod basegeometry;
-  pub mod triangle;
+    pub mod basegeometry;
+    pub mod triangle;
 }
 
 pub mod operations {
-  pub mod triangulate;
-  pub mod windingsort;
-  pub mod extrude;
+    pub mod extrude;
+    pub mod triangulate;
+    pub mod windingsort;
 }
 
 pub mod utility {
-  pub mod geometry;
-  pub mod bgeometry;
+    pub mod bgeometry;
+    pub mod geometry;
 }
 
 pub mod primitives {
-  pub mod arc;
-  pub mod line;
-  pub mod polyline;
-  pub mod rectangle;
-  pub mod polygon;
-  pub mod cylinder;
-  pub mod cuboid;
+    pub mod arc;
+    pub mod cuboid;
+    pub mod cylinder;
+    pub mod line;
+    pub mod polygon;
+    pub mod polyline;
+    pub mod rectangle;
 }
 
 pub mod brep;
+pub mod export;
+pub mod scenegraph;
 
 // v0.3.0
 // mod brep_ds {
@@ -34,4 +36,3 @@ pub mod brep;
 //   mod face;
 //   pub mod brep;
 // }
-
