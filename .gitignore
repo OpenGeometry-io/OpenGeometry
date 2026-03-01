@@ -34,3 +34,6 @@ settings.json
 # CAD export artifacts
 *.pdf
 *.dxf
+
+# CLI local session state
+.opengeometry/

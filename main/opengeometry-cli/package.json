@@ -1,0 +1,18 @@
+{
+  "name": "@opengeometry/cli",
+  "version": "0.1.0",
+  "description": "OpenGeometry command-line interface",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "opengeometry": "dist/bin/opengeometry.js"
+  },
+  "scripts": {
+    "lint": "node ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "build": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json",
+    "test": "npm run build && node --test test/**/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
