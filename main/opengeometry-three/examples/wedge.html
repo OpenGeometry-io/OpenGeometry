@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenGeometry Three - Wedge Example</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #111827;
+        color: #f9fafb;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      #app { width: 100%; height: 100%; }
+      .badge {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(17, 24, 39, 0.85);
+        border: 1px solid rgba(249, 250, 251, 0.15);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div class="badge">OpenGeometry Wedge in Three.js</div>
+
+    <script type="module">
+      import * as THREE from "https://unpkg.com/three@0.168.0/build/three.module.js";
+      import { OrbitControls } from "https://unpkg.com/three@0.168.0/examples/jsm/controls/OrbitControls.js";
+      import init, { OGWedge, Vector3 } from "../../opengeometry/pkg/opengeometry.js";
+
+      // Prerequisite:
+      // 1) Build wasm bindings from repo root: npm run build-core
+      // 2) Serve repository root: python3 -m http.server 8080
+      // 3) Open: http://localhost:8080/main/opengeometry-three/examples/wedge.html
+
+      await init();
+
+      const app = document.getElementById("app");
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x111827);
+
+      const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(4, 4, 6);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      app.appendChild(renderer.domElement);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+      const light = new THREE.DirectionalLight(0xffffff, 1.0);
+      light.position.set(3, 5, 4);
+      scene.add(light);
+      scene.add(new THREE.GridHelper(10, 10, 0x6b7280, 0x374151));
+
+      const wedge = new OGWedge("wedge-example");
+      wedge.set_config(new Vector3(0, 0.8, 0), 2.8, 1.6, 2.0);
+
+      const vertices = JSON.parse(wedge.get_geometry_serialized());
+      const lines = JSON.parse(wedge.get_outline_geometry_serialized());
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.computeVertexNormals();
+
+      const wedgeMesh = new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.75 })
+      );
+      scene.add(wedgeMesh);
+
+      const outlineGeometry = new THREE.BufferGeometry();
+      outlineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(lines, 3));
+      scene.add(new THREE.LineSegments(outlineGeometry, new THREE.LineBasicMaterial({ color: 0x111111 })));
+
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
+</html>

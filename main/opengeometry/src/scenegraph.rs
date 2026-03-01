@@ -15,6 +15,7 @@ use crate::primitives::line::OGLine;
 use crate::primitives::polygon::OGPolygon;
 use crate::primitives::polyline::OGPolyline;
 use crate::primitives::rectangle::OGRectangle;
+use crate::primitives::wedge::OGWedge;
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::export::pdf::{export_scene_to_pdf_with_config, PdfExportConfig};
@@ -162,12 +163,7 @@ impl OGSceneManager {
         kind: impl Into<String>,
         brep: &Brep,
     ) -> Result<(), String> {
-        self.upsert_entity_brep(
-            scene_id,
-            entity_id.into(),
-            kind.into(),
-            brep.clone(),
-        )
+        self.upsert_entity_brep(scene_id, entity_id.into(), kind.into(), brep.clone())
     }
 
     pub fn add_line_to_scene_internal(
@@ -233,6 +229,15 @@ impl OGSceneManager {
         self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGCylinder", cylinder.brep())
     }
 
+    pub fn add_wedge_to_scene_internal(
+        &mut self,
+        scene_id: &str,
+        entity_id: impl Into<String>,
+        wedge: &OGWedge,
+    ) -> Result<(), String> {
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGWedge", wedge.brep())
+    }
+
     pub fn project_scene_to_2d(
         &self,
         scene_id: &str,
@@ -253,7 +258,8 @@ impl OGSceneManager {
         config: &PdfExportConfig,
     ) -> Result<(), String> {
         let projected = self.project_scene_to_2d(scene_id, camera, hlr)?;
-        export_scene_to_pdf_with_config(&projected, file_path, config).map_err(|err| err.to_string())
+        export_scene_to_pdf_with_config(&projected, file_path, config)
+            .map_err(|err| err.to_string())
     }
 
     pub fn project_scene_to_2d_json(
@@ -576,6 +582,29 @@ impl OGSceneManager {
         self.add_cylinder_to_scene(scene_id, entity_id, cylinder)
     }
 
+    #[wasm_bindgen(js_name = addWedgeToScene)]
+    pub fn add_wedge_to_scene(
+        &mut self,
+        scene_id: String,
+        entity_id: String,
+        wedge: &OGWedge,
+    ) -> Result<(), JsValue> {
+        self.add_wedge_to_scene_internal(&scene_id, entity_id, wedge)
+            .map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = addWedgeToCurrentScene)]
+    pub fn add_wedge_to_current_scene(
+        &mut self,
+        entity_id: String,
+        wedge: &OGWedge,
+    ) -> Result<(), JsValue> {
+        let scene_id = self
+            .scene_id_or_current(None)
+            .map_err(|err| JsValue::from_str(&err))?;
+        self.add_wedge_to_scene(scene_id, entity_id, wedge)
+    }
+
     #[wasm_bindgen(js_name = projectTo2DCamera)]
     pub fn project_to_2d_camera(
         &self,
@@ -583,7 +612,8 @@ impl OGSceneManager {
         camera_json: String,
         hlr_json: Option<String>,
     ) -> Result<String, JsValue> {
-        let camera = Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
+        let camera =
+            Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
         let hlr = Self::parse_hlr_json(hlr_json).map_err(|err| JsValue::from_str(&err))?;
         self.project_scene_to_2d_json(&scene_id, &camera, &hlr)
             .map_err(|err| JsValue::from_str(&err))
@@ -596,7 +626,8 @@ impl OGSceneManager {
         camera_json: String,
         hlr_json: Option<String>,
     ) -> Result<String, JsValue> {
-        let camera = Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
+        let camera =
+            Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
         let hlr = Self::parse_hlr_json(hlr_json).map_err(|err| JsValue::from_str(&err))?;
         self.project_scene_to_2d_json_pretty(&scene_id, &camera, &hlr)
             .map_err(|err| JsValue::from_str(&err))
@@ -609,7 +640,8 @@ impl OGSceneManager {
         camera_json: String,
         hlr_json: Option<String>,
     ) -> Result<String, JsValue> {
-        let camera = Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
+        let camera =
+            Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
         let hlr = Self::parse_hlr_json(hlr_json).map_err(|err| JsValue::from_str(&err))?;
         self.project_scene_to_2d_lines_json(&scene_id, &camera, &hlr)
             .map_err(|err| JsValue::from_str(&err))
@@ -622,7 +654,8 @@ impl OGSceneManager {
         camera_json: String,
         hlr_json: Option<String>,
     ) -> Result<String, JsValue> {
-        let camera = Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
+        let camera =
+            Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
         let hlr = Self::parse_hlr_json(hlr_json).map_err(|err| JsValue::from_str(&err))?;
         self.project_scene_to_2d_lines_json_pretty(&scene_id, &camera, &hlr)
             .map_err(|err| JsValue::from_str(&err))
@@ -661,7 +694,8 @@ impl OGSceneManager {
         hlr_json: Option<String>,
         file_path: String,
     ) -> Result<(), JsValue> {
-        let camera = Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
+        let camera =
+            Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
         let hlr = Self::parse_hlr_json(hlr_json).map_err(|err| JsValue::from_str(&err))?;
         self.project_scene_to_pdf_with_camera(
             &scene_id,
@@ -697,7 +731,11 @@ mod tests {
             .unwrap();
 
         let scene_2d = manager
-            .project_scene_to_2d(&scene_id, &CameraParameters::default(), &HlrOptions::default())
+            .project_scene_to_2d(
+                &scene_id,
+                &CameraParameters::default(),
+                &HlrOptions::default(),
+            )
             .unwrap();
 
         assert!(!scene_2d.is_empty());
