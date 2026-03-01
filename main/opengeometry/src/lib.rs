@@ -22,6 +22,7 @@ pub mod primitives {
     pub mod polygon;
     pub mod polyline;
     pub mod rectangle;
+    pub mod wedge;
 }
 
 pub mod brep;
