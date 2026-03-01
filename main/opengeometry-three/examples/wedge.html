@@ -32,6 +32,15 @@
     <div id="app"></div>
     <div class="badge">OpenGeometry Wedge in Three.js</div>
 
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "../../../node_modules/three/build/three.module.js",
+          "three/examples/jsm/": "../../../node_modules/three/examples/jsm/"
+        }
+      }
+    </script>
+
     <script type="module">
       import * as THREE from "https://unpkg.com/three@0.168.0/build/three.module.js";
       import { OrbitControls } from "https://unpkg.com/three@0.168.0/examples/jsm/controls/OrbitControls.js";
