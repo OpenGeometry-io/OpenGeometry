@@ -13,6 +13,26 @@ export interface IPolylineOptions {
   width?: number;
 }
 
+export interface IOffsetResult {
+  points: Vector3[];
+  beveledVertexIndices: number[];
+  isClosed: boolean;
+}
+
+type OffsetKernelOutput = {
+  points: Array<{ x: number; y: number; z: number }>;
+  beveled_vertex_indices: number[];
+  is_closed: boolean;
+};
+
+/* eslint-disable no-unused-vars */
+type OffsetKernelFn = (
+  distance: number,
+  acuteThresholdDegrees: number,
+  bevel: boolean
+) => string;
+/* eslint-enable no-unused-vars */
+
 export class Polyline extends THREE.Line {
   ogid: string;
   options: IPolylineOptions = {
@@ -138,16 +158,31 @@ export class Polyline extends THREE.Line {
     this.isClosed = this.polyline.is_closed();
   }
 
-  // // TODO: Add proper return type
-  // createOffset(offset: number) {
-  //   if (!this.polyline) return null;
-  //   const offsetData = this.polyline.get_offset(offset);
-  //   if (!offsetData) return null;
+  getOffset(
+    distance: number,
+    acuteThresholdDegrees: number = 35.0,
+    bevel: boolean = true
+  ): IOffsetResult {
+    const kernel = this.polyline as unknown as {
+      get_offset_serialized?: OffsetKernelFn;
+    };
+    if (typeof kernel.get_offset_serialized !== "function") {
+      throw new Error(
+        "Offset API is not available in OGPolyline. Rebuild opengeometry wasm bindings."
+      );
+    }
 
-  //   const data = JSON.parse(offsetData);
-  //   if (!data.treated || data.treated.length === 0) {
-  //     return null;
-  //   }
-  //   return data;
-  // }
+    const serialized = kernel.get_offset_serialized(
+      distance,
+      acuteThresholdDegrees,
+      bevel
+    );
+
+    const parsed = JSON.parse(serialized) as OffsetKernelOutput;
+    return {
+      points: parsed.points.map((point) => new Vector3(point.x, point.y, point.z)),
+      beveledVertexIndices: parsed.beveled_vertex_indices ?? [],
+      isClosed: Boolean(parsed.is_closed),
+    };
+  }
 }

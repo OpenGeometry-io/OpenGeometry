@@ -5,6 +5,8 @@ pub mod geometry {
 
 pub mod operations {
     pub mod extrude;
+    pub mod offset;
+    pub mod sweep;
     pub mod triangulate;
     pub mod windingsort;
 }
@@ -17,12 +19,14 @@ pub mod utility {
 pub mod primitives {
     pub mod arc;
     pub mod cuboid;
+    pub mod curve;
     pub mod cylinder;
     pub mod line;
     pub mod polygon;
     pub mod polyline;
     pub mod rectangle;
     pub mod wedge;
+    pub mod sweep;
 }
 
 pub mod brep;

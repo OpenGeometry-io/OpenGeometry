@@ -14,6 +14,26 @@ export interface ILineOptions {
   width?: number;
 }
 
+export interface ILineOffsetResult {
+  points: Vector3[];
+  beveledVertexIndices: number[];
+  isClosed: boolean;
+}
+
+type OffsetKernelOutput = {
+  points: Array<{ x: number; y: number; z: number }>;
+  beveled_vertex_indices: number[];
+  is_closed: boolean;
+};
+
+/* eslint-disable no-unused-vars */
+type OffsetKernelFn = (
+  distance: number,
+  acuteThresholdDegrees: number,
+  bevel: boolean
+) => string;
+/* eslint-enable no-unused-vars */
+
 /**
  * Simple Line defined by Two Points
  */
@@ -128,5 +148,33 @@ export class Line extends THREE.Line {
   getDXF() {
     const dxfData = this.line.get_dxf_serialized();
     return dxfData;
+  }
+
+  getOffset(
+    distance: number,
+    acuteThresholdDegrees: number = 35.0,
+    bevel: boolean = true
+  ): ILineOffsetResult {
+    const kernel = this.line as unknown as {
+      get_offset_serialized?: OffsetKernelFn;
+    };
+    if (typeof kernel.get_offset_serialized !== "function") {
+      throw new Error(
+        "Offset API is not available in OGLine. Rebuild opengeometry wasm bindings."
+      );
+    }
+
+    const serialized = kernel.get_offset_serialized(
+      distance,
+      acuteThresholdDegrees,
+      bevel
+    );
+
+    const parsed = JSON.parse(serialized) as OffsetKernelOutput;
+    return {
+      points: parsed.points.map((point) => new Vector3(point.x, point.y, point.z)),
+      beveledVertexIndices: parsed.beveled_vertex_indices ?? [],
+      isClosed: Boolean(parsed.is_closed),
+    };
   }
 }

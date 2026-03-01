@@ -29,3 +29,7 @@ Documentation is available at [OpenGeometry Documentation](https://docs.opengeom
 - Repository-level AI agent instructions are in [AGENTS.md](./AGENTS.md).
 - All AI-generated documentation must live under [`AI-DOCs/`](./AI-DOCs/).
 - AI-generated docs should not be added under app/code folders unless explicitly requested.
+
+----
+
+> It is my land. Who would I be if I did not try to make it better? - A Knight.

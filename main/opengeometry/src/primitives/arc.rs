@@ -89,8 +89,8 @@ impl OGArc {
             angle += angle_diff;
         }
 
-        let is_closed = (self.end_angle - self.start_angle).abs()
-            >= 2.0 * std::f64::consts::PI - 1.0e-9;
+        let is_closed =
+            (self.end_angle - self.start_angle).abs() >= 2.0 * std::f64::consts::PI - 1.0e-9;
         let mut edge_vertex_count = self.brep.vertices.len();
 
         if is_closed && edge_vertex_count > 2 {
@@ -110,9 +110,11 @@ impl OGArc {
         }
 
         for i in 0..(edge_vertex_count - 1) {
-            self.brep
-                .edges
-                .push(Edge::new(self.brep.get_edge_count(), i as u32, (i + 1) as u32));
+            self.brep.edges.push(Edge::new(
+                self.brep.get_edge_count(),
+                i as u32,
+                (i + 1) as u32,
+            ));
         }
 
         if is_closed && edge_vertex_count > 2 {
