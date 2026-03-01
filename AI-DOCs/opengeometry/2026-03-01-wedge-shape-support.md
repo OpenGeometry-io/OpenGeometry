@@ -25,6 +25,9 @@ The kernel already supports common primitive and solid shapes (e.g., cuboid and 
 5. Browser example:
    - `python3 -m http.server 8080`
    - Open `http://localhost:8080/main/opengeometry-three/examples/wedge.html`
+4. Example output:
+   - `cd main/opengeometry && cargo run --example pdf_primitives_all -- wedge_demo`
+   - Confirm `wedge_demo_wedge.pdf` is generated.
 
 ## Backward-compatibility notes
 - No existing primitive behavior or API signatures were modified.

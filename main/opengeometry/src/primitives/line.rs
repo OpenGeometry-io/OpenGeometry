@@ -8,6 +8,7 @@
  */
 use crate::brep::{Brep, Edge, Vertex};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
+use crate::operations::offset::{offset_path, OffsetOptions, OffsetResult};
 use dxf::entities::*;
 use dxf::Drawing;
 use openmaths::Vector3;
@@ -110,6 +111,17 @@ impl OGLine {
         vertex_serialized
     }
 
+    #[wasm_bindgen]
+    pub fn get_offset_serialized(
+        &self,
+        distance: f64,
+        acute_threshold_degrees: f64,
+        bevel: bool,
+    ) -> String {
+        let result = self.get_offset_result(distance, acute_threshold_degrees, bevel);
+        serde_json::to_string(&result).unwrap()
+    }
+
     pub fn get_dxf_serialized(&self) -> String {
         // TODO: Implement DXF serialization for line
         String::new()
@@ -119,6 +131,30 @@ impl OGLine {
 impl OGLine {
     pub fn brep(&self) -> &Brep {
         &self.brep
+    }
+
+    pub fn get_offset_result(
+        &self,
+        distance: f64,
+        acute_threshold_degrees: f64,
+        bevel: bool,
+    ) -> OffsetResult {
+        let options = OffsetOptions {
+            bevel,
+            acute_threshold_degrees,
+        };
+        let points = vec![self.start, self.end];
+        offset_path(&points, distance, Some(false), options)
+    }
+
+    pub fn get_offset_points(
+        &self,
+        distance: f64,
+        acute_threshold_degrees: f64,
+        bevel: bool,
+    ) -> Vec<Vector3> {
+        self.get_offset_result(distance, acute_threshold_degrees, bevel)
+            .points
     }
 
     pub fn to_projected_scene2d(&self, camera: &CameraParameters, hlr: &HlrOptions) -> Scene2D {

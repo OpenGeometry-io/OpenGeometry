@@ -652,3 +652,4 @@ export {
 
 export * from './src/primitives/';
 export * from './src/shapes/';
+export * from './src/examples/';

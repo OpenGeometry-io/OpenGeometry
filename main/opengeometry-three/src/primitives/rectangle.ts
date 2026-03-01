@@ -10,6 +10,26 @@ export interface IRectangleOptions {
   color: number;
 }
 
+export interface IRectangleOffsetResult {
+  points: Vector3[];
+  beveledVertexIndices: number[];
+  isClosed: boolean;
+}
+
+type OffsetKernelOutput = {
+  points: Array<{ x: number; y: number; z: number }>;
+  beveled_vertex_indices: number[];
+  is_closed: boolean;
+};
+
+/* eslint-disable no-unused-vars */
+type OffsetKernelFn = (
+  distance: number,
+  acuteThresholdDegrees: number,
+  bevel: boolean
+) => string;
+/* eslint-enable no-unused-vars */
+
 export class Rectangle extends THREE.Line {
   ogid: string;
   options: IRectangleOptions = {
@@ -104,6 +124,34 @@ export class Rectangle extends THREE.Line {
       throw new Error("Brep data is not available for Rectangle");
     }
     return JSON.parse(brepData);
+  }
+
+  getOffset(
+    distance: number,
+    acuteThresholdDegrees: number = 35.0,
+    bevel: boolean = true
+  ): IRectangleOffsetResult {
+    const kernel = this.polyLineRectangle as unknown as {
+      get_offset_serialized?: OffsetKernelFn;
+    };
+    if (typeof kernel.get_offset_serialized !== "function") {
+      throw new Error(
+        "Offset API is not available in OGRectangle. Rebuild opengeometry wasm bindings."
+      );
+    }
+
+    const serialized = kernel.get_offset_serialized(
+      distance,
+      acuteThresholdDegrees,
+      bevel
+    );
+    const parsed = JSON.parse(serialized) as OffsetKernelOutput;
+
+    return {
+      points: parsed.points.map((point) => new Vector3(point.x, point.y, point.z)),
+      beveledVertexIndices: parsed.beveled_vertex_indices ?? [],
+      isClosed: Boolean(parsed.is_closed),
+    };
   }
 
   discardGeometry() {

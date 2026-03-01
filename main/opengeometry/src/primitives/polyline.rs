@@ -7,6 +7,7 @@
  */
 use crate::brep::{Brep, Edge, Face, Vertex};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
+use crate::operations::offset::{offset_path, OffsetOptions, OffsetResult};
 use openmaths::Vector3;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -130,7 +131,9 @@ impl OGPolyline {
         }
 
         for i in 0..effective_len {
-            self.brep.vertices.push(Vertex::new(i as u32, self.points[i]));
+            self.brep
+                .vertices
+                .push(Vertex::new(i as u32, self.points[i]));
         }
 
         if effective_len < 2 {
@@ -138,9 +141,11 @@ impl OGPolyline {
         }
 
         for i in 0..(effective_len - 1) {
-            self.brep
-                .edges
-                .push(Edge::new(self.brep.get_edge_count(), i as u32, (i + 1) as u32));
+            self.brep.edges.push(Edge::new(
+                self.brep.get_edge_count(),
+                i as u32,
+                (i + 1) as u32,
+            ));
         }
 
         if self.is_closed && effective_len > 2 {
@@ -189,6 +194,17 @@ impl OGPolyline {
         self.is_closed
     }
 
+    #[wasm_bindgen]
+    pub fn get_offset_serialized(
+        &self,
+        distance: f64,
+        acute_threshold_degrees: f64,
+        bevel: bool,
+    ) -> String {
+        let result = self.get_offset_result(distance, acute_threshold_degrees, bevel);
+        serde_json::to_string(&result).unwrap()
+    }
+
     // Simple Check to see if the Polyline is closed
     // This can be made better
     pub fn check_closed_test(&mut self) {
@@ -220,96 +236,41 @@ impl OGPolyline {
             vertex_buffer.push(vertex.position.z);
         }
 
+        // For closed polylines, line rendering needs the first vertex repeated
+        // at the end to draw the closing segment from last->first.
+        if self.is_closed && !self.brep.vertices.is_empty() {
+            let first = self.brep.vertices[0].position;
+            vertex_buffer.push(first.x);
+            vertex_buffer.push(first.y);
+            vertex_buffer.push(first.z);
+        }
+
         let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
         vertex_serialized
     }
+}
 
-    // // Paper - https://seant23.wordpress.com/wp-content/uploads/2010/11/anoffsetalgorithm.pdf
-    // // Paper has coverage for curves as well, but we will only implement for polylines
-    // #[wasm_bindgen]
-    // pub fn get_offset(&self, distance: f64) -> String {
-    //   let n = self.points.len();
-    //   if n < 2 {
-    //       return serde_json::to_string(&Vec::<Vector3>::new()).unwrap();
-    //   }
+impl OGPolyline {
+    pub fn get_offset_result(
+        &self,
+        distance: f64,
+        acute_threshold_degrees: f64,
+        bevel: bool,
+    ) -> OffsetResult {
+        let options = OffsetOptions {
+            bevel,
+            acute_threshold_degrees,
+        };
+        offset_path(&self.points, distance, Some(self.is_closed), options)
+    }
 
-    //   let mut offset_points = Vec::new();
-
-    //   for i in 0..n {
-    //     let mut prev = if i == 0 {
-    //       self.points[i]
-    //     } else {
-    //       self.points[i - 1]
-    //     };
-    //     let mut curr = self.points[i];
-    //     let mut next = if i == n - 1 {
-    //       self.points[i]
-    //     } else {
-    //       self.points[i + 1]
-    //     };
-
-    //     let v1 = curr.subtract(&prev).normalize();
-    //     let v2 = next.subtract(&curr).normalize();
-
-    //     let mut perp1 = Vector3 { x: -v1.z, y: 0.0, z: v1.x };
-    //     let mut perp2 = Vector3 { x: -v2.z, y: 0.0, z: v2.x };
-
-    //     let offset_point = if i == 0 {
-    //       // Start point: move perpendicular to first segment
-    //       curr.add(&perp2.multiply_scalar(distance))
-    //     } else if i == n - 1 {
-    //       // End point: move perpendicular to last segment
-    //       curr.add(&perp1.multiply_scalar(distance))
-    //     } else {
-    //       // Middle: compute bisector intersection
-    //       let a1 = prev.add(&perp1.multiply_scalar(distance));
-    //       let a2 = curr.add(&perp1.multiply_scalar(distance));
-    //       let b1 = curr.add(&perp2.multiply_scalar(distance));
-    //       let b2 = next.add(&perp2.multiply_scalar(distance));
-
-    //       Self::calculate_2D_interesection(&a1, &a2, &b1, &b2)
-    //           .unwrap_or(curr.add(&perp1.multiply_scalar(distance)))
-    //     };
-
-    //     offset_points.push(offset_point);
-    //   }
-
-    //   let ccw_test = windingsort::is_ccw_need(offset_points.clone());
-
-    //   let data = Data {
-    //     untreated: offset_points.clone(),
-    //     treated: ccw_test.ccw.clone(),
-    //     flag: ccw_test.flag,
-    //   };
-
-    //   serde_json::to_string(&data).unwrap()
-    // }
-
-    // pub fn calculate_2D_interesection(
-    //   point_a: &Vector3,
-    //   point_b: &Vector3,
-    //   point_c: &Vector3,
-    //   point_d: &Vector3,
-    // ) -> Option<Vector3> {
-    //   let dx1 = point_b.x - point_a.x;
-    //   let dz1 = point_b.z - point_a.z;
-    //   let dx2 = point_d.x - point_c.x;
-    //   let dz2 = point_d.z - point_c.z;
-
-    //   let det = dx1 * dz2 - dz1 * dx2;
-    //   if det.abs() < 1e-8 {
-    //     return None; // Parallel lines
-    //   }
-
-    //   let dx = point_c.x - point_a.x;
-    //   let dz = point_c.z - point_a.z;
-
-    //   let t = (dx * dz2 - dz * dx2) / det;
-
-    //   Some(Vector3 {
-    //     x: point_a.x + t * dx1,
-    //     y: 0.0,
-    //     z: point_a.z + t * dz1,
-    //   })
-    // }
+    pub fn get_offset_points(
+        &self,
+        distance: f64,
+        acute_threshold_degrees: f64,
+        bevel: bool,
+    ) -> Vec<Vector3> {
+        self.get_offset_result(distance, acute_threshold_degrees, bevel)
+            .points
+    }
 }

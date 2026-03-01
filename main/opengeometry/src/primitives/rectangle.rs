@@ -11,6 +11,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::brep::{Brep, Edge, Face, Vertex};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
+use crate::operations::offset::{offset_path, OffsetOptions, OffsetResult};
 use crate::utility::bgeometry::BufferGeometry;
 use openmaths::Vector3;
 use uuid::Uuid;
@@ -123,6 +124,17 @@ impl OGRectangle {
         vertex_serialized
     }
 
+    #[wasm_bindgen]
+    pub fn get_offset_serialized(
+        &self,
+        distance: f64,
+        acute_threshold_degrees: f64,
+        bevel: bool,
+    ) -> String {
+        let result = self.get_offset_result(distance, acute_threshold_degrees, bevel);
+        serde_json::to_string(&result).unwrap()
+    }
+
     // TODO: Implement properties and destroy methods
     // #[wasm_bindgen]
     // pub fn update_width(&mut self, width: f64) {
@@ -145,6 +157,43 @@ impl OGRectangle {
 impl OGRectangle {
     pub fn brep(&self) -> &Brep {
         &self.brep
+    }
+
+    pub fn get_raw_points(&self) -> Vec<Vector3> {
+        let half_width = self.width / 2.0;
+        let half_breadth = self.breadth / 2.0;
+        let center = self.center;
+
+        vec![
+            Vector3::new(-half_width, 0.0, -half_breadth).add(&center),
+            Vector3::new(half_width, 0.0, -half_breadth).add(&center),
+            Vector3::new(half_width, 0.0, half_breadth).add(&center),
+            Vector3::new(-half_width, 0.0, half_breadth).add(&center),
+        ]
+    }
+
+    pub fn get_offset_result(
+        &self,
+        distance: f64,
+        acute_threshold_degrees: f64,
+        bevel: bool,
+    ) -> OffsetResult {
+        let options = OffsetOptions {
+            bevel,
+            acute_threshold_degrees,
+        };
+        let points = self.get_raw_points();
+        offset_path(&points, distance, Some(true), options)
+    }
+
+    pub fn get_offset_points(
+        &self,
+        distance: f64,
+        acute_threshold_degrees: f64,
+        bevel: bool,
+    ) -> Vec<Vector3> {
+        self.get_offset_result(distance, acute_threshold_degrees, bevel)
+            .points
     }
 
     pub fn to_projected_scene2d(&self, camera: &CameraParameters, hlr: &HlrOptions) -> Scene2D {
