@@ -15,6 +15,7 @@ use crate::primitives::line::OGLine;
 use crate::primitives::polygon::OGPolygon;
 use crate::primitives::polyline::OGPolyline;
 use crate::primitives::rectangle::OGRectangle;
+use crate::primitives::wedge::OGWedge;
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::export::pdf::{export_scene_to_pdf_with_config, PdfExportConfig};
@@ -226,6 +227,15 @@ impl OGSceneManager {
         cylinder: &OGCylinder,
     ) -> Result<(), String> {
         self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGCylinder", cylinder.brep())
+    }
+
+    pub fn add_wedge_to_scene_internal(
+        &mut self,
+        scene_id: &str,
+        entity_id: impl Into<String>,
+        wedge: &OGWedge,
+    ) -> Result<(), String> {
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGWedge", wedge.brep())
     }
 
     pub fn project_scene_to_2d(
@@ -570,6 +580,29 @@ impl OGSceneManager {
             .scene_id_or_current(None)
             .map_err(|err| JsValue::from_str(&err))?;
         self.add_cylinder_to_scene(scene_id, entity_id, cylinder)
+    }
+
+    #[wasm_bindgen(js_name = addWedgeToScene)]
+    pub fn add_wedge_to_scene(
+        &mut self,
+        scene_id: String,
+        entity_id: String,
+        wedge: &OGWedge,
+    ) -> Result<(), JsValue> {
+        self.add_wedge_to_scene_internal(&scene_id, entity_id, wedge)
+            .map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = addWedgeToCurrentScene)]
+    pub fn add_wedge_to_current_scene(
+        &mut self,
+        entity_id: String,
+        wedge: &OGWedge,
+    ) -> Result<(), JsValue> {
+        let scene_id = self
+            .scene_id_or_current(None)
+            .map_err(|err| JsValue::from_str(&err))?;
+        self.add_wedge_to_scene(scene_id, entity_id, wedge)
     }
 
     #[wasm_bindgen(js_name = projectTo2DCamera)]
