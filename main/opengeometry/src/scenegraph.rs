@@ -162,12 +162,7 @@ impl OGSceneManager {
         kind: impl Into<String>,
         brep: &Brep,
     ) -> Result<(), String> {
-        self.upsert_entity_brep(
-            scene_id,
-            entity_id.into(),
-            kind.into(),
-            brep.clone(),
-        )
+        self.upsert_entity_brep(scene_id, entity_id.into(), kind.into(), brep.clone())
     }
 
     pub fn add_line_to_scene_internal(
@@ -253,7 +248,8 @@ impl OGSceneManager {
         config: &PdfExportConfig,
     ) -> Result<(), String> {
         let projected = self.project_scene_to_2d(scene_id, camera, hlr)?;
-        export_scene_to_pdf_with_config(&projected, file_path, config).map_err(|err| err.to_string())
+        export_scene_to_pdf_with_config(&projected, file_path, config)
+            .map_err(|err| err.to_string())
     }
 
     pub fn project_scene_to_2d_json(
@@ -583,7 +579,8 @@ impl OGSceneManager {
         camera_json: String,
         hlr_json: Option<String>,
     ) -> Result<String, JsValue> {
-        let camera = Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
+        let camera =
+            Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
         let hlr = Self::parse_hlr_json(hlr_json).map_err(|err| JsValue::from_str(&err))?;
         self.project_scene_to_2d_json(&scene_id, &camera, &hlr)
             .map_err(|err| JsValue::from_str(&err))
@@ -596,7 +593,8 @@ impl OGSceneManager {
         camera_json: String,
         hlr_json: Option<String>,
     ) -> Result<String, JsValue> {
-        let camera = Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
+        let camera =
+            Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
         let hlr = Self::parse_hlr_json(hlr_json).map_err(|err| JsValue::from_str(&err))?;
         self.project_scene_to_2d_json_pretty(&scene_id, &camera, &hlr)
             .map_err(|err| JsValue::from_str(&err))
@@ -609,7 +607,8 @@ impl OGSceneManager {
         camera_json: String,
         hlr_json: Option<String>,
     ) -> Result<String, JsValue> {
-        let camera = Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
+        let camera =
+            Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
         let hlr = Self::parse_hlr_json(hlr_json).map_err(|err| JsValue::from_str(&err))?;
         self.project_scene_to_2d_lines_json(&scene_id, &camera, &hlr)
             .map_err(|err| JsValue::from_str(&err))
@@ -622,7 +621,8 @@ impl OGSceneManager {
         camera_json: String,
         hlr_json: Option<String>,
     ) -> Result<String, JsValue> {
-        let camera = Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
+        let camera =
+            Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
         let hlr = Self::parse_hlr_json(hlr_json).map_err(|err| JsValue::from_str(&err))?;
         self.project_scene_to_2d_lines_json_pretty(&scene_id, &camera, &hlr)
             .map_err(|err| JsValue::from_str(&err))
@@ -661,7 +661,8 @@ impl OGSceneManager {
         hlr_json: Option<String>,
         file_path: String,
     ) -> Result<(), JsValue> {
-        let camera = Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
+        let camera =
+            Self::parse_camera_json(&camera_json).map_err(|err| JsValue::from_str(&err))?;
         let hlr = Self::parse_hlr_json(hlr_json).map_err(|err| JsValue::from_str(&err))?;
         self.project_scene_to_pdf_with_camera(
             &scene_id,
@@ -697,7 +698,11 @@ mod tests {
             .unwrap();
 
         let scene_2d = manager
-            .project_scene_to_2d(&scene_id, &CameraParameters::default(), &HlrOptions::default())
+            .project_scene_to_2d(
+                &scene_id,
+                &CameraParameters::default(),
+                &HlrOptions::default(),
+            )
             .unwrap();
 
         assert!(!scene_2d.is_empty());

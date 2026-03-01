@@ -43,6 +43,42 @@ Custom output prefix for per-primitive PDFs:
 cargo run --example pdf_primitives_all -- ./all_primitives
 ```
 
+Sweep a profile along a path and export the projected result:
+
+```bash
+cargo run --example sweep_path_profile
+```
+
+Custom output path for sweep example:
+
+```bash
+cargo run --example sweep_path_profile -- ./sweep_custom.pdf
+```
+
+Offset primitives example (line/polyline/curve/rectangle) with acute-corner beveling:
+
+```bash
+cargo run --example offset_primitives
+```
+
+Custom output path for offset primitives example:
+
+```bash
+cargo run --example offset_primitives -- ./offset_primitives_custom.pdf
+```
+
+Create a wall polygon from two polyline offsets:
+
+```bash
+cargo run --example wall_from_polyline_offsets
+```
+
+Custom output path for wall-from-offsets example:
+
+```bash
+cargo run --example wall_from_polyline_offsets -- ./wall_offsets_custom.pdf
+```
+
 Scenegraph-based projection flow (single source for `projectTo2DCamera` and PDF):
 
 ```bash

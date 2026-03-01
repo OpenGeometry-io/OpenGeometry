@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenGeometry Wall From Offsets Example</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #f4f5f7;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      }
+
+      #app {
+        width: 100%;
+        height: 100%;
+      }
+
+      #info {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid #d6d9de;
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: #1f2937;
+        font-size: 13px;
+        line-height: 1.35;
+        max-width: 420px;
+      }
+
+      code {
+        background: #eef2f7;
+        border-radius: 4px;
+        padding: 1px 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="info">
+      <div><strong>Wall Polygon From Two Polyline Offsets</strong></div>
+      <div>
+        Builds left/right offsets from a center polyline, then stitches both offsets into a
+        wall polygon footprint.
+      </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "../../../node_modules/three/build/three.module.js",
+          "three/examples/jsm/": "../../../node_modules/three/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import { OpenGeometry, createWallFromOffsetsExample } from "../../../dist/index.js";
+
+      const app = document.getElementById("app");
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf4f5f7);
+
+      const camera = new THREE.PerspectiveCamera(
+        55,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        2000
+      );
+      camera.position.set(5.8, 4.2, 7.4);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      app.appendChild(renderer.domElement);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.target.set(0.2, 0.0, 0.4);
+      controls.update();
+
+      scene.add(new THREE.GridHelper(24, 24, 0x8a8f98, 0xd2d6dc));
+      scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.85);
+      key.position.set(5, 8, 6);
+      scene.add(key);
+
+      await OpenGeometry.create({ wasmURL: "../../../dist/opengeometry_bg.wasm" });
+      createWallFromOffsetsExample(scene);
+
+      function onResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      window.addEventListener("resize", onResize);
+
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      animate();
+    </script>
+  </body>
+</html>
