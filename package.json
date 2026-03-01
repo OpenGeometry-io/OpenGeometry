@@ -6,10 +6,11 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "cargo test --manifest-path main/opengeometry/Cargo.toml && cargo test --examples --manifest-path main/opengeometry/Cargo.toml",
     "lint": "eslint main/opengeometry-three/src/**/*.ts --fix",
     "lint:check": "eslint main/opengeometry-three/src/**/*.ts",
     "build-three": "rollup -c rollup.config.js",
+    "build-example-three": "npm --prefix main/opengeometry-three run build-example-three",
     "build-core": "cd main/opengeometry && wasm-pack build --target web && cargo build --release",
     "copy-wasm": "mkdir -p dist && cp main/opengeometry/pkg/opengeometry_bg.wasm dist/ && cp main/opengeometry/pkg/opengeometry_bg.wasm.d.ts dist/ && cp package.json dist/",
     "build": "npm run build-core && npm run build-three && npm run copy-wasm",

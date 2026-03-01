@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OGPolygon, Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import { getUUID } from "../utils/randomizer";
 
-interface IPolygonOptions {
+export interface IPolygonOptions {
   ogid?: string;
   vertices: Vector3[];
   color: number;

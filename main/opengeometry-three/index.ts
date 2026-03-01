@@ -1,3 +1,7 @@
+/**
+ * OpenGeometry Three.js adapter entrypoint.
+ * @module @opengeometry/kernel-three
+ */
 import init, {
   Vector3
 } from "../opengeometry/pkg/opengeometry";
@@ -650,6 +654,15 @@ export {
   SpotLabel,
 }
 
+/**
+ * Primitive wrappers (line/polyline/arc/rectangle/curve).
+ */
 export * from './src/primitives/';
+/**
+ * Shape wrappers (polygon/cuboid/cylinder/wedge/opening/sweep/sphere).
+ */
 export * from './src/shapes/';
+/**
+ * Reusable example builders for quickly wiring demo scenes.
+ */
 export * from './src/examples/';

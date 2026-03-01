@@ -18,6 +18,7 @@
     "main/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "main/opengeometry-three/examples-vite"
   ]
 }

@@ -4,7 +4,13 @@
   "description": "OpenGeometry Kernel for Three.js",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No package-level test command configured\"",
+    "dev-example-three": "vite --config ./vite.examples.config.mjs",
+    "build-example-three": "vite build --config ./vite.examples.config.mjs && node ./scripts/copy-wasm-assets.mjs",
+    "preview-example-three": "vite preview --config ./vite.examples.config.mjs",
+    "docs:api": "typedoc --options ./typedoc.json",
+    "docs:api:watch": "typedoc --options ./typedoc.json --watch",
+    "docs:jsdoc": "npm run docs:api"
   },
   "keywords": [
     "opengeometry",
@@ -15,5 +21,8 @@
   "license": "MIT",
   "dependencies": {
     "@opengeometry/openmaths": "^0.2.3"
+  },
+  "devDependencies": {
+    "typedoc": "^0.28.14"
   }
 }

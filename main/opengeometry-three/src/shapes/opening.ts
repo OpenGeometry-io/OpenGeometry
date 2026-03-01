@@ -2,7 +2,7 @@ import { OGCuboid, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
 
-interface IOpeningOptions {
+export interface IOpeningOptions {
   ogid?: string;
   center: Vector3;
   width: number;

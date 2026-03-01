@@ -15,6 +15,7 @@ use crate::primitives::line::OGLine;
 use crate::primitives::polygon::OGPolygon;
 use crate::primitives::polyline::OGPolyline;
 use crate::primitives::rectangle::OGRectangle;
+use crate::primitives::sphere::OGSphere;
 use crate::primitives::wedge::OGWedge;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -227,6 +228,15 @@ impl OGSceneManager {
         cylinder: &OGCylinder,
     ) -> Result<(), String> {
         self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGCylinder", cylinder.brep())
+    }
+
+    pub fn add_sphere_to_scene_internal(
+        &mut self,
+        scene_id: &str,
+        entity_id: impl Into<String>,
+        sphere: &OGSphere,
+    ) -> Result<(), String> {
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGSphere", sphere.brep())
     }
 
     pub fn add_wedge_to_scene_internal(
@@ -580,6 +590,29 @@ impl OGSceneManager {
             .scene_id_or_current(None)
             .map_err(|err| JsValue::from_str(&err))?;
         self.add_cylinder_to_scene(scene_id, entity_id, cylinder)
+    }
+
+    #[wasm_bindgen(js_name = addSphereToScene)]
+    pub fn add_sphere_to_scene(
+        &mut self,
+        scene_id: String,
+        entity_id: String,
+        sphere: &OGSphere,
+    ) -> Result<(), JsValue> {
+        self.add_sphere_to_scene_internal(&scene_id, entity_id, sphere)
+            .map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = addSphereToCurrentScene)]
+    pub fn add_sphere_to_current_scene(
+        &mut self,
+        entity_id: String,
+        sphere: &OGSphere,
+    ) -> Result<(), JsValue> {
+        let scene_id = self
+            .scene_id_or_current(None)
+            .map_err(|err| JsValue::from_str(&err))?;
+        self.add_sphere_to_scene(scene_id, entity_id, sphere)
     }
 
     #[wasm_bindgen(js_name = addWedgeToScene)]

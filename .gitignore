@@ -23,7 +23,11 @@ Cargo.lock
 # Web 
 node_modules/
 
-dist
+# JS/TS build artifacts
+dist/
+main/opengeometry-three/examples-dist/
+main/opengeometry/pkg/
+
 .DS_Store
 .vscode/
 settings.json

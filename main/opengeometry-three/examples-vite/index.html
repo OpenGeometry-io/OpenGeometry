@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenGeometry Three Examples</title>
+    <link rel="stylesheet" href="./src/styles/theme.css" />
+  </head>
+  <body>
+    <main class="og-specs-shell">
+      <header class="og-specs-head">
+        <h1 class="og-specs-title">Specs</h1>
+        <p class="og-specs-note">
+          OpenGeometry technical sandbox for AEC, MEP and mechanical kernel
+          primitives. Each page is an isolated spec sheet with live parameter
+          controls and local wasm execution.
+        </p>
+      </header>
+
+      <section class="og-specs-section">
+        <div class="og-specs-section-head">
+          <h2 class="og-specs-section-title">Primitives</h2>
+          <p class="og-specs-count">5 items</p>
+        </div>
+        <div class="og-specs-grid">
+          <a class="og-spec-card" href="./primitives/line.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Line</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Two-point line primitive with direct endpoint control.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>Kernel</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>Length, Angle</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./primitives/polyline.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Polyline</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Open and closed path definitions for profile work.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>AEC / MEP</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>Closure, Span</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./primitives/arc.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Arc</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Circular arc with angle span and segmentation control.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>MEP / Mech</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>Radius, Span</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./primitives/rectangle.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Rectangle</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Parametric rectangular primitive for base profiles.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>AEC</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>Width, Breadth</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./primitives/curve.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Curve</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Control-point curve for route and profile sketching.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>AEC / MEP</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>Sag, Lift</dd></div>
+            </dl>
+          </a>
+        </div>
+      </section>
+
+      <section class="og-specs-section">
+        <div class="og-specs-section-head">
+          <h2 class="og-specs-section-title">Shapes</h2>
+          <p class="og-specs-count">7 items</p>
+        </div>
+        <div class="og-specs-grid">
+          <a class="og-spec-card" href="./shapes/polygon.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Polygon</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Planar polygon triangulation for surfaces and slabs.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>AEC</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>Sides, Radius</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./shapes/cuboid.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Cuboid</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Rectangular solid for rooms, equipment blocks and massing.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>AEC / MEP</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>W/H/D</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./shapes/cylinder.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Cylinder</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Cylindrical volume for ducts, pipes and mechanical shafts.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>MEP / Mech</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>R, H, Seg</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./shapes/wedge.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Wedge</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Tapered solid for ramps and sloped technical elements.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>AEC</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>W/H/D</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./shapes/opening.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Opening</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Opening helper volume for void and penetration previews.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>AEC / MEP</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>W/H/D</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./shapes/sweep.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Sweep</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Profile along path sweep for framing and custom sections.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>AEC / Mech</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>Path, Caps</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./shapes/sphere.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Sphere</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">UV sphere for equipment envelopes and clearance studies.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>MEP / Mech</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>R, Segments</dd></div>
+            </dl>
+          </a>
+        </div>
+      </section>
+
+      <section class="og-specs-section">
+        <div class="og-specs-section-head">
+          <h2 class="og-specs-section-title">Operations</h2>
+          <p class="og-specs-count">3 items</p>
+        </div>
+        <div class="og-specs-grid">
+          <a class="og-spec-card" href="./operations/offset.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Offset</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Offset generation with acute-corner and bevel parameters.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>Kernel Ops</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>Offset, Bevel</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./operations/wall-from-offsets.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Wall from Offsets</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Composite wall profile assembled from offset centerlines.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>AEC</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>Thickness</dd></div>
+            </dl>
+          </a>
+          <a class="og-spec-card" href="./operations/sweep-path-profile.html">
+            <div class="og-spec-card-head"><h3 class="og-spec-card-title">Sweep Path + Profile</h3><p class="og-spec-badge">ready</p></div>
+            <p class="og-spec-desc">Operation-level sweep from path primitive + profile primitive.</p>
+            <dl class="og-spec-meta">
+              <div class="og-spec-meta-row"><dt>Domain</dt><dd>Kernel Ops</dd></div>
+              <div class="og-spec-meta-row"><dt>Control</dt><dd>Path + Caps</dd></div>
+            </dl>
+          </a>
+        </div>
+      </section>
+      <p class="og-specs-note">
+        Build command: <code>npm --prefix main/opengeometry-three run build-example-three</code>
+      </p>
+    </main>
+  </body>
+</html>

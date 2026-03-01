@@ -9,6 +9,7 @@ use opengeometry::primitives::line::OGLine;
 use opengeometry::primitives::polygon::OGPolygon;
 use opengeometry::primitives::polyline::OGPolyline;
 use opengeometry::primitives::rectangle::OGRectangle;
+use opengeometry::primitives::sphere::OGSphere;
 use opengeometry::primitives::wedge::OGWedge;
 use openmaths::Vector3;
 
@@ -93,6 +94,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut wedge = OGWedge::new("wedge".to_string());
     wedge.set_config(Vector3::new(0.0, 0.0, 0.0), 2.4, 1.6, 1.2);
 
+    let mut sphere = OGSphere::new("sphere".to_string());
+    sphere.set_config(Vector3::new(0.0, 0.0, 0.0), 1.2, 32, 18);
+
     export_named_scene(
         &format!("{}_line.pdf", output_prefix),
         "OGLine Projection",
@@ -132,6 +136,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &format!("{}_wedge.pdf", output_prefix),
         "OGWedge Projection",
         &wedge.to_projected_scene2d(&camera, &hlr),
+    )?;
+    export_named_scene(
+        &format!("{}_sphere.pdf", output_prefix),
+        "OGSphere Projection",
+        &sphere.to_projected_scene2d(&camera, &hlr),
     )?;
 
     Ok(())

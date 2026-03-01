@@ -1,0 +1,38 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "index.ts",
+    "src/base-types.ts",
+    "src/primitives/index.ts",
+    "src/shapes/index.ts",
+    "src/examples/index.ts"
+  ],
+  "entryPointStrategy": "resolve",
+  "compilerOptions": {
+    "lib": [
+      "ES2022",
+      "DOM",
+      "ESNext.Disposable"
+    ]
+  },
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "examples-vite/**",
+    "scripts/**",
+    "docs/**",
+    "jsdoc-dist/**",
+    "**/*.d.ts"
+  ],
+  "out": "jsdoc-dist",
+  "readme": "none",
+  "categorizeByGroup": false,
+  "sort": [
+    "source-order"
+  ],
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeExternals": true,
+  "includeVersion": true,
+  "name": "OpenGeometry Three API"
+}
