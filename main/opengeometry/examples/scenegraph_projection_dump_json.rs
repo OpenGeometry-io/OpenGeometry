@@ -17,11 +17,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scene_id = manager.create_scene_internal("JSON Inspect Scene");
 
     let mut line = OGLine::new("line-json".to_string());
-    line.set_config(Vector3::new(-1.0, 0.0, 0.0), Vector3::new(1.0, 0.4, 0.6));
-    line.generate_geometry();
+    line.set_config(Vector3::new(-1.0, 0.0, 0.0), Vector3::new(1.0, 0.4, 0.6))
+        .unwrap();
+    line.generate_geometry().unwrap();
 
     let mut cuboid = OGCuboid::new("box-json".to_string());
-    cuboid.set_config(Vector3::new(0.0, 0.0, 0.0), 1.8, 1.2, 1.2);
+    cuboid
+        .set_config(Vector3::new(0.0, 0.0, 0.0), 1.8, 1.2, 1.2)
+        .unwrap();
 
     manager.add_line_to_scene_internal(&scene_id, "line-entity", &line)?;
     manager.add_cuboid_to_scene_internal(&scene_id, "box-entity", &cuboid)?;

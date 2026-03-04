@@ -13,7 +13,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| "sphere_projection.pdf".to_string());
 
     let mut sphere = OGSphere::new("sphere-projection".to_string());
-    sphere.set_config(Vector3::new(0.0, 0.0, 0.0), 1.4, 36, 20);
+    sphere
+        .set_config(Vector3::new(0.0, 0.0, 0.0), 1.4, 36, 20)
+        .unwrap();
 
     println!("Sphere vertices: {}", sphere.brep().vertices.len());
     println!("Sphere edges: {}", sphere.brep().edges.len());

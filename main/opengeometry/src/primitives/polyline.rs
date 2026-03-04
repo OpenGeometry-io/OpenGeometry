@@ -1,11 +1,8 @@
 /**
  * Copyright (c) 2025, OpenGeometry. All rights reserved.
  * Polyline Primitive for OpenGeometry.
- *
- * A Polyline is a connected sequence of line segments.
- * It can be open or closed, and is defined by a series of points.
  */
-use crate::brep::{Brep, Edge, Face, Vertex};
+use crate::brep::{Brep, BrepBuilder};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
 use crate::operations::offset::{offset_path, OffsetOptions, OffsetResult};
 use openmaths::Vector3;
@@ -17,7 +14,6 @@ use wasm_bindgen::prelude::*;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OGPolyline {
     id: String,
-    // TODO: Figure out if we can solely rely on Brep for points
     points: Vec<Vector3>,
     is_closed: bool,
     brep: Brep,
@@ -33,7 +29,6 @@ impl OGPolyline {
     }
 }
 
-// TODO: Implement Drop for all Primitives
 impl Drop for OGPolyline {
     fn drop(&mut self) {
         self.points.clear();
@@ -75,111 +70,70 @@ impl OGPolyline {
         }
     }
 
-    // #[wasm_bindgen]
-    // pub fn translate(&mut self, translation: Vector3) {
-
-    //   self.points.clear();
-
-    //   for i in 0..self.backup_points.len() {
-    //     let point = &mut self.backup_points[i].clone();
-    //     point.x += translation.x;
-    //     point.y += translation.y;
-    //     point.z += translation.z;
-
-    //     self.points.push(point.clone());
-    //     self.brep.vertices.push(point.clone());
-    //   }
-
-    //   self.check_closed_test();
-    //   self.generate_brep();
-    // }
-
-    // #[wasm_bindgen]
-    // pub fn set_position(&mut self, position: Vector3) {
-    //   self.position = position;
-    // }
-
-    pub fn set_config(&mut self, points: Vec<Vector3>) {
-        self.points.clear();
-
-        for point in points {
-            self.points.push(point);
-        }
-
+    pub fn set_config(&mut self, points: Vec<Vector3>) -> Result<(), JsValue> {
+        self.points = points;
         self.check_closed_test();
-        self.generate_geometry();
+        self.generate_geometry()
     }
 
     #[wasm_bindgen]
-    pub fn generate_geometry(&mut self) {
-        self.brep.clear();
+    pub fn generate_geometry(&mut self) -> Result<(), JsValue> {
         if self.points.is_empty() {
-            return;
+            self.brep.clear();
+            return Ok(());
         }
 
-        let mut effective_len = self.points.len();
-        if self.is_closed && self.points.len() > 2 {
-            let first = self.points[0];
-            let last = self.points[self.points.len() - 1];
+        let mut effective_points = self.points.clone();
+        if self.is_closed && effective_points.len() > 2 {
+            let first = effective_points[0];
+            let last = *effective_points.last().unwrap();
             let dx = first.x - last.x;
             let dy = first.y - last.y;
             let dz = first.z - last.z;
             let duplicate_end = dx * dx + dy * dy + dz * dz <= 1.0e-12;
             if duplicate_end {
-                effective_len -= 1;
+                effective_points.pop();
             }
         }
 
-        for i in 0..effective_len {
-            self.brep
-                .vertices
-                .push(Vertex::new(i as u32, self.points[i]));
+        let mut builder = BrepBuilder::new(self.brep.id);
+        builder.add_vertices(&effective_points);
+
+        if effective_points.len() >= 2 {
+            let indices: Vec<u32> = (0..effective_points.len() as u32).collect();
+            let closed_wire = self.is_closed && effective_points.len() > 2;
+            builder.add_wire(&indices, closed_wire).map_err(|err| {
+                JsValue::from_str(&format!("Failed to build polyline wire: {}", err))
+            })?;
+
+            if closed_wire {
+                builder.add_face(&indices, &[]).map_err(|err| {
+                    JsValue::from_str(&format!("Failed to build polyline face: {}", err))
+                })?;
+            }
         }
 
-        if effective_len < 2 {
-            return;
-        }
+        self.brep = builder.build().map_err(|err| {
+            JsValue::from_str(&format!("Failed to finalize polyline BREP: {}", err))
+        })?;
 
-        for i in 0..(effective_len - 1) {
-            self.brep.edges.push(Edge::new(
-                self.brep.get_edge_count(),
-                i as u32,
-                (i + 1) as u32,
-            ));
-        }
-
-        if self.is_closed && effective_len > 2 {
-            self.brep.edges.push(Edge::new(
-                self.brep.get_edge_count(),
-                (effective_len - 1) as u32,
-                0,
-            ));
-
-            let face_indices: Vec<u32> = (0..effective_len as u32).collect();
-            self.brep.faces.push(Face::new(0, face_indices));
-        }
+        Ok(())
     }
 
     #[wasm_bindgen]
-    pub fn add_multiple_points(&mut self, points: Vec<Vector3>) {
-        self.points.clear();
-
-        for point in points {
-            self.points.push(point);
-        }
-
+    pub fn add_multiple_points(&mut self, points: Vec<Vector3>) -> Result<(), JsValue> {
+        self.points = points;
         self.check_closed_test();
-        self.generate_geometry();
+        self.generate_geometry()
     }
 
     #[wasm_bindgen]
-    pub fn add_point(&mut self, point: Vector3) {
+    pub fn add_point(&mut self, point: Vector3) -> Result<(), JsValue> {
         self.points.push(point);
         self.check_closed_test();
-        self.generate_geometry();
+        self.generate_geometry()
     }
 
-    // Get Points for the Circle
     #[wasm_bindgen]
     pub fn get_points(&self) -> String {
         serde_json::to_string(&self.points).unwrap()
@@ -205,15 +159,12 @@ impl OGPolyline {
         serde_json::to_string(&result).unwrap()
     }
 
-    // Simple Check to see if the Polyline is closed
-    // This can be made better
     pub fn check_closed_test(&mut self) {
         self.is_closed = false;
         if self.points.len() > 2 {
-            if self.points[0].x == self.points[self.points.len() - 1].x
-                && self.points[0].y == self.points[self.points.len() - 1].y
-                && self.points[0].z == self.points[self.points.len() - 1].z
-            {
+            let first = self.points[0];
+            let last = self.points[self.points.len() - 1];
+            if first.x == last.x && first.y == last.y && first.z == last.z {
                 self.is_closed = true;
             }
         }
@@ -221,32 +172,35 @@ impl OGPolyline {
 
     #[wasm_bindgen]
     pub fn get_brep_serialized(&self) -> String {
-        let serialized = serde_json::to_string(&self.brep).unwrap();
-        serialized
+        serde_json::to_string(&self.brep).unwrap()
     }
 
     #[wasm_bindgen]
     pub fn get_geometry_serialized(&self) -> String {
         let mut vertex_buffer: Vec<f64> = Vec::new();
 
-        let vertices = self.brep.vertices.clone();
-        for vertex in vertices {
-            vertex_buffer.push(vertex.position.x);
-            vertex_buffer.push(vertex.position.y);
-            vertex_buffer.push(vertex.position.z);
+        if let Some(wire) = self.brep.wires.first() {
+            let wire_vertices = self.brep.get_wire_vertex_indices(wire.id);
+            for vertex_id in &wire_vertices {
+                if let Some(vertex) = self.brep.vertices.get(*vertex_id as usize) {
+                    vertex_buffer.push(vertex.position.x);
+                    vertex_buffer.push(vertex.position.y);
+                    vertex_buffer.push(vertex.position.z);
+                }
+            }
+
+            if self.is_closed && !wire_vertices.is_empty() {
+                if let Some(first_id) = wire_vertices.first() {
+                    if let Some(first_vertex) = self.brep.vertices.get(*first_id as usize) {
+                        vertex_buffer.push(first_vertex.position.x);
+                        vertex_buffer.push(first_vertex.position.y);
+                        vertex_buffer.push(first_vertex.position.z);
+                    }
+                }
+            }
         }
 
-        // For closed polylines, line rendering needs the first vertex repeated
-        // at the end to draw the closing segment from last->first.
-        if self.is_closed && !self.brep.vertices.is_empty() {
-            let first = self.brep.vertices[0].position;
-            vertex_buffer.push(first.x);
-            vertex_buffer.push(first.y);
-            vertex_buffer.push(first.z);
-        }
-
-        let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
-        vertex_serialized
+        serde_json::to_string(&vertex_buffer).unwrap()
     }
 }
 

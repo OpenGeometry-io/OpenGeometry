@@ -22,16 +22,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut cuboid = OGCuboid::new("ortho-cuboid".to_string());
-    cuboid.set_config(Vector3::new(-1.8, 0.0, 0.0), 2.0, 1.5, 1.5);
+    cuboid
+        .set_config(Vector3::new(-1.8, 0.0, 0.0), 2.0, 1.5, 1.5)
+        .unwrap();
 
     let mut cylinder = OGCylinder::new("ortho-cylinder".to_string());
-    cylinder.set_config(
-        Vector3::new(1.8, 0.0, 0.0),
-        0.9,
-        1.8,
-        2.0 * std::f64::consts::PI,
-        32,
-    );
+    cylinder
+        .set_config(
+            Vector3::new(1.8, 0.0, 0.0),
+            0.9,
+            1.8,
+            2.0 * std::f64::consts::PI,
+            32,
+        )
+        .unwrap();
 
     let mut scene_hlr_on = cuboid.to_projected_scene2d(
         &camera,

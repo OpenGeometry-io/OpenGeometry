@@ -24,24 +24,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| "./offset_primitives.pdf".to_string());
 
     let mut base_line = OGLine::new("base-line".to_string());
-    base_line.set_config(Vector3::new(-3.2, 0.0, -2.2), Vector3::new(-0.8, 0.0, -0.9));
-    base_line.generate_geometry();
+    base_line
+        .set_config(Vector3::new(-3.2, 0.0, -2.2), Vector3::new(-0.8, 0.0, -0.9))
+        .unwrap();
+    base_line.generate_geometry().unwrap();
 
     let line_offset_points = base_line.get_offset_points(0.35, 35.0, true);
     let mut offset_line = OGLine::new("offset-line".to_string());
     if line_offset_points.len() == 2 {
-        offset_line.set_config(line_offset_points[0], line_offset_points[1]);
-        offset_line.generate_geometry();
+        offset_line
+            .set_config(line_offset_points[0], line_offset_points[1])
+            .unwrap();
+        offset_line.generate_geometry().unwrap();
     }
 
     let mut base_polyline = OGPolyline::new("base-polyline".to_string());
-    base_polyline.set_config(vec![
-        Vector3::new(-1.2, 0.0, -2.4),
-        Vector3::new(0.2, 0.0, -1.7),
-        Vector3::new(0.8, 0.0, -0.6),
-        Vector3::new(0.0, 0.0, -0.3),
-        Vector3::new(2.4, 0.0, 1.2),
-    ]);
+    base_polyline
+        .set_config(vec![
+            Vector3::new(-1.2, 0.0, -2.4),
+            Vector3::new(0.2, 0.0, -1.7),
+            Vector3::new(0.8, 0.0, -0.6),
+            Vector3::new(0.0, 0.0, -0.3),
+            Vector3::new(2.4, 0.0, 1.2),
+        ])
+        .unwrap();
 
     let polyline_offset = base_polyline.get_offset_result(0.45, 90.0, true);
     println!(
@@ -50,11 +56,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let mut offset_polyline = OGPolyline::new("offset-polyline".to_string());
-    offset_polyline.set_config(polyline_offset.points.clone());
+    offset_polyline
+        .set_config(polyline_offset.points.clone())
+        .unwrap();
 
     let mut base_rectangle = OGRectangle::new("base-rectangle".to_string());
-    base_rectangle.set_config(Vector3::new(1.4, 0.0, -2.0), 1.6, 1.0);
-    base_rectangle.generate_geometry();
+    base_rectangle
+        .set_config(Vector3::new(1.4, 0.0, -2.0), 1.6, 1.0)
+        .unwrap();
+    base_rectangle.generate_geometry().unwrap();
 
     let rectangle_offset = base_rectangle.get_offset_result(0.25, 40.0, true);
     let mut rectangle_offset_outline = rectangle_offset.points.clone();
@@ -69,19 +79,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut offset_rectangle_polyline = OGPolyline::new("offset-rectangle".to_string());
-    offset_rectangle_polyline.set_config(rectangle_offset_outline);
+    offset_rectangle_polyline
+        .set_config(rectangle_offset_outline)
+        .unwrap();
 
     let mut base_curve = OGCurve::new("base-curve".to_string());
-    base_curve.set_config(vec![
-        Vector3::new(-3.0, 0.0, 1.2),
-        Vector3::new(-2.0, 0.0, 1.7),
-        Vector3::new(-1.1, 0.0, 1.6),
-        Vector3::new(-0.4, 0.0, 2.0),
-    ]);
+    base_curve
+        .set_config(vec![
+            Vector3::new(-3.0, 0.0, 1.2),
+            Vector3::new(-2.0, 0.0, 1.7),
+            Vector3::new(-1.1, 0.0, 1.6),
+            Vector3::new(-0.4, 0.0, 2.0),
+        ])
+        .unwrap();
 
     let curve_offset = base_curve.get_offset_result(0.3, 45.0, true);
     let mut curve_offset_polyline = OGPolyline::new("offset-curve".to_string());
-    curve_offset_polyline.set_config(curve_offset.points.clone());
+    curve_offset_polyline
+        .set_config(curve_offset.points.clone())
+        .unwrap();
 
     let mut manager = OGSceneManager::new();
     let scene_id = manager.create_scene_internal("offset-primitives");

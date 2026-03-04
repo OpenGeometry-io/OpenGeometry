@@ -1,9 +1,7 @@
-use std::collections::HashSet;
-
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-use crate::brep::{Brep, Edge, Face, Vertex};
+use crate::brep::{Brep, BrepBuilder};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
 use openmaths::Vector3;
 use uuid::Uuid;
@@ -52,88 +50,123 @@ impl OGSphere {
         radius: f64,
         width_segments: u32,
         height_segments: u32,
-    ) {
+    ) -> Result<(), JsValue> {
         self.center = center;
         self.radius = radius.max(1.0e-6);
         self.width_segments = width_segments.max(3);
         self.height_segments = height_segments.max(2);
 
-        self.generate_brep();
+        self.generate_brep()
     }
 
-    pub fn generate_brep(&mut self) {
+    pub fn generate_brep(&mut self) -> Result<(), JsValue> {
         self.clean_geometry();
-        self.generate_geometry();
+        self.generate_geometry()
     }
 
     pub fn clean_geometry(&mut self) {
         self.brep.clear();
-        self.brep.holes.clear();
-        self.brep.hole_edges.clear();
     }
 
     #[wasm_bindgen]
-    pub fn generate_geometry(&mut self) {
-        self.clean_geometry();
-
+    pub fn generate_geometry(&mut self) -> Result<(), JsValue> {
         let width = self.width_segments.max(3) as usize;
         let height = self.height_segments.max(2) as usize;
 
-        let mut vertex_indices = vec![vec![0u32; width + 1]; height + 1];
+        let mut vertices = Vec::new();
+        // Top pole.
+        vertices.push(Vector3::new(
+            self.center.x,
+            self.center.y + self.radius,
+            self.center.z,
+        ));
 
-        for iy in 0..=height {
+        // Intermediate rings.
+        for iy in 1..height {
             let v = iy as f64 / height as f64;
             let theta = v * std::f64::consts::PI;
             let sin_theta = theta.sin();
             let cos_theta = theta.cos();
 
-            for ix in 0..=width {
+            for ix in 0..width {
                 let u = ix as f64 / width as f64;
                 let phi = u * std::f64::consts::PI * 2.0;
                 let sin_phi = phi.sin();
                 let cos_phi = phi.cos();
 
-                let x = self.center.x + self.radius * sin_theta * cos_phi;
-                let y = self.center.y + self.radius * cos_theta;
-                let z = self.center.z + self.radius * sin_theta * sin_phi;
-
-                let id = self.brep.get_vertex_count();
-                self.brep
-                    .vertices
-                    .push(Vertex::new(id, Vector3::new(x, y, z)));
-                vertex_indices[iy][ix] = id;
+                vertices.push(Vector3::new(
+                    self.center.x + self.radius * sin_theta * cos_phi,
+                    self.center.y + self.radius * cos_theta,
+                    self.center.z + self.radius * sin_theta * sin_phi,
+                ));
             }
         }
 
-        let mut edge_set: HashSet<(u32, u32)> = HashSet::new();
-        let mut next_face_id: u32 = 0;
+        let bottom_id = vertices.len() as u32;
+        vertices.push(Vector3::new(
+            self.center.x,
+            self.center.y - self.radius,
+            self.center.z,
+        ));
 
-        for iy in 0..height {
-            for ix in 0..width {
-                let a = vertex_indices[iy][ix];
-                let b = vertex_indices[iy][ix + 1];
-                let c = vertex_indices[iy + 1][ix];
-                let d = vertex_indices[iy + 1][ix + 1];
+        let ring_vertex = |ring: usize, ix: usize| -> u32 {
+            // ring is 1..height-1
+            1 + ((ring - 1) * width + ix) as u32
+        };
 
-                if iy != 0 {
-                    self.brep.faces.push(Face::new(next_face_id, vec![a, c, b]));
-                    next_face_id += 1;
+        let mut faces: Vec<Vec<u32>> = Vec::new();
 
-                    Self::push_edge_if_new(&mut self.brep, &mut edge_set, a, c);
-                    Self::push_edge_if_new(&mut self.brep, &mut edge_set, c, b);
-                    Self::push_edge_if_new(&mut self.brep, &mut edge_set, b, a);
-                }
+        // Top cap.
+        for ix in 0..width {
+            let next = (ix + 1) % width;
+            faces.push(vec![0, ring_vertex(1, next), ring_vertex(1, ix)]);
+        }
 
-                if iy != (height - 1) {
-                    self.brep.faces.push(Face::new(next_face_id, vec![b, c, d]));
-                    next_face_id += 1;
+        // Body quads split into triangles.
+        if height > 2 {
+            for ring in 1..(height - 1) {
+                for ix in 0..width {
+                    let next = (ix + 1) % width;
+                    let a = ring_vertex(ring, ix);
+                    let b = ring_vertex(ring, next);
+                    let c = ring_vertex(ring + 1, next);
+                    let d = ring_vertex(ring + 1, ix);
 
-                    Self::push_edge_if_new(&mut self.brep, &mut edge_set, b, c);
-                    Self::push_edge_if_new(&mut self.brep, &mut edge_set, c, d);
-                    Self::push_edge_if_new(&mut self.brep, &mut edge_set, d, b);
+                    faces.push(vec![a, b, c]);
+                    faces.push(vec![a, c, d]);
                 }
             }
         }
+
+        // Bottom cap.
+        let last_ring = height - 1;
+        for ix in 0..width {
+            let next = (ix + 1) % width;
+            faces.push(vec![
+                bottom_id,
+                ring_vertex(last_ring, ix),
+                ring_vertex(last_ring, next),
+            ]);
+        }
+
+        let mut builder = BrepBuilder::new(self.brep.id);
+        builder.add_vertices(&vertices);
+
+        for face in &faces {
+            builder.add_face(face, &[]).map_err(|err| {
+                JsValue::from_str(&format!("Failed to build sphere face: {}", err))
+            })?;
+        }
+
+        builder
+            .add_shell_from_all_faces(true)
+            .map_err(|err| JsValue::from_str(&format!("Failed to build sphere shell: {}", err)))?;
+
+        self.brep = builder.build().map_err(|err| {
+            JsValue::from_str(&format!("Failed to finalize sphere BREP: {}", err))
+        })?;
+
+        Ok(())
     }
 
     #[wasm_bindgen]
@@ -146,15 +179,15 @@ impl OGSphere {
         let mut vertex_buffer: Vec<f64> = Vec::new();
 
         for face in &self.brep.faces {
-            if face.face_indices.len() != 3 {
+            let face_vertices = self.brep.get_vertices_by_face_id(face.id);
+            if face_vertices.len() != 3 {
                 continue;
             }
 
-            for vertex_index in &face.face_indices {
-                let vertex = &self.brep.vertices[*vertex_index as usize];
-                vertex_buffer.push(vertex.position.x);
-                vertex_buffer.push(vertex.position.y);
-                vertex_buffer.push(vertex.position.z);
+            for vertex in face_vertices {
+                vertex_buffer.push(vertex.x);
+                vertex_buffer.push(vertex.y);
+                vertex_buffer.push(vertex.z);
             }
         }
 
@@ -165,9 +198,13 @@ impl OGSphere {
     pub fn get_outline_geometry_serialized(&self) -> String {
         let mut vertex_buffer: Vec<f64> = Vec::new();
 
-        for edge in &self.brep.edges {
-            let start_vertex = self.brep.vertices[edge.v1 as usize].clone();
-            let end_vertex = self.brep.vertices[edge.v2 as usize].clone();
+        for (start_id, end_id) in self.brep.collect_outline_segments() {
+            let Some(start_vertex) = self.brep.vertices.get(start_id as usize) else {
+                continue;
+            };
+            let Some(end_vertex) = self.brep.vertices.get(end_id as usize) else {
+                continue;
+            };
 
             vertex_buffer.push(start_vertex.position.x);
             vertex_buffer.push(start_vertex.position.y);
@@ -182,13 +219,6 @@ impl OGSphere {
 }
 
 impl OGSphere {
-    fn push_edge_if_new(brep: &mut Brep, edge_set: &mut HashSet<(u32, u32)>, v1: u32, v2: u32) {
-        let key = if v1 < v2 { (v1, v2) } else { (v2, v1) };
-        if edge_set.insert(key) {
-            brep.edges.push(Edge::new(brep.get_edge_count(), v1, v2));
-        }
-    }
-
     pub fn brep(&self) -> &Brep {
         &self.brep
     }

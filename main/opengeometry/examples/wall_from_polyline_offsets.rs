@@ -42,14 +42,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| "./wall_from_polyline_offsets.pdf".to_string());
 
     let mut centerline = OGPolyline::new("wall-centerline".to_string());
-    centerline.set_config(vec![
-        Vector3::new(-2.6, 0.0, -1.9),
-        Vector3::new(-1.2, 0.0, -1.0),
-        Vector3::new(-0.2, 0.0, 0.1),
-        Vector3::new(0.6, 0.0, 0.2),
-        Vector3::new(0.1, 0.0, 1.0),
-        Vector3::new(2.5, 0.0, 2.0),
-    ]);
+    centerline
+        .set_config(vec![
+            Vector3::new(-2.6, 0.0, -1.9),
+            Vector3::new(-1.2, 0.0, -1.0),
+            Vector3::new(-0.2, 0.0, 0.1),
+            Vector3::new(0.6, 0.0, 0.2),
+            Vector3::new(0.1, 0.0, 1.0),
+            Vector3::new(2.5, 0.0, 2.0),
+        ])
+        .unwrap();
 
     let wall_thickness = 0.45;
     let half = wall_thickness * 0.5;
@@ -69,10 +71,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let mut left_polyline = OGPolyline::new("wall-left-offset".to_string());
-    left_polyline.set_config(left_offset.points.clone());
+    left_polyline
+        .set_config(left_offset.points.clone())
+        .unwrap();
 
     let mut right_polyline = OGPolyline::new("wall-right-offset".to_string());
-    right_polyline.set_config(right_offset.points.clone());
+    right_polyline
+        .set_config(right_offset.points.clone())
+        .unwrap();
 
     let wall_outline = build_wall_outline(&left_offset.points, &right_offset.points);
     if wall_outline.len() < 3 {
@@ -80,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut wall_polygon = OGPolygon::new("wall-polygon".to_string());
-    wall_polygon.set_config(wall_outline.clone());
+    wall_polygon.set_config(wall_outline.clone()).unwrap();
 
     let mut manager = OGSceneManager::new();
     let scene_id = manager.create_scene_internal("wall-from-offsets");

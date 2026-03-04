@@ -19,6 +19,7 @@ interface ISphereKernelInstance {
   ) => void;
   get_geometry_serialized(): string;
   get_brep_serialized(): string;
+  get_outline_geometry_serialized(): string;
 }
 
 type SphereKernelConstructor = new (..._args: [string]) => ISphereKernelInstance;
@@ -148,21 +149,8 @@ export class Sphere extends THREE.Mesh {
     }
 
     if (enable) {
-      const brep = this.getBrep();
-      const lineBuffer: number[] = [];
-
-      for (const edge of brep.edges ?? []) {
-        const start = brep.vertices?.[edge.v1]?.position;
-        const end = brep.vertices?.[edge.v2]?.position;
-        if (!start || !end) {
-          continue;
-        }
-
-        lineBuffer.push(
-          start.x, start.y, start.z,
-          end.x, end.y, end.z
-        );
-      }
+      const outlineBuffer = this.sphere.get_outline_geometry_serialized();
+      const lineBuffer = JSON.parse(outlineBuffer) as number[];
 
       const outlineGeometry = new THREE.BufferGeometry();
       outlineGeometry.setAttribute(

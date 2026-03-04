@@ -45,16 +45,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut line = OGLine::new("line".to_string());
-    line.set_config(Vector3::new(-1.2, 0.0, 0.0), Vector3::new(1.2, 0.0, 0.5));
-    line.generate_geometry();
+    line.set_config(Vector3::new(-1.2, 0.0, 0.0), Vector3::new(1.2, 0.0, 0.5))
+        .unwrap();
+    line.generate_geometry().unwrap();
 
     let mut polyline = OGPolyline::new("polyline".to_string());
-    polyline.set_config(vec![
-        Vector3::new(-1.6, 0.0, -0.8),
-        Vector3::new(-0.8, 0.2, 0.4),
-        Vector3::new(0.0, 0.0, -0.2),
-        Vector3::new(0.9, 0.4, 0.8),
-    ]);
+    polyline
+        .set_config(vec![
+            Vector3::new(-1.6, 0.0, -0.8),
+            Vector3::new(-0.8, 0.2, 0.4),
+            Vector3::new(0.0, 0.0, -0.2),
+            Vector3::new(0.9, 0.4, 0.8),
+        ])
+        .unwrap();
 
     let mut arc = OGArc::new("arc".to_string());
     arc.set_config(
@@ -63,39 +66,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0.0,
         1.25 * std::f64::consts::PI,
         40,
-    );
-    arc.generate_geometry();
+    )
+    .unwrap();
+    arc.generate_geometry().unwrap();
 
     let mut rectangle = OGRectangle::new("rectangle".to_string());
-    rectangle.set_config(Vector3::new(0.0, 0.0, 0.0), 2.4, 1.4);
-    rectangle.generate_geometry();
+    rectangle
+        .set_config(Vector3::new(0.0, 0.0, 0.0), 2.4, 1.4)
+        .unwrap();
+    rectangle.generate_geometry().unwrap();
 
     let mut polygon = OGPolygon::new("polygon".to_string());
-    polygon.set_config(vec![
-        Vector3::new(-1.1, 0.0, -0.6),
-        Vector3::new(0.6, 0.0, -1.0),
-        Vector3::new(1.3, 0.0, 0.0),
-        Vector3::new(0.4, 0.0, 1.1),
-        Vector3::new(-1.0, 0.0, 0.8),
-    ]);
+    polygon
+        .set_config(vec![
+            Vector3::new(-1.1, 0.0, -0.6),
+            Vector3::new(0.6, 0.0, -1.0),
+            Vector3::new(1.3, 0.0, 0.0),
+            Vector3::new(0.4, 0.0, 1.1),
+            Vector3::new(-1.0, 0.0, 0.8),
+        ])
+        .unwrap();
 
     let mut cuboid = OGCuboid::new("cuboid".to_string());
-    cuboid.set_config(Vector3::new(0.0, 0.0, 0.0), 2.0, 1.5, 1.2);
+    cuboid
+        .set_config(Vector3::new(0.0, 0.0, 0.0), 2.0, 1.5, 1.2)
+        .unwrap();
 
     let mut cylinder = OGCylinder::new("cylinder".to_string());
-    cylinder.set_config(
-        Vector3::new(0.0, 0.0, 0.0),
-        0.9,
-        1.8,
-        2.0 * std::f64::consts::PI,
-        40,
-    );
+    cylinder
+        .set_config(
+            Vector3::new(0.0, 0.0, 0.0),
+            0.9,
+            1.8,
+            2.0 * std::f64::consts::PI,
+            40,
+        )
+        .unwrap();
 
     let mut wedge = OGWedge::new("wedge".to_string());
-    wedge.set_config(Vector3::new(0.0, 0.0, 0.0), 2.4, 1.6, 1.2);
+    wedge
+        .set_config(Vector3::new(0.0, 0.0, 0.0), 2.4, 1.6, 1.2)
+        .unwrap();
 
     let mut sphere = OGSphere::new("sphere".to_string());
-    sphere.set_config(Vector3::new(0.0, 0.0, 0.0), 1.2, 32, 18);
+    sphere
+        .set_config(Vector3::new(0.0, 0.0, 0.0), 1.2, 32, 18)
+        .unwrap();
 
     export_named_scene(
         &format!("{}_line.pdf", output_prefix),

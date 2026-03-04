@@ -1,16 +1,10 @@
 /**
  * Copyright (c) 2025, OpenGeometry. All rights reserved.
  * Line Primitive for OpenGeometry.
- *
- * A Line is defined by two points.
- * This line would only have two points, else it becomes a polyline.
- * Created with two arbitrary points, start and end.
  */
-use crate::brep::{Brep, Edge, Vertex};
+use crate::brep::{Brep, BrepBuilder};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
 use crate::operations::offset::{offset_path, OffsetOptions, OffsetResult};
-use dxf::entities::*;
-use dxf::Drawing;
 use openmaths::Vector3;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -27,9 +21,6 @@ pub struct OGLine {
 
 impl Drop for OGLine {
     fn drop(&mut self) {
-        // TODO: Add dispose for Vector3 in OpenMaths
-        // self.start.dispose();
-        // self.end.dispose();
         self.brep.clear();
         self.id.clear();
     }
@@ -58,31 +49,32 @@ impl OGLine {
     }
 
     #[wasm_bindgen]
-    pub fn set_config(&mut self, start: Vector3, end: Vector3) {
-        self.brep.clear();
+    pub fn set_config(&mut self, start: Vector3, end: Vector3) -> Result<(), JsValue> {
         self.start = start;
         self.end = end;
+        self.generate_geometry()
     }
 
     #[wasm_bindgen]
-    pub fn generate_geometry(&mut self) {
-        self.brep.clear();
+    pub fn generate_geometry(&mut self) -> Result<(), JsValue> {
+        let mut builder = BrepBuilder::new(self.brep.id);
+        builder.add_vertices(&[self.start, self.end]);
+        builder
+            .add_wire(&[0, 1], false)
+            .map_err(|err| JsValue::from_str(&format!("Failed to build line wire: {}", err)))?;
 
-        let start_vertex = Vertex::new(0, self.start);
-        let end_vertex = Vertex::new(1, self.end);
+        self.brep = builder
+            .build()
+            .map_err(|err| JsValue::from_str(&format!("Failed to finalize line BREP: {}", err)))?;
 
-        self.brep.vertices.push(start_vertex);
-        self.brep.vertices.push(end_vertex);
-        self.brep.edges.push(Edge::new(0, 0, 1));
+        Ok(())
     }
 
-    // Dispose
     #[wasm_bindgen]
     pub fn dispose_points(&mut self) {
         self.brep.clear();
     }
 
-    // Destroy and Free memory
     #[wasm_bindgen]
     pub fn destroy(&mut self) {
         self.brep.clear();
@@ -91,24 +83,22 @@ impl OGLine {
 
     #[wasm_bindgen]
     pub fn get_brep_serialized(&self) -> String {
-        // Serialize the BREP geometry
-        let serialized = serde_json::to_string(&self.brep).unwrap();
-        serialized
+        serde_json::to_string(&self.brep).unwrap()
     }
 
     #[wasm_bindgen]
     pub fn get_geometry_serialized(&self) -> String {
         let mut vertex_buffer: Vec<f64> = Vec::new();
 
-        let vertices = self.brep.vertices.clone();
-        for vertex in vertices {
-            vertex_buffer.push(vertex.position.x);
-            vertex_buffer.push(vertex.position.y);
-            vertex_buffer.push(vertex.position.z);
+        for vertex_id in self.brep.get_wire_vertex_indices(0) {
+            if let Some(vertex) = self.brep.vertices.get(vertex_id as usize) {
+                vertex_buffer.push(vertex.position.x);
+                vertex_buffer.push(vertex.position.y);
+                vertex_buffer.push(vertex.position.z);
+            }
         }
 
-        let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
-        vertex_serialized
+        serde_json::to_string(&vertex_buffer).unwrap()
     }
 
     #[wasm_bindgen]
@@ -123,7 +113,6 @@ impl OGLine {
     }
 
     pub fn get_dxf_serialized(&self) -> String {
-        // TODO: Implement DXF serialization for line
         String::new()
     }
 }

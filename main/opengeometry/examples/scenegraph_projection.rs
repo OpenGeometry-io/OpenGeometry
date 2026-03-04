@@ -18,19 +18,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scene_id = manager.create_scene_internal("Main Scene");
 
     let mut line = OGLine::new("line-01".to_string());
-    line.set_config(Vector3::new(-1.4, 0.0, -0.2), Vector3::new(1.4, 0.4, 0.5));
-    line.generate_geometry();
+    line.set_config(Vector3::new(-1.4, 0.0, -0.2), Vector3::new(1.4, 0.4, 0.5))
+        .unwrap();
+    line.generate_geometry().unwrap();
 
     let mut polyline = OGPolyline::new("polyline-01".to_string());
-    polyline.set_config(vec![
-        Vector3::new(-1.8, 0.0, -1.2),
-        Vector3::new(-0.8, 0.1, -0.2),
-        Vector3::new(0.1, 0.0, -0.8),
-        Vector3::new(1.1, 0.3, -0.1),
-    ]);
+    polyline
+        .set_config(vec![
+            Vector3::new(-1.8, 0.0, -1.2),
+            Vector3::new(-0.8, 0.1, -0.2),
+            Vector3::new(0.1, 0.0, -0.8),
+            Vector3::new(1.1, 0.3, -0.1),
+        ])
+        .unwrap();
 
     let mut cuboid = OGCuboid::new("cuboid-01".to_string());
-    cuboid.set_config(Vector3::new(0.0, 0.0, 0.5), 1.8, 1.2, 1.2);
+    cuboid
+        .set_config(Vector3::new(0.0, 0.0, 0.5), 1.8, 1.2, 1.2)
+        .unwrap();
 
     manager.add_line_to_scene_internal(&scene_id, "entity-line", &line)?;
     manager.add_polyline_to_scene_internal(&scene_id, "entity-polyline", &polyline)?;

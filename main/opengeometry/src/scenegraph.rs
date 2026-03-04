@@ -744,20 +744,19 @@ impl OGSceneManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::brep::{Edge, Vertex};
+    use crate::brep::{Brep, BrepBuilder};
     use openmaths::Vector3;
+    use uuid::Uuid;
 
     #[test]
     fn test_scene_projection_from_edge_entity() {
         let mut manager = OGSceneManager::new();
         let scene_id = manager.create_scene_internal("test-scene");
 
-        let mut brep = Brep::new(Uuid::new_v4());
-        brep.vertices
-            .push(Vertex::new(0, Vector3::new(-1.0, 0.0, 0.0)));
-        brep.vertices
-            .push(Vertex::new(1, Vector3::new(1.0, 0.0, 0.0)));
-        brep.edges.push(Edge::new(0, 0, 1));
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[Vector3::new(-1.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0)]);
+        builder.add_wire(&[0, 1], false).unwrap();
+        let brep: Brep = builder.build().unwrap();
 
         manager
             .add_brep_entity_to_scene_internal(&scene_id, "edge-1", "Edge", &brep)

@@ -1,15 +1,7 @@
 use serde::{Deserialize, Serialize};
-/**
- * Copyright (c) 2025, OpenGeometry. All rights reserved.
- * Rectangle Primitive for OpenGeometry.
- *
- * A Rectangle is defined by its center, width, and breadth.
- * It can be used to create rectangular shapes in 3D space.
- * Created with a center, width, and breadth.
- */
 use wasm_bindgen::prelude::*;
 
-use crate::brep::{Brep, Edge, Face, Vertex};
+use crate::brep::{Brep, BrepBuilder};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
 use crate::operations::offset::{offset_path, OffsetOptions, OffsetResult};
 use crate::utility::bgeometry::BufferGeometry;
@@ -53,75 +45,56 @@ impl OGRectangle {
         }
     }
 
-    // TODO: Implement clone method if needed
-    // #[wasm_bindgen]
-    // pub fn clone(&self) -> OGRectangle {
-    //   OGRectangle {
-    //     id: self.id.clone(),
-    //     center: self.center.clone(),
-    //     width: self.width,
-    //     breadth: self.breadth,
-    //     points: self.points.clone()
-    //   }
-    // }
-
     #[wasm_bindgen]
-    pub fn set_config(&mut self, center: Vector3, width: f64, breadth: f64) {
+    pub fn set_config(&mut self, center: Vector3, width: f64, breadth: f64) -> Result<(), JsValue> {
         self.center = center;
         self.width = width;
         self.breadth = breadth;
+        Ok(())
     }
 
     #[wasm_bindgen]
-    pub fn generate_geometry(&mut self) {
-        self.brep.clear();
+    pub fn generate_geometry(&mut self) -> Result<(), JsValue> {
+        let points = self.get_raw_points();
 
-        let half_width = self.width / 2.0;
-        let half_breadth = self.breadth / 2.0;
-        let center = self.center.clone();
+        let mut builder = BrepBuilder::new(self.brep.id);
+        builder.add_vertices(&points);
 
-        let p1 = Vector3::new(-half_width, 0.0, -half_breadth).add(&center);
-        let p2 = Vector3::new(half_width, 0.0, -half_breadth).add(&center);
-        let p3 = Vector3::new(half_width, 0.0, half_breadth).add(&center);
-        let p4 = Vector3::new(-half_width, 0.0, half_breadth).add(&center);
+        let indices = vec![0, 1, 2, 3];
+        builder.add_face(&indices, &[]).map_err(|err| {
+            JsValue::from_str(&format!("Failed to build rectangle face: {}", err))
+        })?;
 
-        self.brep.vertices.push(Vertex::new(0, p1));
-        self.brep.vertices.push(Vertex::new(1, p2));
-        self.brep.vertices.push(Vertex::new(2, p3));
-        self.brep.vertices.push(Vertex::new(3, p4));
+        self.brep = builder.build().map_err(|err| {
+            JsValue::from_str(&format!("Failed to finalize rectangle BREP: {}", err))
+        })?;
 
-        self.brep.edges.push(Edge::new(0, 0, 1));
-        self.brep.edges.push(Edge::new(1, 1, 2));
-        self.brep.edges.push(Edge::new(2, 2, 3));
-        self.brep.edges.push(Edge::new(3, 3, 0));
-        self.brep.faces.push(Face::new(0, vec![0, 1, 2, 3]));
+        Ok(())
     }
 
     #[wasm_bindgen]
     pub fn get_brep_serialized(&self) -> String {
-        let serialized = serde_json::to_string(&self.brep).unwrap();
-        serialized
+        serde_json::to_string(&self.brep).unwrap()
     }
 
     #[wasm_bindgen]
     pub fn get_geometry_serialized(&self) -> String {
         let mut vertex_buffer: Vec<f64> = Vec::new();
 
-        let vertices = self.brep.vertices.clone();
-        for vertex in vertices {
-            vertex_buffer.push(vertex.position.x);
-            vertex_buffer.push(vertex.position.y);
-            vertex_buffer.push(vertex.position.z);
+        if let Some(face) = self.brep.faces.first() {
+            let mut vertices = self.brep.get_vertices_by_face_id(face.id);
+            if let Some(first) = vertices.first().copied() {
+                vertices.push(first);
+            }
+
+            for vertex in vertices {
+                vertex_buffer.push(vertex.x);
+                vertex_buffer.push(vertex.y);
+                vertex_buffer.push(vertex.z);
+            }
         }
 
-        // Last point is the first point to close the rectangle
-        let first_vertex = self.brep.vertices.first().unwrap();
-        vertex_buffer.push(first_vertex.position.x);
-        vertex_buffer.push(first_vertex.position.y);
-        vertex_buffer.push(first_vertex.position.z);
-
-        let vertex_serialized = serde_json::to_string(&vertex_buffer).unwrap();
-        vertex_serialized
+        serde_json::to_string(&vertex_buffer).unwrap()
     }
 
     #[wasm_bindgen]
@@ -134,24 +107,6 @@ impl OGRectangle {
         let result = self.get_offset_result(distance, acute_threshold_degrees, bevel);
         serde_json::to_string(&result).unwrap()
     }
-
-    // TODO: Implement properties and destroy methods
-    // #[wasm_bindgen]
-    // pub fn update_width(&mut self, width: f64) {
-    //   self.destroy();
-    //   self.width = width;
-    // }
-
-    // #[wasm_bindgen]
-    // pub fn update_breadth(&mut self, breadth: f64) {
-    //   self.destroy();
-    //   self.breadth = breadth;
-    // }
-
-    // #[wasm_bindgen]
-    // pub fn destroy(&mut self) {
-    //   self.points.clear();
-    // }
 }
 
 impl OGRectangle {

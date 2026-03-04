@@ -1,10 +1,8 @@
 /**
  * Copyright (c) 2025, OpenGeometry. All rights reserved.
  * Curve Primitive for OpenGeometry.
- *
- * A Curve is represented as a polyline through control points for now.
- **/
-use crate::brep::{Brep, Edge, Vertex};
+ */
+use crate::brep::{Brep, BrepBuilder};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
 use crate::operations::offset::{offset_path, OffsetOptions, OffsetResult};
 use openmaths::Vector3;
@@ -42,36 +40,33 @@ impl OGCurve {
     }
 
     #[wasm_bindgen]
-    pub fn set_config(&mut self, control_points: Vec<Vector3>) {
+    pub fn set_config(&mut self, control_points: Vec<Vector3>) -> Result<(), JsValue> {
         self.control_points = control_points;
-        self.generate_geometry();
+        self.generate_geometry()
     }
 
     #[wasm_bindgen]
-    pub fn generate_geometry(&mut self) {
-        self.brep.clear();
-
+    pub fn generate_geometry(&mut self) -> Result<(), JsValue> {
         if self.control_points.is_empty() {
-            return;
+            self.brep.clear();
+            return Ok(());
         }
 
-        for point in &self.control_points {
-            self.brep
-                .vertices
-                .push(Vertex::new(self.brep.get_vertex_count(), *point));
+        let mut builder = BrepBuilder::new(self.brep.id);
+        builder.add_vertices(&self.control_points);
+
+        if self.control_points.len() >= 2 {
+            let indices: Vec<u32> = (0..self.control_points.len() as u32).collect();
+            builder.add_wire(&indices, false).map_err(|err| {
+                JsValue::from_str(&format!("Failed to build curve wire: {}", err))
+            })?;
         }
 
-        if self.control_points.len() < 2 {
-            return;
-        }
+        self.brep = builder
+            .build()
+            .map_err(|err| JsValue::from_str(&format!("Failed to finalize curve BREP: {}", err)))?;
 
-        for i in 0..(self.control_points.len() - 1) {
-            self.brep.edges.push(Edge::new(
-                self.brep.get_edge_count(),
-                i as u32,
-                (i + 1) as u32,
-            ));
-        }
+        Ok(())
     }
 
     #[wasm_bindgen]
@@ -83,10 +78,20 @@ impl OGCurve {
     pub fn get_geometry_serialized(&self) -> String {
         let mut vertex_buffer: Vec<f64> = Vec::new();
 
-        for vertex in &self.brep.vertices {
-            vertex_buffer.push(vertex.position.x);
-            vertex_buffer.push(vertex.position.y);
-            vertex_buffer.push(vertex.position.z);
+        if let Some(wire) = self.brep.wires.first() {
+            for vertex_id in self.brep.get_wire_vertex_indices(wire.id) {
+                if let Some(vertex) = self.brep.vertices.get(vertex_id as usize) {
+                    vertex_buffer.push(vertex.position.x);
+                    vertex_buffer.push(vertex.position.y);
+                    vertex_buffer.push(vertex.position.z);
+                }
+            }
+        } else {
+            for vertex in &self.brep.vertices {
+                vertex_buffer.push(vertex.position.x);
+                vertex_buffer.push(vertex.position.y);
+                vertex_buffer.push(vertex.position.z);
+            }
         }
 
         serde_json::to_string(&vertex_buffer).unwrap()

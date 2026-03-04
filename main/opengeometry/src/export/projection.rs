@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use openmaths::Vector3;
 use serde::{Deserialize, Serialize};
@@ -231,6 +231,13 @@ impl EdgeKey {
 }
 
 #[derive(Clone, Copy, Debug)]
+struct EdgeCandidate {
+    id: u32,
+    a: u32,
+    b: u32,
+}
+
+#[derive(Clone, Copy, Debug)]
 struct FaceInfo {
     front_facing: bool,
     normal: [f64; 3],
@@ -248,15 +255,15 @@ pub fn project_brep_to_scene(brep: &Brep, camera: &CameraParameters, hlr: &HlrOp
 
     let face_info = compute_face_info(brep, &frame);
     let adjacency = build_edge_adjacency(brep);
-    let candidates = collect_candidate_edges(brep, &adjacency);
+    let candidates = collect_candidate_edges(brep);
 
     let mut path = Path2D::new();
     for edge in candidates {
-        if !is_edge_vertex_index_valid(edge, brep.vertices.len()) {
+        if !is_edge_vertex_index_valid(edge.a, edge.b, brep.vertices.len()) {
             continue;
         }
 
-        if hlr.hide_hidden_edges && !is_edge_visible(edge, &adjacency, &face_info) {
+        if hlr.hide_hidden_edges && !is_edge_visible(edge.id, &adjacency, &face_info) {
             continue;
         }
 
@@ -365,54 +372,76 @@ fn project_view_point(point: ViewPoint, mode: ProjectionMode) -> Option<Vec2> {
     }
 }
 
-fn build_edge_adjacency(brep: &Brep) -> HashMap<EdgeKey, Vec<usize>> {
-    let mut adjacency: HashMap<EdgeKey, Vec<usize>> = HashMap::new();
+fn build_edge_adjacency(brep: &Brep) -> HashMap<u32, Vec<usize>> {
+    let face_index_by_id: HashMap<u32, usize> = brep
+        .faces
+        .iter()
+        .enumerate()
+        .map(|(index, face)| (face.id, index))
+        .collect();
 
-    for (face_index, face) in brep.faces.iter().enumerate() {
-        if face.face_indices.len() < 2 {
-            continue;
+    let mut adjacency: HashMap<u32, Vec<usize>> = HashMap::new();
+
+    for edge in &brep.edges {
+        let mut adjacent_faces: Vec<usize> = Vec::new();
+
+        let mut candidate_halfedges = vec![edge.halfedge];
+        if let Some(twin_halfedge) = edge.twin_halfedge {
+            candidate_halfedges.push(twin_halfedge);
         }
 
-        let count = face.face_indices.len();
-        for i in 0..count {
-            let v1 = face.face_indices[i];
-            let v2 = face.face_indices[(i + 1) % count];
-
-            let Some(edge) = EdgeKey::new(v1, v2) else {
+        for halfedge_id in candidate_halfedges {
+            let Some(halfedge) = brep.halfedges.get(halfedge_id as usize) else {
                 continue;
             };
 
-            let faces = adjacency.entry(edge).or_default();
-            if !faces.contains(&face_index) {
-                faces.push(face_index);
+            if let Some(face_id) = halfedge.face {
+                if let Some(face_index) = face_index_by_id.get(&face_id) {
+                    adjacent_faces.push(*face_index);
+                }
+            }
+
+            if let Some(twin_id) = halfedge.twin {
+                if let Some(twin) = brep.halfedges.get(twin_id as usize) {
+                    if let Some(face_id) = twin.face {
+                        if let Some(face_index) = face_index_by_id.get(&face_id) {
+                            adjacent_faces.push(*face_index);
+                        }
+                    }
+                }
             }
         }
+
+        adjacent_faces.sort_unstable();
+        adjacent_faces.dedup();
+        adjacency.insert(edge.id, adjacent_faces);
     }
 
     adjacency
 }
 
-fn collect_candidate_edges(brep: &Brep, adjacency: &HashMap<EdgeKey, Vec<usize>>) -> Vec<EdgeKey> {
-    let mut keys: HashSet<EdgeKey> = HashSet::new();
-    for key in adjacency.keys() {
-        keys.insert(*key);
-    }
+fn collect_candidate_edges(brep: &Brep) -> Vec<EdgeCandidate> {
+    let mut candidates = Vec::new();
 
     for edge in &brep.edges {
-        if let Some(key) = EdgeKey::new(edge.v1, edge.v2) {
-            keys.insert(key);
-        }
+        let Some((v1, v2)) = brep.get_edge_endpoints(edge.id) else {
+            continue;
+        };
+
+        let Some(key) = EdgeKey::new(v1, v2) else {
+            continue;
+        };
+
+        candidates.push(EdgeCandidate {
+            id: edge.id,
+            a: key.a,
+            b: key.b,
+        });
     }
 
-    for edge in &brep.hole_edges {
-        if let Some(key) = EdgeKey::new(edge.v1, edge.v2) {
-            keys.insert(key);
-        }
-    }
-
-    let mut edges: Vec<EdgeKey> = keys.into_iter().collect();
-    edges.sort_by_key(|key| (key.a, key.b));
-    edges
+    candidates.sort_by_key(|edge| (edge.a, edge.b, edge.id));
+    candidates.dedup_by_key(|edge| edge.id);
+    candidates
 }
 
 fn compute_face_info(brep: &Brep, frame: &CameraFrame) -> Vec<FaceInfo> {
@@ -440,13 +469,8 @@ fn compute_face_normal_and_center(
     brep: &Brep,
     face: &crate::brep::Face,
 ) -> Option<([f64; 3], [f64; 3])> {
-    let mut points: Vec<[f64; 3]> = Vec::new();
-    for vertex_id in &face.face_indices {
-        let idx = *vertex_id as usize;
-        if let Some(vertex) = brep.vertices.get(idx) {
-            points.push(vec3_to_arr(&vertex.position));
-        }
-    }
+    let (face_vertices, _) = brep.get_vertices_and_holes_by_face_id(face.id);
+    let points: Vec<[f64; 3]> = face_vertices.iter().map(vec3_to_arr).collect();
 
     if points.len() < 3 {
         return None;
@@ -477,21 +501,18 @@ fn compute_face_normal_and_center(
 }
 
 fn is_edge_visible(
-    edge: EdgeKey,
-    adjacency: &HashMap<EdgeKey, Vec<usize>>,
+    edge_id: u32,
+    adjacency: &HashMap<u32, Vec<usize>>,
     face_info: &[FaceInfo],
 ) -> bool {
-    let Some(adjacent_faces) = adjacency.get(&edge) else {
-        return true;
-    };
-
+    let adjacent_faces = adjacency.get(&edge_id).cloned().unwrap_or_default();
     if adjacent_faces.is_empty() {
         return true;
     }
 
     let mut front_faces = Vec::new();
     for face_index in adjacent_faces {
-        if let Some(face) = face_info.get(*face_index) {
+        if let Some(face) = face_info.get(face_index) {
             if face.front_facing {
                 front_faces.push(*face);
             }
@@ -502,11 +523,7 @@ fn is_edge_visible(
         return false;
     }
 
-    if front_faces.len() < adjacent_faces.len() {
-        return true;
-    }
-
-    if adjacent_faces.len() == 1 {
+    if front_faces.len() == 1 {
         return true;
     }
 
@@ -526,8 +543,8 @@ fn has_crease(front_faces: &[FaceInfo]) -> bool {
     false
 }
 
-fn is_edge_vertex_index_valid(edge: EdgeKey, vertex_count: usize) -> bool {
-    (edge.a as usize) < vertex_count && (edge.b as usize) < vertex_count
+fn is_edge_vertex_index_valid(a: u32, b: u32, vertex_count: usize) -> bool {
+    (a as usize) < vertex_count && (b as usize) < vertex_count
 }
 
 fn is_zero_length_2d(start: Vec2, end: Vec2) -> bool {
@@ -584,7 +601,7 @@ fn normalize(v: [f64; 3]) -> Option<[f64; 3]> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::brep::{Brep, Edge, Vertex};
+    use crate::brep::{Brep, BrepBuilder};
     use uuid::Uuid;
 
     #[test]
@@ -619,12 +636,10 @@ mod tests {
 
     #[test]
     fn test_project_edge_only_brep() {
-        let mut brep = Brep::new(Uuid::new_v4());
-        brep.vertices
-            .push(Vertex::new(0, Vector3::new(-1.0, 0.0, 0.0)));
-        brep.vertices
-            .push(Vertex::new(1, Vector3::new(1.0, 0.0, 0.0)));
-        brep.edges.push(Edge::new(0, 0, 1));
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[Vector3::new(-1.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0)]);
+        builder.add_wire(&[0, 1], false).unwrap();
+        let brep: Brep = builder.build().unwrap();
 
         let camera = CameraParameters {
             position: Vector3::new(0.0, 0.0, 5.0),

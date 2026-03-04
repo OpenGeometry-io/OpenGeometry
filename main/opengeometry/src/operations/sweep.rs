@@ -1,4 +1,4 @@
-use crate::brep::{Brep, Edge, Face, Vertex};
+use crate::brep::{Brep, BrepBuilder};
 use openmaths::Vector3;
 use uuid::Uuid;
 
@@ -103,21 +103,22 @@ pub fn sweep_profile_along_path(
     let (clean_path, path_closed) = sanitize_path(path_points);
     let clean_profile = sanitize_profile(profile_points);
 
-    let mut brep = Brep::new(Uuid::new_v4());
-
     if clean_path.len() < 2 || clean_profile.len() < 3 {
-        return brep;
+        return Brep::new(Uuid::new_v4());
     }
 
     let frames = build_path_frames(&clean_path, path_closed);
     if frames.len() != clean_path.len() {
-        return brep;
+        return Brep::new(Uuid::new_v4());
     }
 
     let local_profile = build_local_profile(&clean_profile);
     if local_profile.len() != clean_profile.len() {
-        return brep;
+        return Brep::new(Uuid::new_v4());
     }
+
+    let mut vertices = Vec::new();
+    let mut faces: Vec<Vec<u32>> = Vec::new();
 
     let section_count = clean_path.len();
     let ring_size = local_profile.len();
@@ -132,10 +133,7 @@ pub fn sweep_profile_along_path(
                 .add(frame.binormal.scale(local.v))
                 .add(frame.tangent.scale(local.w));
 
-            brep.vertices.push(Vertex::new(
-                brep.get_vertex_count(),
-                world_point.to_vector3(),
-            ));
+            vertices.push(world_point.to_vector3());
         }
     }
 
@@ -156,7 +154,7 @@ pub fn sweep_profile_along_path(
             let c = (next_section * ring_size + next_profile) as u32;
             let d = (next_section * ring_size + profile_index) as u32;
 
-            add_face_with_edges(&mut brep, vec![a, b, c, d]);
+            faces.push(vec![a, b, c, d]);
         }
     }
 
@@ -164,7 +162,7 @@ pub fn sweep_profile_along_path(
         if options.cap_start {
             let mut start_face: Vec<u32> = (0..ring_size as u32).collect();
             start_face.reverse();
-            add_face_with_edges(&mut brep, start_face);
+            faces.push(start_face);
         }
 
         if options.cap_end {
@@ -172,11 +170,29 @@ pub fn sweep_profile_along_path(
             let end_face: Vec<u32> = (0..ring_size as u32)
                 .map(|index| end_start + index)
                 .collect();
-            add_face_with_edges(&mut brep, end_face);
+            faces.push(end_face);
         }
     }
 
-    brep
+    let mut builder = BrepBuilder::new(Uuid::new_v4());
+    builder.add_vertices(&vertices);
+
+    for face in &faces {
+        if builder.add_face(face, &[]).is_err() {
+            return Brep::new(Uuid::new_v4());
+        }
+    }
+
+    if !faces.is_empty() {
+        let shell_closed = path_closed || (options.cap_start && options.cap_end);
+        if builder.add_shell_from_all_faces(shell_closed).is_err() {
+            return Brep::new(Uuid::new_v4());
+        }
+    }
+
+    builder
+        .build()
+        .unwrap_or_else(|_| Brep::new(Uuid::new_v4()))
 }
 
 fn sanitize_path(path: &[Vector3]) -> (Vec<Vec3f>, bool) {
@@ -412,22 +428,6 @@ fn rotate_around_axis(vector: Vec3f, axis: Vec3f, angle: f64) -> Vec3f {
         .scale(cos_theta)
         .add(axis.cross(vector).scale(sin_theta))
         .add(axis.scale(axis.dot(vector) * (1.0 - cos_theta)))
-}
-
-fn add_face_with_edges(brep: &mut Brep, face_indices: Vec<u32>) {
-    if face_indices.len() < 3 {
-        return;
-    }
-
-    let face_id = brep.get_face_count();
-    brep.faces.push(Face::new(face_id, face_indices.clone()));
-
-    for index in 0..face_indices.len() {
-        let v1 = face_indices[index];
-        let v2 = face_indices[(index + 1) % face_indices.len()];
-        let edge_id = brep.get_edge_count();
-        brep.edges.push(Edge::new(edge_id, v1, v2));
-    }
 }
 
 #[cfg(test)]
