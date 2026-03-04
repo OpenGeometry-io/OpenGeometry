@@ -5,6 +5,7 @@ import {
   BooleanShape,
   Cuboid,
   Cylinder,
+  parseBooleanOperation,
   Sphere,
   Wedge,
 } from "@og-three";
@@ -83,14 +84,13 @@ void bootstrapExample({
         0xf97316
       );
 
-      const operation = (String(state.operation) as BooleanOperation) ??
-        BooleanOperation.Union;
+      const operation = parseBooleanOperation(String(state.operation));
 
       const boolean = new BooleanShape(left, right, operation, {
         epsilon: state.epsilon as number,
         snap: state.snap as number,
       });
-      boolean.outline = true;
+      boolean.outline = Boolean(state.showOutline);
 
       boolean.material = new THREE.MeshStandardMaterial({
         color: 0x2563eb,
@@ -143,6 +143,12 @@ void bootstrapExample({
             { label: "Cylinder", value: "cylinder" },
             { label: "Wedge", value: "wedge" },
           ],
+        },
+        {
+          type: "boolean",
+          key: "showOutline",
+          label: "Show Outline",
+          value: true,
         },
         {
           type: "number",

@@ -2,77 +2,80 @@
 
 ## What changed
 
-- Added a stateful kernel boolean operation module `operations::boolean` with wasm-bindgen class `OGBoolean`.
-- `OGBoolean::compute` now stores the resulting polygon set and returns triangulated mesh buffer output.
-- Added a kernel outline export API: `OGBoolean::get_outline_geometry_serialized`.
-- Outline generation is done in kernel code by traversing final CSG polygons and emitting deduplicated polygon-boundary edges.
-- Added/updated `@opengeometry/kernel-three` bindings:
-  - `BooleanShape` now requests both mesh and outline buffers from kernel.
-  - Added boolean outline handling (`LineSegments`) with `outline` toggle behavior aligned with other wrapped shapes.
-  - Switched operation selection to symbolic enum-style constants (`BooleanOperation.Union`, `BooleanOperation.Intersection`, `BooleanOperation.Difference`) instead of numeric indices.
-- Updated boolean example page:
-  - Added dropdown for operation selection.
-  - Added left/right shape dropdowns (Cuboid, Sphere, Cylinder, Wedge).
-  - Updated demo to run booleans across those shapes and display resulting outline.
-- Extended example control runtime to support `select` controls in addition to number/boolean controls.
+- Updated the kernel boolean module to support **BRep-like outlines** for boolean outputs rather than raw triangulation edges.
+- `OGBoolean` remains stateful (`last_result`) and now computes outlines by edge-adjacency analysis:
+  - build undirected edge buckets from result polygons
+  - suppress edges shared by coplanar faces (triangle-split seams)
+  - keep boundary edges and sharp-feature edges
+- `OGBoolean::get_outline_geometry_serialized` now returns this BRep-like feature outline buffer.
+- Added kernel test `coplanar_shared_triangle_edge_is_removed_from_outline` to verify internal triangulation diagonals are not emitted.
+- Updated Three.js boolean binding API:
+  - Introduced `BooleanOperationKind` and `parseBooleanOperation` for deterministic operation selection.
+  - `BooleanShape` uses kernel outline output as before, but operation parsing now avoids ambiguous string casting in examples.
+- Updated boolean example (`operations-boolean.ts`):
+  - added **Show Outline** toggle
+  - kept left/right shape selectors (Cuboid, Sphere, Cylinder, Wedge)
+  - operation dropdown now resolves via `parseBooleanOperation` for consistent behavior
 
 ## Why it changed
 
-Follow-up requirements requested parity with other shape wrappers:
+Follow-up requirements requested:
 
-- boolean result must have outline support
-- operation selection should be enum-based (not numeric)
-- example must include additional operand shape types and a dropdown UX
+1. BRep-like outlines instead of triangulated outlines
+2. consistency in operation selection behavior
+3. an explicit outline toggle in the example
+
+These are now addressed directly in kernel + wrapper + example layers.
 
 ## Robustness strategy
 
-The boolean implementation continues to use robust CSG controls:
+Boolean CSG core still uses robust controls:
 
-- Epsilon-based plane classification (`front`, `back`, `coplanar`, `spanning`)
-- Grid snapping for deterministic split points
-- Post-op welding via epsilon snapping
+- epsilon-based plane classification (`front`/`back`/`coplanar`/`spanning`)
+- snap-grid normalization for deterministic splits
+- post-op weld by epsilon snapping
 
-These are exposed via `constraints.epsilon` and `constraints.snap`.
+Outline extraction now adds topology-aware edge filtering to remove coplanar split seams.
 
 ## How to test locally
 
-1. Kernel format + tests:
+1. Kernel checks:
 
 ```bash
 cargo fmt --manifest-path main/opengeometry/Cargo.toml
 cargo test --manifest-path main/opengeometry/Cargo.toml
 ```
 
-2. TS lint check:
+2. TS lint:
 
 ```bash
 npm run lint:check
 ```
 
-3. Build wasm package (requires `wasm-pack`):
+3. Build wasm + three package:
 
 ```bash
 npm run build-core
+npm run build-three
 ```
 
-4. Run examples app:
+4. Example run:
 
 ```bash
 npm --prefix main/opengeometry-three run dev-example-three
 ```
 
-Open:
+Then open:
 
 - `main/opengeometry-three/examples-vite/operations/boolean.html`
 
 ## Backward compatibility
 
-- Existing shape and primitive wrappers are unchanged.
-- Boolean API remains additive.
-- `BooleanShape` API remains compatible while adding outline behavior.
+- Existing non-boolean wrappers remain unchanged.
+- Boolean API stays additive; operation constants are still `BooleanOperation.Union|Intersection|Difference`.
+- New parser helper improves call-site safety without breaking existing valid operation strings.
 
 ## Known caveats and follow-ups
 
-- In this environment, `wasm-pack` is unavailable, so full wasm rebuild and example execution are limited.
-- Existing repository lint errors outside boolean changes still cause `npm run lint:check` to fail.
-- If very dense meshes are used, polygon edge outlines can be visually heavy; future work can add feature-edge filtering by angle threshold.
+- In this environment, wasm package artifacts (`main/opengeometry/pkg/opengeometry`) are unavailable, so full TS build/example rendering remains blocked.
+- Existing repo-level lint errors outside this change still fail `npm run lint:check`.

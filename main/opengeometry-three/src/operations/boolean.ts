@@ -7,8 +7,20 @@ export const BooleanOperation = {
   Difference: "difference",
 } as const;
 
-export type BooleanOperationValue =
+export type BooleanOperationKind =
   (typeof BooleanOperation)[keyof typeof BooleanOperation];
+
+export function parseBooleanOperation(value: string): BooleanOperationKind {
+  switch (value) {
+    case BooleanOperation.Intersection:
+      return BooleanOperation.Intersection;
+    case BooleanOperation.Difference:
+      return BooleanOperation.Difference;
+    case BooleanOperation.Union:
+    default:
+      return BooleanOperation.Union;
+  }
+}
 
 export interface BooleanConstraints {
   epsilon?: number;
@@ -22,7 +34,7 @@ export class BooleanShape extends THREE.Mesh {
   constructor(
     left: THREE.Mesh,
     right: THREE.Mesh,
-    operation: BooleanOperationValue,
+    operation: BooleanOperationKind,
     constraints?: BooleanConstraints,
     material?: THREE.Material
   ) {
@@ -49,7 +61,7 @@ export class BooleanShape extends THREE.Mesh {
   run(
     left: THREE.Mesh,
     right: THREE.Mesh,
-    operation: BooleanOperationValue,
+    operation: BooleanOperationKind,
     constraints?: BooleanConstraints
   ) {
     this.geometry.dispose();
@@ -106,7 +118,7 @@ export class BooleanShape extends THREE.Mesh {
   static computeGeometry(
     left: THREE.Mesh,
     right: THREE.Mesh,
-    operation: BooleanOperationValue,
+    operation: BooleanOperationKind,
     constraints?: BooleanConstraints,
     kernelBoolean = new OGBoolean()
   ) {

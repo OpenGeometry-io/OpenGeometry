@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -542,8 +542,7 @@ fn polygons_to_triangle_buffer(polygons: &[Polygon]) -> Vec<f64> {
 }
 
 fn polygons_to_outline_buffer(polygons: &[Polygon]) -> Vec<f64> {
-    let mut out = Vec::new();
-    let mut seen = HashSet::new();
+    let mut edges: HashMap<EdgeKey, Vec<EdgeSample>> = HashMap::new();
 
     for polygon in polygons {
         if polygon.vertices.len() < 2 {
@@ -554,13 +553,57 @@ fn polygons_to_outline_buffer(polygons: &[Polygon]) -> Vec<f64> {
             let start = polygon.vertices[i].pos;
             let end = polygon.vertices[(i + 1) % polygon.vertices.len()].pos;
             let key = EdgeKey::from_points(start, end);
-            if seen.insert(key) {
-                out.extend_from_slice(&[start.x, start.y, start.z, end.x, end.y, end.z]);
-            }
+            let entry = edges.entry(key).or_default();
+            entry.push(EdgeSample {
+                start,
+                end,
+                normal: polygon.plane.normal,
+            });
+        }
+    }
+
+    let mut out = Vec::new();
+    for samples in edges.values() {
+        if should_emit_edge(samples) {
+            let representative = samples[0];
+            out.extend_from_slice(&[
+                representative.start.x,
+                representative.start.y,
+                representative.start.z,
+                representative.end.x,
+                representative.end.y,
+                representative.end.z,
+            ]);
         }
     }
 
     out
+}
+
+fn should_emit_edge(samples: &[EdgeSample]) -> bool {
+    if samples.len() <= 1 {
+        return true;
+    }
+
+    const COPLANAR_NORMAL_DOT: f64 = 0.9999;
+
+    for i in 0..samples.len() {
+        for j in (i + 1)..samples.len() {
+            let dot = samples[i].normal.dot(samples[j].normal).abs();
+            if dot < COPLANAR_NORMAL_DOT {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+#[derive(Debug, Clone, Copy)]
+struct EdgeSample {
+    start: Vec3,
+    end: Vec3,
+    normal: Vec3,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -624,6 +667,41 @@ mod tests {
         assert_eq!(triangles.len() % 9, 0);
     }
 
+    #[test]
+    fn coplanar_shared_triangle_edge_is_removed_from_outline() {
+        let poly_a = Polygon::new(
+            vec![
+                Vertex {
+                    pos: Vec3::new(0.0, 0.0, 0.0),
+                },
+                Vertex {
+                    pos: Vec3::new(1.0, 0.0, 0.0),
+                },
+                Vertex {
+                    pos: Vec3::new(1.0, 0.0, 1.0),
+                },
+            ],
+            1e-6,
+        );
+        let poly_b = Polygon::new(
+            vec![
+                Vertex {
+                    pos: Vec3::new(0.0, 0.0, 0.0),
+                },
+                Vertex {
+                    pos: Vec3::new(1.0, 0.0, 1.0),
+                },
+                Vertex {
+                    pos: Vec3::new(0.0, 0.0, 1.0),
+                },
+            ],
+            1e-6,
+        );
+
+        let outline = polygons_to_outline_buffer(&[poly_a, poly_b]);
+        // rectangle perimeter only: 4 line segments * 6 coordinates
+        assert_eq!(outline.len(), 24);
+    }
     #[test]
     fn outline_is_generated_for_polygon_result() {
         let polygon = Polygon::new(
