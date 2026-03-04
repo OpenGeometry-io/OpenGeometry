@@ -3,7 +3,9 @@
  * @module @opengeometry/kernel-three
  */
 import init, {
-  Vector3
+  OGSceneManager,
+  OGStlExportResult,
+  Vector3,
 } from "../opengeometry/pkg/opengeometry";
 // Vector3 is also available in opengeometry package
 // import { Vector3 } from "@opengeometry/openmaths";
@@ -650,6 +652,8 @@ export class OpenGeometry {
 // }
 
 export {
+  OGSceneManager,
+  OGStlExportResult,
   Vector3,
   SpotLabel,
 }
