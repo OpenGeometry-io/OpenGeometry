@@ -1,0 +1,414 @@
+---
+title: 'Sweep'
+description: 'Extrude 2D profiles along custom 3D paths to create complex shapes'
+icon: 'life-ring'
+---
+
+## Overview
+
+The `Sweep` class creates 3D shapes by sweeping a 2D profile along a 3D path. This powerful technique enables creation of pipes, tubes, rails, and complex extruded forms that follow custom trajectories.
+
+## Constructor
+
+```typescript
+const sweep = new Sweep(options?: ISweepOptions);
+```
+
+### ISweepOptions
+
+<ParamField path="ogid" type="string" optional>
+  Unique identifier for the sweep. Auto-generated if not provided.
+</ParamField>
+
+<ParamField path="path" type="Vector3[]" required>
+  Array of points defining the 3D path along which the profile is swept. Minimum 2 points required.
+  
+  ```typescript
+  path: [
+    new Vector3(0, 0, 0),
+    new Vector3(0, 5, 0),
+    new Vector3(5, 5, 0),
+    new Vector3(5, 10, 0)
+  ]
+  ```
+</ParamField>
+
+<ParamField path="profile" type="Vector3[]" required>
+  Array of points defining the 2D profile to be swept. Minimum 3 points required. Profile should be defined on a plane perpendicular to the initial path direction.
+  
+  ```typescript
+  profile: [
+    new Vector3(-0.5, 0, -0.5),
+    new Vector3(0.5, 0, -0.5),
+    new Vector3(0.5, 0, 0.5),
+    new Vector3(-0.5, 0, 0.5)
+  ]
+  ```
+</ParamField>
+
+<ParamField path="color" type="number" required>
+  Hexadecimal color value for the swept shape.
+  
+  ```typescript
+  color: 0x00ff00  // Green
+  ```
+</ParamField>
+
+<ParamField path="capStart" type="boolean" optional default="true">
+  Whether to add a cap (face) at the start of the sweep.
+  
+  ```typescript
+  capStart: true  // Close the start
+  ```
+</ParamField>
+
+<ParamField path="capEnd" type="boolean" optional default="true">
+  Whether to add a cap (face) at the end of the sweep.
+  
+  ```typescript
+  capEnd: true  // Close the end
+  ```
+</ParamField>
+
+## Methods
+
+### setConfig()
+
+Updates the sweep configuration with path and profile, using default caps (both true).
+
+```typescript
+sweep.setConfig(options: ISweepOptions): void
+```
+
+**Example:**
+```typescript
+sweep.setConfig({
+  path: [
+    new Vector3(0, 0, 0),
+    new Vector3(0, 10, 0)
+  ],
+  profile: [
+    new Vector3(-1, 0, -1),
+    new Vector3(1, 0, -1),
+    new Vector3(1, 0, 1),
+    new Vector3(-1, 0, 1)
+  ],
+  color: 0x3498db
+});
+```
+
+### getBrep()
+
+Returns the B-Rep (Boundary Representation) data as a parsed JSON object.
+
+```typescript
+sweep.getBrep(): object
+```
+
+**Example:**
+```typescript
+const brepData = sweep.getBrep();
+console.log('Vertices:', brepData.vertices.length);
+console.log('Faces:', brepData.faces.length);
+```
+
+### generateGeometry()
+
+Regenerates the THREE.js geometry from the current configuration. Called automatically after setConfig().
+
+```typescript
+sweep.generateGeometry(): void
+```
+
+### discardGeometry()
+
+Disposes of the current geometry to free memory.
+
+```typescript
+sweep.discardGeometry(): void
+```
+
+## Properties
+
+<ResponseField name="ogid" type="string">
+  Unique identifier for the sweep instance.
+</ResponseField>
+
+<ResponseField name="options" type="ISweepOptions">
+  Current sweep configuration including path, profile, color, and cap settings.
+  
+  ```typescript
+  const pathLength = sweep.options.path.length;
+  const profilePoints = sweep.options.profile.length;
+  ```
+</ResponseField>
+
+<ResponseField name="color" type="number">
+  Get or set the sweep color.
+  
+  ```typescript
+  sweep.color = 0xff0000;  // Change to red
+  ```
+</ResponseField>
+
+<ResponseField name="outline" type="boolean">
+  Enable or disable outline rendering for the sweep edges.
+  
+  ```typescript
+  sweep.outline = true;   // Show wireframe
+  sweep.outline = false;  // Hide wireframe
+  ```
+</ResponseField>
+
+## Usage Examples
+
+### Simple Pipe
+
+```typescript
+import { Sweep, Vector3 } from 'opengeometry-three';
+
+// Straight vertical pipe with square cross-section
+const pipe = new Sweep({
+  path: [
+    new Vector3(0, 0, 0),
+    new Vector3(0, 10, 0)
+  ],
+  profile: [
+    new Vector3(-0.5, 0, -0.5),
+    new Vector3(0.5, 0, -0.5),
+    new Vector3(0.5, 0, 0.5),
+    new Vector3(-0.5, 0, 0.5)
+  ],
+  color: 0x2ecc71,
+  capStart: true,
+  capEnd: true
+});
+
+scene.add(pipe);
+```
+
+### Curved Tube
+
+```typescript
+import { Sweep, Vector3 } from 'opengeometry-three';
+
+// Create a curved path
+const curvedPath = [];
+for (let i = 0; i <= 20; i++) {
+  const t = i / 20;
+  curvedPath.push(new Vector3(
+    Math.cos(t * Math.PI) * 5,
+    t * 10,
+    Math.sin(t * Math.PI) * 5
+  ));
+}
+
+// Circular profile
+const circularProfile = [];
+const segments = 12;
+for (let i = 0; i < segments; i++) {
+  const angle = (i / segments) * Math.PI * 2;
+  circularProfile.push(new Vector3(
+    Math.cos(angle) * 0.5,
+    0,
+    Math.sin(angle) * 0.5
+  ));
+}
+
+const tube = new Sweep({
+  path: curvedPath,
+  profile: circularProfile,
+  color: 0x3498db,
+  capStart: true,
+  capEnd: true
+});
+
+tube.outline = true;
+```
+
+### Handrail
+
+```typescript
+import { Sweep, Vector3 } from 'opengeometry-three';
+
+// Staircase handrail path
+const handrailPath = [
+  new Vector3(0, 0, 0),
+  new Vector3(0, 2, 2),
+  new Vector3(0, 4, 4),
+  new Vector3(0, 6, 6),
+  new Vector3(0, 8, 8)
+];
+
+// Circular handrail profile
+const handrailProfile = [];
+for (let i = 0; i < 16; i++) {
+  const angle = (i / 16) * Math.PI * 2;
+  handrailProfile.push(new Vector3(
+    Math.cos(angle) * 0.3,
+    0,
+    Math.sin(angle) * 0.3
+  ));
+}
+
+const handrail = new Sweep({
+  path: handrailPath,
+  profile: handrailProfile,
+  color: 0x8b4513,
+  capStart: true,
+  capEnd: true
+});
+```
+
+### Open-Ended Sweep
+
+```typescript
+import { Sweep, Vector3 } from 'opengeometry-three';
+
+// Sweep without end caps (open tube)
+const openTube = new Sweep({
+  path: [
+    new Vector3(0, 0, 0),
+    new Vector3(5, 0, 0),
+    new Vector3(5, 5, 0)
+  ],
+  profile: [
+    new Vector3(-0.5, 0, -0.5),
+    new Vector3(0.5, 0, -0.5),
+    new Vector3(0.5, 0, 0.5),
+    new Vector3(-0.5, 0, 0.5)
+  ],
+  color: 0xe74c3c,
+  capStart: false,  // No start cap
+  capEnd: false     // No end cap
+});
+```
+
+### Architectural Molding
+
+```typescript
+import { Sweep, Vector3 } from 'opengeometry-three';
+
+// Complex profile for decorative molding
+const moldingProfile = [
+  new Vector3(0, 0, 0),
+  new Vector3(0.2, 0, 0.1),
+  new Vector3(0.3, 0, 0.1),
+  new Vector3(0.4, 0, 0.3),
+  new Vector3(0.5, 0, 0.3),
+  new Vector3(0.6, 0, 0)
+];
+
+// Path around a room corner
+const roomPath = [
+  new Vector3(0, 8, 0),
+  new Vector3(10, 8, 0),
+  new Vector3(10, 8, 10)
+];
+
+const molding = new Sweep({
+  path: roomPath,
+  profile: moldingProfile,
+  color: 0xf5f5dc,
+  capStart: false,
+  capEnd: false
+});
+```
+
+## Implementation Details
+
+### Sweep Algorithm
+
+The sweep operation positions the profile at each path point and connects adjacent profiles:
+
+**Rust Implementation:** `/workspace/source/main/opengeometry/src/primitives/sweep.rs:92-99`
+
+```rust
+let options = SweepOptions {
+    cap_start: self.cap_start,
+    cap_end: self.cap_end,
+};
+
+self.brep = sweep_profile_along_path(&self.path_points, &self.profile_points, options);
+```
+
+### Material Configuration
+
+Sweeps use MeshStandardMaterial with transparency:
+
+**Source:** `/workspace/source/main/opengeometry-three/src/shapes/sweep.ts:123-127`
+
+```typescript
+const material = new THREE.MeshStandardMaterial({
+  color: this.options.color,
+  transparent: true,
+  opacity: 0.6,
+});
+```
+
+### Validation
+
+The sweep validates path and profile requirements:
+
+**Source:** `/workspace/source/main/opengeometry-three/src/shapes/sweep.ts:75-87`
+
+```typescript
+validateOptions() {
+  if (!this.options) {
+    throw new Error("Options are not defined for Sweep");
+  }
+
+  if (this.options.path.length < 2) {
+    throw new Error("Sweep path requires at least 2 points.");
+  }
+
+  if (this.options.profile.length < 3) {
+    throw new Error("Sweep profile requires at least 3 points.");
+  }
+}
+```
+
+### Cap Generation
+
+When `capStart` or `capEnd` is true, the sweep operation adds triangulated faces at the ends:
+
+**Source:** `/workspace/source/main/opengeometry-three/src/shapes/sweep.ts:95-96`
+
+## Best Practices
+
+<Tip>
+  **Profile Orientation:** Define the profile on a plane perpendicular to the initial path direction. For paths starting along the Y-axis, define profiles on the XZ plane.
+</Tip>
+
+<Warning>
+  **Path Smoothness:** Sharp angles in the path may cause geometry artifacts. For smoother results, use more path points with gradual direction changes.
+</Warning>
+
+<Info>
+  **Profile Complexity:** Complex profiles with many points will generate more geometry. Balance profile detail with performance requirements.
+</Info>
+
+<Tip>
+  **Closed Profiles:** For hollow tubes, ensure the profile forms a closed loop by making the first and last points identical.
+</Tip>
+
+## Performance Considerations
+
+### Vertex Count
+Total vertices ≈ `path_points × profile_points`
+
+### Face Count
+Total faces ≈ `(path_points - 1) × profile_points × 2 + cap_faces`
+
+### Optimization Tips
+
+1. **Reduce Path Points:** Use fewer points for distant or less important sweeps
+2. **Simplify Profiles:** Use simpler profiles (fewer vertices) when high detail isn't needed
+3. **Disable Caps:** Set `capStart` and `capEnd` to `false` for open-ended shapes
+4. **Outline Toggle:** Only enable outlines when needed for debugging or emphasis
+
+## See Also
+
+- [Cylinder](/api/shapes/cylinder) - For simple straight extrusions
+- [Polygon](/api/shapes/polygon) - For creating custom 2D profiles
+- [Cuboid](/api/shapes/cuboid) - For rectangular extrusions

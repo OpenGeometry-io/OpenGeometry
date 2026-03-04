@@ -1,0 +1,317 @@
+---
+title: Quickstart
+description: Create your first 3D shape with OpenGeometry in minutes
+---
+
+This guide will walk you through creating a simple 3D scene with OpenGeometry and rendering it with Three.js.
+
+## Prerequisites
+
+Make sure you have completed the [installation](/installation) steps and have both OpenGeometry and Three.js installed.
+
+## Basic Setup
+
+Let's create a complete example that renders a 3D cuboid in the browser.
+
+<Steps>
+
+<Step title="Create HTML container">
+
+First, set up a basic HTML page with a container for your 3D scene:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenGeometry Quickstart</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #app { width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
+```
+
+</Step>
+
+<Step title="Initialize Three.js scene">
+
+Create a `main.ts` file and set up a basic Three.js scene:
+
+```typescript
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Cuboid, Vector3 } from 'opengeometry';
+
+// Get the app container
+const app = document.getElementById('app');
+if (!app) throw new Error('Missing #app container');
+
+// Create scene
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf3f4f6);
+
+// Create camera
+const camera = new THREE.PerspectiveCamera(
+  55,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+camera.position.set(5, 4, 6);
+
+// Create renderer
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+app.appendChild(renderer.domElement);
+
+// Add orbit controls
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 0.8, 0);
+controls.update();
+
+// Add grid helper
+scene.add(new THREE.GridHelper(20, 20, 0x9ca3af, 0xd1d5db));
+
+// Add lights
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(5, 8, 3);
+scene.add(directionalLight);
+```
+
+</Step>
+
+<Step title="Create a 3D shape">
+
+Now create a cuboid and add it to the scene:
+
+```typescript
+// Create a cuboid
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0.8, 0),
+  width: 1.5,
+  height: 1.6,
+  depth: 1.2,
+  color: 0x10b981,
+});
+
+// Enable outline rendering
+cuboid.outline = true;
+
+// Add to scene
+scene.add(cuboid);
+```
+
+<Info>
+  The `Cuboid` class extends `THREE.Mesh`, so it can be added directly to Three.js scenes. All OpenGeometry shapes work this way.
+</Info>
+
+</Step>
+
+<Step title="Add animation loop">
+
+Finally, create the render loop:
+
+```typescript
+// Animation loop
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// Handle window resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+```
+
+</Step>
+
+</Steps>
+
+## Complete Example
+
+Here's the complete `main.ts` file:
+
+```typescript
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { OpenGeometry, Cuboid, Vector3 } from 'opengeometry';
+
+const app = document.getElementById('app');
+if (!app) throw new Error('Missing #app container');
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf3f4f6);
+
+const camera = new THREE.PerspectiveCamera(
+  55,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+camera.position.set(5, 4, 6);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+app.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 0.8, 0);
+controls.update();
+
+scene.add(new THREE.GridHelper(20, 20, 0x9ca3af, 0xd1d5db));
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(5, 8, 3);
+scene.add(directionalLight);
+
+// Initialize OpenGeometry
+await OpenGeometry.create({});
+
+// Create a cuboid
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0.8, 0),
+  width: 1.5,
+  height: 1.6,
+  depth: 1.2,
+  color: 0x10b981,
+});
+cuboid.outline = true;
+scene.add(cuboid);
+
+// Animation loop
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// Handle window resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+```
+
+## Try Other Shapes
+
+OpenGeometry provides many built-in shapes. Try experimenting with different primitives and shapes:
+
+### Cylinder Example
+
+```typescript
+import { Cylinder, Vector3 } from 'opengeometry';
+
+const cylinder = new Cylinder({
+  center: new Vector3(0, 0.8, 0),
+  radius: 0.6,
+  height: 1.6,
+  segments: 32,
+  angle: Math.PI * 2,
+  color: 0xf97316,
+});
+cylinder.outline = true;
+scene.add(cylinder);
+```
+
+### Sphere Example
+
+```typescript
+import { Sphere, Vector3 } from 'opengeometry';
+
+const sphere = new Sphere({
+  center: new Vector3(0, 1.0, 0),
+  radius: 0.9,
+  widthSegments: 32,
+  heightSegments: 24,
+  color: 0x0ea5e9,
+});
+sphere.outline = true;
+scene.add(sphere);
+```
+
+### 2D Primitives
+
+You can also create 2D primitives like lines, arcs, and curves:
+
+```typescript
+import { Line, Arc, Polyline, Vector3 } from 'opengeometry';
+
+// Line
+const line = new Line({
+  start: new Vector3(-2, 0, 0),
+  end: new Vector3(2, 0, 0),
+  color: 0x111827,
+});
+scene.add(line);
+
+// Arc
+const arc = new Arc({
+  center: new Vector3(0, 0, 0),
+  radius: 1.0,
+  startAngle: 0,
+  endAngle: Math.PI * 1.5,
+  segments: 32,
+  color: 0xb91c1c,
+});
+scene.add(arc);
+
+// Polyline
+const polyline = new Polyline({
+  points: [
+    new Vector3(-1, 0, 0),
+    new Vector3(0, 0, 1),
+    new Vector3(1, 0, 0),
+  ],
+  color: 0x0284c7,
+});
+scene.add(polyline);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="API Reference"
+    icon="book"
+    href="/api-reference"
+  >
+    Explore the complete API documentation for all shapes and operations
+  </Card>
+  <Card
+    title="Live Examples"
+    icon="sparkles"
+    href="https://demos.opengeometry.io/src/kernel/index.html"
+  >
+    See interactive examples showcasing all features
+  </Card>
+</CardGroup>
+
+<Note>
+  For more complex examples including sweep operations, offset curves, and advanced CAD operations, check out the [OpenGeometry Examples repository](https://github.com/OpenGeometry-io/OpenGeometry-examples).
+</Note>

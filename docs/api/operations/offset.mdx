@@ -1,0 +1,266 @@
+---
+title: 'Offset'
+description: 'Generate parallel offset paths from polylines and polygons with smart corner handling'
+icon: 'clone'
+---
+
+## Overview
+
+The offset operation creates a new path parallel to the input path at a specified distance. It intelligently handles corners with mitering or beveling, supports both open and closed paths, and maintains geometric correctness for complex shapes.
+
+## Function Signature
+
+```rust
+pub fn offset_path(
+    points: &[Vector3],
+    distance: f64,
+    force_closed: Option<bool>,
+    options: OffsetOptions,
+) -> OffsetResult
+```
+
+Generates an offset path from a sequence of points.
+
+<ParamField path="points" type="&[Vector3]" required>
+  Array of 3D points defining the path to offset. For 2D paths, use the XZ plane (Y=0 or constant).
+</ParamField>
+
+<ParamField path="distance" type="f64" required>
+  Offset distance. Positive values offset to the left (counter-clockwise side), negative values offset to the right. The distance is measured perpendicular to the path direction.
+</ParamField>
+
+<ParamField path="force_closed" type="Option<bool>">
+  Explicitly specify whether the path should be treated as closed:
+  - `Some(true)`: Force closed path
+  - `Some(false)`: Force open path
+  - `None`: Auto-detect (closed if first and last points are nearly identical)
+</ParamField>
+
+<ParamField path="options" type="OffsetOptions" required>
+  Configuration options controlling corner handling behavior.
+</ParamField>
+
+## Configuration
+
+### OffsetOptions
+
+```rust
+pub struct OffsetOptions {
+    pub bevel: bool,
+    pub acute_threshold_degrees: f64,
+}
+```
+
+<ParamField path="bevel" type="bool" default="true">
+  Enable beveling for outer corners when the interior angle is below the threshold. When `true`, sharp corners are cut off creating two vertices; when `false`, attempts to miter all corners.
+</ParamField>
+
+<ParamField path="acute_threshold_degrees" type="f64" default="35.0">
+  The interior angle threshold (in degrees) below which outer corners will be beveled. Valid range: 1.0 to 179.0 degrees. Lower values bevel more aggressively.
+</ParamField>
+
+### Default Options
+
+```rust
+OffsetOptions {
+    bevel: true,
+    acute_threshold_degrees: 35.0,
+}
+```
+
+## Return Type
+
+### OffsetResult
+
+```rust
+pub struct OffsetResult {
+    pub points: Vec<Vector3>,
+    pub beveled_vertex_indices: Vec<u32>,
+    pub is_closed: bool,
+}
+```
+
+<ResponseField name="points" type="Vec<Vector3>">
+  The offset path vertices. For closed paths, the last point duplicates the first.
+</ResponseField>
+
+<ResponseField name="beveled_vertex_indices" type="Vec<u32>">
+  Indices of vertices in the original path where beveling was applied. Useful for post-processing or visualization.
+</ResponseField>
+
+<ResponseField name="is_closed" type="bool">
+  Whether the result is a closed loop.
+</ResponseField>
+
+## How It Works
+
+1. **Path Sanitization**: Removes consecutive duplicate points and detects if the path is closed
+2. **Segment Analysis**: Calculates unit direction vectors and left-normal vectors for each segment
+3. **Corner Processing**:
+   - **Straight segments**: Simple perpendicular offset
+   - **Outer corners**: Mitered intersection or beveled based on angle threshold
+   - **Inner corners** (open paths): Clipped to prevent spikes
+   - **Collinear segments**: Merged smoothly
+4. **Path Closing**: For closed paths, ensures first and last points match exactly
+
+## Code Examples
+
+### Basic Line Offset
+
+```rust
+use opengeometry::operations::offset::{offset_path, OffsetOptions};
+use openmaths::Vector3;
+
+// Straight line from origin to (5, 0, 0)
+let line = vec![
+    Vector3::new(0.0, 0.0, 0.0),
+    Vector3::new(5.0, 0.0, 0.0),
+];
+
+// Offset 1 unit to the left (positive Z direction)
+let result = offset_path(&line, 1.0, Some(false), OffsetOptions::default());
+
+// Result points at Z=1.0:
+// Vector3::new(0.0, 0.0, 1.0)
+// Vector3::new(5.0, 0.0, 1.0)
+assert_eq!(result.points.len(), 2);
+assert!((result.points[0].z - 1.0).abs() < 1e-6);
+```
+
+### Closed Rectangle Offset
+
+```rust
+use opengeometry::operations::offset::{offset_path, OffsetOptions};
+use openmaths::Vector3;
+
+// Rectangle
+let rectangle = vec![
+    Vector3::new(0.0, 0.0, 0.0),
+    Vector3::new(2.0, 0.0, 0.0),
+    Vector3::new(2.0, 0.0, 2.0),
+    Vector3::new(0.0, 0.0, 2.0),
+    Vector3::new(0.0, 0.0, 0.0), // Close the loop
+];
+
+// Inset by 0.2 units (negative offset)
+let result = offset_path(&rectangle, -0.2, None, OffsetOptions::default());
+
+assert!(result.is_closed);
+assert!(result.points.len() >= 5);
+```
+
+### Beveling Acute Corners
+
+```rust
+use opengeometry::operations::offset::{offset_path, OffsetOptions};
+use openmaths::Vector3;
+
+// Path with a sharp corner
+let sharp_path = vec![
+    Vector3::new(0.0, 0.0, 0.0),
+    Vector3::new(2.0, 0.0, 0.0),
+    Vector3::new(1.0, 0.0, 0.3), // Creates acute angle
+];
+
+let result = offset_path(
+    &sharp_path,
+    0.3,
+    Some(false),
+    OffsetOptions {
+        bevel: true,
+        acute_threshold_degrees: 45.0,
+    },
+);
+
+// Check that beveling occurred
+assert!(!result.beveled_vertex_indices.is_empty());
+assert!(result.points.len() >= 4); // Extra vertex from bevel
+```
+
+### Custom Corner Handling
+
+```rust
+use opengeometry::operations::offset::{offset_path, OffsetOptions};
+use openmaths::Vector3;
+
+let path = create_complex_path(); // Your path creation logic
+
+// Aggressive beveling for smoother offsets
+let smooth_options = OffsetOptions {
+    bevel: true,
+    acute_threshold_degrees: 60.0,
+};
+
+// Sharp corners with minimal beveling
+let sharp_options = OffsetOptions {
+    bevel: true,
+    acute_threshold_degrees: 20.0,
+};
+
+let smooth_result = offset_path(&path, 0.5, None, smooth_options);
+let sharp_result = offset_path(&path, 0.5, None, sharp_options);
+```
+
+## Visual Examples
+
+```
+Open Path Offset:
+
+Original:          Offset (distance=0.5):
+    
+  p1────p2           p1'──p2'
+                      │    │
+  p0────p1    →      p0'──p1'
+
+
+Closed Path with Beveled Corner:
+
+                    Offset with beveling:
+    p2
+    ╱│               ┌─────┐
+   ╱ │      →        │  ╱b2│  (corner beveled)
+  p0─p1              b1───┘
+```
+
+## Corner Behavior
+
+### Outer Corners
+
+- **Angle > threshold**: Mitered (intersection point calculated)
+- **Angle ≤ threshold**: Beveled (two vertices inserted)
+- **Parallel segments**: Smooth continuation
+
+### Inner Corners
+
+- **Closed paths**: Mitered to intersection point
+- **Open paths**: Clipped with two vertices to prevent long spikes
+
+## Implementation Details
+
+### Source Location
+
+`~/workspace/source/main/opengeometry/src/operations/offset.rs:87`
+
+### Precision
+
+- Uses `EPSILON = 1.0e-9` for geometric comparisons
+- Works in 2D projection (XZ plane, Y preserved)
+- Robust handling of degenerate cases (zero-length segments, duplicate points)
+
+### Performance Considerations
+
+- Linear time complexity: O(n) where n is the number of input points
+- Minimal memory allocation beyond output storage
+- Removes duplicate points during sanitization
+
+## Edge Cases
+
+- **Zero distance**: Returns a copy of the input path
+- **Insufficient points**: Returns empty result
+- **Collinear points**: Handled gracefully with tangent smoothing
+- **Self-intersecting paths**: Not automatically resolved; may produce overlapping geometry
+
+## See Also
+
+- [Sweep](/api/operations/sweep) - Offset a profile along a path
+- [Extrude](/api/operations/extrude) - Create 3D geometry from 2D shapes

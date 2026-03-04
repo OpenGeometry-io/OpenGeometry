@@ -1,0 +1,535 @@
+---
+title: PDF Export
+description: Export 2D projections to vector PDF documents
+---
+
+## Overview
+
+The PDF export system converts projected 2D scenes to vector PDF documents. All output is true vector graphics with no rasterization, suitable for technical drawings, CAD exports, and high-quality prints.
+
+<Note>
+PDF export is **only available in native (non-WASM) builds**. The `printpdf` crate used for PDF generation does not support WebAssembly targets.
+</Note>
+
+## PdfExportConfig
+
+### Structure
+
+```rust
+pub struct PdfExportConfig {
+    pub page_width_mm: f64,
+    pub page_height_mm: f64,
+    pub margin_mm: f64,
+    pub line_width_mm: f64,
+    pub auto_fit: bool,
+    pub title: Option<String>,
+}
+```
+
+Configuration for PDF export operations.
+
+### Default Configuration
+
+```rust
+impl Default for PdfExportConfig {
+    fn default() -> Self {
+        Self {
+            page_width_mm: 297.0,   // A4 landscape
+            page_height_mm: 210.0,  // A4 landscape
+            margin_mm: 10.0,
+            line_width_mm: 0.25,
+            auto_fit: true,
+            title: None,
+        }
+    }
+}
+```
+
+Defaults to A4 landscape with 10mm margins and 0.25mm line width.
+
+### Predefined Page Sizes
+
+#### a4_portrait
+
+```rust
+pub fn a4_portrait() -> Self
+```
+
+210mm × 297mm (standard A4 portrait)
+
+#### a4_landscape
+
+```rust
+pub fn a4_landscape() -> Self
+```
+
+297mm × 210mm (standard A4 landscape, same as default)
+
+#### a3_landscape
+
+```rust
+pub fn a3_landscape() -> Self
+```
+
+420mm × 297mm (large format)
+
+#### custom
+
+```rust
+pub fn custom(width_mm: f64, height_mm: f64) -> Self
+```
+
+Custom page dimensions in millimeters.
+
+### Configuration Examples
+
+```rust
+// A4 portrait
+let config = PdfExportConfig::a4_portrait();
+
+// A3 landscape with custom margins
+let config = PdfExportConfig {
+    margin_mm: 15.0,
+    ..PdfExportConfig::a3_landscape()
+};
+
+// Custom size with thick lines
+let config = PdfExportConfig {
+    line_width_mm: 0.5,
+    title: Some("Technical Drawing".to_string()),
+    ..PdfExportConfig::custom(400.0, 300.0)
+};
+
+// Disable auto-fit for 1:1 scale
+let config = PdfExportConfig {
+    auto_fit: false,
+    ..Default::default()
+};
+```
+
+## Export Functions
+
+### export_scene_to_pdf
+
+```rust
+pub fn export_scene_to_pdf(
+    scene: &Scene2D, 
+    file_path: &str
+) -> PdfExportResult<()>
+```
+
+Export a Scene2D to PDF with default configuration.
+
+**Example (Rust):**
+
+```rust
+use opengeometry::export::pdf::export_scene_to_pdf;
+
+let scene = project_brep_to_scene(&brep, &camera, &hlr);
+export_scene_to_pdf(&scene, "output.pdf")?;
+```
+
+### export_scene_to_pdf_with_config
+
+```rust
+pub fn export_scene_to_pdf_with_config(
+    scene: &Scene2D,
+    file_path: &str,
+    config: &PdfExportConfig,
+) -> PdfExportResult<()>
+```
+
+Export with custom configuration.
+
+**Example (Rust):**
+
+```rust
+use opengeometry::export::pdf::{export_scene_to_pdf_with_config, PdfExportConfig};
+
+let config = PdfExportConfig {
+    page_width_mm: 420.0,
+    page_height_mm: 297.0,
+    margin_mm: 20.0,
+    line_width_mm: 0.35,
+    auto_fit: true,
+    title: Some("Building Floor Plan".to_string()),
+};
+
+export_scene_to_pdf_with_config(&scene, "floorplan.pdf", &config)?;
+```
+
+### export_brep_to_pdf_with_camera
+
+```rust
+pub fn export_brep_to_pdf_with_camera(
+    brep: &Brep,
+    camera: &CameraParameters,
+    hlr: &HlrOptions,
+    file_path: &str,
+    config: &PdfExportConfig,
+) -> PdfExportResult<()>
+```
+
+Combined projection and export in a single operation.
+
+**Example (Rust):**
+
+```rust
+use opengeometry::export::pdf::{export_brep_to_pdf_with_camera, PdfExportConfig};
+use opengeometry::export::projection::{CameraParameters, HlrOptions};
+
+let camera = CameraParameters::default();
+let hlr = HlrOptions::default();
+let config = PdfExportConfig::a4_landscape();
+
+export_brep_to_pdf_with_camera(&brep, &camera, &hlr, "drawing.pdf", &config)?;
+```
+
+### export_scene_to_pdf_bytes
+
+```rust
+pub fn export_scene_to_pdf_bytes(
+    scene: &Scene2D,
+    config: &PdfExportConfig,
+) -> PdfExportResult<Vec<u8>>
+```
+
+Export to memory instead of file (useful for web servers or in-memory processing).
+
+**Example (Rust):**
+
+```rust
+use opengeometry::export::pdf::{export_scene_to_pdf_bytes, PdfExportConfig};
+
+let pdf_bytes = export_scene_to_pdf_bytes(&scene, &PdfExportConfig::default())?;
+
+// Write to response, save to database, etc.
+std::fs::write("output.pdf", &pdf_bytes)?;
+```
+
+## Scene Manager Integration
+
+### projectToPDF (Native Only)
+
+```javascript
+// Available only in Node.js or native builds, NOT in browser/WASM
+manager.projectToPDF(sceneId, cameraJson, hlrJson, "output.pdf");
+```
+
+The OGSceneManager provides a convenience method that projects and exports in one call.
+
+**Example (Node.js):**
+
+```javascript
+const { OGSceneManager, OGCuboid } = require('opengeometry');
+
+const manager = new OGSceneManager();
+const sceneId = manager.createScene("My Model");
+
+const cuboid = OGCuboid.new("origin", 10.0, 8.0, 6.0);
+manager.addCuboidToScene(sceneId, "box", cuboid);
+
+const camera = {
+    position: { x: 15, y: 12, z: 15 },
+    target: { x: 0, y: 0, z: 0 },
+    up: { x: 0, y: 1, z: 0 },
+    near: 0.1,
+    projection_mode: "Orthographic"
+};
+
+const hlr = { hide_hidden_edges: true };
+
+try {
+    manager.projectToPDF(
+        sceneId,
+        JSON.stringify(camera),
+        JSON.stringify(hlr),
+        "technical-drawing.pdf"
+    );
+    console.log("PDF exported successfully");
+} catch (error) {
+    console.error("Export failed:", error);
+}
+```
+
+## Error Handling
+
+### PdfExportError
+
+```rust
+pub enum PdfExportError {
+    DocumentCreation(String),
+    FileWrite(String),
+    EmptyScene,
+    InvalidConfig(String),
+}
+```
+
+**DocumentCreation**: Failed to create PDF structure
+
+**FileWrite**: Failed to write to output file
+
+**EmptyScene**: Attempted to export a scene with no visible geometry
+
+**InvalidConfig**: Configuration is invalid (e.g., margins larger than page)
+
+### Handling Errors (Rust)
+
+```rust
+use opengeometry::export::pdf::{export_scene_to_pdf, PdfExportError};
+
+match export_scene_to_pdf(&scene, "output.pdf") {
+    Ok(()) => println!("Export successful"),
+    Err(PdfExportError::EmptyScene) => {
+        eprintln!("Scene has no visible geometry");
+    }
+    Err(PdfExportError::FileWrite(msg)) => {
+        eprintln!("File write failed: {}", msg);
+    }
+    Err(e) => eprintln!("Export error: {}", e),
+}
+```
+
+## Coordinate System & Scaling
+
+### Units
+
+- **Input Scene**: Meters (from 3D projection)
+- **PDF Output**: Millimeters
+- **Conversion**: 1 meter = 1000 millimeters
+
+### Auto-Fit Behavior
+
+When `auto_fit: true` (default):
+
+1. Calculate scene bounding box
+2. Calculate drawable area: `page_size - 2 × margin`
+3. Compute scale factor to fit scene within drawable area
+4. Apply uniform scaling (maintains aspect ratio)
+5. Center the scaled drawing on the page
+
+### 1:1 Scale Export
+
+```rust
+let config = PdfExportConfig {
+    auto_fit: false,
+    ..Default::default()
+};
+```
+
+With `auto_fit: false`, 1 meter in the scene = 1000mm on the PDF (may overflow page).
+
+## Styling & Appearance
+
+### Line Width
+
+Global line width is set via `config.line_width_mm`. Individual paths can override this:
+
+```rust
+let mut path = Path2D::new();
+path.stroke_width = Some(0.5); // Override to 0.5mm
+```
+
+### Line Color
+
+Paths can specify custom stroke colors:
+
+```rust
+path.stroke_color = Some((1.0, 0.0, 0.0)); // Red (RGB 0-1 range)
+path.stroke_color = Some((0.0, 0.0, 0.0)); // Black (default)
+```
+
+Colors are specified as `(r, g, b)` tuples with values from 0.0 to 1.0.
+
+### Document Metadata
+
+The PDF title is set from:
+1. `config.title` if provided
+2. `scene.name` if available
+3. `"OpenGeometry Export"` as fallback
+
+## Complete Export Example (Rust)
+
+```rust
+use opengeometry::{
+    primitives::cuboid::OGCuboid,
+    export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, ProjectionMode},
+    export::pdf::{export_scene_to_pdf_with_config, PdfExportConfig},
+};
+use openmaths::Vector3;
+
+// Create geometry
+let cuboid = OGCuboid::new(
+    Vector3::new(0.0, 0.0, 0.0),
+    5.0, 3.0, 2.0
+);
+
+// Setup projection
+let camera = CameraParameters {
+    position: Vector3::new(8.0, 6.0, 8.0),
+    target: Vector3::new(0.0, 1.0, 0.0),
+    up: Vector3::new(0.0, 1.0, 0.0),
+    near: 0.1,
+    projection_mode: ProjectionMode::Orthographic,
+};
+
+let hlr = HlrOptions {
+    hide_hidden_edges: true,
+};
+
+// Project to 2D
+let scene = project_brep_to_scene(cuboid.brep(), &camera, &hlr);
+
+// Configure export
+let config = PdfExportConfig {
+    page_width_mm: 297.0,
+    page_height_mm: 210.0,
+    margin_mm: 15.0,
+    line_width_mm: 0.35,
+    auto_fit: true,
+    title: Some("Cuboid Technical Drawing".to_string()),
+};
+
+// Export
+export_scene_to_pdf_with_config(&scene, "cuboid.pdf", &config)?;
+
+println!("✓ PDF exported successfully");
+```
+
+## Multi-View Technical Drawing (Rust)
+
+```rust
+use printpdf::*;
+use opengeometry::export::projection::*;
+use opengeometry::export::pdf::*;
+
+struct View {
+    name: &'static str,
+    camera: CameraParameters,
+}
+
+let views = vec![
+    View {
+        name: "Front",
+        camera: CameraParameters {
+            position: Vector3::new(0.0, 0.0, 20.0),
+            target: Vector3::new(0.0, 0.0, 0.0),
+            up: Vector3::new(0.0, 1.0, 0.0),
+            near: 0.1,
+            projection_mode: ProjectionMode::Orthographic,
+        },
+    },
+    View {
+        name: "Top",
+        camera: CameraParameters {
+            position: Vector3::new(0.0, 20.0, 0.0),
+            target: Vector3::new(0.0, 0.0, 0.0),
+            up: Vector3::new(0.0, 0.0, -1.0),
+            near: 0.1,
+            projection_mode: ProjectionMode::Orthographic,
+        },
+    },
+    View {
+        name: "Right",
+        camera: CameraParameters {
+            position: Vector3::new(20.0, 0.0, 0.0),
+            target: Vector3::new(0.0, 0.0, 0.0),
+            up: Vector3::new(0.0, 1.0, 0.0),
+            near: 0.1,
+            projection_mode: ProjectionMode::Orthographic,
+        },
+    },
+];
+
+let hlr = HlrOptions::default();
+
+for view in views {
+    let scene = project_brep_to_scene(&brep, &view.camera, &hlr);
+    let config = PdfExportConfig {
+        title: Some(format!("{} View", view.name)),
+        ..PdfExportConfig::a4_landscape()
+    };
+    
+    let filename = format!("{}_view.pdf", view.name.to_lowercase());
+    export_scene_to_pdf_with_config(&scene, &filename, &config)?;
+    println!("✓ Exported {}", filename);
+}
+```
+
+## Best Practices
+
+### Page Size Selection
+
+- **A4 (210×297mm)**: Standard documents, small to medium models
+- **A3 (297×420mm)**: Larger models, detailed drawings
+- **Custom**: Use when specific output size is required
+
+### Line Width Guidelines
+
+- **0.18mm**: Fine detail, small scale
+- **0.25mm**: Standard technical drawings (default)
+- **0.35mm**: Bold lines, large format prints
+- **0.5mm+**: Emphasis lines, thick outlines
+
+### Margins
+
+- **10mm**: Standard (default)
+- **15-20mm**: Professional presentations
+- **5mm**: Maximum content area
+
+### Quality Optimization
+
+```rust
+// High-quality export
+let config = PdfExportConfig {
+    line_width_mm: 0.18,
+    margin_mm: 20.0,
+    auto_fit: true,
+    ..PdfExportConfig::a3_landscape()
+};
+```
+
+### Troubleshooting Empty PDFs
+
+If your PDF is blank:
+
+1. Verify scene is not empty: `!scene.is_empty()`
+2. Check scene bounding box: `scene.bounding_box()`
+3. Ensure geometry is within camera view
+4. Verify camera near plane doesn't clip all geometry
+5. Check HLR isn't hiding all edges
+
+## Platform Availability
+
+| Platform | Support | Notes |
+|----------|---------|-------|
+| Native Rust | ✅ Full | All export functions available |
+| Node.js (napi) | ✅ Full | Via `projectToPDF` method |
+| Browser/WASM | ❌ None | Use Scene2D JSON for client-side rendering |
+
+### WASM Alternative
+
+For web applications, export Scene2D as JSON and render using canvas/SVG:
+
+```javascript
+// In browser
+const scene2dJson = manager.projectTo2DLines(sceneId, cameraJson, hlrJson);
+const lineData = JSON.parse(scene2dJson);
+
+// Render with Canvas API or SVG
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+lineData.lines.forEach(line => {
+    ctx.beginPath();
+    ctx.moveTo(line.start.x * 100, line.start.y * 100);
+    ctx.lineTo(line.end.x * 100, line.end.y * 100);
+    ctx.stroke();
+});
+```
+
+## Related
+
+- [Projection](/api/export/projection) - Creating 2D scenes from 3D geometry
+- [Scene Management](/api/scene/scene-management) - Organizing geometry entities
+- [BRep](/concepts/brep) - Boundary representation structure

@@ -1,0 +1,127 @@
+---
+title: OpenGeometry
+description: A high-performance CAD SDK and Toolkits for the web, bringing 3D geometry operations to your browser
+---
+
+## What is OpenGeometry?
+
+OpenGeometry is a high-performance CAD kernel for the web that provides 2D and 3D geometric primitives and CAD operations via WebAssembly. Written in Rust and compiled to WASM, it delivers near-native performance for complex geometric computations directly in the browser.
+
+OpenGeometry makes it easy to build sophisticated CAD applications, 3D modeling tools, architectural visualization software, and interactive geometry editors for the web.
+
+OpenGeometry works with Three.js with plans to support other 3D libraries as well.
+
+We have a dedicated Toolkit for Architects and Interior Designers called OpenPlans, which is built on top of OpenGeometry and can be used to create floor plans and 3D models of buildings.
+
+<Tip>
+Check out [OpenPlans](https://openplans.io) for more information.
+</Tip>
+
+## Why OpenGeometry?
+
+Building CAD applications for the web has traditionally required complex server-side processing or compromising on performance. OpenGeometry changes that:
+
+- **High Performance**: Rust-compiled WASM delivers near-native speed for geometric operations
+- **Browser-Native**: No server required - all computation happens client-side
+- **Three.js Integration**: Drop-in components that work seamlessly with Three.js scenes
+- **Type-Safe**: Full TypeScript support with complete type definitions
+- **Production-Ready**: Robust triangulation, extrusion, offset, and Boolean operations
+
+## Key Features
+
+### 2D & 3D Primitives
+
+Create lines, polylines, arcs, curves, and rectangles with simple, intuitive APIs:
+
+```typescript
+const line = new Line({
+  start: new Vector3(-3.0, 0.0, -2.0),
+  end: new Vector3(-1.0, 0.0, -1.0),
+  color: 0x111827,
+});
+```
+
+### Parametric Shapes
+
+Build complex 3D shapes including cuboids, cylinders, spheres, wedges, and polygons:
+
+```typescript
+const cuboid = new Cuboid({
+  center: new Vector3(0.0, 0.8, -1.2),
+  width: 1.2,
+  height: 1.6,
+  depth: 1.0,
+  color: 0x10b981,
+});
+cuboid.outline = true;
+```
+
+### Advanced Operations
+
+- **Triangulation**: Robust polygon triangulation with hole support
+- **Extrusion**: Convert 2D profiles into 3D solids
+- **Sweep**: Create complex shapes by sweeping profiles along paths
+- **Offset**: Generate offset curves and surfaces
+- **Boolean Operations**: Union, intersection, and difference (in progress)
+
+### BREP Data Access
+
+Access boundary representation data for advanced CAD workflows:
+
+```typescript
+const brepData = cuboid.getBrepData();
+```
+
+<Tip>
+  Want to suggest a primitive or shape? Create an issue on our [GitHub repository](https://github.com/OpenGeometry-io/OpenGeometry).
+</Tip>
+
+## What Can You Build?
+
+OpenGeometry enables a wide range of web-based 3D applications:
+
+- **Architectural Design Tools**: Floor plan editors, building configurators, space planning applications
+- **Engineering CAD**: Mechanical design tools, assembly visualizers, technical drawing generators
+- **Creative Tools**: 3D modeling applications, procedural geometry generators, parametric design systems
+- **Product Configurators**: Interactive 3D product customization for e-commerce
+
+## Get Started
+
+<CardGroup cols={2}>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Install OpenGeometry and set up your development environment
+  </Card>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Create your first 3D shape in minutes
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api-reference"
+  >
+    Explore the complete API documentation
+  </Card>
+  <Card
+    title="Examples"
+    icon="sparkles"
+    href="https://demos.opengeometry.io/src/kernel/index.html"
+  >
+    See live interactive examples and demos
+  </Card>
+</CardGroup>
+
+## Open Source
+
+OpenGeometry is open source and actively developed. Visit the [GitHub repository](https://github.com/OpenGeometry-io/OpenGeometry) to contribute, report issues, or explore the source code.
+
+<Note>
+  OpenGeometry is under active development. Expect frequent updates and new features. The API may change as the project evolves.
+</Note>

@@ -1,0 +1,283 @@
+---
+title: Line
+description: A simple line primitive defined by two points
+icon: 'minus'
+---
+
+## Overview
+
+The Line primitive represents a straight line segment in 3D space, defined by a start point and an end point. It is the simplest 2D primitive in OpenGeometry and is suitable for creating linear segments, edges, and simple geometric constructions.
+
+**Use Cases:**
+- Drawing straight line segments
+- Creating basic geometric shapes
+- Defining edges in technical drawings
+- Path offset operations for parallel lines
+
+## Constructor
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let line = OGLine::new(id: String);
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const line = new Line(options?: ILineOptions);
+    ```
+  </Tab>
+</Tabs>
+
+### Rust Constructor Parameters
+
+<ParamField path="id" type="String" required>
+  Unique identifier for the line instance
+</ParamField>
+
+### TypeScript Constructor Parameters
+
+<ParamField path="options" type="ILineOptions">
+  Configuration options for the line
+</ParamField>
+
+<ParamField path="options.ogid" type="string">
+  Optional unique identifier (auto-generated if not provided)
+</ParamField>
+
+<ParamField path="options.start" type="Vector3" required>
+  Starting point of the line
+</ParamField>
+
+<ParamField path="options.end" type="Vector3" required>
+  Ending point of the line
+</ParamField>
+
+<ParamField path="options.color" type="number" required>
+  Line color as a hexadecimal number (e.g., 0x000000 for black)
+</ParamField>
+
+<ParamField path="options.fatLines" type="boolean" default="false">
+  Enable thick line rendering using Line2
+</ParamField>
+
+<ParamField path="options.width" type="number" default="20">
+  Line width when fatLines is enabled
+</ParamField>
+
+## Methods
+
+### set_config
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    line.set_config(start: Vector3, end: Vector3);
+    ```
+    Updates the line's start and end points.
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    line.setConfig(options: ILineOptions);
+    ```
+    Updates the line configuration and regenerates geometry.
+  </Tab>
+</Tabs>
+
+### generate_geometry
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    line.generate_geometry();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    // Called automatically by setConfig
+    ```
+  </Tab>
+</Tabs>
+
+Generates the BREP (Boundary Representation) geometry for the line, creating vertices and edges.
+
+### get_geometry_serialized
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let geometry: String = line.get_geometry_serialized();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    // Used internally for rendering
+    ```
+  </Tab>
+</Tabs>
+
+Returns serialized vertex buffer data as a JSON string.
+
+### get_offset_serialized
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let offset_data = line.get_offset_serialized(
+        distance: f64,
+        acute_threshold_degrees: f64,
+        bevel: bool
+    );
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const result = line.getOffset(
+        distance: number,
+        acuteThresholdDegrees: number = 35.0,
+        bevel: boolean = true
+    ): ILineOffsetResult;
+    ```
+  </Tab>
+</Tabs>
+
+Generates an offset path parallel to the line at the specified distance.
+
+<ParamField path="distance" type="number" required>
+  Distance to offset the line (positive or negative)
+</ParamField>
+
+<ParamField path="acuteThresholdDegrees" type="number" default="35.0">
+  Angle threshold for beveling acute corners
+</ParamField>
+
+<ParamField path="bevel" type="boolean" default="true">
+  Enable beveling at acute angles
+</ParamField>
+
+### get_brep_serialized
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let brep: String = line.get_brep_serialized();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    // Available through internal API
+    ```
+  </Tab>
+</Tabs>
+
+Returns the complete BREP representation as JSON.
+
+## Properties
+
+<ResponseField name="id" type="String">
+  Unique identifier for the line instance
+</ResponseField>
+
+<ResponseField name="start" type="Vector3">
+  Starting point of the line (Rust only)
+</ResponseField>
+
+<ResponseField name="end" type="Vector3">
+  Ending point of the line (Rust only)
+</ResponseField>
+
+<ResponseField name="brep" type="Brep">
+  Internal BREP representation containing vertices and edges
+</ResponseField>
+
+<ResponseField name="color" type="number">
+  Line color (TypeScript only, settable)
+</ResponseField>
+
+## Code Examples
+
+### Creating a Basic Line
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    use opengeometry::primitives::OGLine;
+    use openmaths::Vector3;
+
+    let mut line = OGLine::new("line-1".to_string());
+    line.set_config(
+        Vector3::new(0.0, 0.0, 0.0),
+        Vector3::new(10.0, 0.0, 0.0)
+    );
+    line.generate_geometry();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    import { Line, Vector3 } from 'opengeometry-three';
+
+    const line = new Line({
+      start: new Vector3(0, 0, 0),
+      end: new Vector3(10, 0, 0),
+      color: 0x000000
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Generating Offset Lines
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let offset_data = line.get_offset_serialized(2.0, 35.0, true);
+    let result: OffsetResult = serde_json::from_str(&offset_data).unwrap();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const offsetResult = line.getOffset(
+      2.0,  // distance
+      35.0, // acute threshold
+      true  // bevel
+    );
+
+    console.log(offsetResult.points);              // Vector3[]
+    console.log(offsetResult.beveledVertexIndices); // number[]
+    console.log(offsetResult.isClosed);            // false for lines
+    ```
+  </Tab>
+</Tabs>
+
+### Using Fat Lines
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const thickLine = new Line({
+      start: new Vector3(0, 0, 0),
+      end: new Vector3(10, 5, 0),
+      color: 0xff0000,
+      fatLines: true,
+      width: 50
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Updating Line Configuration
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    line.setConfig({
+      start: new Vector3(0, 0, 0),
+      end: new Vector3(15, 10, 0),
+      color: 0x00ff00
+    });
+
+    // Change color dynamically
+    line.color = 0x0000ff;
+    ```
+  </Tab>
+</Tabs>

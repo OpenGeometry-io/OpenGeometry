@@ -1,0 +1,341 @@
+---
+title: 'Wedge'
+description: 'Create triangular prism shapes with customizable dimensions'
+icon: 'triangle'
+---
+
+## Overview
+
+The `Wedge` class creates 3D wedge shapes (triangular prisms). A wedge is defined by its center point, width, height, and depth, creating a geometric shape with a rectangular base and a triangular cross-section.
+
+## Constructor
+
+```typescript
+const wedge = new Wedge(options?: IWedgeOptions);
+```
+
+### IWedgeOptions
+
+<ParamField path="ogid" type="string" optional>
+  Unique identifier for the wedge. Auto-generated if not provided.
+</ParamField>
+
+<ParamField path="center" type="Vector3" required>
+  Center point of the wedge in 3D space.
+  
+  ```typescript
+  center: new Vector3(0, 0, 0)
+  ```
+</ParamField>
+
+<ParamField path="width" type="number" required>
+  Width of the wedge base along the X-axis.
+  
+  ```typescript
+  width: 10
+  ```
+</ParamField>
+
+<ParamField path="height" type="number" required>
+  Height of the wedge along the Y-axis.
+  
+  ```typescript
+  height: 5
+  ```
+</ParamField>
+
+<ParamField path="depth" type="number" required>
+  Depth of the wedge along the Z-axis.
+  
+  ```typescript
+  depth: 8
+  ```
+</ParamField>
+
+<ParamField path="color" type="number" required>
+  Hexadecimal color value for the wedge.
+  
+  ```typescript
+  color: 0x00ff00  // Green
+  ```
+</ParamField>
+
+## Methods
+
+### setConfig()
+
+Updates the wedge configuration and regenerates geometry.
+
+```typescript
+wedge.setConfig(options: IWedgeOptions): void
+```
+
+**Example:**
+```typescript
+wedge.setConfig({
+  center: new Vector3(5, 2, 3),
+  width: 12,
+  height: 6,
+  depth: 10,
+  color: 0x3498db
+});
+```
+
+### getBrepData()
+
+Returns the B-Rep (Boundary Representation) data as a parsed JSON object.
+
+```typescript
+wedge.getBrepData(): object
+```
+
+**Example:**
+```typescript
+const brepData = wedge.getBrepData();
+console.log('Vertices:', brepData.vertices);
+console.log('Edges:', brepData.edges);
+console.log('Faces:', brepData.faces);
+```
+
+### generateGeometry()
+
+Regenerates the THREE.js geometry from the current configuration. Called automatically after setConfig().
+
+```typescript
+wedge.generateGeometry(): void
+```
+
+### discardGeometry()
+
+Disposes of the current geometry to free memory.
+
+```typescript
+wedge.discardGeometry(): void
+```
+
+## Properties
+
+<ResponseField name="ogid" type="string">
+  Unique identifier for the wedge instance.
+</ResponseField>
+
+<ResponseField name="options" type="IWedgeOptions">
+  Current wedge configuration.
+  
+  ```typescript
+  const currentWidth = wedge.options.width;
+  const currentHeight = wedge.options.height;
+  const currentDepth = wedge.options.depth;
+  ```
+</ResponseField>
+
+<ResponseField name="color" type="number">
+  Get or set the wedge color.
+  
+  ```typescript
+  wedge.color = 0xff0000;  // Change to red
+  ```
+</ResponseField>
+
+<ResponseField name="outline" type="boolean">
+  Enable or disable outline rendering for the wedge edges.
+  
+  ```typescript
+  wedge.outline = true;   // Show edges
+  wedge.outline = false;  // Hide edges
+  ```
+</ResponseField>
+
+<ResponseField name="outlineMesh" type="THREE.Line | null">
+  Reference to the outline mesh if outline is enabled.
+</ResponseField>
+
+## Usage Examples
+
+### Basic Wedge
+
+```typescript
+import { Wedge, Vector3 } from 'opengeometry-three';
+
+const wedge = new Wedge({
+  center: new Vector3(0, 0, 0),
+  width: 10,
+  height: 5,
+  depth: 8,
+  color: 0x2ecc71
+});
+
+// Add to scene
+scene.add(wedge);
+```
+
+### Ramp or Slope
+
+```typescript
+import { Wedge, Vector3 } from 'opengeometry-three';
+
+// Create a ramp
+const ramp = new Wedge({
+  center: new Vector3(0, 2.5, 0),
+  width: 20,   // Wide base
+  height: 5,   // Rise
+  depth: 10,   // Run
+  color: 0x95a5a6
+});
+
+ramp.outline = true;
+```
+
+### Wedge with Outline
+
+```typescript
+import { Wedge, Vector3 } from 'opengeometry-three';
+
+const wedge = new Wedge({
+  center: new Vector3(0, 0, 0),
+  width: 8,
+  height: 6,
+  depth: 12,
+  color: 0x3498db
+});
+
+// Enable wireframe edges
+wedge.outline = true;
+```
+
+### Roof Section
+
+```typescript
+import { Wedge, Vector3 } from 'opengeometry-three';
+
+// Triangular roof element
+const roofSection = new Wedge({
+  center: new Vector3(0, 10, 0),
+  width: 15,
+  height: 4,   // Roof peak height
+  depth: 20,   // Roof length
+  color: 0xe74c3c
+});
+```
+
+### Array of Wedges
+
+```typescript
+import { Wedge, Vector3 } from 'opengeometry-three';
+
+// Create a stepped pattern
+for (let i = 0; i < 5; i++) {
+  const wedge = new Wedge({
+    center: new Vector3(i * 12, i * 2, 0),
+    width: 10,
+    height: 4,
+    depth: 8,
+    color: 0x9b59b6
+  });
+  wedge.outline = true;
+  scene.add(wedge);
+}
+```
+
+## Implementation Details
+
+### Geometry Structure
+
+A wedge consists of 6 vertices forming 5 faces:
+- 1 rectangular bottom face
+- 2 triangular end faces (front and back)
+- 2 rectangular side faces (left and right)
+
+**Rust Implementation:** `/workspace/source/main/opengeometry/src/primitives/wedge.rs:67-113`
+
+```rust
+let half_width = self.width / 2.0;
+let half_height = self.height / 2.0;
+let half_depth = self.depth / 2.0;
+
+let x_min = self.center.x - half_width;
+let x_max = self.center.x + half_width;
+let y_min = self.center.y - half_height;
+let y_max = self.center.y + half_height;
+let z_min = self.center.z - half_depth;
+let z_max = self.center.z + half_depth;
+
+// 6 vertices defining the wedge
+self.brep.vertices.push(Vertex::new(0, Vector3::new(x_min, y_min, z_min)));
+self.brep.vertices.push(Vertex::new(1, Vector3::new(x_max, y_min, z_min)));
+self.brep.vertices.push(Vertex::new(2, Vector3::new(x_min, y_max, z_min)));
+self.brep.vertices.push(Vertex::new(3, Vector3::new(x_min, y_min, z_max)));
+self.brep.vertices.push(Vertex::new(4, Vector3::new(x_max, y_min, z_max)));
+self.brep.vertices.push(Vertex::new(5, Vector3::new(x_min, y_max, z_max)));
+```
+
+### Face Topology
+
+The wedge has 5 faces with specific vertex indices:
+
+**Source:** `/workspace/source/main/opengeometry/src/primitives/wedge.rs:108-112`
+
+```rust
+self.brep.faces.push(Face::new(0, vec![0, 1, 4, 3]));  // Bottom (quad)
+self.brep.faces.push(Face::new(1, vec![0, 2, 1]));     // Front triangle
+self.brep.faces.push(Face::new(2, vec![3, 4, 5]));     // Back triangle
+self.brep.faces.push(Face::new(3, vec![0, 3, 5, 2]));  // Left side (quad)
+self.brep.faces.push(Face::new(4, vec![1, 2, 5, 4]));  // Right sloped side (quad)
+```
+
+### Material Configuration
+
+Wedges use MeshStandardMaterial with transparency:
+
+**Source:** `/workspace/source/main/opengeometry-three/src/shapes/wedge.ts:82-86`
+
+```typescript
+const material = new THREE.MeshStandardMaterial({
+  color: this.options.color,
+  transparent: true,
+  opacity: 0.6,
+});
+```
+
+### Triangulation
+
+Quadrilateral faces are automatically triangulated for rendering:
+
+**Source:** `/workspace/source/main/opengeometry/src/primitives/wedge.rs:125-146`
+
+## Best Practices
+
+<Tip>
+  **Orientation:** The wedge's sloped edge runs from the top-left to bottom-right when viewed from the front. Rotate the wedge mesh for different orientations.
+</Tip>
+
+<Warning>
+  **Non-Zero Dimensions:** All dimensions (width, height, depth) must be greater than zero. Zero or negative values will cause rendering issues.
+</Warning>
+
+<Info>
+  **Use Cases:** Wedges are ideal for creating ramps, roof sections, staircases, and architectural slope elements.
+</Info>
+
+## Geometric Properties
+
+### Vertex Count
+6 vertices
+
+### Edge Count
+9 edges
+
+### Face Count
+5 faces (2 triangular, 3 quadrilateral)
+
+### Volume
+The volume of a wedge is:
+```
+V = (width × height × depth) / 2
+```
+
+## See Also
+
+- [Cuboid](/api/shapes/cuboid) - For rectangular boxes
+- [Polygon](/api/shapes/polygon) - For 2D triangular shapes
+- [Sweep](/api/shapes/sweep) - For custom extrusions

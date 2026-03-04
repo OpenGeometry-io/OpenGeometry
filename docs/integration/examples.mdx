@@ -1,0 +1,366 @@
+---
+title: Examples
+description: Complete working examples using OpenGeometry
+---
+
+Explore real-world examples demonstrating OpenGeometry's capabilities, from basic shapes to complex 3D models.
+
+## Repository
+
+All source code examples are available at:
+
+**[OpenGeometry-Examples](https://github.com/OpenGeometry-io/OpenGeometry-examples)**
+
+Live interactive demos: **[demos.opengeometry.io](https://demos.opengeometry.io/src/kernel/index.html)**
+
+## Quick Start
+
+For getting started quickly, see the basic template:
+
+**[Quick Start Repository](https://github.com/OpenGeometry-io/quickstart-js)**
+
+## Example Categories
+
+### Basic: Shapes
+
+Simple 3D shapes with interactive controls.
+
+#### Polygon
+
+Interactive polygon with side count and radius controls:
+
+```typescript
+import { Polygon, Vector3 } from '@og-three';
+import { bootstrapExample, mountControls } from '../shared/runtime';
+
+function buildPolygonVertices(sides: number, radius: number): Vector3[] {
+  const clampedSides = Math.max(3, Math.floor(sides));
+  const points: Vector3[] = [];
+
+  for (let i = 0; i < clampedSides; i += 1) {
+    const t = (i / clampedSides) * Math.PI * 2;
+    const r = i % 2 === 0 ? radius : radius * 0.72;
+    points.push(new Vector3(Math.cos(t) * r, 0, Math.sin(t) * r));
+  }
+
+  return points;
+}
+
+bootstrapExample({
+  title: "Shape: Polygon",
+  description: "Interactive polygon triangulation with side/radius controls.",
+  build: ({ scene }) => {
+    let current: Polygon | null = null;
+
+    mountControls(
+      "Polygon Parameters",
+      [
+        { type: "number", key: "sides", label: "Sides", min: 3, max: 12, step: 1, value: 5 },
+        { type: "number", key: "radius", label: "Radius", min: 0.4, max: 3, step: 0.05, value: 1.8 },
+        { type: "boolean", key: "outline", label: "Outline", value: true },
+      ],
+      (state) => {
+        const polygon = new Polygon({
+          vertices: buildPolygonVertices(state.sides as number, state.radius as number),
+          color: 0x2563eb,
+        });
+        polygon.outline = state.outline as boolean;
+
+        current = replaceSceneObject(scene, current, polygon);
+      }
+    );
+  },
+});
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/examples-vite/src/pages/shapes-polygon.ts:1
+
+#### Cuboid
+
+Interactive box with width, height, and depth controls:
+
+```typescript
+import { Cuboid, Vector3 } from '@og-three';
+import { bootstrapExample, mountControls, replaceSceneObject } from '../shared/runtime';
+
+bootstrapExample({
+  title: "Shape: Cuboid",
+  description: "Interactive cuboid BREP with outline controls.",
+  build: ({ scene }) => {
+    let current: Cuboid | null = null;
+
+    mountControls(
+      "Cuboid Parameters",
+      [
+        { type: "number", key: "width", label: "Width", min: 0.2, max: 4, step: 0.05, value: 1.8 },
+        { type: "number", key: "height", label: "Height", min: 0.2, max: 4, step: 0.05, value: 1.6 },
+        { type: "number", key: "depth", label: "Depth", min: 0.2, max: 4, step: 0.05, value: 1.2 },
+        { type: "boolean", key: "outline", label: "Outline", value: true },
+      ],
+      (state) => {
+        const cuboid = new Cuboid({
+          center: new Vector3(0, (state.height as number) * 0.5, 0),
+          width: state.width as number,
+          height: state.height as number,
+          depth: state.depth as number,
+          color: 0x10b981,
+        });
+        cuboid.outline = state.outline as boolean;
+
+        current = replaceSceneObject(scene, current, cuboid);
+      }
+    );
+  },
+});
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/examples-vite/src/pages/shapes-cuboid.ts:1
+
+#### Cylinder
+
+Parametric cylinder with radius and height adjustments.
+
+**Source:** ~/workspace/source/main/opengeometry-three/examples-vite/src/pages/shapes-cylinder.ts
+
+#### Sphere
+
+Sphere with tessellation quality controls.
+
+**Source:** ~/workspace/source/main/opengeometry-three/examples-vite/src/pages/shapes-sphere.ts
+
+### Intermediate: Path Sweeping
+
+#### Profile Sweep
+
+Sweep a 2D profile along a 3D path:
+
+```typescript
+import { Sweep, Vector3 } from '@og-three';
+import { bootstrapExample, mountControls, replaceSceneObject } from '../shared/runtime';
+
+function buildPath(height: number, spread: number): Vector3[] {
+  return [
+    new Vector3(-2.0, 0.0, -1.2),
+    new Vector3(-1.0, height * 0.25, -0.2 * spread),
+    new Vector3(0.2, height * 0.55, 0.7 * spread),
+    new Vector3(1.3, height * 0.8, 0.2 * spread),
+    new Vector3(2.1, height, -0.9 * spread),
+  ];
+}
+
+function buildProfile(width: number, depth: number): Vector3[] {
+  return [
+    new Vector3(-width * 0.5, 0, -depth * 0.5),
+    new Vector3(width * 0.5, 0, -depth * 0.5),
+    new Vector3(width * 0.5, 0, depth * 0.5),
+    new Vector3(-width * 0.5, 0, depth * 0.5),
+  ];
+}
+
+bootstrapExample({
+  title: "Shape: Sweep",
+  description: "Interactive profile sweep along a 3D path.",
+  build: ({ scene }) => {
+    let current: Sweep | null = null;
+
+    mountControls(
+      "Sweep Parameters",
+      [
+        { type: "number", key: "height", label: "Path Height", min: 0.4, max: 4, step: 0.05, value: 2.3 },
+        { type: "number", key: "spread", label: "Path Spread", min: 0.4, max: 2, step: 0.05, value: 1.0 },
+        { type: "number", key: "profileWidth", label: "Profile Width", min: 0.1, max: 1.5, step: 0.05, value: 0.5 },
+        { type: "number", key: "profileDepth", label: "Profile Depth", min: 0.1, max: 1.5, step: 0.05, value: 0.4 },
+        { type: "boolean", key: "capStart", label: "Cap Start", value: true },
+        { type: "boolean", key: "capEnd", label: "Cap End", value: true },
+        { type: "boolean", key: "outline", label: "Outline", value: true },
+      ],
+      (state) => {
+        const sweep = new Sweep({
+          path: buildPath(state.height as number, state.spread as number),
+          profile: buildProfile(state.profileWidth as number, state.profileDepth as number),
+          color: 0x0ea5e9,
+          capStart: state.capStart as boolean,
+          capEnd: state.capEnd as boolean,
+        });
+        sweep.outline = state.outline as boolean;
+
+        current = replaceSceneObject(scene, current, sweep);
+      }
+    );
+  },
+});
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/examples-vite/src/pages/shapes-sweep.ts:1
+
+### Advanced: Operations
+
+#### Offset Operations
+
+Create walls and offset polygons.
+
+**Source:** ~/workspace/source/main/opengeometry-three/examples-vite/src/pages/operations-offset.ts
+
+#### Wall from Offsets
+
+Generate architectural walls with thickness.
+
+**Source:** ~/workspace/source/main/opengeometry-three/examples-vite/src/pages/operations-wall-from-offsets.ts
+
+#### Opening Operations
+
+Create openings in walls and solids.
+
+**Source:** ~/workspace/source/main/opengeometry-three/examples-vite/src/pages/shapes-opening.ts
+
+## Example Runtime
+
+The examples use a shared runtime that sets up Three.js and OpenGeometry:
+
+```typescript
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { OpenGeometry } from "@og-three";
+
+export async function bootstrapExample(config: BootstrapConfig) {
+  // Create Three.js scene
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf3f4f6);
+
+  const camera = new THREE.PerspectiveCamera(
+    55,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    4000
+  );
+  camera.position.set(5.5, 4.2, 6.5);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.target.set(0, 0.8, 0);
+  controls.update();
+
+  // Add lighting
+  scene.add(new THREE.GridHelper(32, 32, 0x9ca3af, 0xd1d5db));
+  const ambient = new THREE.AmbientLight(0xffffff, 0.65);
+  scene.add(ambient);
+
+  const key = new THREE.DirectionalLight(0xffffff, 0.85);
+  key.position.set(6, 8, 4);
+  scene.add(key);
+
+  // Initialize OpenGeometry
+  await OpenGeometry.create({ wasmURL: getWasmUrl() });
+  await config.build({ scene, camera, renderer, controls });
+
+  // Animation loop
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+}
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/examples-vite/src/shared/runtime.ts:53
+
+## Interactive Controls
+
+The `mountControls` helper creates UI for parameter adjustment:
+
+```typescript
+export function mountControls(
+  title: string,
+  definitions: ExampleControlDefinition[],
+  onChange: (state: ExampleControlState) => void
+) {
+  // Creates sliders for number controls
+  // Creates toggles for boolean controls
+  // Calls onChange when any value changes
+}
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/examples-vite/src/shared/runtime.ts:168
+
+## Utilities
+
+### Scene Object Replacement
+
+Replace and cleanup objects when parameters change:
+
+```typescript
+export function replaceSceneObject<T extends THREE.Object3D>(
+  scene: THREE.Scene,
+  previous: T | null,
+  next: T
+): T {
+  if (previous) {
+    previous.parent?.remove(previous);
+    disposeObject3D(previous);
+  }
+  scene.add(next);
+  return next;
+}
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/examples-vite/src/shared/runtime.ts:154
+
+## Running Examples Locally
+
+1. Clone the examples repository:
+```bash
+git clone https://github.com/OpenGeometry-io/OpenGeometry-examples.git
+cd OpenGeometry-examples
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Start the dev server:
+```bash
+npm run dev
+```
+
+4. Open your browser to the provided URL
+
+## Live Demos
+
+View all examples running live at:
+
+**[demos.opengeometry.io](https://demos.opengeometry.io/src/kernel/index.html)**
+
+Available demos include:
+
+**Primitives:**
+- Line
+- Arc
+- Curve
+- Polyline
+- Rectangle
+
+**Shapes:**
+- Polygon
+- Cuboid
+- Cylinder
+- Sphere
+- Wedge
+- Sweep
+- Opening
+
+**Operations:**
+- Offset
+- Sweep (Path + Profile)
+- Wall from Offsets
+
+## Next Steps
+
+- Review [Three.js Integration](/integration/threejs) for API details
+- Explore [Polygon Shape](/api/shapes/polygon) for complete shape documentation
+- Learn about [Line Primitive](/api/primitives/line) for lower-level drawing tools

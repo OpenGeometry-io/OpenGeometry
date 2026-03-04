@@ -1,0 +1,336 @@
+---
+title: Arc
+description: A circular arc primitive defined by center, radius, and angles
+icon: 'circle-notch'
+---
+
+## Overview
+
+The Arc primitive represents a segment of a circle in 3D space. It is defined by a center point, radius, start angle, end angle, and the number of segments used for tessellation. When the angle range equals 2π, the arc forms a complete circle.
+
+**Use Cases:**
+- Creating circular arcs and curves
+- Drawing complete circles
+- Rounded corners and fillets
+- Circular patterns and designs
+
+## Constructor
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let arc = OGArc::new(id: String);
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const arc = new Arc(options?: IArcOptions);
+    ```
+  </Tab>
+</Tabs>
+
+### Rust Constructor Parameters
+
+<ParamField path="id" type="String" required>
+  Unique identifier for the arc instance
+</ParamField>
+
+### TypeScript Constructor Parameters
+
+<ParamField path="options" type="IArcOptions">
+  Configuration options for the arc
+</ParamField>
+
+<ParamField path="options.ogid" type="string">
+  Optional unique identifier (auto-generated if not provided)
+</ParamField>
+
+<ParamField path="options.center" type="Vector3" required>
+  Center point of the arc
+</ParamField>
+
+<ParamField path="options.radius" type="number" required>
+  Radius of the arc
+</ParamField>
+
+<ParamField path="options.startAngle" type="number" required>
+  Starting angle in radians
+</ParamField>
+
+<ParamField path="options.endAngle" type="number" required>
+  Ending angle in radians
+</ParamField>
+
+<ParamField path="options.segments" type="number" required>
+  Number of line segments to approximate the arc (higher = smoother)
+</ParamField>
+
+<ParamField path="options.color" type="number" required>
+  Arc color as a hexadecimal number (e.g., 0x00ff00 for green)
+</ParamField>
+
+<ParamField path="options.fatLines" type="boolean" default="false">
+  Enable thick line rendering using Line2
+</ParamField>
+
+<ParamField path="options.width" type="number" default="20">
+  Line width when fatLines is enabled
+</ParamField>
+
+## Methods
+
+### set_config
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    arc.set_config(
+        center: Vector3,
+        radius: f64,
+        start_angle: f64,
+        end_angle: f64,
+        segments: u32
+    );
+    ```
+    Updates the arc's geometric parameters.
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    arc.setConfig(options: IArcOptions);
+    ```
+    Updates the arc configuration and regenerates geometry.
+  </Tab>
+</Tabs>
+
+### generate_geometry
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    arc.generate_geometry();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    // Called automatically by setConfig
+    ```
+  </Tab>
+</Tabs>
+
+Generates vertices along the arc using the specified number of segments. For closed arcs (full circles), it automatically creates a face.
+
+### get_geometry_serialized
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let geometry: String = arc.get_geometry_serialized();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    // Used internally for rendering
+    ```
+  </Tab>
+</Tabs>
+
+Returns serialized vertex buffer data as a JSON string.
+
+### get_brep_serialized
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let brep: String = arc.get_brep_serialized();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const brep = arc.getBrep();
+    ```
+  </Tab>
+</Tabs>
+
+Returns the complete BREP representation including vertices, edges, and faces.
+
+### getConfig
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const config = arc.getConfig();
+    ```
+    Returns the current arc configuration.
+  </Tab>
+</Tabs>
+
+### discardGeometry
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    arc.discardGeometry();
+    ```
+    Disposes of the current geometry (called automatically before regeneration).
+  </Tab>
+</Tabs>
+
+## Properties
+
+<ResponseField name="id" type="String">
+  Unique identifier for the arc instance
+</ResponseField>
+
+<ResponseField name="center" type="Vector3">
+  Center point of the arc (default: origin)
+</ResponseField>
+
+<ResponseField name="radius" type="f64">
+  Radius of the arc (default: 1.0)
+</ResponseField>
+
+<ResponseField name="start_angle" type="f64">
+  Starting angle in radians (default: 0.0)
+</ResponseField>
+
+<ResponseField name="end_angle" type="f64">
+  Ending angle in radians (default: 2π)
+</ResponseField>
+
+<ResponseField name="segments" type="u32">
+  Number of segments for tessellation (default: 32)
+</ResponseField>
+
+<ResponseField name="brep" type="Brep">
+  Internal BREP representation containing vertices, edges, and optionally a face for closed arcs
+</ResponseField>
+
+<ResponseField name="color" type="number">
+  Arc color (TypeScript only, settable)
+</ResponseField>
+
+## Code Examples
+
+### Creating a Semicircle
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    use opengeometry::primitives::OGArc;
+    use openmaths::Vector3;
+    use std::f64::consts::PI;
+
+    let mut arc = OGArc::new("arc-1".to_string());
+    arc.set_config(
+        Vector3::new(0.0, 0.0, 0.0),  // center
+        5.0,                           // radius
+        0.0,                           // start angle
+        PI,                            // end angle (180 degrees)
+        32                             // segments
+    );
+    arc.generate_geometry();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    import { Arc, Vector3 } from 'opengeometry-three';
+
+    const semicircle = new Arc({
+      center: new Vector3(0, 0, 0),
+      radius: 5,
+      startAngle: 0,
+      endAngle: Math.PI,
+      segments: 32,
+      color: 0x00ff00
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Creating a Full Circle
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    use std::f64::consts::PI;
+
+    let mut circle = OGArc::new("circle-1".to_string());
+    circle.set_config(
+        Vector3::new(0.0, 0.0, 0.0),
+        3.5,
+        0.0,
+        2.0 * PI,  // Full circle
+        64         // Higher segments for smoother circle
+    );
+    circle.generate_geometry();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const circle = new Arc({
+      center: new Vector3(0, 0, 0),
+      radius: 3.5,
+      startAngle: 0,
+      endAngle: Math.PI * 2,
+      segments: 64,
+      color: 0xff0000
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Creating a Quarter Arc
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const quarterArc = new Arc({
+      center: new Vector3(5, 0, 5),
+      radius: 2.0,
+      startAngle: 0,
+      endAngle: Math.PI / 2,  // 90 degrees
+      segments: 16,
+      color: 0x0000ff
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Using Fat Lines for Arcs
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const thickArc = new Arc({
+      center: new Vector3(0, 0, 0),
+      radius: 10,
+      startAngle: 0,
+      endAngle: Math.PI * 1.5,
+      segments: 48,
+      color: 0xff00ff,
+      fatLines: true,
+      width: 30
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Updating Arc Parameters
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    arc.setConfig({
+      center: new Vector3(0, 0, 0),
+      radius: 7.5,
+      startAngle: Math.PI / 4,
+      endAngle: Math.PI * 1.75,
+      segments: 40,
+      color: 0xffff00
+    });
+
+    // Change color
+    arc.color = 0x00ffff;
+    ```
+  </Tab>
+</Tabs>

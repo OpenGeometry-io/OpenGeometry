@@ -1,0 +1,169 @@
+---
+title: 'Extrude'
+description: 'Transform 2D polygons into 3D geometry by extruding them along a vertical axis'
+icon: 'cubes'
+---
+
+## Overview
+
+The extrude operation transforms a 2D polygon into a 3D solid by extending it along a height vector. This creates a prismatic geometry with the original polygon as the base, vertical side faces connecting the base to the top, and a parallel top face.
+
+## Function Signature
+
+### extrude_polygon_by_buffer_geometry
+
+```rust
+pub fn extrude_polygon_by_buffer_geometry(geom_buf: BaseGeometry, height: f64) -> Geometry
+```
+
+Extrudes a polygon defined by buffer geometry to create a 3D mesh.
+
+<ParamField path="geom_buf" type="BaseGeometry" required>
+  The base geometry containing the polygon vertices to extrude. Must have at least 3 vertices to form a valid polygon.
+</ParamField>
+
+<ParamField path="height" type="f64" required>
+  The extrusion height in the vertical (Y) direction. Positive values extrude upward, negative values extrude downward.
+</ParamField>
+
+### extrude_brep_face
+
+```rust
+pub fn extrude_brep_face(brep_face: Brep, height: f64) -> Brep
+```
+
+Extrudes a BREP (Boundary Representation) face to create a new BREP object with topological information.
+
+<ParamField path="brep_face" type="Brep" required>
+  The BREP face to extrude. Must contain at least 3 vertices.
+</ParamField>
+
+<ParamField path="height" type="f64" required>
+  The extrusion height in the Y direction.
+</ParamField>
+
+## Return Type
+
+### Geometry Structure
+
+The `extrude_polygon_by_buffer_geometry` function returns a `Geometry` object with:
+
+- **vertices**: Complete vertex list including both base and top vertices
+- **edges**: All edges forming the bottom face, top face, and vertical connections
+- **faces**: Bottom face, all side faces (one per edge of the original polygon), and top face
+
+### Brep Structure
+
+The `extrude_brep_face` function returns a `Brep` object with:
+
+- **vertices**: Vector of `Vertex` objects with unique IDs and positions
+- **edges**: Vector of `Edge` objects connecting vertices
+- **faces**: Vector of `Face` objects containing vertex indices
+
+## How It Works
+
+1. **Winding Order**: The input vertices are sorted to counter-clockwise (CCW) order to ensure consistent face normals
+2. **Bottom Face**: Creates edges and a face from the original polygon vertices
+3. **Vertical Edges**: Generates new vertices offset by the height vector (0, height, 0) and connects them to base vertices
+4. **Side Faces**: Creates quadrilateral faces connecting each edge of the base to the corresponding edge on top
+5. **Top Face**: Constructs the top face with reversed vertex order for correct normal orientation
+
+## Code Examples
+
+### Basic Extrusion
+
+```rust
+use opengeometry::{
+    geometry::basegeometry::BaseGeometry,
+    operations::extrude::extrude_polygon_by_buffer_geometry,
+};
+use openmaths::Vector3;
+
+// Create a square base polygon
+let vertices = vec![
+    Vector3::new(0.0, 0.0, 0.0),
+    Vector3::new(1.0, 0.0, 0.0),
+    Vector3::new(1.0, 0.0, 1.0),
+    Vector3::new(0.0, 0.0, 1.0),
+];
+
+let base_geom = BaseGeometry::from_vertices(vertices);
+
+// Extrude 2 units upward
+let extruded = extrude_polygon_by_buffer_geometry(base_geom, 2.0);
+
+// Result: A rectangular box with base at Y=0 and top at Y=2
+```
+
+### Extruding a Triangle
+
+```rust
+use opengeometry::operations::extrude::extrude_polygon_by_buffer_geometry;
+use opengeometry::geometry::basegeometry::BaseGeometry;
+use openmaths::Vector3;
+
+// Create a triangular base
+let triangle = vec![
+    Vector3::new(0.0, 0.0, 0.0),
+    Vector3::new(1.0, 0.0, 0.0),
+    Vector3::new(0.5, 0.0, 1.0),
+];
+
+let base_geom = BaseGeometry::from_vertices(triangle);
+let prism = extrude_polygon_by_buffer_geometry(base_geom, 1.5);
+
+// Result: A triangular prism
+```
+
+### Using BREP Extrusion
+
+```rust
+use opengeometry::{
+    brep::Brep,
+    operations::extrude::extrude_brep_face,
+};
+use uuid::Uuid;
+
+// Assuming you have a BREP face
+let brep_face = create_polygon_brep(); // Your BREP creation logic
+
+// Extrude to create a 3D BREP with topological data
+let extruded_brep = extrude_brep_face(brep_face, 3.0);
+
+// Access topological information
+println!("Vertices: {}", extruded_brep.get_vertex_count());
+println!("Edges: {}", extruded_brep.get_edge_count());
+println!("Faces: {}", extruded_brep.get_face_count());
+```
+
+## Visual Examples
+
+```
+Input Polygon (Top View):          Extruded Result (3D):
+    
+    v3────v2                        v7────v6
+    │      │                        ╱│    ╱│
+    │      │          +height      ╱ │   ╱ │
+    v0────v1          ────────>   v4─┼─v5  │
+                                   │ v3──┼─v2
+                                   │╱    │╱
+                                   v0────v1
+```
+
+## Implementation Details
+
+### Source Location
+
+`~/workspace/source/main/opengeometry/src/operations/extrude.rs:9`
+
+### Edge Cases
+
+- **Minimum Vertices**: Polygons with fewer than 3 vertices are technically invalid, but the function proceeds (returns incomplete geometry)
+- **Direction**: Currently extrudes only in the Y direction; future versions may support arbitrary extrusion vectors
+- **Winding Order**: Automatically corrects to CCW to ensure proper face orientation
+
+## See Also
+
+- [Sweep](/api/operations/sweep) - Extrude a profile along an arbitrary path
+- [Offset](/api/operations/offset) - Create parallel offset curves
+- [Triangulate](/api/operations/triangulate) - Convert polygons to triangle meshes

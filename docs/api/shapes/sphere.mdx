@@ -1,0 +1,351 @@
+---
+title: 'Sphere'
+description: 'Create spherical shapes with customizable resolution'
+icon: 'globe'
+---
+
+## Overview
+
+The `Sphere` class creates 3D spherical shapes with customizable radius and segment resolution. Spheres are generated using UV parameterization with configurable width and height segments for controlling geometry smoothness.
+
+## Constructor
+
+```typescript
+const sphere = new Sphere(options?: ISphereOptions);
+```
+
+### ISphereOptions
+
+<ParamField path="ogid" type="string" optional>
+  Unique identifier for the sphere. Auto-generated if not provided.
+</ParamField>
+
+<ParamField path="center" type="Vector3" required>
+  Center point of the sphere in 3D space.
+  
+  ```typescript
+  center: new Vector3(0, 0, 0)
+  ```
+</ParamField>
+
+<ParamField path="radius" type="number" required>
+  Radius of the sphere.
+  
+  ```typescript
+  radius: 5  // Units in scene space
+  ```
+</ParamField>
+
+<ParamField path="widthSegments" type="number" required>
+  Number of horizontal segments (longitude). Higher values create smoother spheres.
+  
+  ```typescript
+  widthSegments: 24  // Default value
+  ```
+</ParamField>
+
+<ParamField path="heightSegments" type="number" required>
+  Number of vertical segments (latitude). Higher values create smoother spheres.
+  
+  ```typescript
+  heightSegments: 16  // Default value
+  ```
+</ParamField>
+
+<ParamField path="color" type="number" required>
+  Hexadecimal color value for the sphere.
+  
+  ```typescript
+  color: 0x00ff00  // Green
+  ```
+</ParamField>
+
+## Methods
+
+### setConfig()
+
+Updates the sphere configuration and regenerates geometry.
+
+```typescript
+sphere.setConfig(options: ISphereOptions): void
+```
+
+**Example:**
+```typescript
+sphere.setConfig({
+  center: new Vector3(0, 5, 0),
+  radius: 8,
+  widthSegments: 32,
+  heightSegments: 24,
+  color: 0x3498db
+});
+```
+
+### getBrep()
+
+Returns the B-Rep (Boundary Representation) data as a parsed JSON object.
+
+```typescript
+sphere.getBrep(): object
+```
+
+**Example:**
+```typescript
+const brepData = sphere.getBrep();
+console.log('Vertices:', brepData.vertices.length);
+console.log('Edges:', brepData.edges.length);
+console.log('Faces:', brepData.faces.length);
+```
+
+### generateGeometry()
+
+Regenerates the THREE.js geometry from the current configuration. Called automatically after setConfig().
+
+```typescript
+sphere.generateGeometry(): void
+```
+
+### discardGeometry()
+
+Disposes of the current geometry to free memory.
+
+```typescript
+sphere.discardGeometry(): void
+```
+
+## Properties
+
+<ResponseField name="ogid" type="string">
+  Unique identifier for the sphere instance.
+</ResponseField>
+
+<ResponseField name="options" type="ISphereOptions">
+  Current sphere configuration.
+  
+  ```typescript
+  const currentRadius = sphere.options.radius;
+  const currentSegments = sphere.options.widthSegments;
+  ```
+</ResponseField>
+
+<ResponseField name="radius" type="number">
+  Get or set the sphere radius. Setting triggers geometry regeneration.
+  
+  ```typescript
+  sphere.radius = 10;  // Update radius and regenerate
+  ```
+</ResponseField>
+
+<ResponseField name="color" type="number">
+  Get or set the sphere color.
+  
+  ```typescript
+  sphere.color = 0xff0000;  // Change to red
+  ```
+</ResponseField>
+
+<ResponseField name="outline" type="boolean">
+  Enable or disable outline rendering showing the sphere's wireframe edges.
+  
+  ```typescript
+  sphere.outline = true;   // Show wireframe
+  sphere.outline = false;  // Hide wireframe
+  ```
+</ResponseField>
+
+<ResponseField name="outlineMesh" type="THREE.LineSegments | null">
+  Reference to the outline mesh if outline is enabled.
+</ResponseField>
+
+## Usage Examples
+
+### Basic Sphere
+
+```typescript
+import { Sphere, Vector3 } from 'opengeometry-three';
+
+const sphere = new Sphere({
+  center: new Vector3(0, 0, 0),
+  radius: 5,
+  widthSegments: 24,
+  heightSegments: 16,
+  color: 0x2ecc71
+});
+
+// Add to scene
+scene.add(sphere);
+```
+
+### High-Resolution Sphere
+
+```typescript
+import { Sphere, Vector3 } from 'opengeometry-three';
+
+// Smooth sphere for close-up viewing
+const smoothSphere = new Sphere({
+  center: new Vector3(0, 0, 0),
+  radius: 8,
+  widthSegments: 48,  // High horizontal resolution
+  heightSegments: 32,  // High vertical resolution
+  color: 0x3498db
+});
+
+smoothSphere.outline = true;
+```
+
+### Low-Poly Sphere
+
+```typescript
+import { Sphere, Vector3 } from 'opengeometry-three';
+
+// Faceted appearance for stylized visuals
+const lowPolySphere = new Sphere({
+  center: new Vector3(0, 0, 0),
+  radius: 6,
+  widthSegments: 8,   // Low segment count
+  heightSegments: 6,
+  color: 0xe74c3c
+});
+```
+
+### Animated Sphere
+
+```typescript
+import { Sphere, Vector3 } from 'opengeometry-three';
+
+const sphere = new Sphere({
+  center: new Vector3(0, 0, 0),
+  radius: 5,
+  widthSegments: 32,
+  heightSegments: 24,
+  color: 0x9b59b6
+});
+
+// Pulsating animation
+function animate() {
+  const time = Date.now() * 0.001;
+  sphere.radius = 5 + Math.sin(time * 2) * 1.5;
+  requestAnimationFrame(animate);
+}
+animate();
+```
+
+### Planet with Outline
+
+```typescript
+import { Sphere, Vector3 } from 'opengeometry-three';
+
+const planet = new Sphere({
+  center: new Vector3(0, 0, 0),
+  radius: 10,
+  widthSegments: 40,
+  heightSegments: 30,
+  color: 0x1e8bc3
+});
+
+planet.outline = true;
+```
+
+## Implementation Details
+
+### UV Sphere Generation
+
+Spheres are generated using parametric equations with UV coordinates:
+
+**Rust Implementation:** `/workspace/source/main/opengeometry/src/primitives/sphere.rs:76-106`
+
+```rust
+for iy in 0..=height {
+    let v = iy as f64 / height as f64;
+    let theta = v * std::f64::consts::PI;
+    let sin_theta = theta.sin();
+    let cos_theta = theta.cos();
+
+    for ix in 0..=width {
+        let u = ix as f64 / width as f64;
+        let phi = u * std::f64::consts::PI * 2.0;
+        let sin_phi = phi.sin();
+        let cos_phi = phi.cos();
+
+        let x = self.center.x + self.radius * sin_theta * cos_phi;
+        let y = self.center.y + self.radius * cos_theta;
+        let z = self.center.z + self.radius * sin_theta * sin_phi;
+    }
+}
+```
+
+### Material Configuration
+
+Spheres use MeshStandardMaterial with transparency:
+
+**Source:** `/workspace/source/main/opengeometry-three/src/shapes/sphere.ts:113-117`
+
+```typescript
+const material = new THREE.MeshStandardMaterial({
+  color: this.options.color,
+  transparent: true,
+  opacity: 0.6,
+});
+```
+
+### Outline from B-Rep Edges
+
+Unlike other shapes, sphere outlines are generated from the B-Rep edge data to properly represent the geometry:
+
+**Source:** `/workspace/source/main/opengeometry-three/src/shapes/sphere.ts:150-176`
+
+```typescript
+const brep = this.getBrep();
+const lineBuffer: number[] = [];
+
+for (const edge of brep.edges ?? []) {
+  const start = brep.vertices?.[edge.v1]?.position;
+  const end = brep.vertices?.[edge.v2]?.position;
+  if (!start || !end) continue;
+  
+  lineBuffer.push(
+    start.x, start.y, start.z,
+    end.x, end.y, end.z
+  );
+}
+```
+
+### Face Generation
+
+The sphere is composed of triangular faces, with special handling for the poles to avoid degenerate triangles:
+
+**Source:** `/workspace/source/main/opengeometry/src/primitives/sphere.rs:111-136`
+
+## Best Practices
+
+<Tip>
+  **Segment Optimization:** Use `widthSegments: 24` and `heightSegments: 16` for general purposes. Increase for close-ups (32/24 or 48/32), decrease for distant objects (12/8) to improve performance.
+</Tip>
+
+<Warning>
+  **Minimum Segments:** The Rust implementation enforces minimum values: `widthSegments >= 3` and `heightSegments >= 2`. Lower values will be automatically clamped.
+</Warning>
+
+<Info>
+  **Aspect Ratio:** For most realistic spheres, maintain a `widthSegments:heightSegments` ratio of approximately 3:2 (e.g., 24:16, 30:20, 48:32).
+</Info>
+
+## Performance Considerations
+
+### Vertex Count
+
+The total number of vertices generated is `(widthSegments + 1) × (heightSegments + 1)`:
+
+- 24×16 segments = 425 vertices
+- 32×24 segments = 825 vertices  
+- 48×32 segments = 1,617 vertices
+
+### Face Count
+
+Approximate number of triangular faces: `widthSegments × heightSegments × 2`
+
+## See Also
+
+- [Cylinder](/api/shapes/cylinder) - For cylindrical shapes
+- [Cuboid](/api/shapes/cuboid) - For rectangular boxes
+- [Sweep](/api/shapes/sweep) - For custom revolution shapes

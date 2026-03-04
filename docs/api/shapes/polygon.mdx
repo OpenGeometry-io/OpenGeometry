@@ -1,0 +1,281 @@
+---
+title: 'Polygon'
+description: 'Create 2D polygons with support for holes and triangulation'
+icon: 'draw-polygon'
+---
+
+## Overview
+
+The `Polygon` class creates 2D polygonal shapes on the XY plane. It supports complex polygons with holes, automatic triangulation, and outline rendering. Polygons are defined by counter-clockwise (CCW) vertices, with holes specified in clockwise (CW) order.
+
+## Constructor
+
+```typescript
+const polygon = new Polygon(options?: IPolygonOptions);
+```
+
+### IPolygonOptions
+
+<ParamField path="ogid" type="string" optional>
+  Unique identifier for the polygon. Auto-generated if not provided.
+</ParamField>
+
+<ParamField path="vertices" type="Vector3[]" required>
+  Array of vertices defining the polygon boundary. Must be in counter-clockwise order when viewed from above (positive Y-axis).
+  
+  ```typescript
+  vertices: [
+    new Vector3(0, 0, 0),
+    new Vector3(10, 0, 0),
+    new Vector3(10, 0, 10),
+    new Vector3(0, 0, 10)
+  ]
+  ```
+</ParamField>
+
+<ParamField path="color" type="number" required>
+  Hexadecimal color value for the polygon fill.
+  
+  ```typescript
+  color: 0x00ff00  // Green
+  ```
+</ParamField>
+
+## Methods
+
+### setConfig()
+
+Updates the polygon configuration and regenerates geometry.
+
+```typescript
+polygon.setConfig(options: IPolygonOptions): void
+```
+
+**Example:**
+```typescript
+polygon.setConfig({
+  vertices: [
+    new Vector3(0, 0, 0),
+    new Vector3(5, 0, 0),
+    new Vector3(5, 0, 5),
+    new Vector3(0, 0, 5)
+  ],
+  color: 0xff0000
+});
+```
+
+### addVertices()
+
+Replaces all vertices with a new set and regenerates the polygon.
+
+```typescript
+polygon.addVertices(vertices: Vector3[]): void
+```
+
+**Example:**
+```typescript
+const newVertices = [
+  new Vector3(0, 0, 0),
+  new Vector3(10, 0, 0),
+  new Vector3(5, 0, 10)
+];
+polygon.addVertices(newVertices);
+```
+
+### addHole()
+
+Adds a hole to the polygon. Hole vertices must be in clockwise order.
+
+```typescript
+polygon.addHole(holeVertices: Vector3[]): void
+```
+
+**Example:**
+```typescript
+const holeVertices = [
+  new Vector3(2, 0, 2),
+  new Vector3(2, 0, 4),
+  new Vector3(4, 0, 4),
+  new Vector3(4, 0, 2)
+];
+polygon.addHole(holeVertices);
+```
+
+### getBrepData()
+
+Returns the B-Rep (Boundary Representation) data as a JSON string.
+
+```typescript
+polygon.getBrepData(): string | null
+```
+
+### generateGeometry()
+
+Regenerates the THREE.js geometry from the current polygon configuration. Automatically called after configuration changes.
+
+```typescript
+polygon.generateGeometry(): void
+```
+
+### dispose()
+
+Cleans up geometry and material resources.
+
+```typescript
+polygon.dispose(): void
+```
+
+## Properties
+
+<ResponseField name="ogid" type="string">
+  Unique identifier for the polygon instance.
+</ResponseField>
+
+<ResponseField name="options" type="IPolygonOptions">
+  Current polygon configuration including vertices and color.
+</ResponseField>
+
+<ResponseField name="transformationMatrix" type="THREE.Matrix4">
+  Transformation matrix for the polygon geometry.
+</ResponseField>
+
+<ResponseField name="color" type="number">
+  Get or set the polygon fill color.
+  
+  ```typescript
+  polygon.color = 0xff0000;  // Set to red
+  const currentColor = polygon.color;  // Get current color
+  ```
+</ResponseField>
+
+<ResponseField name="outline" type="boolean">
+  Enable or disable outline rendering.
+  
+  ```typescript
+  polygon.outline = true;   // Show outline
+  polygon.outline = false;  // Hide outline
+  ```
+</ResponseField>
+
+<ResponseField name="outlineColor" type="number">
+  Get or set the outline color (default: 0x000000 - black).
+  
+  ```typescript
+  polygon.outlineColor = 0x0000ff;  // Blue outline
+  ```
+</ResponseField>
+
+## Usage Examples
+
+### Basic Rectangle
+
+```typescript
+import { Polygon, Vector3 } from 'opengeometry-three';
+
+const rectangle = new Polygon({
+  vertices: [
+    new Vector3(0, 0, 0),
+    new Vector3(10, 0, 0),
+    new Vector3(10, 0, 8),
+    new Vector3(0, 0, 8)
+  ],
+  color: 0x00ff00
+});
+
+// Enable outline
+rectangle.outline = true;
+rectangle.outlineColor = 0x000000;
+```
+
+### Polygon with Hole
+
+```typescript
+import { Polygon, Vector3 } from 'opengeometry-three';
+
+// Create outer polygon
+const polygon = new Polygon({
+  vertices: [
+    new Vector3(0, 0, 0),
+    new Vector3(20, 0, 0),
+    new Vector3(20, 0, 20),
+    new Vector3(0, 0, 20)
+  ],
+  color: 0x3498db
+});
+
+// Add a rectangular hole in the center
+polygon.addHole([
+  new Vector3(8, 0, 8),   // Clockwise order
+  new Vector3(8, 0, 12),
+  new Vector3(12, 0, 12),
+  new Vector3(12, 0, 8)
+]);
+```
+
+### Complex Shape
+
+```typescript
+import { Polygon, Vector3 } from 'opengeometry-three';
+
+// L-shaped polygon
+const lShape = new Polygon({
+  vertices: [
+    new Vector3(0, 0, 0),
+    new Vector3(10, 0, 0),
+    new Vector3(10, 0, 5),
+    new Vector3(5, 0, 5),
+    new Vector3(5, 0, 15),
+    new Vector3(0, 0, 15)
+  ],
+  color: 0xe74c3c
+});
+
+lShape.outline = true;
+```
+
+## Implementation Details
+
+### Triangulation
+
+The polygon is automatically triangulated using the `triangulate_polygon_with_holes` function from the Rust kernel. This ensures proper rendering of complex shapes with holes.
+
+**Source:** `/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:155`
+
+### Geometry Generation
+
+Geometry is stored as a THREE.BufferGeometry with double-sided material to ensure visibility from both sides:
+
+```typescript
+const material = new THREE.MeshBasicMaterial({
+  color: this.options.color,
+  side: THREE.DoubleSide,
+});
+```
+
+**Source:** `/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:176-182`
+
+### Outline Rendering
+
+Outlines are rendered as THREE.LineSegments, positioned as a child of the polygon mesh to maintain transformation hierarchy.
+
+**Source:** `/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:345-379`
+
+## Best Practices
+
+<Tip>
+  **Vertex Order:** Always define outer polygon vertices in counter-clockwise (CCW) order and hole vertices in clockwise (CW) order when viewed from above.
+</Tip>
+
+<Warning>
+  **Minimum Vertices:** Polygons require at least 3 vertices. The geometry generation will fail silently if fewer vertices are provided.
+</Warning>
+
+<Info>
+  **Performance:** For polygons with many vertices or multiple holes, consider enabling outline rendering only when necessary, as it adds additional geometry.
+</Info>
+
+## See Also
+
+- [Cuboid](/api/shapes/cuboid) - For rectangular 3D boxes
+- [Cylinder](/api/shapes/cylinder) - For circular extrusions
+- [Sweep](/api/shapes/sweep) - For extruding profiles along paths

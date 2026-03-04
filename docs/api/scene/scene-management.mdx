@@ -1,0 +1,273 @@
+---
+title: Scene Management
+description: Managing collections of geometry entities in OpenGeometry
+---
+
+## Overview
+
+The scene management system provides a way to organize multiple geometry entities, manage their lifecycle, and apply operations to entire collections. The `OGScene` class represents a collection of geometry entities, while `OGSceneManager` provides high-level scene operations.
+
+## OGScene
+
+### Structure
+
+```rust
+pub struct OGScene {
+    pub id: String,
+    pub name: String,
+    pub entities: Vec<SceneEntity>,
+}
+```
+
+A scene is a named collection of geometry entities, each with a unique ID and associated BRep representation.
+
+### Creating a Scene
+
+```rust
+pub fn new(name: impl Into<String>) -> Self
+```
+
+Creates a new empty scene with a generated UUID.
+
+**Example:**
+
+```javascript
+const manager = new OGSceneManager();
+const sceneId = manager.createScene("My Architecture Model");
+```
+
+### Managing Entities
+
+#### upsert_entity
+
+```rust
+pub fn upsert_entity(&mut self, entity: SceneEntity)
+```
+
+Inserts or updates an entity in the scene. If an entity with the same ID exists, it will be replaced; otherwise, the entity is added.
+
+**Example:**
+
+```javascript
+const cuboid = OGCuboid.new("origin", 10.0, 5.0, 3.0);
+manager.addCuboidToScene(sceneId, "cuboid-1", cuboid);
+
+const sphere = OGSphere.new("origin", 2.5);
+manager.addSphereToScene(sceneId, "sphere-1", sphere);
+```
+
+#### remove_entity
+
+```rust
+pub fn remove_entity(&mut self, entity_id: &str) -> bool
+```
+
+Removes an entity from the scene by ID. Returns `true` if the entity was found and removed.
+
+**Example:**
+
+```javascript
+const removed = manager.removeEntityFromScene(sceneId, "cuboid-1");
+if (removed) {
+    console.log("Entity removed successfully");
+}
+```
+
+### Projection
+
+#### project_to_2d
+
+```rust
+pub fn project_to_2d(&self, camera: &CameraParameters, hlr: &HlrOptions) -> Scene2D
+```
+
+Projects all entities in the scene to 2D using the specified camera parameters and hidden line removal options.
+
+**Example:**
+
+```javascript
+const cameraJson = JSON.stringify({
+    position: { x: 10, y: 10, z: 10 },
+    target: { x: 0, y: 0, z: 0 },
+    up: { x: 0, y: 1, z: 0 },
+    near: 0.1,
+    projection_mode: "Orthographic"
+});
+
+const hlrJson = JSON.stringify({
+    hide_hidden_edges: true
+});
+
+const scene2d = manager.projectTo2DCamera(sceneId, cameraJson, hlrJson);
+const projected = JSON.parse(scene2d);
+```
+
+## SceneEntity
+
+### Structure
+
+```rust
+pub struct SceneEntity {
+    pub id: String,
+    pub kind: String,
+    pub brep: Brep,
+}
+```
+
+Each entity in a scene has:
+- **id**: Unique identifier for the entity
+- **kind**: Type descriptor (e.g., "OGCuboid", "OGSphere")
+- **brep**: The boundary representation of the geometry
+
+## OGSceneManager
+
+The scene manager provides a high-level API for managing multiple scenes and adding various geometry types.
+
+### Scene Operations
+
+#### createScene
+
+```javascript
+const sceneId = manager.createScene("Project Name");
+```
+
+Creates a new scene and sets it as the current scene.
+
+#### removeScene
+
+```javascript
+const removed = manager.removeScene(sceneId);
+```
+
+Removes a scene by ID. If it was the current scene, another scene becomes current.
+
+#### setCurrentScene
+
+```javascript
+manager.setCurrentScene(sceneId);
+```
+
+Sets the active scene for operations that don't specify a scene ID.
+
+#### listScenes
+
+```javascript
+const scenesJson = manager.listScenes();
+const scenes = JSON.parse(scenesJson);
+// Returns array of SceneSummary objects
+```
+
+Returns a JSON array of scene summaries containing ID, name, and entity count.
+
+### Adding Entities
+
+The manager provides methods to add various geometry types to scenes:
+
+```javascript
+// Add to specific scene
+manager.addCuboidToScene(sceneId, entityId, cuboid);
+manager.addCylinderToScene(sceneId, entityId, cylinder);
+manager.addSphereToScene(sceneId, entityId, sphere);
+manager.addLineToScene(sceneId, entityId, line);
+manager.addPolygonToScene(sceneId, entityId, polygon);
+
+// Add to current scene
+manager.addCuboidToCurrentScene(entityId, cuboid);
+manager.addSphereToCurrentScene(entityId, sphere);
+```
+
+### Complete Example: Multi-Entity Scene
+
+```javascript
+import { OGSceneManager, OGCuboid, OGCylinder, OGSphere } from 'opengeometry';
+
+// Create scene manager and new scene
+const manager = new OGSceneManager();
+const sceneId = manager.createScene("Building Components");
+
+// Add foundation (cuboid)
+const foundation = OGCuboid.new("origin", 20.0, 1.0, 15.0);
+manager.addCuboidToScene(sceneId, "foundation", foundation);
+
+// Add columns (cylinders)
+for (let i = 0; i < 4; i++) {
+    const x = (i % 2) * 18 - 9;
+    const z = Math.floor(i / 2) * 13 - 6.5;
+    const origin = `${x},1.5,${z}`;
+    const direction = "0,1,0";
+    
+    const column = OGCylinder.new(origin, direction, 0.5, 3.0);
+    manager.addCylinderToScene(sceneId, `column-${i}`, column);
+}
+
+// Add decorative sphere
+const sphere = OGSphere.new("0,5,0", 1.5);
+manager.addSphereToScene(sceneId, "dome", sphere);
+
+// Get scene info
+const scenesJson = manager.listScenes();
+const scenes = JSON.parse(scenesJson);
+console.log(`Scene contains ${scenes[0].entity_count} entities`);
+
+// Project to 2D for technical drawing
+const cameraJson = JSON.stringify({
+    position: { x: 30, y: 20, z: 25 },
+    target: { x: 0, y: 2, z: 0 },
+    up: { x: 0, y: 1, z: 0 },
+    near: 0.1,
+    projection_mode: "Orthographic"
+});
+
+const hlrJson = JSON.stringify({ hide_hidden_edges: true });
+const scene2dJson = manager.projectTo2DCamera(sceneId, cameraJson, hlrJson);
+const scene2d = JSON.parse(scene2dJson);
+
+console.log(`Projected scene has ${scene2d.paths.length} paths`);
+```
+
+## Scene Summary
+
+```rust
+pub struct SceneSummary {
+    pub id: String,
+    pub name: String,
+    pub entity_count: usize,
+}
+```
+
+Provides lightweight metadata about a scene without loading all geometry data.
+
+## Best Practices
+
+### Entity IDs
+
+- Use descriptive IDs that indicate purpose: `"wall-north"`, `"column-A1"`
+- Keep IDs unique within a scene
+- Use consistent naming conventions for entity groups
+
+### Performance
+
+- Scenes can contain thousands of entities efficiently
+- Use `upsert_entity` for batch updates without removing/re-adding
+- Remove entities when no longer needed to reduce memory
+
+### Scene Organization
+
+```javascript
+// Create separate scenes for different views or versions
+const designScene = manager.createScene("Design Iteration 1");
+const analysisScene = manager.createScene("Structural Analysis");
+
+// Switch between scenes
+manager.setCurrentScene(designScene);
+// ... add design entities
+
+manager.setCurrentScene(analysisScene);
+// ... add analysis-specific entities
+```
+
+## Related
+
+- [Projection](/api/export/projection) - Converting 3D scenes to 2D drawings
+- [PDF Export](/api/export/pdf) - Exporting scenes to PDF format
+- [Line Primitive](/api/primitives/line) - Basic 2D geometry that can be added to scenes

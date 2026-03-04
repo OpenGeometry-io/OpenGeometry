@@ -1,0 +1,423 @@
+---
+title: Polyline
+description: A connected sequence of line segments defined by multiple points
+icon: 'wave-square'
+---
+
+## Overview
+
+The Polyline primitive represents a connected sequence of line segments in 3D space. It is defined by a series of points and can be either open or closed. When the first and last points coincide, the polyline automatically detects and creates a closed loop.
+
+**Use Cases:**
+- Creating complex paths and contours
+- Defining irregular shapes
+- Profile curves for extrusion
+- Offset operations for parallel paths
+- Closed polygons and open paths
+
+## Constructor
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let polyline = OGPolyline::new(id: String);
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const polyline = new Polyline(options?: IPolylineOptions);
+    ```
+  </Tab>
+</Tabs>
+
+### Rust Constructor Parameters
+
+<ParamField path="id" type="String" required>
+  Unique identifier for the polyline instance
+</ParamField>
+
+### TypeScript Constructor Parameters
+
+<ParamField path="options" type="IPolylineOptions">
+  Configuration options for the polyline
+</ParamField>
+
+<ParamField path="options.ogid" type="string">
+  Optional unique identifier (auto-generated if not provided)
+</ParamField>
+
+<ParamField path="options.points" type="Vector3[]" required>
+  Array of points defining the polyline path
+</ParamField>
+
+<ParamField path="options.color" type="number" required>
+  Polyline color as a hexadecimal number (e.g., 0x00ff00 for green)
+</ParamField>
+
+<ParamField path="options.fatLines" type="boolean" default="false">
+  Enable thick line rendering using Line2
+</ParamField>
+
+<ParamField path="options.width" type="number" default="20">
+  Line width when fatLines is enabled
+</ParamField>
+
+## Methods
+
+### set_config
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    polyline.set_config(points: Vec<Vector3>);
+    ```
+    Updates the polyline's points and automatically checks if it's closed.
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    polyline.setConfig(options: IPolylineOptions);
+    ```
+    Updates the polyline configuration and regenerates geometry.
+  </Tab>
+</Tabs>
+
+### add_point
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    polyline.add_point(point: Vector3);
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    polyline.addPoint(point: Vector3);
+    ```
+  </Tab>
+</Tabs>
+
+Adds a single point to the polyline and regenerates the geometry.
+
+### add_multiple_points
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    polyline.add_multiple_points(points: Vec<Vector3>);
+    ```
+    Replaces all points with the provided array.
+  </Tab>
+</Tabs>
+
+### generate_geometry
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    polyline.generate_geometry();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    // Called automatically by setConfig and addPoint
+    ```
+  </Tab>
+</Tabs>
+
+Generates vertices and edges from the points. For closed polylines, creates a face and the closing edge.
+
+### get_geometry_serialized
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let geometry: String = polyline.get_geometry_serialized();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    // Used internally for rendering
+    ```
+  </Tab>
+</Tabs>
+
+Returns serialized vertex buffer data. For closed polylines, includes the first vertex repeated at the end.
+
+### get_offset_serialized
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let offset_data = polyline.get_offset_serialized(
+        distance: f64,
+        acute_threshold_degrees: f64,
+        bevel: bool
+    );
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const result = polyline.getOffset(
+        distance: number,
+        acuteThresholdDegrees: number = 35.0,
+        bevel: boolean = true
+    ): IOffsetResult;
+    ```
+  </Tab>
+</Tabs>
+
+Generates an offset path parallel to the polyline. The behavior differs for open vs. closed polylines.
+
+<ParamField path="distance" type="number" required>
+  Distance to offset the polyline (positive or negative)
+</ParamField>
+
+<ParamField path="acuteThresholdDegrees" type="number" default="35.0">
+  Angle threshold for beveling acute corners
+</ParamField>
+
+<ParamField path="bevel" type="boolean" default="true">
+  Enable beveling at acute angles
+</ParamField>
+
+### is_closed
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let closed: bool = polyline.is_closed();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const isClosed = polyline.isClosed;
+    ```
+  </Tab>
+</Tabs>
+
+Returns whether the polyline forms a closed loop.
+
+### get_points
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let points_json: String = polyline.get_points();
+    ```
+    Returns serialized points as JSON.
+  </Tab>
+</Tabs>
+
+### get_brep_serialized
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let brep: String = polyline.get_brep_serialized();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    // Available through internal API
+    ```
+  </Tab>
+</Tabs>
+
+Returns the complete BREP representation.
+
+## Properties
+
+<ResponseField name="id" type="String">
+  Unique identifier for the polyline instance
+</ResponseField>
+
+<ResponseField name="points" type="Vec<Vector3>">
+  Array of points defining the polyline path
+</ResponseField>
+
+<ResponseField name="is_closed" type="bool">
+  Whether the polyline forms a closed loop (automatically detected)
+</ResponseField>
+
+<ResponseField name="brep" type="Brep">
+  Internal BREP representation containing vertices, edges, and optionally a face for closed polylines
+</ResponseField>
+
+<ResponseField name="isClosed" type="boolean">
+  Indicates if the polyline is closed (TypeScript property)
+</ResponseField>
+
+<ResponseField name="color" type="number">
+  Polyline color (TypeScript only, settable)
+</ResponseField>
+
+## Code Examples
+
+### Creating an Open Polyline
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    use opengeometry::primitives::OGPolyline;
+    use openmaths::Vector3;
+
+    let mut polyline = OGPolyline::new("poly-1".to_string());
+    let points = vec![
+        Vector3::new(0.0, 0.0, 0.0),
+        Vector3::new(5.0, 0.0, 2.0),
+        Vector3::new(10.0, 0.0, 1.0),
+        Vector3::new(15.0, 0.0, 4.0),
+    ];
+    polyline.set_config(points);
+    polyline.generate_geometry();
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    import { Polyline, Vector3 } from 'opengeometry-three';
+
+    const polyline = new Polyline({
+      points: [
+        new Vector3(0, 0, 0),
+        new Vector3(5, 0, 2),
+        new Vector3(10, 0, 1),
+        new Vector3(15, 0, 4)
+      ],
+      color: 0x00ff00
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Creating a Closed Polygon
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    // Create a triangle by repeating the first point
+    let points = vec![
+        Vector3::new(0.0, 0.0, 0.0),
+        Vector3::new(10.0, 0.0, 0.0),
+        Vector3::new(5.0, 0.0, 8.66),
+        Vector3::new(0.0, 0.0, 0.0),  // Close the loop
+    ];
+    polyline.set_config(points);
+    assert!(polyline.is_closed());
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const triangle = new Polyline({
+      points: [
+        new Vector3(0, 0, 0),
+        new Vector3(10, 0, 0),
+        new Vector3(5, 0, 8.66),
+        new Vector3(0, 0, 0)  // Closes the triangle
+      ],
+      color: 0xff0000
+    });
+
+    console.log(triangle.isClosed);  // true
+    ```
+  </Tab>
+</Tabs>
+
+### Adding Points Incrementally
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let mut polyline = OGPolyline::new("poly-2".to_string());
+    polyline.add_point(Vector3::new(0.0, 0.0, 0.0));
+    polyline.add_point(Vector3::new(5.0, 0.0, 0.0));
+    polyline.add_point(Vector3::new(5.0, 0.0, 5.0));
+    polyline.add_point(Vector3::new(0.0, 0.0, 5.0));
+    polyline.add_point(Vector3::new(0.0, 0.0, 0.0));  // Close it
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const polyline = new Polyline({ points: [], color: 0x0000ff });
+    
+    polyline.addPoint(new Vector3(0, 0, 0));
+    polyline.addPoint(new Vector3(5, 0, 0));
+    polyline.addPoint(new Vector3(5, 0, 5));
+    polyline.addPoint(new Vector3(0, 0, 5));
+    polyline.addPoint(new Vector3(0, 0, 0));  // Close the square
+    ```
+  </Tab>
+</Tabs>
+
+### Generating Offset Polylines
+
+<Tabs>
+  <Tab title="Rust">
+    ```rust
+    let offset_data = polyline.get_offset_serialized(2.0, 35.0, true);
+    let result: OffsetResult = serde_json::from_str(&offset_data).unwrap();
+    
+    println!("Offset is closed: {}", result.is_closed);
+    println!("Number of points: {}", result.points.len());
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const offsetResult = polyline.getOffset(2.0, 35.0, true);
+    
+    console.log(offsetResult.points);              // Vector3[]
+    console.log(offsetResult.beveledVertexIndices); // Indices of beveled vertices
+    console.log(offsetResult.isClosed);            // true if original was closed
+    
+    // Create a new polyline from the offset
+    const offsetPolyline = new Polyline({
+      points: offsetResult.points,
+      color: 0xff00ff
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Using Fat Lines
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const thickPolyline = new Polyline({
+      points: [
+        new Vector3(0, 0, 0),
+        new Vector3(10, 0, 5),
+        new Vector3(20, 0, 2),
+        new Vector3(30, 0, 8)
+      ],
+      color: 0xffff00,
+      fatLines: true,
+      width: 50
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Complex Path Example
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    // Create a zigzag pattern
+    const zigzag = new Polyline({
+      points: [
+        new Vector3(0, 0, 0),
+        new Vector3(5, 0, 5),
+        new Vector3(10, 0, 0),
+        new Vector3(15, 0, 5),
+        new Vector3(20, 0, 0),
+        new Vector3(25, 0, 5)
+      ],
+      color: 0x00ffff
+    });
+
+    // Generate parallel zigzags
+    const offset1 = zigzag.getOffset(2);
+    const offset2 = zigzag.getOffset(-2);
+    ```
+  </Tab>
+</Tabs>

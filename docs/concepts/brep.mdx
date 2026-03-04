@@ -1,0 +1,230 @@
+---
+title: 'Boundary Representation (BREP)'
+description: 'Understanding the BREP data structure in OpenGeometry'
+---
+
+Boundary Representation (BREP) is the core data structure used in OpenGeometry to represent geometric entities. It describes 3D objects by defining their boundaries through vertices, edges, and faces.
+
+## What is BREP?
+
+BREP is a method of representing shapes by explicitly defining their boundaries. Instead of storing a solid as a filled volume, BREP stores:
+
+- **Vertices** - Points in 3D space
+- **Edges** - Connections between vertices
+- **Faces** - Surfaces bounded by edges
+
+This representation is:
+- **Exact** - Preserves geometric precision
+- **Topology-aware** - Maintains relationships between elements
+- **Efficient** - Avoids redundant storage of shared vertices/edges
+
+## Why BREP?
+
+OpenGeometry uses BREP because it:
+
+1. **Supports complex operations** - Boolean operations, offsetting, and extrusion work naturally on boundaries
+2. **Maintains precision** - No approximation errors from voxelization or tessellation
+3. **Industry standard** - Compatible with CAD file formats like STEP, IGES, and Parasolid
+4. **Flexible** - Can represent wireframes, surfaces, and solids with the same structure
+
+## BREP Body Types
+
+OpenGeometry can represent different types of geometric bodies:
+
+- **Solid body** - Has volume (e.g., cube, sphere)
+- **Shell body** - Has surface but no volume (e.g., car body)
+- **Sheet body** - Has 2D surface (e.g., flat plate)
+- **Wireframe body** - Has only edges (e.g., line drawing)
+- **Point body** - Single vertex in space
+
+## Data Structure
+
+The BREP structure is defined in `src/brep/mod.rs`:
+
+```rust
+pub struct Brep {
+    pub id: Uuid,
+    pub vertices: Vec<Vertex>,
+    pub edges: Vec<Edge>,
+    pub faces: Vec<Face>,
+    pub holes: Vec<u32>,
+    pub hole_edges: Vec<Edge>,
+}
+```
+
+### Core Components
+
+#### Vertex
+
+Defined in `src/brep/vertex.rs`, a vertex represents a point in 3D space:
+
+```rust
+pub struct Vertex {
+    pub id: u32,
+    pub position: Vector3,
+}
+```
+
+**Example:**
+```rust
+let v = Vertex::new(0, Vector3::new(1.0, 2.0, 3.0));
+```
+
+#### Edge
+
+Defined in `src/brep/edge.rs`, an edge connects two vertices:
+
+```rust
+pub struct Edge {
+    pub id: u32,
+    pub v1: u32,  // ID of first vertex
+    pub v2: u32,  // ID of second vertex
+}
+```
+
+**Example:**
+```rust
+let edge = Edge::new(0, 0, 1);  // Edge from vertex 0 to vertex 1
+```
+
+#### Face
+
+Defined in `src/brep/face.rs`, a face is a surface bounded by vertices:
+
+```rust
+pub struct Face {
+    pub id: u32,
+    pub normal: Vector3,
+    pub face_indices: Vec<u32>,  // Vertex IDs in winding order
+}
+```
+
+**Example:**
+```rust
+let face = Face::new(0, vec![0, 1, 2, 3]);  // Quad face
+face.set_normal(Vector3::new(0.0, 0.0, 1.0));
+```
+
+### Half-Edge Structure (Planned)
+
+Defined in `src/brep/halfedge.rs`, the half-edge data structure is planned for future implementation:
+
+```rust
+pub struct HalfEdge {
+    pub id: u32,
+    pub twin_ref: u32,    // ID of twin halfedge
+    pub next_ref: u32,    // ID of next halfedge in loop
+    pub edge_ref: u32,    // ID of parent edge
+    pub vertex_ref: u32,  // ID of vertex this points to
+    pub face_ref: u32,    // ID of adjacent face
+}
+```
+
+Half-edges enable efficient traversal of mesh topology and are commonly used in mesh editing operations.
+
+## BREP Operations
+
+The `Brep` struct provides several utility methods:
+
+### Querying Geometry
+
+```rust
+// Get count of elements
+let vertex_count = brep.get_vertex_count();
+let edge_count = brep.get_edge_count();
+let face_count = brep.get_face_count();
+
+// Get vertices for a specific face
+let vertices: Vec<Vector3> = brep.get_vertices_by_face_id(0);
+
+// Get all vertices as flat array
+let all_vertices: Vec<Vector3> = brep.get_flattened_vertices();
+```
+
+### Handling Holes
+
+Faces can contain holes (e.g., a plate with circular cutouts):
+
+```rust
+// Get face with holes
+let (face_vertices, hole_vertices) = brep.get_vertices_and_holes_by_face_id(0);
+// face_vertices: outer boundary
+// hole_vertices: Vec of hole boundaries
+```
+
+### Modifying Topology
+
+```rust
+// Add vertex to face
+brep.insert_vertex_at_face_by_id(face_id, vertex_id);
+
+// Clear all geometry
+brep.clear();
+```
+
+## Example: Building a BREP
+
+Here's how a simple triangle is represented:
+
+```rust
+use uuid::Uuid;
+use openmaths::Vector3;
+use opengeometry::brep::{Brep, Vertex, Edge, Face};
+
+let mut brep = Brep::new(Uuid::new_v4());
+
+// Add vertices
+brep.vertices.push(Vertex::new(0, Vector3::new(0.0, 0.0, 0.0)));
+brep.vertices.push(Vertex::new(1, Vector3::new(1.0, 0.0, 0.0)));
+brep.vertices.push(Vertex::new(2, Vector3::new(0.5, 1.0, 0.0)));
+
+// Add edges
+brep.edges.push(Edge::new(0, 0, 1));
+brep.edges.push(Edge::new(1, 1, 2));
+brep.edges.push(Edge::new(2, 2, 0));
+
+// Add face
+let mut face = Face::new(0, vec![0, 1, 2]);
+face.set_normal(Vector3::new(0.0, 0.0, 1.0));
+brep.faces.push(face);
+```
+
+## Serialization
+
+BREP structures are serializable via `serde`:
+
+```rust
+// Serialize to JSON
+let json = serde_json::to_string(&brep)?;
+
+// Deserialize from JSON
+let brep: Brep = serde_json::from_str(&json)?;
+```
+
+This enables passing BREP data between Rust and JavaScript via WASM.
+
+## Topology Validation
+
+While OpenGeometry doesn't enforce strict manifold constraints, valid BREP structures should maintain:
+
+- **Vertex references** - All edge vertex IDs exist in vertex list
+- **Face winding** - Consistent counter-clockwise ordering (right-hand rule)
+- **Edge connectivity** - Edges properly connect vertices without gaps
+
+## References
+
+The BREP implementation is based on:
+- [Boundary Representation (Wikipedia)](https://en.wikipedia.org/wiki/Boundary_representation)
+- [Doubly Connected Edge List](https://en.wikipedia.org/wiki/Doubly_connected_edge_list)
+- [CMU Graphics Lectures](https://15462.courses.cs.cmu.edu/spring2021content/lectures/11_meshes/11_meshes_slides.pdf)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="diagram-project" href="/concepts/architecture">
+    Understand how BREP fits in the system architecture
+  </Card>
+  <Card title="Scene Graph" icon="sitemap" href="/concepts/scene-graph">
+    Learn how BREP bodies are managed in scenes
+  </Card>
+</CardGroup>

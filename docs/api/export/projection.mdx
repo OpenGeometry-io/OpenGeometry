@@ -1,0 +1,417 @@
+---
+title: Projection & Hidden Line Removal
+description: Project 3D geometry to 2D with hidden line removal
+---
+
+## Overview
+
+The projection system converts 3D boundary representations (BReps) to 2D vector drawings with optional hidden line removal. It supports both orthographic and perspective projections with configurable camera parameters.
+
+## Key Concepts
+
+### Projection Modes
+
+```rust
+pub enum ProjectionMode {
+    Orthographic,
+    Perspective,
+}
+```
+
+- **Orthographic**: Parallel projection preserving relative dimensions
+- **Perspective**: View with perspective distortion based on distance from camera
+
+### Hidden Line Removal
+
+The HLR algorithm determines edge visibility by:
+1. Computing face normals and front-facing determination
+2. Building edge-to-face adjacency maps
+3. Analyzing edge creases and silhouettes
+4. Filtering based on visibility criteria
+
+## CameraParameters
+
+### Structure
+
+```rust
+pub struct CameraParameters {
+    pub position: Vector3,
+    pub target: Vector3,
+    pub up: Vector3,
+    pub near: f64,
+    pub projection_mode: ProjectionMode,
+}
+```
+
+### Default Camera
+
+```rust
+impl Default for CameraParameters {
+    fn default() -> Self {
+        Self {
+            position: Vector3::new(3.0, 3.0, 3.0),
+            target: Vector3::new(0.0, 0.0, 0.0),
+            up: Vector3::new(0.0, 1.0, 0.0),
+            near: 0.01,
+            projection_mode: ProjectionMode::Orthographic,
+        }
+    }
+}
+```
+
+### Camera Configuration
+
+**position**: Camera location in 3D space (meters)
+
+**target**: Point the camera is looking at (meters)
+
+**up**: Vector defining camera's up direction (typically `[0, 1, 0]`)
+
+**near**: Near clipping plane distance - geometry closer than this is clipped
+
+**projection_mode**: `"Orthographic"` or `"Perspective"`
+
+### Example: Isometric View
+
+```javascript
+const camera = {
+    position: { x: 10, y: 10, z: 10 },
+    target: { x: 0, y: 0, z: 0 },
+    up: { x: 0, y: 1, z: 0 },
+    near: 0.1,
+    projection_mode: "Orthographic"
+};
+```
+
+### Example: Front View
+
+```javascript
+const camera = {
+    position: { x: 0, y: 0, z: 20 },
+    target: { x: 0, y: 0, z: 0 },
+    up: { x: 0, y: 1, z: 0 },
+    near: 0.1,
+    projection_mode: "Orthographic"
+};
+```
+
+### Example: Perspective View
+
+```javascript
+const camera = {
+    position: { x: 15, y: 12, z: 15 },
+    target: { x: 0, y: 2, z: 0 },
+    up: { x: 0, y: 1, z: 0 },
+    near: 1.0,
+    projection_mode: "Perspective"
+};
+```
+
+## HlrOptions
+
+### Structure
+
+```rust
+pub struct HlrOptions {
+    pub hide_hidden_edges: bool,
+}
+```
+
+### Default Options
+
+```rust
+impl Default for HlrOptions {
+    fn default() -> Self {
+        Self {
+            hide_hidden_edges: true,
+        }
+    }
+}
+```
+
+**hide_hidden_edges**: When `true`, edges obscured by front-facing geometry are removed from the output. When `false`, all edges are shown (wireframe mode).
+
+### Wireframe vs Hidden Line Removal
+
+```javascript
+// Show all edges (wireframe)
+const wireframe = { hide_hidden_edges: false };
+
+// Remove hidden edges (clean technical drawing)
+const hlr = { hide_hidden_edges: true };
+```
+
+## Scene2D
+
+### Structure
+
+```rust
+pub struct Scene2D {
+    pub name: Option<String>,
+    pub paths: Vec<Path2D>,
+}
+```
+
+The projected 2D scene containing vector paths.
+
+### Methods
+
+#### new / with_name
+
+```rust
+pub fn new() -> Self
+pub fn with_name(name: impl Into<String>) -> Self
+```
+
+Create a new 2D scene, optionally with a name.
+
+#### add_path
+
+```rust
+pub fn add_path(&mut self, path: Path2D)
+```
+
+Add a path to the scene. Empty paths are automatically filtered.
+
+#### extend
+
+```rust
+pub fn extend(&mut self, other: Scene2D)
+```
+
+Merge another Scene2D into this one.
+
+#### bounding_box
+
+```rust
+pub fn bounding_box(&self) -> Option<(Vec2, Vec2)>
+```
+
+Returns `(min, max)` corner points of the scene's bounding box, or `None` if empty.
+
+#### to_lines
+
+```rust
+pub fn to_lines(&self) -> Scene2DLines
+```
+
+Converts the scene to a flat list of line segments, useful for export or analysis.
+
+## Path2D & Segment2D
+
+### Path2D Structure
+
+```rust
+pub struct Path2D {
+    pub segments: Vec<Segment2D>,
+    pub stroke_width: Option<f64>,
+    pub stroke_color: Option<(f64, f64, f64)>,
+}
+```
+
+A collection of connected or disconnected line segments with optional styling.
+
+### Segment2D
+
+```rust
+pub enum Segment2D {
+    Line { start: Vec2, end: Vec2 },
+}
+```
+
+Currently supports line segments. Future versions may add arcs and curves.
+
+### Vec2
+
+```rust
+pub struct Vec2 {
+    pub x: f64,
+    pub y: f64,
+}
+```
+
+A 2D point or vector in projected space (meters).
+
+## Projection Function
+
+### project_brep_to_scene
+
+```rust
+pub fn project_brep_to_scene(
+    brep: &Brep, 
+    camera: &CameraParameters, 
+    hlr: &HlrOptions
+) -> Scene2D
+```
+
+Projects a 3D BRep to a 2D scene.
+
+**Example:**
+
+```javascript
+import { OGCuboid, OGSceneManager } from 'opengeometry';
+
+const manager = new OGSceneManager();
+const sceneId = manager.createScene("Projection Test");
+
+const cuboid = OGCuboid.new("origin", 5.0, 3.0, 2.0);
+manager.addCuboidToScene(sceneId, "box", cuboid);
+
+const camera = {
+    position: { x: 8, y: 6, z: 8 },
+    target: { x: 0, y: 0, z: 0 },
+    up: { x: 0, y: 1, z: 0 },
+    near: 0.1,
+    projection_mode: "Orthographic"
+};
+
+const hlr = { hide_hidden_edges: true };
+
+const cameraJson = JSON.stringify(camera);
+const hlrJson = JSON.stringify(hlr);
+const scene2dJson = manager.projectTo2DCamera(sceneId, cameraJson, hlrJson);
+const scene2d = JSON.parse(scene2dJson);
+
+console.log(`Projected to ${scene2d.paths.length} paths`);
+scene2d.paths.forEach((path, i) => {
+    console.log(`Path ${i}: ${path.segments.length} segments`);
+});
+```
+
+## Scene2DLines
+
+### Structure
+
+```rust
+pub struct Scene2DLines {
+    pub name: Option<String>,
+    pub lines: Vec<Line2D>,
+}
+```
+
+Flattened representation with individual line segments.
+
+### Line2D
+
+```rust
+pub struct Line2D {
+    pub start: Vec2,
+    pub end: Vec2,
+    pub stroke_width: Option<f64>,
+    pub stroke_color: Option<(f64, f64, f64)>,
+}
+```
+
+A single line segment with optional styling.
+
+### Usage
+
+```javascript
+const scene2dLinesJson = manager.projectTo2DLines(sceneId, cameraJson, hlrJson);
+const lineData = JSON.parse(scene2dLinesJson);
+
+console.log(`Total lines: ${lineData.lines.length}`);
+lineData.lines.forEach(line => {
+    console.log(`Line from (${line.start.x}, ${line.start.y}) to (${line.end.x}, ${line.end.y})`);
+});
+```
+
+## Common Projection Patterns
+
+### Standard Engineering Views
+
+```javascript
+const views = {
+    front: {
+        position: { x: 0, y: 0, z: 20 },
+        target: { x: 0, y: 0, z: 0 },
+        up: { x: 0, y: 1, z: 0 },
+    },
+    top: {
+        position: { x: 0, y: 20, z: 0 },
+        target: { x: 0, y: 0, z: 0 },
+        up: { x: 0, y: 0, z: -1 },
+    },
+    right: {
+        position: { x: 20, y: 0, z: 0 },
+        target: { x: 0, y: 0, z: 0 },
+        up: { x: 0, y: 1, z: 0 },
+    },
+    isometric: {
+        position: { x: 10, y: 10, z: 10 },
+        target: { x: 0, y: 0, z: 0 },
+        up: { x: 0, y: 1, z: 0 },
+    },
+};
+
+for (const [name, config] of Object.entries(views)) {
+    const camera = {
+        ...config,
+        near: 0.1,
+        projection_mode: "Orthographic"
+    };
+    
+    const viewJson = manager.projectTo2DCamera(
+        sceneId,
+        JSON.stringify(camera),
+        JSON.stringify({ hide_hidden_edges: true })
+    );
+    
+    // Export or render each view
+    console.log(`Generated ${name} view`);
+}
+```
+
+### Adjusting Detail Level
+
+```javascript
+// High detail - show all edges
+const detailedJson = manager.projectTo2DCamera(
+    sceneId,
+    cameraJson,
+    JSON.stringify({ hide_hidden_edges: false })
+);
+
+// Clean presentation - hide hidden lines
+const cleanJson = manager.projectTo2DCamera(
+    sceneId,
+    cameraJson,
+    JSON.stringify({ hide_hidden_edges: true })
+);
+```
+
+## Implementation Details
+
+### Projection Pipeline
+
+1. **Camera Frame Construction**: Build right/up/forward vectors from camera parameters
+2. **World to View Transform**: Convert 3D points to camera-relative coordinates
+3. **Near Plane Clipping**: Clip segments crossing the near plane
+4. **Projection**: Apply orthographic or perspective transform
+5. **Hidden Line Removal**: Filter edges based on face visibility
+6. **2D Scene Assembly**: Collect visible segments into paths
+
+### Edge Visibility Algorithm
+
+An edge is visible if:
+- It has no adjacent faces (standalone edge), or
+- At least one adjacent face is front-facing, and
+  - Some adjacent faces are back-facing (silhouette edge), or
+  - Adjacent front-facing faces have different normals (crease edge)
+
+### Crease Detection
+
+Edges between faces with normals differing by more than ~2° (cos θ < 0.9995) are considered creases and remain visible.
+
+## Performance Considerations
+
+- Projection time scales linearly with edge count
+- HLR adds overhead for face normal computation
+- Complex scenes (10,000+ edges) project in milliseconds
+- Use Scene2DLines for simpler post-processing
+
+## Related
+
+- [Scene Management](/api/scene/scene-management) - Organizing multiple entities
+- [PDF Export](/api/export/pdf) - Exporting projections to PDF
+- [BRep](/concepts/brep) - Boundary representation structure

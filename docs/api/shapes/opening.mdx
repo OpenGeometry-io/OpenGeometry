@@ -1,0 +1,243 @@
+---
+title: 'Opening'
+description: 'Create transparent cuboid openings for architectural elements like doors and windows'
+icon: 'door-open'
+---
+
+## Overview
+
+The `Opening` class creates transparent cuboid volumes that represent openings in architectural models, such as doors, windows, or other voids. Openings are rendered with zero opacity but maintain outlines for visualization.
+
+## Constructor
+
+```typescript
+new Opening(options?: IOpeningOptions)
+```
+
+<ParamField path="options" type="IOpeningOptions" optional>
+  Configuration options for the opening
+
+  <Expandable title="IOpeningOptions properties">
+    <ParamField path="ogid" type="string" optional>
+      Unique identifier for the opening. Auto-generated if not provided.
+    </ParamField>
+
+    <ParamField path="center" type="Vector3" required>
+      Center point of the opening in 3D space
+    </ParamField>
+
+    <ParamField path="width" type="number" required>
+      Width of the opening (X dimension)
+    </ParamField>
+
+    <ParamField path="height" type="number" required>
+      Height of the opening (Y dimension)
+    </ParamField>
+
+    <ParamField path="depth" type="number" required>
+      Depth of the opening (Z dimension)
+    </ParamField>
+
+    <ParamField path="color" type="number" required>
+      Color value (primarily used for outlines, since opening is transparent)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Properties
+
+<ResponseField name="ogid" type="string">
+  Unique identifier for the opening instance
+</ResponseField>
+
+<ResponseField name="options" type="IOpeningOptions">
+  Current configuration options
+</ResponseField>
+
+<ResponseField name="width" type="number">
+  Width of the opening (settable property)
+</ResponseField>
+
+<ResponseField name="height" type="number">
+  Height of the opening (settable property)
+</ResponseField>
+
+<ResponseField name="depth" type="number">
+  Depth of the opening (settable property)
+</ResponseField>
+
+<ResponseField name="dimensions" type="object">
+  Get the current dimensions as an object with width, height, and depth
+</ResponseField>
+
+<ResponseField name="outline" type="boolean">
+  Enable or disable the outline rendering (settable property)
+</ResponseField>
+
+<ResponseField name="outlineMesh" type="THREE.Line | null">
+  Access the outline mesh if enabled
+</ResponseField>
+
+## Methods
+
+### setConfig()
+
+Update the opening configuration and regenerate geometry.
+
+```typescript
+setConfig(options: IOpeningOptions): void
+```
+
+<ParamField path="options" type="IOpeningOptions" required>
+  New configuration options to apply
+</ParamField>
+
+### getBrepData()
+
+Get the boundary representation (BREP) data for the opening.
+
+```typescript
+getBrepData(): object | null
+```
+
+Returns the BREP structure as a parsed JSON object, or null if not available.
+
+### generateGeometry()
+
+Regenerate the Three.js geometry from the kernel.
+
+```typescript
+generateGeometry(): void
+```
+
+### discardGeometry()
+
+Dispose of the Three.js geometry to free memory.
+
+```typescript
+discardGeometry(): void
+```
+
+## Example Usage
+
+### Basic Window Opening
+
+```typescript
+import { Opening } from '@opengeometry/kernel-three';
+import { Vector3 } from 'opengeometry';
+import * as THREE from 'three';
+
+// Create a window opening
+const windowOpening = new Opening({
+  center: new Vector3(0, 1.5, 0),
+  width: 1.2,
+  height: 1.5,
+  depth: 0.3,
+  color: 0x666666
+});
+
+// Enable outline to visualize the opening
+windowOpening.outline = true;
+
+// Add to scene
+scene.add(windowOpening);
+```
+
+### Door Opening
+
+```typescript
+// Create a door opening
+const doorOpening = new Opening({
+  center: new Vector3(2, 1, 0),
+  width: 0.9,
+  height: 2.1,
+  depth: 0.2,
+  color: 0x333333
+});
+
+doorOpening.outline = true;
+scene.add(doorOpening);
+```
+
+### Dynamic Resizing
+
+```typescript
+const opening = new Opening({
+  center: new Vector3(0, 1, 0),
+  width: 1.0,
+  height: 2.0,
+  depth: 0.3,
+  color: 0x888888
+});
+
+// Resize dynamically
+opening.width = 1.5;
+opening.height = 2.5;
+opening.depth = 0.4;
+
+// Access current dimensions
+console.log(opening.dimensions);
+// { width: 1.5, height: 2.5, depth: 0.4 }
+```
+
+### Using BREP Data
+
+```typescript
+const opening = new Opening({
+  center: new Vector3(0, 1, 0),
+  width: 1.0,
+  height: 2.0,
+  depth: 0.3,
+  color: 0x999999
+});
+
+// Get boundary representation
+const brepData = opening.getBrepData();
+if (brepData) {
+  console.log('Opening BREP:', brepData);
+  // Use BREP data for boolean operations or analysis
+}
+```
+
+## Material Properties
+
+The Opening uses a `MeshStandardMaterial` with these special properties:
+
+- **transparent**: `true` - Enables transparency
+- **opacity**: `0` - Fully transparent (invisible volume)
+- **depthWrite**: `false` - Allows seeing through to elements behind
+
+This makes openings invisible while maintaining their volumetric representation for computational purposes.
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Architectural Modeling" icon="building">
+    Create window and door openings in walls
+  </Card>
+  <Card title="Space Planning" icon="vector-square">
+    Define void spaces in floor plans
+  </Card>
+  <Card title="Boolean Operations" icon="shapes">
+    Use as cutting volumes for wall penetrations
+  </Card>
+  <Card title="Visualization" icon="eye">
+    Mark areas of interest with outlined volumes
+  </Card>
+</CardGroup>
+
+## Notes
+
+<Note>
+Openings are rendered with zero opacity but can have visible outlines. Enable the outline property to visualize the opening boundaries.
+</Note>
+
+<Warning>
+Opening geometry uses `depthWrite: false` which means it won't write to the depth buffer. This is intentional to allow seeing through openings, but be aware of this when compositing with other transparent objects.
+</Warning>
+
+## Related
+
+- [Cuboid](/api/shapes/cuboid) - Solid rectangular boxes
+- [Polygon](/api/shapes/polygon) - For 2D shapes that can be extruded
+- [Scene Management](/api/scene/scene-management) - Organizing multiple openings in a scene

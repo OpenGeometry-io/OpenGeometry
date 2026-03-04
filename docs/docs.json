@@ -1,0 +1,116 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "OpenGeometry",
+  "theme": "almond",
+  "colors": {
+    "primary": "#4460FF",
+    "light": "#4460FF",
+    "dark": "#4460FF"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/OpenGeometry-io/OpenGeometry"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/OpenGeometry-io/OpenGeometry"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "global": {
+          "anchors": [
+            {
+              "anchor": "Blog",
+              "href": "https://mintlify.com/blog",
+              "icon": "newspaper"
+            },
+            {
+              "anchor": "Discord",
+              "href": "https://discord.gg/mintlify",
+              "icon": "discord"
+            },
+            {
+              "anchor": "SDK",
+              "href": "https://npmjs.com/org/mintlify",
+              "icon": "npm" 
+            }
+          ]
+        },
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": [
+              "what-is-opengeometry",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/brep",
+              "concepts/scene-graph"
+            ]
+          },
+          {
+            "group": "Integration",
+            "pages": [
+              "integration/threejs",
+              "integration/examples"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "2D Primitives",
+            "pages": [
+              "api/primitives/line",
+              "api/primitives/arc",
+              "api/primitives/rectangle",
+              "api/primitives/polyline",
+              "api/primitives/curve"
+            ]
+          },
+          {
+            "group": "3D Shapes",
+            "pages": [
+              "api/shapes/polygon",
+              "api/shapes/cylinder",
+              "api/shapes/cuboid",
+              "api/shapes/sphere",
+              "api/shapes/wedge",
+              "api/shapes/sweep",
+              "api/shapes/opening"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "api/operations/extrude",
+              "api/operations/offset",
+              "api/operations/sweep",
+              "api/operations/triangulate"
+            ]
+          },
+          {
+            "group": "Scene & Export",
+            "pages": [
+              "api/scene/scene-management",
+              "api/export/projection",
+              "api/export/pdf"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

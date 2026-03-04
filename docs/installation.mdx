@@ -1,0 +1,131 @@
+---
+title: Installation
+description: Install OpenGeometry and set up your development environment
+---
+
+## Install OpenGeometry
+
+Install the OpenGeometry package using your preferred package manager:
+
+<CodeGroup>
+
+```bash npm
+npm install opengeometry
+```
+
+```bash yarn
+yarn add opengeometry
+```
+
+```bash pnpm
+pnpm add opengeometry
+```
+
+</CodeGroup>
+
+## Peer Dependencies
+
+OpenGeometry requires Three.js for 3D rendering. Install it as a peer dependency:
+
+<CodeGroup>
+
+```bash npm
+npm install three@^0.168.0
+```
+
+```bash yarn
+yarn add three@^0.168.0
+```
+
+```bash pnpm
+pnpm add three@^0.168.0
+```
+
+</CodeGroup>
+
+## TypeScript Support
+
+If you're using TypeScript, install the Three.js type definitions:
+
+<CodeGroup>
+
+```bash npm
+npm install --save-dev @types/three
+```
+
+```bash yarn
+yarn add --dev @types/three
+```
+
+```bash pnpm
+pnpm add --dev @types/three
+```
+
+</CodeGroup>
+
+OpenGeometry includes built-in TypeScript definitions, so no additional types are needed for the core library.
+
+## WebAssembly Setup
+
+OpenGeometry uses WebAssembly for high-performance geometric computations. The WASM file needs to be initialized before you can use the library.
+
+### Development Setup
+
+During development, the WASM file will be loaded from your `node_modules` directory. No additional configuration is needed.
+
+### Production Setup
+
+For production builds, you'll need to ensure the WASM file is accessible. Most modern bundlers (Vite, webpack, etc.) handle this automatically.
+
+#### Vite Configuration
+
+Vite automatically handles WASM files. No additional configuration is required.
+
+#### Webpack Configuration
+
+If using webpack 5+, add the following to your `webpack.config.js`:
+
+```javascript
+module.exports = {
+  experiments: {
+    asyncWebAssembly: true,
+  },
+};
+```
+
+## Verify Installation
+
+Create a simple test file to verify your installation:
+
+```typescript
+import { Cuboid, Vector3 } from 'opengeometry';
+import * as THREE from 'three';
+
+// Create a simple test cuboid
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0, 0),
+  width: 2,
+  height: 1,
+  depth: 1,
+  color: 0x4460ff
+});
+
+console.log('OpenGeometry cuboid created:', cuboid);
+console.log('OGID:', cuboid.ogid);
+```
+
+<Note>
+  OpenGeometry uses WebAssembly which loads automatically. The shapes are ready to use immediately after import.
+</Note>
+
+## Next Steps
+
+Now that you have OpenGeometry installed, you're ready to create your first 3D geometry:
+
+<Card
+  title="Quickstart Guide"
+  icon="rocket"
+  href="/quickstart"
+>
+  Follow the quickstart guide to create your first 3D shape
+</Card>

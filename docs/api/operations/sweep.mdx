@@ -1,0 +1,293 @@
+---
+title: 'Sweep'
+description: 'Create 3D surfaces by sweeping a profile shape along a path with automatic frame calculation'
+icon: 'route'
+---
+
+## Overview
+
+The sweep operation generates a 3D surface (BREP) by moving a 2D profile shape along a 3D path. It automatically computes rotation-minimizing frames along the path to prevent twisting, making it ideal for creating pipes, tubes, rails, and architectural moldings.
+
+## Function Signature
+
+```rust
+pub fn sweep_profile_along_path(
+    path_points: &[Vector3],
+    profile_points: &[Vector3],
+    options: SweepOptions,
+) -> Brep
+```
+
+Sweeps a profile curve along a path curve to create a 3D boundary representation.
+
+<ParamField path="path_points" type="&[Vector3]" required>
+  The 3D path curve to sweep along. Must have at least 2 points. If the first and last points are identical (within epsilon), the path is treated as closed.
+</ParamField>
+
+<ParamField path="profile_points" type="&[Vector3]" required>
+  The 2D or 3D profile shape to sweep. Must have at least 3 points to form a valid closed profile. The profile is automatically centered and oriented relative to the path.
+</ParamField>
+
+<ParamField path="options" type="SweepOptions" required>
+  Configuration controlling end cap generation.
+</ParamField>
+
+## Configuration
+
+### SweepOptions
+
+```rust
+pub struct SweepOptions {
+    pub cap_start: bool,
+    pub cap_end: bool,
+}
+```
+
+<ParamField path="cap_start" type="bool" default="true">
+  Generate a closed face at the start of the sweep (only for open paths). Set to `false` to create an open tube.
+</ParamField>
+
+<ParamField path="cap_end" type="bool" default="true">
+  Generate a closed face at the end of the sweep (only for open paths). Set to `false` to create an open tube.
+</ParamField>
+
+### Default Options
+
+```rust
+SweepOptions {
+    cap_start: true,
+    cap_end: true,
+}
+```
+
+## Return Type
+
+Returns a `Brep` (Boundary Representation) object containing:
+
+- **vertices**: All 3D vertex positions (profile vertices × path sections)
+- **edges**: Connectivity information for the mesh
+- **faces**: Quadrilateral side faces and optional triangular/polygonal end caps
+
+## How It Works
+
+1. **Path Sanitization**: Removes consecutive duplicate points and detects if the path forms a closed loop
+2. **Profile Preparation**: 
+   - Computes profile centroid
+   - Calculates profile plane normal
+   - Converts profile to local coordinates (u, v, w basis)
+3. **Frame Calculation**: 
+   - Computes tangent vectors along the path
+   - Builds rotation-minimizing frames using parallel transport
+   - Ensures smooth frame transitions without twisting
+4. **Vertex Placement**: Transforms each profile point into world space at each path section
+5. **Face Generation**:
+   - Creates quadrilateral side faces connecting successive sections
+   - Adds end caps for open paths (if enabled)
+   - Connects vertices to form a watertight mesh
+
+## Code Examples
+
+### Basic Sweep: Creating a Pipe
+
+```rust
+use opengeometry::{
+    brep::Brep,
+    operations::sweep::{sweep_profile_along_path, SweepOptions},
+};
+use openmaths::Vector3;
+
+// Straight path from origin upward
+let path = vec![
+    Vector3::new(0.0, 0.0, 0.0),
+    Vector3::new(0.0, 2.0, 0.0),
+];
+
+// Circular profile (approximated with 8 points)
+let radius = 0.5;
+let segments = 8;
+let mut profile = Vec::new();
+for i in 0..segments {
+    let angle = (i as f64) * 2.0 * std::f64::consts::PI / (segments as f64);
+    profile.push(Vector3::new(
+        radius * angle.cos(),
+        0.0,
+        radius * angle.sin(),
+    ));
+}
+
+let pipe = sweep_profile_along_path(&path, &profile, SweepOptions::default());
+
+// Result: A capped cylinder
+assert_eq!(pipe.vertices.len(), 16); // 8 profile × 2 sections
+assert_eq!(pipe.faces.len(), 10); // 8 sides + 2 caps
+```
+
+### Curved Path Sweep
+
+```rust
+use opengeometry::operations::sweep::{sweep_profile_along_path, SweepOptions};
+use openmaths::Vector3;
+
+// Curved path (quarter circle arc)
+let mut path = Vec::new();
+for i in 0..=10 {
+    let t = (i as f64) / 10.0;
+    let angle = t * std::f64::consts::PI / 2.0;
+    path.push(Vector3::new(
+        angle.cos(),
+        0.0,
+        angle.sin(),
+    ));
+}
+
+// Rectangular profile
+let profile = vec![
+    Vector3::new(-0.2, 0.0, -0.1),
+    Vector3::new(0.2, 0.0, -0.1),
+    Vector3::new(0.2, 0.0, 0.1),
+    Vector3::new(-0.2, 0.0, 0.1),
+];
+
+let curved_beam = sweep_profile_along_path(&path, &profile, SweepOptions::default());
+
+// Result: Curved rectangular beam following the arc
+```
+
+### Open Tube Without Caps
+
+```rust
+use opengeometry::operations::sweep::{sweep_profile_along_path, SweepOptions};
+use openmaths::Vector3;
+
+let path = vec![
+    Vector3::new(0.0, 0.0, 0.0),
+    Vector3::new(0.0, 1.0, 0.0),
+    Vector3::new(1.0, 2.0, 0.0),
+];
+
+let profile = create_circle_profile(0.4, 12); // 12-sided circle
+
+// Create open tube
+let tube = sweep_profile_along_path(
+    &path,
+    &profile,
+    SweepOptions {
+        cap_start: false,
+        cap_end: false,
+    },
+);
+
+assert_eq!(tube.vertices.len(), 36); // 12 profile × 3 sections
+assert_eq!(tube.faces.len(), 24); // Only side faces, no caps
+```
+
+### Closed Loop Sweep
+
+```rust
+use opengeometry::operations::sweep::{sweep_profile_along_path, SweepOptions};
+use openmaths::Vector3;
+
+// Circular closed path
+let mut path = Vec::new();
+for i in 0..16 {
+    let angle = (i as f64) * 2.0 * std::f64::consts::PI / 16.0;
+    path.push(Vector3::new(
+        2.0 * angle.cos(),
+        0.0,
+        2.0 * angle.sin(),
+    ));
+}
+path.push(path[0]); // Close the loop
+
+// Small circular profile
+let profile = create_circle_profile(0.2, 8);
+
+// Sweep to create a torus-like shape
+let torus = sweep_profile_along_path(&path, &profile, SweepOptions::default());
+
+// Note: End caps are NOT generated for closed paths
+assert_eq!(torus.vertices.len(), 128); // 8 profile × 16 sections
+assert_eq!(torus.faces.len(), 128); // Only side faces
+```
+
+## Visual Examples
+
+```
+Sweep Process:
+
+   Path              Profile           Result
+   
+     ●                 ○               ╭─○─╮
+     │                                  │   │
+     ●                         →       ●───●
+     │                                  │   │
+     ●                                  ╰─○─╯
+
+
+Closed Path Sweep (Torus):
+
+   Path (circle)     Profile (circle)    Result
+   
+     ╭───╮              ●              ╭─────╮
+     │   │                             ╱ ╭───╮ ╲
+     ╰───╯              ●      →      │  │   │  │
+                                       ╲ ╰───╯ ╱
+                                        ╰─────╯
+```
+
+## Frame Calculation Details
+
+### Rotation-Minimizing Frames
+
+The sweep operation uses a parallel transport method to compute frames that:
+
+- Follow the path tangent direction
+- Minimize rotation (twist) along the path
+- Handle sudden direction changes smoothly
+- Work correctly for both open and closed paths
+
+### Frame Components
+
+- **Tangent**: Direction along the path
+- **Normal**: First perpendicular direction (maps to profile U axis)
+- **Binormal**: Second perpendicular direction (maps to profile V axis)
+
+## Implementation Details
+
+### Source Location
+
+`~/workspace/source/main/opengeometry/src/operations/sweep.rs:98`
+
+### Precision
+
+- Uses `EPSILON = 1.0e-9` for geometric comparisons
+- Robust handling of near-zero vectors
+- Graceful fallback for degenerate cases
+
+### Profile Orientation
+
+- Profile is automatically centered at its centroid
+- Profile normal is computed using Newell's method
+- Profile is decomposed into local orthonormal basis (u, v, w)
+- No manual profile alignment required
+
+## Edge Cases
+
+- **Insufficient Points**: 
+  - Path < 2 points: Returns empty BREP
+  - Profile < 3 points: Returns empty BREP
+- **Closed Paths**: Automatically detected and handled (no end caps generated)
+- **Degenerate Frames**: Fallback to default orthogonal vectors
+- **Collinear Path Segments**: Frames smoothly interpolated
+
+## Performance Considerations
+
+- Vertex count: `profile_points × path_sections`
+- Face count (open): `profile_points × (path_sections - 1) + 2 caps`
+- Face count (closed): `profile_points × path_sections`
+- Memory: O(vertices + faces)
+
+## See Also
+
+- [Extrude](/api/operations/extrude) - Special case of sweep along a straight vertical path
+- [Offset](/api/operations/offset) - Create parallel offset curves in 2D

@@ -1,0 +1,354 @@
+---
+title: Three.js Integration
+description: How to use OpenGeometry shapes with Three.js
+---
+
+OpenGeometry provides a comprehensive Three.js wrapper that extends `THREE.Mesh` to create CAD-quality 3D shapes backed by the OpenGeometry kernel.
+
+## Installation
+
+All shape classes are exported from the main `@opengeometry/kernel-three` package:
+
+```typescript
+import { OpenGeometry, Polygon, Cuboid, Cylinder, Sphere, Sweep } from '@opengeometry/kernel-three';
+import { Vector3 } from '@opengeometry/kernel-three';
+```
+
+## Initialization
+
+Before using any shapes, initialize the OpenGeometry WASM module:
+
+```typescript
+await OpenGeometry.create({ 
+  wasmURL: '/path/to/opengeometry_bg.wasm' 
+});
+```
+
+## Shape Architecture
+
+### Extending THREE.Mesh
+
+All OpenGeometry shapes extend `THREE.Mesh`, making them compatible with standard Three.js workflows:
+
+```typescript
+const polygon = new Polygon({
+  vertices: [/* Vector3[] */],
+  color: 0x2563eb
+});
+
+// Use like any THREE.Mesh
+scene.add(polygon);
+polygon.position.set(0, 1, 0);
+polygon.rotation.y = Math.PI / 4;
+```
+
+### Options Pattern
+
+Each shape uses an options interface for configuration:
+
+```typescript
+interface IPolygonOptions {
+  ogid?: string;        // Optional unique ID
+  vertices: Vector3[];  // Required vertices
+  color: number;        // Hex color value
+}
+
+interface ICuboidOptions {
+  ogid?: string;
+  center: Vector3;
+  width: number;
+  height: number;
+  depth: number;
+  color: number;
+}
+```
+
+## Available Shapes
+
+### Polygon
+
+2D polygons with automatic triangulation:
+
+```typescript
+import { Polygon, Vector3 } from '@opengeometry/kernel-three';
+
+const polygon = new Polygon({
+  vertices: [
+    new Vector3(-1, 0, -1),
+    new Vector3(1, 0, -1),
+    new Vector3(1, 0, 1),
+    new Vector3(-1, 0, 1)
+  ],
+  color: 0x2563eb
+});
+
+scene.add(polygon);
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:11
+
+#### Adding Holes
+
+```typescript
+polygon.addHole([
+  new Vector3(-0.5, 0, -0.5),
+  new Vector3(0.5, 0, -0.5),
+  new Vector3(0.5, 0, 0.5),
+  new Vector3(-0.5, 0, 0.5)
+]);
+```
+
+### Cuboid
+
+3D box with center, dimensions, and outline support:
+
+```typescript
+import { Cuboid, Vector3 } from '@opengeometry/kernel-three';
+
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0.5, 0),
+  width: 1.8,
+  height: 1.6,
+  depth: 1.2,
+  color: 0x10b981
+});
+
+cuboid.outline = true;
+scene.add(cuboid);
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/cuboid.ts:14
+
+### Cylinder
+
+Parametric cylinder with radius, height, and segment control:
+
+```typescript
+import { Cylinder, Vector3 } from '@opengeometry/kernel-three';
+
+const cylinder = new Cylinder({
+  center: new Vector3(0, 1, 0),
+  radius: 1.0,
+  height: 2.0,
+  segments: 32,
+  angle: 2 * Math.PI,  // Full circle
+  color: 0x0ea5e9
+});
+
+scene.add(cylinder);
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/cylinder.ts:15
+
+### Sphere
+
+Parametric sphere with tessellation control:
+
+```typescript
+import { Sphere, Vector3 } from '@opengeometry/kernel-three';
+
+const sphere = new Sphere({
+  center: new Vector3(0, 1, 0),
+  radius: 1.0,
+  widthSegments: 24,
+  heightSegments: 16,
+  color: 0xf59e0b
+});
+
+scene.add(sphere);
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/sphere.ts:27
+
+### Sweep
+
+Sweep a 2D profile along a 3D path:
+
+```typescript
+import { Sweep, Vector3 } from '@opengeometry/kernel-three';
+
+const sweep = new Sweep({
+  path: [
+    new Vector3(-2, 0, -1),
+    new Vector3(-1, 0.5, 0),
+    new Vector3(0, 1, 0.5),
+    new Vector3(1, 1.5, 0),
+    new Vector3(2, 2, -1)
+  ],
+  profile: [
+    new Vector3(-0.25, 0, -0.25),
+    new Vector3(0.25, 0, -0.25),
+    new Vector3(0.25, 0, 0.25),
+    new Vector3(-0.25, 0, 0.25)
+  ],
+  color: 0x0ea5e9,
+  capStart: true,
+  capEnd: true
+});
+
+scene.add(sweep);
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/sweep.ts:28
+
+## Common Patterns
+
+### Dynamic Configuration with setConfig
+
+Update shape parameters after creation:
+
+```typescript
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0.5, 0),
+  width: 1,
+  height: 1,
+  depth: 1,
+  color: 0x10b981
+});
+
+// Later, update dimensions
+cuboid.setConfig({
+  center: new Vector3(0, 1, 0),
+  width: 2,
+  height: 2,
+  depth: 2,
+  color: 0x10b981
+});
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/cuboid.ts:60
+
+### Color Management
+
+All shapes support dynamic color changes:
+
+```typescript
+polygon.color = 0xff0000;  // Change to red
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:19
+
+### Outline Rendering
+
+Toggle edge outlines for better visualization:
+
+```typescript
+polygon.outline = true;  // Enable outline
+polygon.outline = false; // Disable outline
+polygon.outlineColor = 0x000000; // Set outline color
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:345
+
+### BREP Data Access
+
+Access the underlying boundary representation:
+
+```typescript
+const brepData = cuboid.getBrepData();
+console.log(brepData); // { vertices: [...], edges: [...], faces: [...] }
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/cuboid.ts:118
+
+### Geometry Management
+
+All shapes handle geometry cleanup automatically:
+
+```typescript
+// Geometry is regenerated when calling setConfig
+polygon.setConfig(newOptions);
+
+// Manual cleanup if needed
+polygon.discardGeometry();
+```
+
+**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:139
+
+## Complete Example
+
+Here's a complete scene with multiple shapes:
+
+```typescript
+import * as THREE from 'three';
+import { OpenGeometry, Polygon, Cuboid, Cylinder, Vector3 } from '@opengeometry/kernel-three';
+
+// Initialize scene
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Initialize OpenGeometry
+await OpenGeometry.create({ 
+  wasmURL: '/opengeometry_bg.wasm' 
+});
+
+// Create shapes
+const polygon = new Polygon({
+  vertices: [
+    new Vector3(-1, 0, -1),
+    new Vector3(1, 0, -1),
+    new Vector3(1, 0, 1),
+    new Vector3(-1, 0, 1)
+  ],
+  color: 0x2563eb
+});
+polygon.outline = true;
+scene.add(polygon);
+
+const cuboid = new Cuboid({
+  center: new Vector3(3, 0.5, 0),
+  width: 1.5,
+  height: 1.5,
+  depth: 1.5,
+  color: 0x10b981
+});
+cuboid.outline = true;
+scene.add(cuboid);
+
+const cylinder = new Cylinder({
+  center: new Vector3(-3, 1, 0),
+  radius: 0.75,
+  height: 2,
+  segments: 32,
+  angle: 2 * Math.PI,
+  color: 0x0ea5e9
+});
+cylinder.outline = true;
+scene.add(cylinder);
+
+// Setup camera
+camera.position.set(5, 4, 6);
+camera.lookAt(0, 0, 0);
+
+// Render loop
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+```
+
+## Debug Mode
+
+Enable debug visualization for development:
+
+```typescript
+const og = await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' });
+og.enableDebug = true;
+```
+
+When enabled:
+- Geometry renders with semi-transparent materials
+- Faces have random colors for triangle visualization
+- Normals are rendered for debugging
+
+**Source:** ~/workspace/source/main/opengeometry-three/index.ts:34
+
+## Next Steps
+
+- See [Examples](/integration/examples) for complete working demos
+- Explore [Line Primitive](/api/primitives/line) for lower-level drawing tools
+- Learn about [Extrude Operation](/api/operations/extrude) for creating 3D geometry

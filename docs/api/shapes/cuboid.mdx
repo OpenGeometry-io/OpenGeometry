@@ -1,0 +1,330 @@
+---
+title: 'Cuboid'
+description: 'Create rectangular box shapes with customizable dimensions'
+icon: 'cube'
+---
+
+## Overview
+
+The `Cuboid` class creates 3D rectangular box shapes (also known as rectangular prisms or boxes). Cuboids are defined by their center point and dimensions along the X, Y, and Z axes.
+
+## Constructor
+
+```typescript
+const cuboid = new Cuboid(options?: ICuboidOptions);
+```
+
+### ICuboidOptions
+
+<ParamField path="ogid" type="string" optional>
+  Unique identifier for the cuboid. Auto-generated if not provided.
+</ParamField>
+
+<ParamField path="center" type="Vector3" required>
+  Center point of the cuboid in 3D space.
+  
+  ```typescript
+  center: new Vector3(0, 0, 0)
+  ```
+</ParamField>
+
+<ParamField path="width" type="number" required>
+  Width of the cuboid along the X-axis.
+  
+  ```typescript
+  width: 10
+  ```
+</ParamField>
+
+<ParamField path="height" type="number" required>
+  Height of the cuboid along the Y-axis.
+  
+  ```typescript
+  height: 5
+  ```
+</ParamField>
+
+<ParamField path="depth" type="number" required>
+  Depth of the cuboid along the Z-axis.
+  
+  ```typescript
+  depth: 8
+  ```
+</ParamField>
+
+<ParamField path="color" type="number" required>
+  Hexadecimal color value for the cuboid.
+  
+  ```typescript
+  color: 0x00ff00  // Green
+  ```
+</ParamField>
+
+## Methods
+
+### setConfig()
+
+Updates the cuboid configuration and regenerates geometry.
+
+```typescript
+cuboid.setConfig(options: ICuboidOptions): void
+```
+
+**Example:**
+```typescript
+cuboid.setConfig({
+  center: new Vector3(5, 2, 3),
+  width: 12,
+  height: 6,
+  depth: 10,
+  color: 0x3498db
+});
+```
+
+### getBrepData()
+
+Returns the B-Rep (Boundary Representation) data as a parsed JSON object.
+
+```typescript
+cuboid.getBrepData(): object | null
+```
+
+**Example:**
+```typescript
+const brepData = cuboid.getBrepData();
+if (brepData) {
+  console.log('Vertices:', brepData.vertices);
+  console.log('Edges:', brepData.edges);
+  console.log('Faces:', brepData.faces);
+}
+```
+
+### generateGeometry()
+
+Regenerates the THREE.js geometry from the current configuration. Called automatically after setConfig().
+
+```typescript
+cuboid.generateGeometry(): void
+```
+
+### discardGeometry()
+
+Disposes of the current geometry to free memory.
+
+```typescript
+cuboid.discardGeometry(): void
+```
+
+## Properties
+
+<ResponseField name="ogid" type="string">
+  Unique identifier for the cuboid instance.
+</ResponseField>
+
+<ResponseField name="options" type="ICuboidOptions">
+  Current cuboid configuration.
+  
+  ```typescript
+  const currentWidth = cuboid.options.width;
+  const currentHeight = cuboid.options.height;
+  const currentDepth = cuboid.options.depth;
+  ```
+</ResponseField>
+
+<ResponseField name="width" type="number">
+  Get or set the cuboid width. Setting triggers geometry regeneration.
+  
+  ```typescript
+  cuboid.width = 15;  // Update width and regenerate
+  ```
+</ResponseField>
+
+<ResponseField name="color" type="number">
+  Get or set the cuboid color.
+  
+  ```typescript
+  cuboid.color = 0xff0000;  // Change to red
+  ```
+</ResponseField>
+
+<ResponseField name="outline" type="boolean">
+  Enable or disable outline rendering for the cuboid edges.
+  
+  ```typescript
+  cuboid.outline = true;   // Show wireframe edges
+  cuboid.outline = false;  // Hide wireframe edges
+  ```
+</ResponseField>
+
+<ResponseField name="outlineMesh" type="THREE.Line | null">
+  Reference to the outline mesh if outline is enabled.
+</ResponseField>
+
+## Usage Examples
+
+### Basic Cuboid
+
+```typescript
+import { Cuboid, Vector3 } from 'opengeometry-three';
+
+const box = new Cuboid({
+  center: new Vector3(0, 0, 0),
+  width: 10,
+  height: 5,
+  depth: 8,
+  color: 0x2ecc71
+});
+
+// Add to scene
+scene.add(box);
+```
+
+### Cuboid with Outline
+
+```typescript
+import { Cuboid, Vector3 } from 'opengeometry-three';
+
+const cuboid = new Cuboid({
+  center: new Vector3(0, 2.5, 0),
+  width: 12,
+  height: 5,
+  depth: 6,
+  color: 0x3498db
+});
+
+// Enable edge visualization
+cuboid.outline = true;
+```
+
+### Cube (Equal Dimensions)
+
+```typescript
+import { Cuboid, Vector3 } from 'opengeometry-three';
+
+const cube = new Cuboid({
+  center: new Vector3(0, 0, 0),
+  width: 8,
+  height: 8,
+  depth: 8,
+  color: 0xe74c3c
+});
+```
+
+### Dynamic Cuboid Scaling
+
+```typescript
+import { Cuboid, Vector3 } from 'opengeometry-three';
+
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0, 0),
+  width: 10,
+  height: 10,
+  depth: 10,
+  color: 0x9b59b6
+});
+
+// Animate size
+function animate() {
+  const time = Date.now() * 0.001;
+  const scale = 1 + Math.sin(time) * 0.3;
+  
+  cuboid.setConfig({
+    center: cuboid.options.center,
+    width: 10 * scale,
+    height: 10,
+    depth: 10 * scale,
+    color: cuboid.options.color
+  });
+  
+  requestAnimationFrame(animate);
+}
+animate();
+```
+
+### Building Block
+
+```typescript
+import { Cuboid, Vector3 } from 'opengeometry-three';
+
+// Create a wall segment
+const wallSegment = new Cuboid({
+  center: new Vector3(0, 3, 0),
+  width: 20,   // Wide
+  height: 6,   // Moderate height
+  depth: 1,    // Thin
+  color: 0x95a5a6
+});
+
+wallSegment.outline = true;
+```
+
+## Implementation Details
+
+### Geometry Generation
+
+Cuboids are created by defining a rectangular base on the XZ plane and extruding it along the Y-axis using the `extrude_brep_face` operation.
+
+**Rust Implementation:** `/workspace/source/main/opengeometry/src/primitives/cuboid.rs:80-129`
+
+```rust
+let half_width = self.width / 2.0;
+let half_height = self.height / 2.0;
+let half_depth = self.depth / 2.0;
+
+// Create bottom face vertices
+bottom_face_brep.vertices.push(Vertex::new(
+    0,
+    Vector3::new(
+        self.center.x - half_width,
+        self.center.y - half_height,
+        self.center.z - half_depth,
+    ),
+));
+// ... (additional vertices)
+
+// Extrude to create the box
+let extruded_brep = extrude_brep_face(bottom_face_brep, self.height);
+```
+
+### Material Configuration
+
+Cuboids use MeshStandardMaterial with transparency:
+
+**Source:** `/workspace/source/main/opengeometry-three/src/shapes/cuboid.ts:100-104`
+
+```typescript
+const material = new THREE.MeshStandardMaterial({
+  color: this.options.color,
+  transparent: true,
+  opacity: 0.6,
+});
+```
+
+### B-Rep Structure
+
+Cuboids have a well-defined B-Rep structure:
+- **8 vertices** (corners)
+- **12 edges** (connecting corners)
+- **6 faces** (sides)
+
+**Source:** `/workspace/source/main/opengeometry/src/primitives/cuboid.rs:86-128`
+
+## Best Practices
+
+<Tip>
+  **Center-Based Positioning:** Cuboids are positioned by their center point, making rotation and scaling operations more intuitive.
+</Tip>
+
+<Warning>
+  **Non-Zero Dimensions:** All dimensions (width, height, depth) should be greater than zero. Zero or negative values may cause rendering issues.
+</Warning>
+
+<Info>
+  **Memory Management:** Use `discardGeometry()` when removing cuboids from the scene to properly free GPU memory.
+</Info>
+
+## See Also
+
+- [Wedge](/api/shapes/wedge) - For triangular prism shapes
+- [Cylinder](/api/shapes/cylinder) - For cylindrical shapes
+- [Polygon](/api/shapes/polygon) - For 2D base shapes
