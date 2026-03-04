@@ -666,3 +666,8 @@ export * from './src/shapes/';
  * Reusable example builders for quickly wiring demo scenes.
  */
 export * from './src/examples/';
+
+/**
+ * Boolean/constructive solid operations wrappers.
+ */
+export * from './src/operations/';

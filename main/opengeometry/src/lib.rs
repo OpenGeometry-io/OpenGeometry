@@ -4,6 +4,7 @@ pub mod geometry {
 }
 
 pub mod operations {
+    pub mod boolean;
     pub mod extrude;
     pub mod offset;
     pub mod sweep;
