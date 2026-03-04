@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -35,18 +36,22 @@ impl Default for BooleanConstraints {
 }
 
 #[wasm_bindgen]
-pub struct OGBoolean;
+pub struct OGBoolean {
+    last_result: Vec<Polygon>,
+}
 
 #[wasm_bindgen]
 impl OGBoolean {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        Self
+        Self {
+            last_result: Vec::new(),
+        }
     }
 
     #[wasm_bindgen]
     pub fn compute(
-        &self,
+        &mut self,
         mesh_a_serialized: String,
         mesh_b_serialized: String,
         operation: String,
@@ -72,7 +77,7 @@ impl OGBoolean {
         let polygons_a = triangles_to_polygons(&vertices_a, &constraints)?;
         let polygons_b = triangles_to_polygons(&vertices_b, &constraints)?;
 
-        let result = match op {
+        let mut result = match op {
             BooleanOperation::Union => csg_union(polygons_a, polygons_b, constraints.epsilon),
             BooleanOperation::Intersection => {
                 csg_intersection(polygons_a, polygons_b, constraints.epsilon)
@@ -82,8 +87,17 @@ impl OGBoolean {
             }
         };
 
-        let flattened = polygons_to_triangle_buffer(&result);
+        weld_vertices(&mut result, constraints.epsilon);
+        self.last_result = result;
+
+        let flattened = polygons_to_triangle_buffer(&self.last_result);
         serde_json::to_string(&flattened).map_err(|err| JsValue::from_str(&err.to_string()))
+    }
+
+    #[wasm_bindgen]
+    pub fn get_outline_geometry_serialized(&self) -> Result<String, JsValue> {
+        let outline = polygons_to_outline_buffer(&self.last_result);
+        serde_json::to_string(&outline).map_err(|err| JsValue::from_str(&err.to_string()))
     }
 }
 
@@ -326,6 +340,7 @@ impl Node {
         let mut back = Vec::new();
         let mut coplanar_front = Vec::new();
         let mut coplanar_back = Vec::new();
+
         for polygon in polygons {
             plane.split_polygon(
                 &polygon,
@@ -335,6 +350,7 @@ impl Node {
                 &mut back,
             );
         }
+
         front.extend(coplanar_front);
         back.extend(coplanar_back);
 
@@ -398,6 +414,7 @@ impl Node {
                 node.build(front);
             }
         }
+
         if !back.is_empty() {
             if self.back.is_none() {
                 self.back = Some(Box::new(Node::new(Vec::new())));
@@ -409,7 +426,7 @@ impl Node {
     }
 }
 
-fn csg_union(a: Vec<Polygon>, b: Vec<Polygon>, epsilon: f64) -> Vec<Polygon> {
+fn csg_union(a: Vec<Polygon>, b: Vec<Polygon>, _epsilon: f64) -> Vec<Polygon> {
     let mut a_node = Node::new(a);
     let mut b_node = Node::new(b);
 
@@ -420,12 +437,10 @@ fn csg_union(a: Vec<Polygon>, b: Vec<Polygon>, epsilon: f64) -> Vec<Polygon> {
     b_node.invert();
 
     a_node.build(b_node.all_polygons());
-    let mut result = a_node.all_polygons();
-    weld_vertices(&mut result, epsilon);
-    result
+    a_node.all_polygons()
 }
 
-fn csg_subtract(a: Vec<Polygon>, b: Vec<Polygon>, epsilon: f64) -> Vec<Polygon> {
+fn csg_subtract(a: Vec<Polygon>, b: Vec<Polygon>, _epsilon: f64) -> Vec<Polygon> {
     let mut a_node = Node::new(a);
     let mut b_node = Node::new(b);
 
@@ -438,12 +453,10 @@ fn csg_subtract(a: Vec<Polygon>, b: Vec<Polygon>, epsilon: f64) -> Vec<Polygon> 
     a_node.build(b_node.all_polygons());
     a_node.invert();
 
-    let mut result = a_node.all_polygons();
-    weld_vertices(&mut result, epsilon);
-    result
+    a_node.all_polygons()
 }
 
-fn csg_intersection(a: Vec<Polygon>, b: Vec<Polygon>, epsilon: f64) -> Vec<Polygon> {
+fn csg_intersection(a: Vec<Polygon>, b: Vec<Polygon>, _epsilon: f64) -> Vec<Polygon> {
     let mut a_node = Node::new(a);
     let mut b_node = Node::new(b);
 
@@ -455,9 +468,7 @@ fn csg_intersection(a: Vec<Polygon>, b: Vec<Polygon>, epsilon: f64) -> Vec<Polyg
     a_node.build(b_node.all_polygons());
     a_node.invert();
 
-    let mut result = a_node.all_polygons();
-    weld_vertices(&mut result, epsilon);
-    result
+    a_node.all_polygons()
 }
 
 fn triangles_to_polygons(
@@ -526,7 +537,67 @@ fn polygons_to_triangle_buffer(polygons: &[Polygon]) -> Vec<f64> {
             out.extend_from_slice(&[base.x, base.y, base.z, b.x, b.y, b.z, c.x, c.y, c.z]);
         }
     }
+
     out
+}
+
+fn polygons_to_outline_buffer(polygons: &[Polygon]) -> Vec<f64> {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+
+    for polygon in polygons {
+        if polygon.vertices.len() < 2 {
+            continue;
+        }
+
+        for i in 0..polygon.vertices.len() {
+            let start = polygon.vertices[i].pos;
+            let end = polygon.vertices[(i + 1) % polygon.vertices.len()].pos;
+            let key = EdgeKey::from_points(start, end);
+            if seen.insert(key) {
+                out.extend_from_slice(&[start.x, start.y, start.z, end.x, end.y, end.z]);
+            }
+        }
+    }
+
+    out
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct EdgeKey {
+    a: QuantizedPoint,
+    b: QuantizedPoint,
+}
+
+impl EdgeKey {
+    fn from_points(a: Vec3, b: Vec3) -> Self {
+        let qa = QuantizedPoint::from_vec3(a);
+        let qb = QuantizedPoint::from_vec3(b);
+
+        if qa <= qb {
+            Self { a: qa, b: qb }
+        } else {
+            Self { a: qb, b: qa }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct QuantizedPoint {
+    x: i64,
+    y: i64,
+    z: i64,
+}
+
+impl QuantizedPoint {
+    fn from_vec3(v: Vec3) -> Self {
+        const SCALE: f64 = 1_000_000.0;
+        Self {
+            x: (v.x * SCALE).round() as i64,
+            y: (v.y * SCALE).round() as i64,
+            z: (v.z * SCALE).round() as i64,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -551,5 +622,29 @@ mod tests {
         let triangles = polygons_to_triangle_buffer(&csg_union(a, b, constraints.epsilon));
         assert!(!triangles.is_empty());
         assert_eq!(triangles.len() % 9, 0);
+    }
+
+    #[test]
+    fn outline_is_generated_for_polygon_result() {
+        let polygon = Polygon::new(
+            vec![
+                Vertex {
+                    pos: Vec3::new(0.0, 0.0, 0.0),
+                },
+                Vertex {
+                    pos: Vec3::new(1.0, 0.0, 0.0),
+                },
+                Vertex {
+                    pos: Vec3::new(1.0, 0.0, 1.0),
+                },
+                Vertex {
+                    pos: Vec3::new(0.0, 0.0, 1.0),
+                },
+            ],
+            1e-6,
+        );
+
+        let outline = polygons_to_outline_buffer(&[polygon]);
+        assert_eq!(outline.len(), 24);
     }
 }

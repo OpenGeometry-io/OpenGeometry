@@ -1,45 +1,96 @@
 import * as THREE from "three";
 import { Vector3 } from "../../../../opengeometry/pkg/opengeometry";
-import { BooleanShape, Cuboid, Sphere } from "@og-three";
+import {
+  BooleanOperation,
+  BooleanShape,
+  Cuboid,
+  Cylinder,
+  Sphere,
+  Wedge,
+} from "@og-three";
 import {
   bootstrapExample,
   mountControls,
   replaceSceneObject,
 } from "../shared/runtime";
 
-const operations = ["union", "intersection", "difference"] as const;
+function buildOperand(kind: string, center: Vector3, color: number): THREE.Mesh {
+  switch (kind) {
+    case "sphere": {
+      const sphere = new Sphere({
+        center,
+        radius: 0.9,
+        widthSegments: 30,
+        heightSegments: 20,
+        color,
+      });
+      sphere.outline = true;
+      return sphere;
+    }
+    case "cylinder": {
+      const cylinder = new Cylinder({
+        center,
+        radius: 0.7,
+        height: 1.9,
+        segments: 32,
+        angle: Math.PI * 2,
+        color,
+      });
+      cylinder.outline = true;
+      return cylinder;
+    }
+    case "wedge": {
+      const wedge = new Wedge({
+        center,
+        width: 1.6,
+        height: 1.8,
+        depth: 1.4,
+        color,
+      });
+      wedge.outline = true;
+      return wedge;
+    }
+    default: {
+      const cuboid = new Cuboid({
+        center,
+        width: 1.6,
+        height: 1.8,
+        depth: 1.5,
+        color,
+      });
+      cuboid.outline = true;
+      return cuboid;
+    }
+  }
+}
 
 void bootstrapExample({
   title: "Boolean (Union / Intersection / Difference)",
   description:
-    "Robust BSP-style constructive solid geometry over any OpenGeometry triangulated shape.",
+    "Boolean operations over Cuboid, Sphere, Cylinder, and Wedge operands with kernel-generated outlines.",
   build: ({ scene }) => {
     let result: THREE.Mesh | null = null;
 
-    const update = (state: Record<string, number | boolean>) => {
-      const left = new Cuboid({
-        center: new Vector3(-0.4, 0.9, 0),
-        width: state.leftWidth as number,
-        height: 1.8,
-        depth: 1.5,
-        color: 0x10b981,
-      });
-      left.outline = true;
+    const update = (state: Record<string, number | boolean | string>) => {
+      const left = buildOperand(
+        String(state.leftShape),
+        new Vector3(-0.55, 0.9, 0),
+        0x10b981
+      );
+      const right = buildOperand(
+        String(state.rightShape),
+        new Vector3(0.55, 0.9, 0),
+        0xf97316
+      );
 
-      const right = new Sphere({
-        center: new Vector3(0.5, 0.9, 0),
-        radius: state.rightRadius as number,
-        widthSegments: 30,
-        heightSegments: 20,
-        color: 0xf97316,
-      });
-      right.outline = true;
+      const operation = (String(state.operation) as BooleanOperation) ??
+        BooleanOperation.Union;
 
-      const operation = operations[Math.round(state.operation as number)] ?? "union";
       const boolean = new BooleanShape(left, right, operation, {
         epsilon: state.epsilon as number,
         snap: state.snap as number,
       });
+      boolean.outline = true;
 
       boolean.material = new THREE.MeshStandardMaterial({
         color: 0x2563eb,
@@ -58,21 +109,61 @@ void bootstrapExample({
     mountControls(
       "Boolean Controls",
       [
-        { type: "number", key: "operation", label: "Operation (0=Union,1=Intersect,2=Diff)", min: 0, max: 2, step: 1, value: 0 },
-        { type: "number", key: "leftWidth", label: "Left Cuboid Width", min: 0.8, max: 2.2, step: 0.1, value: 1.4 },
-        { type: "number", key: "rightRadius", label: "Right Sphere Radius", min: 0.5, max: 1.2, step: 0.05, value: 0.85 },
-        { type: "number", key: "epsilon", label: "Plane Epsilon", min: 0.000001, max: 0.005, step: 0.000001, value: 0.00001 },
-        { type: "number", key: "snap", label: "Snap Grid", min: 0.000001, max: 0.005, step: 0.000001, value: 0.00001 },
+        {
+          type: "select",
+          key: "operation",
+          label: "Operation",
+          value: BooleanOperation.Union,
+          options: [
+            { label: "Union", value: BooleanOperation.Union },
+            { label: "Intersection", value: BooleanOperation.Intersection },
+            { label: "Difference", value: BooleanOperation.Difference },
+          ],
+        },
+        {
+          type: "select",
+          key: "leftShape",
+          label: "Left Shape",
+          value: "cuboid",
+          options: [
+            { label: "Cuboid", value: "cuboid" },
+            { label: "Sphere", value: "sphere" },
+            { label: "Cylinder", value: "cylinder" },
+            { label: "Wedge", value: "wedge" },
+          ],
+        },
+        {
+          type: "select",
+          key: "rightShape",
+          label: "Right Shape",
+          value: "sphere",
+          options: [
+            { label: "Cuboid", value: "cuboid" },
+            { label: "Sphere", value: "sphere" },
+            { label: "Cylinder", value: "cylinder" },
+            { label: "Wedge", value: "wedge" },
+          ],
+        },
+        {
+          type: "number",
+          key: "epsilon",
+          label: "Plane Epsilon",
+          min: 0.000001,
+          max: 0.005,
+          step: 0.000001,
+          value: 0.00001,
+        },
+        {
+          type: "number",
+          key: "snap",
+          label: "Snap Grid",
+          min: 0.000001,
+          max: 0.005,
+          step: 0.000001,
+          value: 0.00001,
+        },
       ],
       update
     );
-
-    update({
-      operation: 0,
-      leftWidth: 1.4,
-      rightRadius: 0.85,
-      epsilon: 0.00001,
-      snap: 0.00001,
-    });
   },
 });

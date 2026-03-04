@@ -1,7 +1,14 @@
 import { OGBoolean } from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 
-export type BooleanOperation = "union" | "intersection" | "difference";
+export const BooleanOperation = {
+  Union: "union",
+  Intersection: "intersection",
+  Difference: "difference",
+} as const;
+
+export type BooleanOperationValue =
+  (typeof BooleanOperation)[keyof typeof BooleanOperation];
 
 export interface BooleanConstraints {
   epsilon?: number;
@@ -10,15 +17,22 @@ export interface BooleanConstraints {
 
 export class BooleanShape extends THREE.Mesh {
   private readonly kernelBoolean = new OGBoolean();
+  #outlineMesh: THREE.LineSegments | null = null;
 
   constructor(
     left: THREE.Mesh,
     right: THREE.Mesh,
-    operation: BooleanOperation,
+    operation: BooleanOperationValue,
     constraints?: BooleanConstraints,
     material?: THREE.Material
   ) {
-    const geometry = BooleanShape.computeGeometry(left, right, operation, constraints);
+    const { geometry, outline } = BooleanShape.computeGeometry(
+      left,
+      right,
+      operation,
+      constraints
+    );
+
     super(
       geometry,
       material ??
@@ -28,23 +42,71 @@ export class BooleanShape extends THREE.Mesh {
           opacity: 0.7,
         })
     );
+
+    this.applyOutline(outline);
   }
 
   run(
     left: THREE.Mesh,
     right: THREE.Mesh,
-    operation: BooleanOperation,
+    operation: BooleanOperationValue,
     constraints?: BooleanConstraints
   ) {
     this.geometry.dispose();
-    this.geometry = BooleanShape.computeGeometry(left, right, operation, constraints, this.kernelBoolean);
+    const { geometry, outline } = BooleanShape.computeGeometry(
+      left,
+      right,
+      operation,
+      constraints,
+      this.kernelBoolean
+    );
+    this.geometry = geometry;
     this.geometry.computeVertexNormals();
+    this.applyOutline(outline);
+  }
+
+  set outline(enable: boolean) {
+    if (!enable) {
+      if (this.#outlineMesh) {
+        this.remove(this.#outlineMesh);
+        this.#outlineMesh.geometry.dispose();
+        (this.#outlineMesh.material as THREE.Material).dispose();
+        this.#outlineMesh = null;
+      }
+      return;
+    }
+
+    if (this.#outlineMesh) {
+      this.add(this.#outlineMesh);
+    }
+  }
+
+  private applyOutline(outlinePositions: number[]) {
+    if (this.#outlineMesh) {
+      this.remove(this.#outlineMesh);
+      this.#outlineMesh.geometry.dispose();
+      (this.#outlineMesh.material as THREE.Material).dispose();
+      this.#outlineMesh = null;
+    }
+
+    if (outlinePositions.length === 0) {
+      return;
+    }
+
+    const outlineGeometry = new THREE.BufferGeometry();
+    outlineGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(outlinePositions, 3)
+    );
+    const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x111827 });
+    this.#outlineMesh = new THREE.LineSegments(outlineGeometry, outlineMaterial);
+    this.add(this.#outlineMesh);
   }
 
   static computeGeometry(
     left: THREE.Mesh,
     right: THREE.Mesh,
-    operation: BooleanOperation,
+    operation: BooleanOperationValue,
     constraints?: BooleanConstraints,
     kernelBoolean = new OGBoolean()
   ) {
@@ -58,11 +120,18 @@ export class BooleanShape extends THREE.Mesh {
       constraints ? JSON.stringify(constraints) : undefined
     );
 
+    const outlineResult = kernelBoolean.get_outline_geometry_serialized();
+
     const positions = JSON.parse(result) as number[];
+    const outline = JSON.parse(outlineResult) as number[];
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(positions, 3)
+    );
     geometry.computeVertexNormals();
-    return geometry;
+
+    return { geometry, outline };
   }
 }
 

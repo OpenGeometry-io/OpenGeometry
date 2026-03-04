@@ -25,9 +25,16 @@ export type ExampleControlDefinition =
       key: string;
       label: string;
       value: boolean;
+    }
+  | {
+      type: "select";
+      key: string;
+      label: string;
+      value: string;
+      options: Array<{ label: string; value: string }>;
     };
 
-export type ExampleControlState = Record<string, number | boolean>;
+export type ExampleControlState = Record<string, number | boolean | string>;
 
 interface BootstrapConfig {
   title: string;
@@ -242,7 +249,7 @@ export function mountControls(
       inputs.appendChild(rangeInput);
       inputs.appendChild(numberInput);
       row.appendChild(inputs);
-    } else {
+    } else if (definition.type === "boolean") {
       const boolWrap = document.createElement("div");
       boolWrap.className = "og-control-bool";
 
@@ -267,6 +274,25 @@ export function mountControls(
       boolWrap.appendChild(boolLabel);
       row.appendChild(header);
       row.appendChild(boolWrap);
+    } else {
+      row.appendChild(header);
+      const select = document.createElement("select");
+      select.className = "og-control-select";
+
+      for (const option of definition.options) {
+        const optionElement = document.createElement("option");
+        optionElement.value = option.value;
+        optionElement.textContent = option.label;
+        optionElement.selected = option.value === definition.value;
+        select.appendChild(optionElement);
+      }
+
+      select.addEventListener("change", () => {
+        state[definition.key] = select.value;
+        emitChange();
+      });
+
+      row.appendChild(select);
     }
 
     panel.appendChild(row);
