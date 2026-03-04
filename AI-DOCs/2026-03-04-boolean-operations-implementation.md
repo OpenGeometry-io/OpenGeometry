@@ -6,6 +6,7 @@
 - `OGBoolean` remains stateful (`last_result`) and now computes outlines by edge-adjacency analysis:
   - build undirected edge buckets from result polygons
   - suppress edges shared by coplanar faces (triangle-split seams)
+  - apply a feature-angle filter so smooth tessellation edges are hidden
   - keep boundary edges and sharp-feature edges
 - `OGBoolean::get_outline_geometry_serialized` now returns this BRep-like feature outline buffer.
 - Added kernel test `coplanar_shared_triangle_edge_is_removed_from_outline` to verify internal triangulation diagonals are not emitted.
@@ -35,7 +36,7 @@ Boolean CSG core still uses robust controls:
 - snap-grid normalization for deterministic splits
 - post-op weld by epsilon snapping
 
-Outline extraction now adds topology-aware edge filtering to remove coplanar split seams.
+Outline extraction now adds topology-aware edge filtering to remove coplanar split seams and smooth-surface tessellation artifacts.
 
 ## How to test locally
 

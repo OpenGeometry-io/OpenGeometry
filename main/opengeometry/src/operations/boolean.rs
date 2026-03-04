@@ -38,6 +38,7 @@ impl Default for BooleanConstraints {
 #[wasm_bindgen]
 pub struct OGBoolean {
     last_result: Vec<Polygon>,
+    last_constraints: BooleanConstraints,
 }
 
 #[wasm_bindgen]
@@ -46,6 +47,7 @@ impl OGBoolean {
     pub fn new() -> Self {
         Self {
             last_result: Vec::new(),
+            last_constraints: BooleanConstraints::default(),
         }
     }
 
@@ -88,6 +90,7 @@ impl OGBoolean {
         };
 
         weld_vertices(&mut result, constraints.epsilon);
+        self.last_constraints = constraints;
         self.last_result = result;
 
         let flattened = polygons_to_triangle_buffer(&self.last_result);
@@ -96,7 +99,7 @@ impl OGBoolean {
 
     #[wasm_bindgen]
     pub fn get_outline_geometry_serialized(&self) -> Result<String, JsValue> {
-        let outline = polygons_to_outline_buffer(&self.last_result);
+        let outline = polygons_to_outline_buffer(&self.last_result, &self.last_constraints);
         serde_json::to_string(&outline).map_err(|err| JsValue::from_str(&err.to_string()))
     }
 }
@@ -541,7 +544,7 @@ fn polygons_to_triangle_buffer(polygons: &[Polygon]) -> Vec<f64> {
     out
 }
 
-fn polygons_to_outline_buffer(polygons: &[Polygon]) -> Vec<f64> {
+fn polygons_to_outline_buffer(polygons: &[Polygon], constraints: &BooleanConstraints) -> Vec<f64> {
     let mut edges: HashMap<EdgeKey, Vec<EdgeSample>> = HashMap::new();
 
     for polygon in polygons {
@@ -552,7 +555,7 @@ fn polygons_to_outline_buffer(polygons: &[Polygon]) -> Vec<f64> {
         for i in 0..polygon.vertices.len() {
             let start = polygon.vertices[i].pos;
             let end = polygon.vertices[(i + 1) % polygon.vertices.len()].pos;
-            let key = EdgeKey::from_points(start, end);
+            let key = EdgeKey::from_points(start, end, constraints);
             let entry = edges.entry(key).or_default();
             entry.push(EdgeSample {
                 start,
@@ -564,7 +567,7 @@ fn polygons_to_outline_buffer(polygons: &[Polygon]) -> Vec<f64> {
 
     let mut out = Vec::new();
     for samples in edges.values() {
-        if should_emit_edge(samples) {
+        if should_emit_edge(samples, constraints) {
             let representative = samples[0];
             out.extend_from_slice(&[
                 representative.start.x,
@@ -580,22 +583,25 @@ fn polygons_to_outline_buffer(polygons: &[Polygon]) -> Vec<f64> {
     out
 }
 
-fn should_emit_edge(samples: &[EdgeSample]) -> bool {
+fn should_emit_edge(samples: &[EdgeSample], constraints: &BooleanConstraints) -> bool {
     if samples.len() <= 1 {
         return true;
     }
 
-    const COPLANAR_NORMAL_DOT: f64 = 0.9999;
+    let feature_angle_degrees = 28.0_f64;
+    let feature_dot = (feature_angle_degrees.to_radians()).cos();
 
     for i in 0..samples.len() {
         for j in (i + 1)..samples.len() {
             let dot = samples[i].normal.dot(samples[j].normal).abs();
-            if dot < COPLANAR_NORMAL_DOT {
+            if dot < feature_dot {
                 return true;
             }
         }
     }
 
+    // If all normals are close, it is a smooth/coplanar tessellation edge and should be hidden.
+    let _ = constraints;
     false
 }
 
@@ -613,9 +619,9 @@ struct EdgeKey {
 }
 
 impl EdgeKey {
-    fn from_points(a: Vec3, b: Vec3) -> Self {
-        let qa = QuantizedPoint::from_vec3(a);
-        let qb = QuantizedPoint::from_vec3(b);
+    fn from_points(a: Vec3, b: Vec3, constraints: &BooleanConstraints) -> Self {
+        let qa = QuantizedPoint::from_vec3(a, constraints);
+        let qb = QuantizedPoint::from_vec3(b, constraints);
 
         if qa <= qb {
             Self { a: qa, b: qb }
@@ -633,12 +639,13 @@ struct QuantizedPoint {
 }
 
 impl QuantizedPoint {
-    fn from_vec3(v: Vec3) -> Self {
-        const SCALE: f64 = 1_000_000.0;
+    fn from_vec3(v: Vec3, constraints: &BooleanConstraints) -> Self {
+        let tol = constraints.snap.max(constraints.epsilon).max(1e-5);
+        let scale = 1.0 / tol;
         Self {
-            x: (v.x * SCALE).round() as i64,
-            y: (v.y * SCALE).round() as i64,
-            z: (v.z * SCALE).round() as i64,
+            x: (v.x * scale).round() as i64,
+            y: (v.y * scale).round() as i64,
+            z: (v.z * scale).round() as i64,
         }
     }
 }
@@ -698,7 +705,7 @@ mod tests {
             1e-6,
         );
 
-        let outline = polygons_to_outline_buffer(&[poly_a, poly_b]);
+        let outline = polygons_to_outline_buffer(&[poly_a, poly_b], &BooleanConstraints::default());
         // rectangle perimeter only: 4 line segments * 6 coordinates
         assert_eq!(outline.len(), 24);
     }
@@ -722,7 +729,7 @@ mod tests {
             1e-6,
         );
 
-        let outline = polygons_to_outline_buffer(&[polygon]);
+        let outline = polygons_to_outline_buffer(&[polygon], &BooleanConstraints::default());
         assert_eq!(outline.len(), 24);
     }
 }
