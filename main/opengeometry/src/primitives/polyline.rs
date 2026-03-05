@@ -107,7 +107,13 @@ impl OGPolyline {
             })?;
 
             if closed_wire {
-                builder.add_face(&indices, &[]).map_err(|err| {
+                // The wire already consumes directed edges in index order.
+                // Reversing for the face loop avoids duplicate-directed-halfedge collisions
+                // while still building a valid face with twin halfedges.
+                let mut face_indices = indices.clone();
+                face_indices.reverse();
+
+                builder.add_face(&face_indices, &[]).map_err(|err| {
                     JsValue::from_str(&format!("Failed to build polyline face: {}", err))
                 })?;
             }
@@ -226,5 +232,30 @@ impl OGPolyline {
     ) -> Vec<Vector3> {
         self.get_offset_result(distance, acute_threshold_degrees, bevel)
             .points
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn closed_polyline_builds_wire_and_face_without_duplicate_halfedge_error() {
+        let mut polyline = OGPolyline::new("polyline-test".to_string());
+        let points = vec![
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(2.0, 0.0, 0.0),
+            Vector3::new(2.0, 0.0, 2.0),
+            Vector3::new(0.0, 0.0, 2.0),
+            Vector3::new(0.0, 0.0, 0.0),
+        ];
+
+        polyline
+            .set_config(points)
+            .expect("closed polyline should build without duplicate directed halfedge");
+
+        assert!(polyline.is_closed());
+        assert_eq!(polyline.brep.wires.len(), 1);
+        assert_eq!(polyline.brep.faces.len(), 1);
     }
 }

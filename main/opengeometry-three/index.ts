@@ -3,8 +3,10 @@
  * @module @opengeometry/kernel-three
  */
 import init, {
+  OGIfcExportResult,
   OGSceneManager,
   OGStlExportResult,
+  OGStepExportResult,
   Vector3,
 } from "../opengeometry/pkg/opengeometry";
 // Vector3 is also available in opengeometry package
@@ -652,8 +654,10 @@ export class OpenGeometry {
 // }
 
 export {
+  OGIfcExportResult,
   OGSceneManager,
   OGStlExportResult,
+  OGStepExportResult,
   Vector3,
   SpotLabel,
 }
