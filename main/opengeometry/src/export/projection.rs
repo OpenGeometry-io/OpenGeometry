@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 use crate::brep::Brep;
 
 const EPSILON: f64 = 1.0e-9;
-const CREASE_COS_THRESHOLD: f64 = 0.9995;
+// Suppress tessellation-internal edges for smooth curved primitives while
+// keeping hard feature edges visible.
+const CREASE_COS_THRESHOLD: f64 = 0.95;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum ProjectionMode {
@@ -297,6 +299,52 @@ pub fn project_brep_to_scene(brep: &Brep, camera: &CameraParameters, hlr: &HlrOp
 
     scene.add_path(path);
     scene
+}
+
+pub fn collect_visible_outline_vertex_buffer(
+    brep: &Brep,
+    camera: &CameraParameters,
+    hlr: &HlrOptions,
+) -> Vec<f64> {
+    if brep.vertices.is_empty() {
+        return Vec::new();
+    }
+
+    let Some(frame) = build_camera_frame(camera) else {
+        return Vec::new();
+    };
+
+    let face_info = compute_face_info(brep, &frame);
+    let adjacency = build_edge_adjacency(brep);
+    let candidates = collect_candidate_edges(brep);
+
+    let mut vertex_buffer: Vec<f64> = Vec::new();
+
+    for edge in candidates {
+        if !is_edge_vertex_index_valid(edge.a, edge.b, brep.vertices.len()) {
+            continue;
+        }
+
+        if hlr.hide_hidden_edges && !is_edge_visible(edge.id, &adjacency, &face_info) {
+            continue;
+        }
+
+        let Some(start_vertex) = brep.vertices.get(edge.a as usize) else {
+            continue;
+        };
+        let Some(end_vertex) = brep.vertices.get(edge.b as usize) else {
+            continue;
+        };
+
+        vertex_buffer.push(start_vertex.position.x);
+        vertex_buffer.push(start_vertex.position.y);
+        vertex_buffer.push(start_vertex.position.z);
+        vertex_buffer.push(end_vertex.position.x);
+        vertex_buffer.push(end_vertex.position.y);
+        vertex_buffer.push(end_vertex.position.z);
+    }
+
+    vertex_buffer
 }
 
 fn build_camera_frame(camera: &CameraParameters) -> Option<CameraFrame> {
@@ -656,5 +704,37 @@ mod tests {
 
         let line_scene = scene.to_lines();
         assert_eq!(line_scene.lines.len(), 1);
+    }
+
+    #[test]
+    fn test_smooth_front_faces_are_not_treated_as_crease() {
+        let faces = vec![
+            FaceInfo {
+                front_facing: true,
+                normal: [0.0, 0.0, 1.0],
+            },
+            FaceInfo {
+                front_facing: true,
+                normal: [0.1, 0.0, 0.995].map(|v| v / (0.1f64 * 0.1 + 0.995f64 * 0.995).sqrt()),
+            },
+        ];
+
+        assert!(!has_crease(&faces));
+    }
+
+    #[test]
+    fn test_sharp_front_faces_are_treated_as_crease() {
+        let faces = vec![
+            FaceInfo {
+                front_facing: true,
+                normal: [0.0, 0.0, 1.0],
+            },
+            FaceInfo {
+                front_facing: true,
+                normal: [1.0, 0.0, 0.0],
+            },
+        ];
+
+        assert!(has_crease(&faces));
     }
 }

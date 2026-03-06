@@ -76,7 +76,7 @@ pub fn extrude_brep_face(brep_face: Brep, height: f64) -> Brep {
         return Brep::new(brep_face.id);
     }
 
-    let mut base = windingsort::ccw_test(base_points);
+    let mut base = base_points;
     if base.len() < 3 {
         return Brep::new(brep_face.id);
     }
@@ -92,6 +92,15 @@ pub fn extrude_brep_face(brep_face: Brep, height: f64) -> Brep {
 
     if base.len() < 3 {
         return Brep::new(brep_face.id);
+    }
+
+    // Align loop winding with extrusion direction so cap and side normals are
+    // consistently outward for shell construction.
+    let extrusion_axis = [0.0, height, 0.0];
+    if let Some(base_normal) = compute_loop_normal(&base) {
+        if dot(base_normal, extrusion_axis) < 0.0 {
+            base.reverse();
+        }
     }
 
     let mut builder = BrepBuilder::new(brep_face.id);
@@ -131,4 +140,44 @@ pub fn extrude_brep_face(brep_face: Brep, height: f64) -> Brep {
     }
 
     builder.build().unwrap_or_else(|_| Brep::new(brep_face.id))
+}
+
+fn compute_loop_normal(points: &[Vector3]) -> Option<[f64; 3]> {
+    if points.len() < 3 {
+        return None;
+    }
+
+    let p0 = points[0];
+    for index in 1..(points.len() - 1) {
+        let p1 = points[index];
+        let p2 = points[index + 1];
+
+        let edge_a = [p1.x - p0.x, p1.y - p0.y, p1.z - p0.z];
+        let edge_b = [p2.x - p0.x, p2.y - p0.y, p2.z - p0.z];
+        let candidate = cross(edge_a, edge_b);
+        let length_sq = dot(candidate, candidate);
+
+        if length_sq > 1.0e-18 {
+            let inv_len = length_sq.sqrt().recip();
+            return Some([
+                candidate[0] * inv_len,
+                candidate[1] * inv_len,
+                candidate[2] * inv_len,
+            ]);
+        }
+    }
+
+    None
+}
+
+fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
 }

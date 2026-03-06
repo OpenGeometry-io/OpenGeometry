@@ -71,7 +71,12 @@ export class OpenGeometry {
   }
 
   private async setup(wasmURL?: string) {
-    await init(wasmURL);
+    if (wasmURL) {
+      await init({ module_or_path: wasmURL });
+      return;
+    }
+
+    await init();
   }
 }
 

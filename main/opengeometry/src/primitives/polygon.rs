@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use crate::brep::{Brep, BrepBuilder};
-use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
+use crate::export::projection::{
+    collect_visible_outline_vertex_buffer, project_brep_to_scene, CameraParameters, HlrOptions,
+    ProjectionMode, Scene2D,
+};
 use crate::operations::triangulate::triangulate_polygon_with_holes;
 use crate::utility::bgeometry::BufferGeometry;
 use openmaths::{Matrix4, Vector3};
@@ -221,6 +224,28 @@ impl OGPolygon {
             vertex_buffer.push(end_vertex.position.z);
         }
 
+        serde_json::to_string(&vertex_buffer).unwrap()
+    }
+
+    #[wasm_bindgen]
+    pub fn get_outline_geometry_hlr_serialized(
+        &self,
+        camera_position: Vector3,
+        camera_target: Vector3,
+        camera_up: Vector3,
+        near: f64,
+        hide_hidden_edges: bool,
+    ) -> String {
+        let camera = CameraParameters {
+            position: camera_position,
+            target: camera_target,
+            up: camera_up,
+            near: near.max(1.0e-6),
+            projection_mode: ProjectionMode::Perspective,
+        };
+
+        let hlr = HlrOptions { hide_hidden_edges };
+        let vertex_buffer = collect_visible_outline_vertex_buffer(&self.brep, &camera, &hlr);
         serde_json::to_string(&vertex_buffer).unwrap()
     }
 }

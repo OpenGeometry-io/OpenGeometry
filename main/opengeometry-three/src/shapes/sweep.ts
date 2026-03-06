@@ -20,6 +20,9 @@ interface ISweepKernelInstance {
   get_geometry_serialized(): string;
   get_brep_serialized(): string;
   get_outline_geometry_serialized(): string;
+  get_outline_geometry_hlr_serialized?: (
+    ..._args: [Vector3, Vector3, Vector3, number, boolean]
+  ) => string;
 }
 
 type SweepKernelConstructor = new (..._args: [string]) => ISweepKernelInstance;
@@ -143,6 +146,26 @@ export class Sweep extends THREE.Mesh {
       throw new Error("Brep data is not available for Sweep.");
     }
     return JSON.parse(brepData);
+  }
+
+  getHlrOutlineGeometry(
+    camera: THREE.PerspectiveCamera,
+    target: THREE.Vector3,
+    hideHiddenEdges = true
+  ) {
+    if (typeof this.sweep.get_outline_geometry_hlr_serialized === "function") {
+      const serialized = this.sweep.get_outline_geometry_hlr_serialized(
+        new Vector3(camera.position.x, camera.position.y, camera.position.z),
+        new Vector3(target.x, target.y, target.z),
+        new Vector3(camera.up.x, camera.up.y, camera.up.z),
+        camera.near,
+        hideHiddenEdges
+      );
+      return JSON.parse(serialized) as number[];
+    }
+
+    const fallback = this.sweep.get_outline_geometry_serialized();
+    return JSON.parse(fallback) as number[];
   }
 
   set outline(enable: boolean) {

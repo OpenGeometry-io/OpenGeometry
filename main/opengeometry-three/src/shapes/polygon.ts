@@ -328,6 +328,31 @@ export class Polygon extends THREE.Mesh {
     return brepData;
   }
 
+  getHlrOutlineGeometry(
+    camera: THREE.PerspectiveCamera,
+    target: THREE.Vector3,
+    hideHiddenEdges = true
+  ) {
+    const kernel = this.polygon as unknown as {
+      get_outline_geometry_hlr_serialized?: Function;
+      get_outline_geometry_serialized: () => string;
+    };
+
+    if (typeof kernel.get_outline_geometry_hlr_serialized === "function") {
+      const serialized = kernel.get_outline_geometry_hlr_serialized(
+        new Vector3(camera.position.x, camera.position.y, camera.position.z),
+        new Vector3(target.x, target.y, target.z),
+        new Vector3(camera.up.x, camera.up.y, camera.up.z),
+        camera.near,
+        hideHiddenEdges
+      );
+      return JSON.parse(serialized) as number[];
+    }
+
+    const fallback = kernel.get_outline_geometry_serialized();
+    return JSON.parse(fallback) as number[];
+  }
+
   set outlineColor(color: number) {
     if (this.#outlineMesh && this.#outlineMesh.material instanceof THREE.LineBasicMaterial) {
       this.#outlineMesh.material.color.set(color);
