@@ -70,24 +70,32 @@ export class Cuboid extends THREE.Mesh {
     }
   }
 
+  getConfig() {
+    return this.options;
+  }
+
   setConfig(options: ICuboidOptions) {
     this.validateOptions();
 
     this.options = { ...this.options, ...options };
+
     this._fatOutlines = this.options.fatOutlines ?? false;
     this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
     this.options.fatOutlines = this._fatOutlines;
     this.options.outlineWidth = this._outlineWidth;
 
     const { width, height, depth, center, color } = this.options;
+
+    // Material Configs
+    this.options.color = color;
+
+    // Kernel Configs
     this.cuboid.set_config(
       center.clone(),
       width,
       height,
       depth
     );
-
-    this.options.color = color;
 
     this.generateGeometry();
   }
