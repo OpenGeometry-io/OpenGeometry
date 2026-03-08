@@ -103,6 +103,8 @@
       const { pathPrimitive, profilePrimitive, sweep } = createSweepExample(scene);
       pathPrimitive.position.y += 0.01;
       profilePrimitive.position.set(-3.2, 0.0, -2.4);
+      sweep.fatOutlines = true;
+      sweep.outlineWidth = 6;
       sweep.outline = true;
 
       function onResize() {

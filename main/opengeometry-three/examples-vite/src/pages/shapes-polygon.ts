@@ -30,11 +30,15 @@ bootstrapExample({
         { type: "number", key: "sides", label: "Sides", min: 3, max: 12, step: 1, value: 5 },
         { type: "number", key: "radius", label: "Radius", min: 0.4, max: 3, step: 0.05, value: 1.8 },
         { type: "boolean", key: "outline", label: "Outline", value: true },
+        { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
+        { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 },
       ],
       (state) => {
         const polygon = new Polygon({
           vertices: buildPolygonVertices(state.sides as number, state.radius as number),
           color: 0x2563eb,
+          fatOutlines: state.fatOutlines as boolean,
+          outlineWidth: state.outlineWidth as number,
         });
         polygon.outline = state.outline as boolean;
 

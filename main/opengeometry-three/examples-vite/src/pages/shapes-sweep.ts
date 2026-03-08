@@ -40,6 +40,8 @@ bootstrapExample({
         { type: "boolean", key: "capStart", label: "Cap Start", value: true },
         { type: "boolean", key: "capEnd", label: "Cap End", value: true },
         { type: "boolean", key: "outline", label: "Outline", value: true },
+        { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
+        { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 },
       ],
       (state) => {
         const sweep = new Sweep({
@@ -48,6 +50,8 @@ bootstrapExample({
           color: 0x0ea5e9,
           capStart: state.capStart as boolean,
           capEnd: state.capEnd as boolean,
+          fatOutlines: state.fatOutlines as boolean,
+          outlineWidth: state.outlineWidth as number,
         });
         sweep.outline = state.outline as boolean;
 

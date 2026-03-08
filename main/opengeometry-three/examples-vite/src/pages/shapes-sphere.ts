@@ -18,6 +18,8 @@ bootstrapExample({
         { type: "number", key: "widthSegments", label: "Width Segments", min: 3, max: 96, step: 1, value: 32 },
         { type: "number", key: "heightSegments", label: "Height Segments", min: 2, max: 64, step: 1, value: 20 },
         { type: "boolean", key: "outline", label: "Outline", value: true },
+        { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
+        { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 },
       ],
       (state) => {
         const radius = state.radius as number;
@@ -27,6 +29,8 @@ bootstrapExample({
           widthSegments: Math.floor(state.widthSegments as number),
           heightSegments: Math.floor(state.heightSegments as number),
           color: 0x0891b2,
+          fatOutlines: state.fatOutlines as boolean,
+          outlineWidth: state.outlineWidth as number,
         });
         sphere.outline = state.outline as boolean;
 

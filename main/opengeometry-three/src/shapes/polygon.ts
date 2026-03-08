@@ -1,18 +1,37 @@
 import * as THREE from "three";
 import { OGPolygon, Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import { getUUID } from "../utils/randomizer";
+import {
+  createShapeOutlineMesh,
+  disposeShapeOutlineMesh,
+  getShapeOutlineColor,
+  sanitizeOutlineWidth,
+  setShapeOutlineColor,
+  ShapeOutlineMesh,
+} from "./outline-utils";
 
 export interface IPolygonOptions {
   ogid?: string;
   vertices: Vector3[];
   color: number;
+  fatOutlines?: boolean;
+  outlineWidth?: number;
 }
 
 export class Polygon extends THREE.Mesh {
   ogid: string;
-  options: IPolygonOptions = { vertices: [], color: 0x00ff00 };
+  options: IPolygonOptions = {
+    vertices: [],
+    color: 0x00ff00,
+    fatOutlines: false,
+    outlineWidth: 1,
+  };
   polygon: OGPolygon;
-  #outlineMesh: THREE.Line | null = null;
+  #outlineMesh: ShapeOutlineMesh | null = null;
+  private _outlineEnabled = false;
+  private _fatOutlines = false;
+  private _outlineWidth = 1;
+  private _outlineColor = 0x000000;
 
   transformationMatrix: THREE.Matrix4 = new THREE.Matrix4();
 
@@ -70,7 +89,13 @@ export class Polygon extends THREE.Mesh {
   setConfig(options: IPolygonOptions) {
     this.validateOptions();
 
-    const { vertices, color } = options;
+    this.options = { ...this.options, ...options };
+    this._fatOutlines = this.options.fatOutlines ?? false;
+    this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
+    this.options.fatOutlines = this._fatOutlines;
+    this.options.outlineWidth = this._outlineWidth;
+
+    const { vertices, color } = this.options;
     this.polygon.set_config(vertices);
 
     this.options.color = color;
@@ -187,6 +212,10 @@ export class Polygon extends THREE.Mesh {
     this.geometry = geometry;
     this.material = material;
 
+    if (this._outlineEnabled) {
+      this.outline = true;
+    }
+
     // this.geometry.computeBoundingBox();
     // const originalCenter = new THREE.Vector3();
     // this.geometry.boundingBox?.getCenter(originalCenter);
@@ -288,11 +317,6 @@ export class Polygon extends THREE.Mesh {
     
     this.disposeGeometryMaterial();
     this.generateGeometry();
-
-    // We end up calling the outline method again with creation of geometry
-    if (this.outline) {
-      this.outline = true;
-    }
   }
 
   // extrude(height: number) {
@@ -329,60 +353,61 @@ export class Polygon extends THREE.Mesh {
   }
 
   set outlineColor(color: number) {
-    if (this.#outlineMesh && this.#outlineMesh.material instanceof THREE.LineBasicMaterial) {
-      this.#outlineMesh.material.color.set(color);
-    }
+    this._outlineColor = color;
+    setShapeOutlineColor(this.#outlineMesh, color);
   }
 
   get outlineColor() {
-    if (this.#outlineMesh && this.#outlineMesh.material instanceof THREE.LineBasicMaterial) {
-      return this.#outlineMesh.material.color.getHex();
-    }
-    return 0x000000; // Default color if outline mesh is not present
+    return getShapeOutlineColor(this.#outlineMesh, this._outlineColor);
   }
 
   // TODO: Do we need a separate method for Hole Outlines?
   set outline(enable: boolean) {
-    if (this.#outlineMesh) {
-      this.remove(this.#outlineMesh);
-      this.#outlineMesh.geometry.dispose();
-      this.#outlineMesh = null;
-    }
-
-    if (enable && !this.#outlineMesh) {
+    this._outlineEnabled = enable;
+    this.clearOutlineMesh();
+    if (enable) {
       const outline_buff = this.polygon.get_outline_geometry_serialized();
-      const outline_buf = JSON.parse(outline_buff);
-
-      const outlineGeometry = new THREE.BufferGeometry();
-      outlineGeometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(outline_buf, 3)
-      );
-
-      const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-      this.#outlineMesh = new THREE.LineSegments(
-        outlineGeometry,
-        outlineMaterial
-      );
+      const outline_buf = JSON.parse(outline_buff) as number[];
+      this.#outlineMesh = createShapeOutlineMesh({
+        positions: outline_buf,
+        color: this._outlineColor,
+        fatOutlines: this._fatOutlines,
+        outlineWidth: this._outlineWidth,
+      });
 
       // this.#outlineMesh.geometry.center();
       // this.#outlineMesh.applyMatrix4(this.transformationMatrix);
 
       this.add(this.#outlineMesh);
     }
-
-    if (!enable && this.#outlineMesh) {
-      this.remove(this.#outlineMesh);
-      this.#outlineMesh.geometry.dispose();
-      this.#outlineMesh = null;
-    }
   }
 
   get outline() {
-    if (this.#outlineMesh) {
-      return true;
+    return this._outlineEnabled;
+  }
+
+  set fatOutlines(value: boolean) {
+    this._fatOutlines = value;
+    this.options.fatOutlines = value;
+    if (this._outlineEnabled) {
+      this.outline = true;
     }
-    return false;
+  }
+
+  get fatOutlines() {
+    return this._fatOutlines;
+  }
+
+  set outlineWidth(value: number) {
+    this._outlineWidth = sanitizeOutlineWidth(value);
+    this.options.outlineWidth = this._outlineWidth;
+    if (this._outlineEnabled) {
+      this.outline = true;
+    }
+  }
+
+  get outlineWidth() {
+    return this._outlineWidth;
   }
 
   // bTree() {
@@ -399,12 +424,16 @@ export class Polygon extends THREE.Mesh {
     if (this.material instanceof THREE.Material) {
       this.material.dispose();
     }
-    if (this.#outlineMesh) {
-      this.#outlineMesh.geometry.dispose();
-      if (this.#outlineMesh.material instanceof THREE.Material) {
-        this.#outlineMesh.material.dispose();
-      }
+    this.clearOutlineMesh();
+  }
+
+  private clearOutlineMesh() {
+    if (!this.#outlineMesh) {
+      return;
     }
+    this.remove(this.#outlineMesh);
+    disposeShapeOutlineMesh(this.#outlineMesh);
+    this.#outlineMesh = null;
   }
 
   dispose() {

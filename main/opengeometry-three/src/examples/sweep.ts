@@ -53,6 +53,8 @@ export function createSweepExample(scene: THREE.Scene) {
     color: 0x2a9d8f,
     capStart: true,
     capEnd: false,
+    fatOutlines: true,
+    outlineWidth: 4,
   });
 
   scene.add(pathPrimitive);

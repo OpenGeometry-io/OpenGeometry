@@ -2,6 +2,12 @@ import * as OGKernel from "../../../opengeometry/pkg/opengeometry";
 import { Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
+import {
+  createShapeOutlineMesh,
+  disposeShapeOutlineMesh,
+  sanitizeOutlineWidth,
+  ShapeOutlineMesh,
+} from "./outline-utils";
 
 export interface ISweepOptions {
   ogid?: string;
@@ -10,6 +16,8 @@ export interface ISweepOptions {
   color: number;
   capStart?: boolean;
   capEnd?: boolean;
+  fatOutlines?: boolean;
+  outlineWidth?: number;
 }
 
 /* eslint-disable no-unused-vars */
@@ -41,10 +49,15 @@ export class Sweep extends THREE.Mesh {
     color: 0x00ff00,
     capStart: true,
     capEnd: true,
+    fatOutlines: false,
+    outlineWidth: 1,
   };
 
   private sweep: ISweepKernelInstance;
-  #outlineMesh: THREE.LineSegments | null = null;
+  #outlineMesh: ShapeOutlineMesh | null = null;
+  private _outlineEnabled = false;
+  private _fatOutlines = false;
+  private _outlineWidth = 1;
 
   set color(color: number) {
     this.options.color = color;
@@ -88,6 +101,11 @@ export class Sweep extends THREE.Mesh {
 
   setConfig(options: ISweepOptions) {
     this.options = { ...this.options, ...options };
+    this._fatOutlines = this.options.fatOutlines ?? false;
+    this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
+    this.options.fatOutlines = this._fatOutlines;
+    this.options.outlineWidth = this._outlineWidth;
+
     this.validateOptions();
 
     const path = this.options.path.map((point) => point.clone());
@@ -132,7 +150,7 @@ export class Sweep extends THREE.Mesh {
     this.geometry = geometry;
     this.material = material;
 
-    if (this.#outlineMesh) {
+    if (this._outlineEnabled) {
       this.outline = true;
     }
   }
@@ -146,32 +164,57 @@ export class Sweep extends THREE.Mesh {
   }
 
   set outline(enable: boolean) {
-    if (this.#outlineMesh) {
-      this.remove(this.#outlineMesh);
-      this.#outlineMesh.geometry.dispose();
-      if (Array.isArray(this.#outlineMesh.material)) {
-        this.#outlineMesh.material.forEach((material) => material.dispose());
-      } else {
-        this.#outlineMesh.material.dispose();
-      }
-      this.#outlineMesh = null;
-    }
-
+    this._outlineEnabled = enable;
+    this.clearOutlineMesh();
     if (enable) {
       const outlineBuff = this.sweep.get_outline_geometry_serialized();
-      const outlineData = JSON.parse(outlineBuff);
-
-      const outlineGeometry = new THREE.BufferGeometry();
-      outlineGeometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(outlineData, 3)
-      );
-
-      const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-      this.#outlineMesh = new THREE.LineSegments(outlineGeometry, outlineMaterial);
+      const outlineData = JSON.parse(outlineBuff) as number[];
+      this.#outlineMesh = createShapeOutlineMesh({
+        positions: outlineData,
+        color: 0x000000,
+        fatOutlines: this._fatOutlines,
+        outlineWidth: this._outlineWidth,
+      });
 
       this.add(this.#outlineMesh);
     }
+  }
+
+  get outline() {
+    return this._outlineEnabled;
+  }
+
+  set fatOutlines(value: boolean) {
+    this._fatOutlines = value;
+    this.options.fatOutlines = value;
+    if (this._outlineEnabled) {
+      this.outline = true;
+    }
+  }
+
+  get fatOutlines() {
+    return this._fatOutlines;
+  }
+
+  set outlineWidth(value: number) {
+    this._outlineWidth = sanitizeOutlineWidth(value);
+    this.options.outlineWidth = this._outlineWidth;
+    if (this._outlineEnabled) {
+      this.outline = true;
+    }
+  }
+
+  get outlineWidth() {
+    return this._outlineWidth;
+  }
+
+  private clearOutlineMesh() {
+    if (!this.#outlineMesh) {
+      return;
+    }
+    this.remove(this.#outlineMesh);
+    disposeShapeOutlineMesh(this.#outlineMesh);
+    this.#outlineMesh = null;
   }
 
   discardGeometry() {

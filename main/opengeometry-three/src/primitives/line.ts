@@ -135,7 +135,6 @@ export class Line extends THREE.Line {
     );
 
     this.geometry = geometry;
-    this.geometry = geometry;
     this.material = new THREE.LineBasicMaterial({ color: this.options.color });
 
     if (this.options.fatLines) {

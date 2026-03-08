@@ -49,6 +49,9 @@ bootstrapExample({
         { type: "number", key: "profileDepth", label: "Profile Depth", min: 0.1, max: 1.5, step: 0.05, value: 0.4 },
         { type: "boolean", key: "capStart", label: "Cap Start", value: true },
         { type: "boolean", key: "capEnd", label: "Cap End", value: false },
+        { type: "boolean", key: "outline", label: "Outline", value: true },
+        { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
+        { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 },
       ],
       (state) => {
         const pathPrimitive = new Polyline({
@@ -72,8 +75,10 @@ bootstrapExample({
           color: 0x2a9d8f,
           capStart: state.capStart as boolean,
           capEnd: state.capEnd as boolean,
+          fatOutlines: state.fatOutlines as boolean,
+          outlineWidth: state.outlineWidth as number,
         });
-        sweep.outline = true;
+        sweep.outline = state.outline as boolean;
 
         pathPrimitive.position.y += 0.01;
         profilePrimitive.position.set(-3.0, 0.0, -2.2);

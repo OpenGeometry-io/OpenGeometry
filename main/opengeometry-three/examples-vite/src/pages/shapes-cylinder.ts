@@ -19,6 +19,8 @@ bootstrapExample({
         { type: "number", key: "segments", label: "Segments", min: 6, max: 96, step: 1, value: 36 },
         { type: "number", key: "angleDeg", label: "Angle (deg)", min: 20, max: 360, step: 1, value: 360 },
         { type: "boolean", key: "outline", label: "Outline", value: true },
+        { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
+        { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 },
       ],
       (state) => {
         const cylinder = new Cylinder({
@@ -28,6 +30,8 @@ bootstrapExample({
           segments: Math.floor(state.segments as number),
           angle: ((state.angleDeg as number) * Math.PI) / 180,
           color: 0xf59e0b,
+          fatOutlines: state.fatOutlines as boolean,
+          outlineWidth: state.outlineWidth as number,
         });
         cylinder.outline = state.outline as boolean;
 

@@ -38,6 +38,9 @@ bootstrapExample({
         { type: "number", key: "acute", label: "Acute Threshold", min: 1, max: 179, step: 1, value: 90 },
         { type: "number", key: "curveBias", label: "Curve Bias", min: -0.8, max: 0.8, step: 0.05, value: 0.0 },
         { type: "boolean", key: "bevel", label: "Bevel", value: true },
+        { type: "boolean", key: "outline", label: "Outline", value: true },
+        { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
+        { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 },
       ],
       (state) => {
         const centerline = new Polyline({
@@ -57,9 +60,14 @@ bootstrapExample({
           return;
         }
 
-        const polygon = new Polygon({ vertices: outline, color: 0x3b82f6 });
+        const polygon = new Polygon({
+          vertices: outline,
+          color: 0x3b82f6,
+          fatOutlines: state.fatOutlines as boolean,
+          outlineWidth: state.outlineWidth as number,
+        });
         polygon.position.y = 0.01;
-        polygon.outline = true;
+        polygon.outline = state.outline as boolean;
 
         const group = new THREE.Group();
         group.add(centerline);
