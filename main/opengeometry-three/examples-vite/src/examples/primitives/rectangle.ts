@@ -8,8 +8,8 @@ export default defineExample({
   title: "Rectangle",
   description: "Parametric rectangular primitive for base profiles.",
   statusLabel: "ready",
-  chips: ["Control: Width", "Control: Breadth"],
-  footerText: "Control: Width, Breadth",
+  chips: ["Width", "Breadth"],
+  footerText: "Width, Breadth",
   build: ({ scene }) => {
     let current: Rectangle | null = null;
 

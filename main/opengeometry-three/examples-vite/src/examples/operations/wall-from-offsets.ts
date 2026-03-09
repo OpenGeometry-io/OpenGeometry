@@ -28,8 +28,8 @@ export default defineExample({
   title: "Wall from Offsets",
   description: "Composite wall profile assembled from offset centerlines.",
   statusLabel: "ready",
-  chips: ["Control: Thickness"],
-  footerText: "Control: Thickness",
+  chips: ["Thickness"],
+  footerText: "Thickness",
   build: ({ scene }) => {
     let current: THREE.Group | null = null;
 

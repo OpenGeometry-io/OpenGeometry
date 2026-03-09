@@ -202,20 +202,24 @@ code {
 .og-badge-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .og-chip {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  padding: 7px 12px;
-  border-radius: 999px;
+  padding: 2px 9px;
+  corner-shape: squicle;
+  border-radius: 12px;
   border: 1px solid rgba(214, 132, 83, 0.14);
   background: rgba(246, 234, 226, 0.92);
+}
+
+.og-chip span {
+  font-size: 11px;
   color: #9f6b4e;
-  font-size: 12px;
-  font-weight: 500;
+  font-weight: 550;
+  letter-spacing: 0.02em;
 }
 
 .og-chip-accent {
@@ -384,6 +388,16 @@ code {
   background: rgba(255, 255, 255, 0.85);
   color: var(--og-text);
   padding: 8px 10px;
+  font: inherit;
+  border-radius: 12px;
+}
+
+.og-control-select {
+  width: 100%;
+  border: 1px solid var(--og-line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--og-text);
+  padding: 10px 12px;
   font: inherit;
   border-radius: 12px;
 }

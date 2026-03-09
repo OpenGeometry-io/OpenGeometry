@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Wall from Offsets Example</title>
+    <title>OpenGeometry Sweep Hilbert Profiles Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="OpenGeometry Demo" />
@@ -14,7 +14,8 @@
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Polygon, Polyline, Vector3 } from "@og-three";
+      import { OpenGeometry, Arc, Polyline, Rectangle, Sweep, Vector3 } from "@og-three";
+      import { hilbert3D } from "three/examples/jsm/utils/GeometryUtils.js";
 
 
       const app = document.getElementById("app");
@@ -285,79 +286,207 @@
 
       async function main() {
         const meta = {
-        "slug": "operations/wall-from-offsets",
+        "slug": "operations/sweep-hilbert-profiles",
         "category": "operations",
-        "title": "Wall from Offsets",
-        "description": "Composite wall profile assembled from offset centerlines.",
+        "title": "Sweep Hilbert Profiles",
+        "description": "Locked Hilbert3D path with switchable kernel and custom section profiles.",
         "statusLabel": "ready",
         "chips": [
-          "Thickness"
+          "Hilbert Path",
+          "Profiles",
+          "Sweep"
         ],
-        "footerText": "Thickness"
+        "footerText": "Profile Type, Caps, Outlines"
       };
 
-        function buildCenterline(curveBias) {
-          return [
-            new Vector3(-2.6, 0, -1.9),
-            new Vector3(-1.2, 0, -1.0),
-            new Vector3(-0.2, 0, 0.1),
-            new Vector3(0.7 + curveBias, 0, 0.2),
-            new Vector3(0.1, 0, 1.0),
-            new Vector3(2.6, 0, 2.0)
-          ];
+        const LOCKED_HILBERT_SIZE = 8;
+        const LOCKED_HILBERT_ITERATIONS = 1;
+
+        function toVector3List(vertices) {
+          return vertices.map((vertex) => new Vector3(vertex.position.x, vertex.position.y, vertex.position.z));
         }
 
-        function buildWallOutline(left, right) {
-          if (!left.length || !right.length) {
-            return [];
+        function readLineGeometryPoints(object) {
+          const positions = object.geometry && object.geometry.getAttribute("position");
+          if (!positions || positions.itemSize !== 3) {
+            throw new Error("Profile preview geometry is missing line positions.");
           }
 
-          return left.map((point) => point.clone()).concat(right.map((point) => point.clone()).reverse());
+          const points = [];
+          for (let index = 0; index < positions.count; index += 1) {
+            points.push(new Vector3(positions.getX(index), positions.getY(index), positions.getZ(index)));
+          }
+
+          if (points.length >= 3) {
+            const first = points[0];
+            const last = points[points.length - 1];
+            const dx = first.x - last.x;
+            const dy = first.y - last.y;
+            const dz = first.z - last.z;
+            if (dx * dx + dy * dy + dz * dz <= 1.0e-12) {
+              points.pop();
+            }
+          }
+
+          return points;
+        }
+
+        function scaleProfileShape(points, width, depth) {
+          return points.map(([x, z]) => new Vector3(x * width, 0, z * depth));
+        }
+
+        function buildHilbertPath(size, iterations) {
+          const rawPoints = hilbert3D(new THREE.Vector3(0, 0, 0), size, iterations);
+          const minY = rawPoints.reduce((lowest, point) => Math.min(lowest, point.y), Number.POSITIVE_INFINITY);
+          const lift = Number.isFinite(minY) ? Math.max(0.25 - minY, 0) : 0;
+          return rawPoints.map((point) => new Vector3(point.x, point.y + lift, point.z));
+        }
+
+        function createPreviewLoop(points, color) {
+          const positions = [];
+          points.forEach((point) => {
+            positions.push(point.x, point.y, point.z);
+          });
+
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+          return new THREE.LineLoop(geometry, new THREE.LineBasicMaterial({ color }));
+        }
+
+        function buildCustomProfile(profileType, width, depth) {
+          const normalizedPointsByType = {
+            "architectural-molding": [
+              [-0.5, -0.5],
+              [0.5, -0.5],
+              [0.5, -0.16],
+              [0.18, -0.16],
+              [0.28, 0.04],
+              [0.12, 0.26],
+              [-0.08, 0.4],
+              [-0.28, 0.5],
+              [-0.5, 0.5]
+            ],
+            trapezoid: [
+              [-0.5, -0.5],
+              [0.5, -0.5],
+              [0.24, 0.5],
+              [-0.24, 0.5]
+            ],
+            diamond: [
+              [0, -0.5],
+              [0.5, 0],
+              [0, 0.5],
+              [-0.5, 0]
+            ],
+            hexagon: [
+              [-0.25, -0.5],
+              [0.25, -0.5],
+              [0.5, 0],
+              [0.25, 0.5],
+              [-0.25, 0.5],
+              [-0.5, 0]
+            ]
+          };
+
+          return scaleProfileShape(normalizedPointsByType[profileType], width, depth);
+        }
+
+        function buildProfilePoints(profileType, width, depth) {
+          if (profileType === "arc-pipe") {
+            const radius = Math.min(width, depth) * 0.5;
+            const profilePrimitive = new Arc({
+              center: new Vector3(0, 0, 0),
+              radius,
+              startAngle: 0,
+              endAngle: Math.PI * 2,
+              segments: 48,
+              color: 0xc2410c
+            });
+
+            return readLineGeometryPoints(profilePrimitive);
+          }
+
+          if (profileType === "rectangle") {
+            const profilePrimitive = new Rectangle({
+              center: new Vector3(0, 0, 0),
+              width,
+              breadth: depth,
+              color: 0xc2410c
+            });
+
+            return toVector3List(profilePrimitive.getBrep().vertices);
+          }
+
+          return buildCustomProfile(profileType, width, depth);
         }
 
         const { scene } = await createExampleScene(meta);
         let current = null;
+        let cachedProfileKey = "";
+        let cachedProfilePoints = [];
+        const lockedPathPoints = buildHilbertPath(LOCKED_HILBERT_SIZE, LOCKED_HILBERT_ITERATIONS);
 
-        mountControls("Wall Parameters", [
-          { type: "number", key: "thickness", label: "Wall Thickness", min: 0.1, max: 2, step: 0.05, value: 0.45 },
-          { type: "number", key: "acute", label: "Acute Threshold", min: 1, max: 179, step: 1, value: 90 },
-          { type: "number", key: "curveBias", label: "Curve Bias", min: -0.8, max: 0.8, step: 0.05, value: 0.0 },
-          { type: "boolean", key: "bevel", label: "Bevel", value: true },
-          { type: "boolean", key: "outline", label: "Outline", value: true },
+        function getProfilePoints(profileType, width, depth) {
+          const nextKey = profileType + ":" + width + ":" + depth;
+          if (nextKey !== cachedProfileKey) {
+            cachedProfileKey = nextKey;
+            cachedProfilePoints = buildProfilePoints(profileType, width, depth);
+          }
+
+          return cachedProfilePoints.map((point) => point.clone());
+        }
+
+        mountControls("Hilbert Sweep Parameters", [
+          {
+            type: "select",
+            key: "profileType",
+            label: "Profile Type",
+            value: "arc-pipe",
+            options: [
+              { label: "Arc Pipe", value: "arc-pipe" },
+              { label: "Rectangle", value: "rectangle" },
+              { label: "Architectural Molding", value: "architectural-molding" },
+              { label: "Trapezoid", value: "trapezoid" },
+              { label: "Diamond", value: "diamond" },
+              { label: "Hexagon", value: "hexagon" }
+            ]
+          },
+          { type: "number", key: "profileWidth", label: "Profile Width", min: 0.15, max: 1.5, step: 0.05, value: 0.6 },
+          { type: "number", key: "profileDepth", label: "Profile Depth", min: 0.15, max: 1.5, step: 0.05, value: 0.45 },
+          { type: "boolean", key: "capStart", label: "Cap Start", value: true },
+          { type: "boolean", key: "capEnd", label: "Cap End", value: true },
+          { type: "boolean", key: "outline", label: "Outline", value: false },
           { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
           { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 }
         ], (state) => {
-          const centerline = new Polyline({
-            points: buildCenterline(state.curveBias),
-            color: 0x1f2937
+          const pathPoints = lockedPathPoints.map((point) => point.clone());
+          const profilePoints = getProfilePoints(state.profileType, state.profileWidth, state.profileDepth);
+
+          const pathPrimitive = new Polyline({
+            points: pathPoints.map((point) => point.clone()),
+            color: 0x4b5563
           });
 
-          const half = state.thickness * 0.5;
-          const leftOffset = centerline.getOffset(half, state.acute, state.bevel);
-          const rightOffset = centerline.getOffset(-half, state.acute, state.bevel);
-
-          const leftPolyline = new Polyline({ points: leftOffset.points, color: 0x22c55e });
-          const rightPolyline = new Polyline({ points: rightOffset.points, color: 0xf97316 });
-          const outline = buildWallOutline(leftOffset.points, rightOffset.points);
-
-          if (outline.length < 3) {
-            return;
-          }
-
-          const polygon = new Polygon({
-            vertices: outline,
-            color: 0x3b82f6,
+          const previewObject = createPreviewLoop(profilePoints, 0xc2410c);
+          const sweep = new Sweep({
+            path: pathPoints.map((point) => point.clone()),
+            profile: profilePoints.map((point) => point.clone()),
+            color: 0x0f766e,
+            capStart: state.capStart,
+            capEnd: state.capEnd,
             fatOutlines: state.fatOutlines,
             outlineWidth: state.outlineWidth
           });
-          polygon.position.y = 0.01;
-          polygon.outline = state.outline;
+          sweep.outline = state.outline;
+
+          const previewOffset = LOCKED_HILBERT_SIZE * 0.95;
+          pathPrimitive.position.y += 0.01;
+          previewObject.position.set(-previewOffset, 0.02, -previewOffset);
 
           const group = new THREE.Group();
-          group.add(centerline);
-          group.add(leftPolyline);
-          group.add(rightPolyline);
-          group.add(polygon);
+          group.add(pathPrimitive);
+          group.add(previewObject);
+          group.add(sweep);
 
           current = replaceSceneObject(scene, current, group);
         });

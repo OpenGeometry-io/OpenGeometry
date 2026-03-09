@@ -8,8 +8,8 @@ export default defineExample({
   title: "Line",
   description: "Two-point line primitive with direct endpoint control.",
   statusLabel: "ready",
-  chips: ["Control: Length", "Control: Angle"],
-  footerText: "Control: Length, Angle",
+  chips: ["Length", "Angle"],
+  footerText: "Length, Angle",
   build: ({ scene }) => {
     let current: Line | null = null;
 

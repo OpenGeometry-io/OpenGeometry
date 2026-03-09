@@ -18,8 +18,8 @@ export default defineExample({
   title: "Offset",
   description: "Offset generation with acute-corner and bevel parameters.",
   statusLabel: "ready",
-  chips: ["Control: Offset", "Control: Bevel"],
-  footerText: "Control: Offset, Bevel",
+  chips: ["Offset", "Bevel"],
+  footerText: "Offset, Bevel",
   build: ({ scene }) => {
     let current: THREE.Group | null = null;
 

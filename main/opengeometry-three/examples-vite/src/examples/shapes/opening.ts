@@ -8,8 +8,8 @@ export default defineExample({
   title: "Opening",
   description: "Opening helper volume for void and penetration previews.",
   statusLabel: "ready",
-  chips: ["Control: W/H/D"],
-  footerText: "Control: W/H/D",
+  chips: ["Width", "Height", "Depth"],
+  footerText: "Width, Height, Depth",
   build: ({ scene }) => {
     let current: Opening | null = null;
 

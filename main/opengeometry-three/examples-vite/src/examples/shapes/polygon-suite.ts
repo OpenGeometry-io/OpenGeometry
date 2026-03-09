@@ -206,8 +206,8 @@ export default defineExample({
   title: "Polygon Suite",
   description: "Dataset-backed polygon validation with concave, performance, and multi-hole cases.",
   statusLabel: "ready",
-  chips: ["Coverage: Holes", "Coverage: Concavity"],
-  footerText: "Coverage: Holes, Concavity",
+  chips: ["Holes", "Concavity"],
+  footerText: "Holes, Concavity",
   build: ({ scene, camera, renderer, controls }) => {
     camera.position.set(0, 20, 20);
     controls.target.set(0, 0, 0);

@@ -17,8 +17,8 @@ export default defineExample({
   title: "Curve",
   description: "Control-point curve for route and profile sketching.",
   statusLabel: "ready",
-  chips: ["Control: Sag", "Control: Lift"],
-  footerText: "Control: Sag, Lift",
+  chips: ["Sag", "Lift"],
+  footerText: "Sag, Lift",
   build: ({ scene }) => {
     let current: Curve | null = null;
 

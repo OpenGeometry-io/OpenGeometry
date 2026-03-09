@@ -105,12 +105,6 @@ impl OGPolyline {
             builder.add_wire(&indices, closed_wire).map_err(|err| {
                 JsValue::from_str(&format!("Failed to build polyline wire: {}", err))
             })?;
-
-            if closed_wire {
-                builder.add_face(&indices, &[]).map_err(|err| {
-                    JsValue::from_str(&format!("Failed to build polyline face: {}", err))
-                })?;
-            }
         }
 
         self.brep = builder.build().map_err(|err| {

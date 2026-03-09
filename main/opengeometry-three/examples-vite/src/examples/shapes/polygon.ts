@@ -21,8 +21,8 @@ export default defineExample({
   title: "Polygon",
   description: "Planar polygon triangulation for surfaces and slabs.",
   statusLabel: "ready",
-  chips: ["Control: Sides", "Control: Radius"],
-  footerText: "Control: Sides, Radius",
+  chips: ["Sides", "Radius"],
+  footerText: "Sides, Radius",
   build: ({ scene }) => {
     let current: Polygon | null = null;
 

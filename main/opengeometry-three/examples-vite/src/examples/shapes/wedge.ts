@@ -8,8 +8,8 @@ export default defineExample({
   title: "Wedge",
   description: "Tapered solid for ramps and sloped technical elements.",
   statusLabel: "ready",
-  chips: ["Control: W/H/D"],
-  footerText: "Control: W/H/D",
+  chips: ["Width", "Height", "Depth"],
+  footerText: "Width, Height, Depth",
   build: ({ scene }) => {
     let current: Wedge | null = null;
 

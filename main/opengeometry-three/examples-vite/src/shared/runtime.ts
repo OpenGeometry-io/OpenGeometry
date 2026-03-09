@@ -27,18 +27,30 @@ export type ExampleControlDefinition =
       key: string;
       label: string;
       value: boolean;
+    }
+  | {
+      type: "select";
+      key: string;
+      label: string;
+      value: string;
+      options: Array<{
+        label: string;
+        value: string;
+      }>;
     };
 
-export type ExampleControlState = Record<string, number | boolean>;
+export type ExampleControlState = Record<string, number | boolean | string>;
 
 interface BootstrapConfig {
   example: ExampleDefinition;
-  build: (ctx: ExampleContext) => void | Promise<void>;
 }
 
 function getWasmUrl(): string {
   if (import.meta.env.PROD) {
-    return new URL("./wasm/opengeometry_bg.wasm", import.meta.url).toString();
+    return new URL(
+      /* @vite-ignore */ "./wasm/opengeometry_bg.wasm",
+      import.meta.url
+    ).toString();
   }
 
   return new URL(
@@ -114,7 +126,7 @@ export async function bootstrapExample(config: BootstrapConfig) {
   scene.add(fill);
 
   await OpenGeometry.create({ wasmURL: getWasmUrl() });
-  await config.build({ scene, camera, renderer, controls });
+  await config.example.build({ scene, camera, renderer, controls });
 
   function onResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -255,30 +267,52 @@ export function mountControls(
       inputs.appendChild(numberInput);
       row.appendChild(inputs);
     } else {
-      const boolWrap = document.createElement("div");
-      boolWrap.className = "og-control-bool";
-
-      const toggle = document.createElement("input");
-      toggle.type = "checkbox";
-      toggle.className = "og-toggle";
-      toggle.checked = definition.value;
-      toggle.setAttribute("aria-label", definition.label);
-
-      const boolLabel = document.createElement("span");
-      boolLabel.className = "og-control-bool-state";
-      boolLabel.textContent = definition.value ? "Enabled" : "Disabled";
-
-      const updateToggle = () => {
-        state[definition.key] = toggle.checked;
-        boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-        emitChange();
-      };
-
-      toggle.addEventListener("change", updateToggle);
-      boolWrap.appendChild(toggle);
-      boolWrap.appendChild(boolLabel);
       row.appendChild(header);
-      row.appendChild(boolWrap);
+
+      if (definition.type === "boolean") {
+        const boolWrap = document.createElement("div");
+        boolWrap.className = "og-control-bool";
+
+        const toggle = document.createElement("input");
+        toggle.type = "checkbox";
+        toggle.className = "og-toggle";
+        toggle.checked = definition.value;
+        toggle.setAttribute("aria-label", definition.label);
+
+        const boolLabel = document.createElement("span");
+        boolLabel.className = "og-control-bool-state";
+        boolLabel.textContent = definition.value ? "Enabled" : "Disabled";
+
+        const updateToggle = () => {
+          state[definition.key] = toggle.checked;
+          boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
+          emitChange();
+        };
+
+        toggle.addEventListener("change", updateToggle);
+        boolWrap.appendChild(toggle);
+        boolWrap.appendChild(boolLabel);
+        row.appendChild(boolWrap);
+      } else {
+        const select = document.createElement("select");
+        select.className = "og-control-select";
+        select.setAttribute("aria-label", definition.label);
+
+        for (const option of definition.options) {
+          const optionElement = document.createElement("option");
+          optionElement.value = option.value;
+          optionElement.textContent = option.label;
+          optionElement.selected = option.value === definition.value;
+          select.appendChild(optionElement);
+        }
+
+        select.addEventListener("change", () => {
+          state[definition.key] = select.value;
+          emitChange();
+        });
+
+        row.appendChild(select);
+      }
     }
 
     panel.appendChild(row);

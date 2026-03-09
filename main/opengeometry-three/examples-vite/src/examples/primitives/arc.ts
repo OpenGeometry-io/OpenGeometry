@@ -8,8 +8,8 @@ export default defineExample({
   title: "Arc",
   description: "Circular arc with angle span and segmentation control.",
   statusLabel: "ready",
-  chips: ["Control: Radius", "Control: Span"],
-  footerText: "Control: Radius, Span",
+  chips: ["Radius", "Span"],
+  footerText: "Radius, Span",
   build: ({ scene }) => {
     let current: Arc | null = null;
 

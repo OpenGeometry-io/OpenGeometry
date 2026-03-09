@@ -8,8 +8,8 @@ export default defineExample({
   title: "Cylinder",
   description: "Cylindrical volume for ducts, pipes and mechanical shafts.",
   statusLabel: "ready",
-  chips: ["Control: R", "Control: H", "Control: Seg"],
-  footerText: "Control: R, H, Seg",
+  chips: ["Radius", "Height", "Segments"],
+  footerText: "Radius, Height, Segments",
   build: ({ scene }) => {
     let current: Cylinder | null = null;
 

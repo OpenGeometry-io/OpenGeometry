@@ -27,8 +27,8 @@ export default defineExample({
   title: "Sweep",
   description: "Profile along path sweep for framing and custom sections.",
   statusLabel: "ready",
-  chips: ["Control: Path", "Control: Caps"],
-  footerText: "Control: Path, Caps",
+  chips: ["Path", "Caps"],
+  footerText: "Path, Caps",
   build: ({ scene }) => {
     let current: Sweep | null = null;
 

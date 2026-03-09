@@ -23,8 +23,8 @@ export default defineExample({
   title: "Polyline",
   description: "Open and closed path definitions for profile work.",
   statusLabel: "ready",
-  chips: ["Control: Closure", "Control: Span"],
-  footerText: "Control: Closure, Span",
+  chips: ["Closure", "Span"],
+  footerText: "Closure, Span",
   build: ({ scene }) => {
     let current: Polyline | null = null;
 

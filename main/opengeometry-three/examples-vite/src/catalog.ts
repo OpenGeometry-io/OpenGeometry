@@ -43,7 +43,7 @@ for (const category of ["primitives", "shapes", "operations"] as ExampleCategory
     const card = document.createElement("article");
     card.className = "og-spec-card";
     const chips = example.chips
-      .map((chip) => `<span class="og-chip">${chip}</span>`)
+      .map((chip) => `<div class="og-chip"><span>${chip}</span></div>`)
       .join("");
 
     card.innerHTML = `

@@ -99,12 +99,6 @@ impl OGArc {
             builder
                 .add_wire(&indices, is_closed && points.len() > 2)
                 .map_err(|err| JsValue::from_str(&format!("Failed to build arc wire: {}", err)))?;
-
-            if is_closed && points.len() > 2 {
-                builder.add_face(&indices, &[]).map_err(|err| {
-                    JsValue::from_str(&format!("Failed to build arc face: {}", err))
-                })?;
-            }
         }
 
         self.brep = builder

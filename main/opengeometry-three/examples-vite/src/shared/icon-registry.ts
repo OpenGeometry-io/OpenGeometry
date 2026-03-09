@@ -36,6 +36,7 @@ const iconBySlug: Record<string, IconDefinition> = {
   offset: faUpRightAndDownLeftFromCenter,
   "wall-from-offsets": faWarehouse,
   "sweep-path-profile": faRoute,
+  "sweep-hilbert-profiles": faRoute,
 };
 
 export function getExampleIconMarkup(slug: string): string {

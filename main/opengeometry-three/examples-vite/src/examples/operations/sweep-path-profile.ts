@@ -38,8 +38,8 @@ export default defineExample({
   title: "Sweep Path + Profile",
   description: "Operation-level sweep from path primitive + profile primitive.",
   statusLabel: "ready",
-  chips: ["Control: Path", "Control: Caps"],
-  footerText: "Control: Path + Caps",
+  chips: ["Path", "Caps"],
+  footerText: "Path, Caps",
   build: ({ scene }) => {
     let current: THREE.Group | null = null;
 

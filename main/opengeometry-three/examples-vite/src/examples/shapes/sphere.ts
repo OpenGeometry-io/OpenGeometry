@@ -8,8 +8,8 @@ export default defineExample({
   title: "Sphere",
   description: "UV sphere for equipment envelopes and clearance studies.",
   statusLabel: "ready",
-  chips: ["Control: R", "Control: Segments"],
-  footerText: "Control: R, Segments",
+  chips: ["Radius", "Segments"],
+  footerText: "Radius, Segments",
   build: ({ scene }) => {
     let current: Sphere | null = null;
 

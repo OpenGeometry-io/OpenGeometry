@@ -8,8 +8,8 @@ export default defineExample({
   title: "Cuboid",
   description: "Rectangular solid for rooms, equipment blocks and massing.",
   statusLabel: "ready",
-  chips: ["Control: W/H/D"],
-  footerText: "Control: W/H/D",
+  chips: ["Width", "Height", "Depth"],
+  footerText: "Width, Height, Depth",
   build: ({ scene }) => {
     let current: Cuboid | null = null;
 
