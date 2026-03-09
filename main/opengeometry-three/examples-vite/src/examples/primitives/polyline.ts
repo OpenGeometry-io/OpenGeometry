@@ -1,9 +1,6 @@
 import { Polyline, Vector3 } from "@og-three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
 function buildPolyline(amplitude: number, length: number, closed: boolean): Vector3[] {
   const points = [
@@ -20,9 +17,14 @@ function buildPolyline(amplitude: number, length: number, closed: boolean): Vect
   return points;
 }
 
-bootstrapExample({
-  title: "Primitive: Polyline",
-  description: "Interactive open/closed polyline configurations.",
+export default defineExample({
+  slug: "primitives/polyline",
+  category: "primitives",
+  title: "Polyline",
+  description: "Open and closed path definitions for profile work.",
+  statusLabel: "ready",
+  chips: ["Control: Closure", "Control: Span"],
+  footerText: "Control: Closure, Span",
   build: ({ scene }) => {
     let current: Polyline | null = null;
 

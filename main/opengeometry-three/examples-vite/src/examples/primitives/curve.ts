@@ -1,9 +1,6 @@
 import { Curve, Vector3 } from "@og-three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
 function buildControlPoints(span: number, sag: number, lift: number): Vector3[] {
   return [
@@ -14,9 +11,14 @@ function buildControlPoints(span: number, sag: number, lift: number): Vector3[] 
   ];
 }
 
-bootstrapExample({
-  title: "Primitive: Curve",
-  description: "Interactive curve primitive defined by control points.",
+export default defineExample({
+  slug: "primitives/curve",
+  category: "primitives",
+  title: "Curve",
+  description: "Control-point curve for route and profile sketching.",
+  statusLabel: "ready",
+  chips: ["Control: Sag", "Control: Lift"],
+  footerText: "Control: Sag, Lift",
   build: ({ scene }) => {
     let current: Curve | null = null;
 

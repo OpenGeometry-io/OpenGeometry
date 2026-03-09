@@ -26,6 +26,7 @@ node_modules/
 # JS/TS build artifacts
 dist/
 main/opengeometry-three/examples-dist/
+main/opengeometry-three/examples-vite/.generated/
 main/opengeometry/pkg/
 
 .DS_Store

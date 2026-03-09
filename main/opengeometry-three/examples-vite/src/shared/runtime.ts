@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { OpenGeometry } from "@og-three";
 import "../styles/theme.css";
+import type { ExampleDefinition } from "./example-contract";
+import { getExampleIconMarkup } from "./icon-registry";
 
 export interface ExampleContext {
   scene: THREE.Scene;
@@ -30,20 +32,15 @@ export type ExampleControlDefinition =
 export type ExampleControlState = Record<string, number | boolean>;
 
 interface BootstrapConfig {
-  title: string;
-  description: string;
+  example: ExampleDefinition;
   build: (ctx: ExampleContext) => void | Promise<void>;
 }
 
 function getWasmUrl(): string {
-  // Resolve from the built runtime chunk location (`examples-dist/assets/...`)
-  // so nested example pages (e.g. `shapes/sphere.html`) do not request
-  // `shapes/assets/...` and 404.
   if (import.meta.env.PROD) {
     return new URL("./wasm/opengeometry_bg.wasm", import.meta.url).toString();
   }
 
-  // Dev server fallback.
   return new URL(
     "../../../../opengeometry/pkg/opengeometry_bg.wasm",
     import.meta.url
@@ -55,20 +52,35 @@ export async function bootstrapExample(config: BootstrapConfig) {
   if (!app) {
     throw new Error("Missing #app container");
   }
+
+  const { example } = config;
   document.body.classList.add("og-example-page");
+  document.title = `${example.title} | OpenGeometry`;
 
   const badge = document.createElement("div");
   badge.className = "og-badge";
   badge.innerHTML = `
-    <div class="og-badge-kicker">OPEN GEOMETRY • SPEC VIEW</div>
-    <strong class="og-badge-title">${config.title}</strong>
-    <span class="og-badge-desc">${config.description}</span>
-    <a class="og-badge-link" href="../index.html">All Example Specs</a>
+    <div class="og-badge-top">
+      <div class="og-badge-icon-wrap">${getExampleIconMarkup(example.slug)}</div>
+      <p class="og-badge-status">${example.statusLabel}</p>
+    </div>
+    <div class="og-badge-meta">
+      <p class="og-badge-kicker">OPEN GEOMETRY • ${example.category.toUpperCase()}</p>
+      <strong class="og-badge-title">${example.title}</strong>
+      <span class="og-badge-desc">${example.description}</span>
+    </div>
+    <div class="og-badge-chip-row">
+      ${example.chips.map((chip) => `<span class="og-chip og-chip-accent">${chip}</span>`).join("")}
+    </div>
+    <div class="og-badge-footer">
+      <span class="og-badge-context">${example.footerText}</span>
+      <a class="og-badge-link" href="../index.html">Back to Examples</a>
+    </div>
   `;
   document.body.appendChild(badge);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf3f4f6);
+  scene.background = new THREE.Color(0xf6f1eb);
 
   const camera = new THREE.PerspectiveCamera(
     55,
@@ -88,16 +100,16 @@ export async function bootstrapExample(config: BootstrapConfig) {
   controls.target.set(0, 0.8, 0);
   controls.update();
 
-  scene.add(new THREE.GridHelper(32, 32, 0x9ca3af, 0xd1d5db));
+  scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
 
-  const ambient = new THREE.AmbientLight(0xffffff, 0.65);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.72);
   scene.add(ambient);
 
-  const key = new THREE.DirectionalLight(0xffffff, 0.85);
+  const key = new THREE.DirectionalLight(0xffffff, 0.9);
   key.position.set(6, 8, 4);
   scene.add(key);
 
-  const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.42);
   fill.position.set(-5, 3, -6);
   scene.add(fill);
 
@@ -194,7 +206,7 @@ export function mountControls(
     header.className = "og-control-header";
 
     const label = document.createElement("span");
-    label.className = "og-control-label";
+    label.className = "og-control-label-chip";
     label.textContent = definition.label;
     header.appendChild(label);
 
@@ -261,8 +273,8 @@ export function mountControls(
         boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
         emitChange();
       };
-      toggle.addEventListener("change", updateToggle);
 
+      toggle.addEventListener("change", updateToggle);
       boolWrap.appendChild(toggle);
       boolWrap.appendChild(boolLabel);
       row.appendChild(header);

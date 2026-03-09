@@ -1,10 +1,7 @@
 import { Polygon, Polyline, Vector3 } from "@og-three";
 import * as THREE from "three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
 function buildCenterline(curveBias: number): Vector3[] {
   return [
@@ -22,12 +19,17 @@ function buildWallOutline(left: Vector3[], right: Vector3[]): Vector3[] {
     return [];
   }
 
-  return [...left.map((p) => p.clone()), ...right.map((p) => p.clone()).reverse()];
+  return [...left.map((point) => point.clone()), ...right.map((point) => point.clone()).reverse()];
 }
 
-bootstrapExample({
-  title: "Operation: Wall from Offsets",
-  description: "Interactive wall polygon generated from +/- polyline offsets.",
+export default defineExample({
+  slug: "operations/wall-from-offsets",
+  category: "operations",
+  title: "Wall from Offsets",
+  description: "Composite wall profile assembled from offset centerlines.",
+  statusLabel: "ready",
+  chips: ["Control: Thickness"],
+  footerText: "Control: Thickness",
   build: ({ scene }) => {
     let current: THREE.Group | null = null;
 

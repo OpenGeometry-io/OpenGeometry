@@ -1,13 +1,15 @@
 import { Rectangle, Vector3 } from "@og-three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
-bootstrapExample({
-  title: "Primitive: Rectangle",
-  description: "Interactive rectangle primitive with width/breadth controls.",
+export default defineExample({
+  slug: "primitives/rectangle",
+  category: "primitives",
+  title: "Rectangle",
+  description: "Parametric rectangular primitive for base profiles.",
+  statusLabel: "ready",
+  chips: ["Control: Width", "Control: Breadth"],
+  footerText: "Control: Width, Breadth",
   build: ({ scene }) => {
     let current: Rectangle | null = null;
 

@@ -1,13 +1,15 @@
 import { Opening, Vector3 } from "@og-three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
-bootstrapExample({
-  title: "Shape: Opening",
-  description: "Interactive opening helper rendered as cutout volume.",
+export default defineExample({
+  slug: "shapes/opening",
+  category: "shapes",
+  title: "Opening",
+  description: "Opening helper volume for void and penetration previews.",
+  statusLabel: "ready",
+  chips: ["Control: W/H/D"],
+  footerText: "Control: W/H/D",
   build: ({ scene }) => {
     let current: Opening | null = null;
 

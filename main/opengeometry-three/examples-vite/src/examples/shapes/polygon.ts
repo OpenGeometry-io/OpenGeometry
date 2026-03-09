@@ -1,9 +1,6 @@
 import { Polygon, Vector3 } from "@og-three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
 function buildPolygonVertices(sides: number, radius: number): Vector3[] {
   const clampedSides = Math.max(3, Math.floor(sides));
@@ -18,9 +15,14 @@ function buildPolygonVertices(sides: number, radius: number): Vector3[] {
   return points;
 }
 
-bootstrapExample({
-  title: "Shape: Polygon",
-  description: "Interactive polygon triangulation with side/radius controls.",
+export default defineExample({
+  slug: "shapes/polygon",
+  category: "shapes",
+  title: "Polygon",
+  description: "Planar polygon triangulation for surfaces and slabs.",
+  statusLabel: "ready",
+  chips: ["Control: Sides", "Control: Radius"],
+  footerText: "Control: Sides, Radius",
   build: ({ scene }) => {
     let current: Polygon | null = null;
 

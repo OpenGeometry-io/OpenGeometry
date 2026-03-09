@@ -1,13 +1,15 @@
 import { Cylinder, Vector3 } from "@og-three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
-bootstrapExample({
-  title: "Shape: Cylinder",
-  description: "Interactive cylinder with segment and angle controls.",
+export default defineExample({
+  slug: "shapes/cylinder",
+  category: "shapes",
+  title: "Cylinder",
+  description: "Cylindrical volume for ducts, pipes and mechanical shafts.",
+  statusLabel: "ready",
+  chips: ["Control: R", "Control: H", "Control: Seg"],
+  footerText: "Control: R, H, Seg",
   build: ({ scene }) => {
     let current: Cylinder | null = null;
 

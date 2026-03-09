@@ -1,13 +1,15 @@
 import { Line, Vector3 } from "@og-three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
-bootstrapExample({
-  title: "Primitive: Line",
-  description: "Interactive line primitive with live parameter controls.",
+export default defineExample({
+  slug: "primitives/line",
+  category: "primitives",
+  title: "Line",
+  description: "Two-point line primitive with direct endpoint control.",
+  statusLabel: "ready",
+  chips: ["Control: Length", "Control: Angle"],
+  footerText: "Control: Length, Angle",
   build: ({ scene }) => {
     let current: Line | null = null;
 

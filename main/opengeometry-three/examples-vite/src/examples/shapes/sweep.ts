@@ -1,9 +1,6 @@
 import { Sweep, Vector3 } from "@og-three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
 function buildPath(height: number, spread: number): Vector3[] {
   return [
@@ -24,9 +21,14 @@ function buildProfile(width: number, depth: number): Vector3[] {
   ];
 }
 
-bootstrapExample({
-  title: "Shape: Sweep",
-  description: "Interactive profile sweep along a 3D path.",
+export default defineExample({
+  slug: "shapes/sweep",
+  category: "shapes",
+  title: "Sweep",
+  description: "Profile along path sweep for framing and custom sections.",
+  statusLabel: "ready",
+  chips: ["Control: Path", "Control: Caps"],
+  footerText: "Control: Path, Caps",
   build: ({ scene }) => {
     let current: Sweep | null = null;
 

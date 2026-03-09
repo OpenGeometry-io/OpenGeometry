@@ -1,13 +1,15 @@
 import { Vector3, Wedge } from "@og-three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
-bootstrapExample({
-  title: "Shape: Wedge",
-  description: "Interactive wedge primitive with size controls.",
+export default defineExample({
+  slug: "shapes/wedge",
+  category: "shapes",
+  title: "Wedge",
+  description: "Tapered solid for ramps and sloped technical elements.",
+  statusLabel: "ready",
+  chips: ["Control: W/H/D"],
+  footerText: "Control: W/H/D",
   build: ({ scene }) => {
     let current: Wedge | null = null;
 
@@ -27,7 +29,7 @@ bootstrapExample({
           width: state.width as number,
           height: state.height as number,
           depth: state.depth as number,
-          color: 0x7c3aed,
+          color: 0xd97706,
           fatOutlines: state.fatOutlines as boolean,
           outlineWidth: state.outlineWidth as number,
         });

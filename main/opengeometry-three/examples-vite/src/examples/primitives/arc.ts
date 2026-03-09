@@ -1,13 +1,15 @@
 import { Arc, Vector3 } from "@og-three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
-bootstrapExample({
-  title: "Primitive: Arc",
-  description: "Interactive arc with radius, angle span, and segment controls.",
+export default defineExample({
+  slug: "primitives/arc",
+  category: "primitives",
+  title: "Arc",
+  description: "Circular arc with angle span and segmentation control.",
+  statusLabel: "ready",
+  chips: ["Control: Radius", "Control: Span"],
+  footerText: "Control: Radius, Span",
   build: ({ scene }) => {
     let current: Arc | null = null;
 

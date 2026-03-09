@@ -1,10 +1,7 @@
 import { Polyline, Rectangle, Sweep, Vector3 } from "@og-three";
 import * as THREE from "three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
 type KernelVertex = {
   position: {
@@ -35,9 +32,14 @@ function buildPath(height: number): Vector3[] {
   ];
 }
 
-bootstrapExample({
-  title: "Operation: Sweep Path + Profile",
-  description: "Interactive sweep generated from path and profile primitives.",
+export default defineExample({
+  slug: "operations/sweep-path-profile",
+  category: "operations",
+  title: "Sweep Path + Profile",
+  description: "Operation-level sweep from path primitive + profile primitive.",
+  statusLabel: "ready",
+  chips: ["Control: Path", "Control: Caps"],
+  footerText: "Control: Path + Caps",
   build: ({ scene }) => {
     let current: THREE.Group | null = null;
 

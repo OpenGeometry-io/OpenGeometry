@@ -1,13 +1,15 @@
 import { Cuboid, Vector3 } from "@og-three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
-bootstrapExample({
-  title: "Shape: Cuboid",
-  description: "Interactive cuboid BREP with outline controls.",
+export default defineExample({
+  slug: "shapes/cuboid",
+  category: "shapes",
+  title: "Cuboid",
+  description: "Rectangular solid for rooms, equipment blocks and massing.",
+  statusLabel: "ready",
+  chips: ["Control: W/H/D"],
+  footerText: "Control: W/H/D",
   build: ({ scene }) => {
     let current: Cuboid | null = null;
 

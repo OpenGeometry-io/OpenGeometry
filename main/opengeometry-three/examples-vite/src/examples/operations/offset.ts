@@ -1,10 +1,7 @@
 import { Polyline, Vector3 } from "@og-three";
 import * as THREE from "three";
-import {
-  bootstrapExample,
-  mountControls,
-  replaceSceneObject,
-} from "../shared/runtime";
+import { defineExample } from "../../shared/example-contract";
+import { mountControls, replaceSceneObject } from "../../shared/runtime";
 
 function createBasePolyline(turn: number): Vector3[] {
   return [
@@ -15,9 +12,14 @@ function createBasePolyline(turn: number): Vector3[] {
   ];
 }
 
-bootstrapExample({
-  title: "Operation: Offset",
-  description: "Interactive offset operation on a polyline primitive.",
+export default defineExample({
+  slug: "operations/offset",
+  category: "operations",
+  title: "Offset",
+  description: "Offset generation with acute-corner and bevel parameters.",
+  statusLabel: "ready",
+  chips: ["Control: Offset", "Control: Bevel"],
+  footerText: "Control: Offset, Bevel",
   build: ({ scene }) => {
     let current: THREE.Group | null = null;
 
