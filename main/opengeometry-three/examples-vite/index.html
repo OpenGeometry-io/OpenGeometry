@@ -1,12 +1,526 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenGeometry Three Examples</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --og-bg: #ede7e0;
+        --og-line: rgba(95, 61, 46, 0.1);
+        --og-text: #221a14;
+        --og-muted: #736255;
+        --og-muted-soft: #9f8f83;
+        --og-accent: #ff5400;
+        --og-accent-soft: rgba(255, 84, 0, 0.12);
+        --og-shadow: 0 22px 44px rgba(72, 44, 24, 0.08);
+        --og-font: "Space Grotesk", "Sora", "Avenir Next", "Segoe UI", sans-serif;
+        --og-mono: "IBM Plex Mono", "JetBrains Mono", "SFMono-Regular", monospace;
+        --og-squircle: 32px 34px 30px 36px / 32px 28px 36px 30px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        min-height: 100%;
+        background:
+          radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0)),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(116, 84, 63, 0.05)),
+          var(--og-bg);
+        color: var(--og-text);
+        font: 14px/1.45 var(--og-font);
+      }
+
+      body {
+        overflow-x: hidden;
+      }
+
+      code {
+        font-family: var(--og-mono);
+      }
+
+      #app {
+        width: 100%;
+        height: 100%;
+      }
+
+      .og-specs-shell {
+        width: min(1320px, calc(100% - 30px));
+        margin: 0 auto;
+        padding: 26px 8px 48px;
+      }
+
+      .og-specs-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+        gap: 24px;
+        padding: 22px 24px;
+        border: 1px solid var(--og-line);
+        border-radius: var(--og-squircle);
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(249, 239, 229, 0.9));
+        box-shadow: var(--og-shadow);
+      }
+
+      .og-specs-title {
+        margin: 6px 0 0;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        font-size: clamp(42px, 6vw, 74px);
+        line-height: 0.92;
+      }
+
+      .og-specs-note {
+        margin: 0;
+        color: var(--og-muted);
+        font-size: 12px;
+        line-height: 1.4;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .og-specs-head .og-specs-note:last-child {
+        align-self: end;
+        justify-self: end;
+        max-width: 320px;
+        text-align: right;
+      }
+
+      .og-specs-section {
+        margin-top: 26px;
+      }
+
+      .og-support {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-top: 28px;
+        padding: 20px 22px;
+        border: 1px solid rgba(255, 84, 0, 0.18);
+        border-radius: var(--og-squircle);
+        background: linear-gradient(145deg, rgba(255, 248, 242, 0.96), rgba(250, 239, 230, 0.92));
+        box-shadow: var(--og-shadow);
+      }
+
+      .og-support-copy {
+        display: grid;
+        gap: 6px;
+      }
+
+      .og-support-kicker {
+        margin: 0;
+        color: var(--og-accent);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .og-support-title {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+      }
+
+      .og-support-text {
+        margin: 0;
+        color: var(--og-muted);
+        font-size: 14px;
+      }
+
+      .og-specs-section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 14px;
+        padding: 0 4px;
+      }
+
+      .og-specs-section-title {
+        margin: 0;
+        font-size: clamp(28px, 4vw, 42px);
+        letter-spacing: -0.03em;
+        font-weight: 650;
+      }
+
+      .og-specs-count {
+        margin: 0;
+        color: var(--og-muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.45);
+        border: 1px solid var(--og-line);
+      }
+
+      .og-specs-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+        gap: 18px;
+      }
+
+      .og-spec-card {
+        display: grid;
+        gap: 16px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(250, 242, 235, 0.96));
+        border: 1px solid var(--og-line);
+        min-height: 312px;
+        padding: 18px 18px 16px;
+        border-radius: var(--og-squircle);
+        box-shadow: var(--og-shadow);
+        transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+      }
+
+      .og-spec-card:hover {
+        border-color: rgba(255, 84, 0, 0.28);
+        transform: translateY(-3px);
+        box-shadow: 0 28px 52px rgba(72, 44, 24, 0.12);
+      }
+
+      .og-spec-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 12px;
+      }
+
+      .og-spec-card-brand {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        border-radius: 20px;
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(255, 235, 223, 0.92));
+        border: 1px solid rgba(255, 84, 0, 0.18);
+        color: var(--og-accent);
+        font: 700 11px/1 var(--og-mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .og-spec-card-brand svg {
+        width: 20px;
+        height: 20px;
+        opacity: 0.88;
+      }
+
+      .og-spec-card-title {
+        margin: 0;
+        font-weight: 650;
+        font-size: 28px;
+        letter-spacing: -0.02em;
+      }
+
+      .og-spec-badge {
+        margin: 0;
+        color: #4f7259;
+        background: rgba(133, 189, 149, 0.12);
+        border: 1px solid rgba(133, 189, 149, 0.24);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: capitalize;
+        padding: 8px 12px;
+        border-radius: 14px;
+      }
+
+      .og-spec-desc {
+        margin: 6px 0 0;
+        color: var(--og-muted);
+        font-size: 14px;
+        min-height: 44px;
+      }
+
+      .og-spec-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 6px;
+      }
+
+      .og-chip {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-self: flex-start;
+        align-items: center;
+        justify-content: center;
+        height: 28px;
+        padding: 0 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(214, 132, 83, 0.14);
+        background: rgba(246, 234, 226, 0.92);
+        white-space: nowrap;
+      }
+
+      .og-chip span {
+        display: inline-block;
+        font-size: 11px;
+        line-height: 1;
+        color: #9f6b4e;
+        font-weight: 550;
+        letter-spacing: 0.02em;
+      }
+
+      .og-spec-card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 14px;
+        margin-top: auto;
+        padding-top: 14px;
+        border-top: 1px solid rgba(95, 61, 46, 0.08);
+      }
+
+      .og-spec-open {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 16px;
+        border-radius: 14px;
+        border: 1px solid rgba(96, 87, 78, 0.14);
+        background: #64584f;
+        color: #fbf7f3;
+        font-weight: 600;
+        text-decoration: none;
+        box-shadow: 0 10px 18px rgba(76, 63, 54, 0.16);
+      }
+
+      .og-support-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-height: 46px;
+        padding: 0 18px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 84, 0, 0.18);
+        background: var(--og-accent);
+        color: #fff7f2;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+        box-shadow: 0 12px 24px rgba(255, 84, 0, 0.18);
+      }
+
+      .og-support-link svg {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 auto;
+      }
+
+      @media (max-width: 900px) {
+        .og-specs-head {
+          grid-template-columns: 1fr;
+        }
+
+        .og-specs-head .og-specs-note:last-child {
+          justify-self: start;
+          text-align: left;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .og-specs-shell {
+          width: min(100%, calc(100% - 20px));
+          padding-top: 18px;
+        }
+
+        .og-spec-card {
+          min-height: 286px;
+        }
+
+        .og-spec-card-title {
+          font-size: 24px;
+        }
+
+        .og-spec-card-footer {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .og-support {
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="./src/catalog.ts"></script>
+    <script type="module">
+      import { icon } from "@fortawesome/fontawesome-svg-core";
+      import {
+        faBezierCurve,
+        faCompassDrafting,
+        faCube,
+        faDatabase,
+        faDoorOpen,
+        faDrawPolygon,
+        faGlobe,
+        faLayerGroup,
+        faMountain,
+        faRoad,
+        faRoute,
+        faShapes,
+        faSlash,
+        faUpRightAndDownLeftFromCenter,
+        faVectorSquare,
+        faWarehouse,
+      } from "@fortawesome/free-solid-svg-icons";
+
+      const categoryLabels = {
+        primitives: "Primitives",
+        shapes: "Shapes",
+        operations: "Operations",
+      };
+
+      const examples = [
+        { slug: "primitives/arc", category: "primitives", title: "Arc", description: "Circular arc with angle span and segmentation control.", statusLabel: "ready", chips: ["Radius", "Span"], footerText: "Radius, Span" },
+        { slug: "primitives/curve", category: "primitives", title: "Curve", description: "Control-point curve for route and profile sketching.", statusLabel: "ready", chips: ["Sag", "Lift"], footerText: "Sag, Lift" },
+        { slug: "primitives/line", category: "primitives", title: "Line", description: "Two-point line primitive with direct endpoint control.", statusLabel: "ready", chips: ["Length", "Angle"], footerText: "Length, Angle" },
+        { slug: "primitives/polyline", category: "primitives", title: "Polyline", description: "Open and closed path definitions for profile work.", statusLabel: "ready", chips: ["Closure", "Span"], footerText: "Closure, Span" },
+        { slug: "primitives/rectangle", category: "primitives", title: "Rectangle", description: "Parametric rectangular primitive for base profiles.", statusLabel: "ready", chips: ["Width", "Breadth"], footerText: "Width, Breadth" },
+        { slug: "shapes/cuboid", category: "shapes", title: "Cuboid", description: "Rectangular solid for rooms, equipment blocks and massing.", statusLabel: "ready", chips: ["Width", "Height", "Depth"], footerText: "Width, Height, Depth" },
+        { slug: "shapes/cylinder", category: "shapes", title: "Cylinder", description: "Cylindrical volume for ducts, pipes and mechanical shafts.", statusLabel: "ready", chips: ["Radius", "Height", "Segments"], footerText: "Radius, Height, Segments" },
+        { slug: "shapes/opening", category: "shapes", title: "Opening", description: "Opening helper volume for void and penetration previews.", statusLabel: "ready", chips: ["Width", "Height", "Depth"], footerText: "Width, Height, Depth" },
+        { slug: "shapes/polygon", category: "shapes", title: "Polygon", description: "Planar polygon triangulation for surfaces and slabs.", statusLabel: "ready", chips: ["Sides", "Radius"], footerText: "Sides, Radius" },
+        { slug: "shapes/polygon-suite", category: "shapes", title: "Polygon Suite", description: "Dataset-backed polygon validation with concave, performance, and multi-hole cases.", statusLabel: "ready", chips: ["Holes", "Concavity"], footerText: "Holes, Concavity" },
+        { slug: "shapes/sphere", category: "shapes", title: "Sphere", description: "UV sphere for equipment envelopes and clearance studies.", statusLabel: "ready", chips: ["Radius", "Segments"], footerText: "Radius, Segments" },
+        { slug: "shapes/sweep", category: "shapes", title: "Sweep", description: "Profile along path sweep for framing and custom sections.", statusLabel: "ready", chips: ["Path", "Caps"], footerText: "Path, Caps" },
+        { slug: "shapes/wedge", category: "shapes", title: "Wedge", description: "Tapered solid for ramps and sloped technical elements.", statusLabel: "ready", chips: ["Width", "Height", "Depth"], footerText: "Width, Height, Depth" },
+        { slug: "operations/offset", category: "operations", title: "Offset", description: "Offset generation with acute-corner and bevel parameters.", statusLabel: "ready", chips: ["Offset", "Bevel"], footerText: "Offset, Bevel" },
+        { slug: "operations/sweep-path-profile", category: "operations", title: "Sweep Path + Profile", description: "Operation-level sweep from path primitive + profile primitive.", statusLabel: "ready", chips: ["Path", "Caps"], footerText: "Path, Caps" },
+        { slug: "operations/sweep-hilbert-profiles", category: "operations", title: "Sweep Hilbert Profiles", description: "Locked Hilbert3D path with switchable kernel and custom section profiles.", statusLabel: "ready", chips: ["Hilbert Path", "Profiles", "Sweep"], footerText: "Profile Type, Caps, Outlines" },
+        { slug: "operations/wall-from-offsets", category: "operations", title: "Wall from Offsets", description: "Composite wall profile assembled from offset centerlines.", statusLabel: "ready", chips: ["Thickness"], footerText: "Thickness" },
+      ];
+
+      const iconBySlug = {
+        line: faSlash,
+        polyline: faDrawPolygon,
+        arc: faCompassDrafting,
+        rectangle: faVectorSquare,
+        curve: faBezierCurve,
+        polygon: faDrawPolygon,
+        "polygon-suite": faLayerGroup,
+        cuboid: faCube,
+        cylinder: faDatabase,
+        wedge: faMountain,
+        opening: faDoorOpen,
+        sweep: faRoad,
+        sphere: faGlobe,
+        offset: faUpRightAndDownLeftFromCenter,
+        "wall-from-offsets": faWarehouse,
+        "sweep-path-profile": faRoute,
+        "sweep-hilbert-profiles": faRoute,
+      };
+
+      function getExamplesByCategory(category) {
+        return examples.filter((example) => example.category === category);
+      }
+
+      function getExampleIconMarkup(slug) {
+        const key = slug.split("/").pop() || slug;
+        const selected = iconBySlug[key] || faShapes;
+        return icon(selected).html.join("");
+      }
+
+      function getDiscordIconMarkup() {
+        return `
+          <svg viewBox="0 0 127.14 96.36" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.73,56.6.53,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2.06a75.57,75.57,0,0,0,64.32,0c.87.72,1.76,1.4,2.66,2.06a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.59,80.2h0C129.24,52.84,122.06,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,59.94,31,52.85S36.06,40,42.45,40s11.58,5.81,11.46,12.85S48.84,65.69,42.45,65.69Zm42.24,0c-6.27,0-11.45-5.75-11.45-12.84S78.3,40,84.69,40s11.57,5.81,11.45,12.85S91.08,65.69,84.69,65.69Z"></path>
+          </svg>
+        `;
+      }
+
+      const app = document.getElementById("app");
+      if (!app) {
+        throw new Error("Missing #app container");
+      }
+
+      const shell = document.createElement("main");
+      shell.className = "og-specs-shell";
+
+      const head = document.createElement("header");
+      head.className = "og-specs-head";
+      head.innerHTML = `
+        <div>
+          <p class="og-specs-note">OpenGeometry Technical Sandbox</p>
+          <h1 class="og-specs-title">Examples</h1>
+        </div>
+        <p class="og-specs-note">Build command: <code>npm --prefix main/opengeometry-three run build-example-three</code></p>
+      `;
+      shell.appendChild(head);
+
+      for (const category of ["primitives", "shapes", "operations"]) {
+        const items = getExamplesByCategory(category);
+        const section = document.createElement("section");
+        section.className = "og-specs-section";
+
+        const heading = document.createElement("div");
+        heading.className = "og-specs-section-head";
+        heading.innerHTML = `
+          <h2 class="og-specs-section-title">${categoryLabels[category]}</h2>
+          <p class="og-specs-count">${items.length} items</p>
+        `;
+        section.appendChild(heading);
+
+        const grid = document.createElement("div");
+        grid.className = "og-specs-grid";
+
+        for (const example of items) {
+          const card = document.createElement("article");
+          card.className = "og-spec-card";
+          const chips = example.chips
+            .map((chip) => `<div class="og-chip"><span>${chip}</span></div>`)
+            .join("");
+
+          card.innerHTML = `
+            <div class="og-spec-card-head">
+              <div class="og-spec-card-brand">${getExampleIconMarkup(example.slug)}</div>
+              <p class="og-spec-badge">${example.statusLabel}</p>
+            </div>
+            <div>
+              <h3 class="og-spec-card-title">${example.title}</h3>
+              <p class="og-spec-desc">${example.description}</p>
+            </div>
+            <div class="og-spec-chip-row">${chips}</div>
+            <div class="og-spec-card-footer">
+              <a class="og-spec-open" href="./${example.slug}.html">Open example</a>
+            </div>
+          `;
+
+          grid.appendChild(card);
+        }
+
+        section.appendChild(grid);
+        shell.appendChild(section);
+      }
+
+      const support = document.createElement("section");
+      support.className = "og-support";
+      support.innerHTML = `
+        <div class="og-support-copy">
+          <p class="og-support-kicker">Need Help?</p>
+          <h2 class="og-support-title">Didn’t find what you were looking for?</h2>
+          <p class="og-support-text">Reach out to us on Discord and tell us what example or workflow you want next.</p>
+        </div>
+        <a class="og-support-link" href="https://discord.gg/BUBcPU8w" target="_blank" rel="noreferrer">${getDiscordIconMarkup()}<span>Join Discord</span></a>
+      `;
+      shell.appendChild(support);
+
+      app.replaceChildren(shell);
+    </script>
   </body>
 </html>
