@@ -13,7 +13,7 @@
   --og-shadow: 0 22px 44px rgba(72, 44, 24, 0.08);
   --og-font: "Space Grotesk", "Sora", "Avenir Next", "Segoe UI", sans-serif;
   --og-mono: "IBM Plex Mono", "JetBrains Mono", "SFMono-Regular", monospace;
-  --og-squircle: 32px 34px 30px 36px / 32px 28px 36px 30px;
+  --og-squircle-radius: 24px;
 }
 
 * {
@@ -52,13 +52,22 @@ code {
   padding: 26px 8px 48px;
 }
 
+.og-specs-head,
+.og-spec-card,
+.og-spec-open,
+.og-badge,
+.og-badge-link,
+.og-controls {
+  corner-shape: squircle;
+  border-radius: var(--og-squircle-radius);
+}
+
 .og-specs-head {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
   gap: 24px;
   padding: 22px 24px;
   border: 1px solid var(--og-line);
-  border-radius: var(--og-squircle);
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(249, 239, 229, 0.9));
   box-shadow: var(--og-shadow);
 }
@@ -132,7 +141,6 @@ code {
   border: 1px solid var(--og-line);
   min-height: 312px;
   padding: 18px 18px 16px;
-  border-radius: var(--og-squircle);
   box-shadow: var(--og-shadow);
   transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
@@ -209,7 +217,7 @@ code {
   display: inline-flex;
   align-items: center;
   padding: 2px 9px;
-  corner-shape: squicle;
+  corner-shape: squircle;
   border-radius: 12px;
   border: 1px solid rgba(214, 132, 83, 0.14);
   background: rgba(246, 234, 226, 0.92);
@@ -239,13 +247,6 @@ code {
   border-top: 1px solid rgba(95, 61, 46, 0.08);
 }
 
-.og-spec-context,
-.og-badge-context {
-  color: var(--og-muted-soft);
-  font-size: 12px;
-  letter-spacing: 0.02em;
-}
-
 .og-spec-open,
 .og-badge-link {
   display: inline-flex;
@@ -253,7 +254,6 @@ code {
   justify-content: center;
   min-height: 42px;
   padding: 0 16px;
-  border-radius: 14px;
   border: 1px solid rgba(96, 87, 78, 0.14);
   background: #64584f;
   color: #fbf7f3;
@@ -276,7 +276,6 @@ code {
   border: 1px solid var(--og-line);
   background: var(--og-panel);
   padding: 16px;
-  border-radius: var(--og-squircle);
   box-shadow: var(--og-shadow);
   z-index: 30;
 }
@@ -325,7 +324,6 @@ code {
   border: 1px solid var(--og-line);
   background: var(--og-panel);
   padding: 14px;
-  border-radius: var(--og-squircle);
   box-shadow: var(--og-shadow);
   z-index: 30;
 }

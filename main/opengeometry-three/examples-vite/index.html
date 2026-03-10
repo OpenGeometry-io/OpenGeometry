@@ -17,7 +17,7 @@
         --og-shadow: 0 22px 44px rgba(72, 44, 24, 0.08);
         --og-font: "Space Grotesk", "Sora", "Avenir Next", "Segoe UI", sans-serif;
         --og-mono: "IBM Plex Mono", "JetBrains Mono", "SFMono-Regular", monospace;
-        --og-squircle: 32px 34px 30px 36px / 32px 28px 36px 30px;
+        --og-squircle-radius: 24px;
       }
 
       * {
@@ -56,13 +56,21 @@
         padding: 26px 8px 48px;
       }
 
+      .og-specs-head,
+      .og-spec-card,
+      .og-support,
+      .og-spec-open,
+      .og-support-link {
+        corner-shape: squircle;
+        border-radius: var(--og-squircle-radius);
+      }
+
       .og-specs-head {
         display: grid;
         grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
         gap: 24px;
         padding: 22px 24px;
         border: 1px solid var(--og-line);
-        border-radius: var(--og-squircle);
         background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(249, 239, 229, 0.9));
         box-shadow: var(--og-shadow);
       }
@@ -135,7 +143,6 @@
         min-height: 312px;
         padding: 18px 18px 16px;
         border: 1px solid var(--og-line);
-        border-radius: var(--og-squircle);
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(250, 242, 235, 0.96));
         box-shadow: var(--og-shadow);
         transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
@@ -238,19 +245,12 @@
         border-top: 1px solid rgba(95, 61, 46, 0.08);
       }
 
-      .og-spec-context {
-        color: var(--og-muted-soft);
-        font-size: 12px;
-        letter-spacing: 0.02em;
-      }
-
       .og-spec-open {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         min-height: 42px;
         padding: 0 16px;
-        border-radius: 14px;
         border: 1px solid rgba(96, 87, 78, 0.14);
         background: #64584f;
         color: #fbf7f3;
@@ -267,7 +267,6 @@
         margin-top: 28px;
         padding: 20px 22px;
         border: 1px solid rgba(255, 84, 0, 0.18);
-        border-radius: var(--og-squircle);
         background: linear-gradient(145deg, rgba(255, 248, 242, 0.96), rgba(250, 239, 230, 0.92));
         box-shadow: var(--og-shadow);
       }
@@ -306,7 +305,6 @@
         gap: 10px;
         min-height: 46px;
         padding: 0 18px;
-        border-radius: 14px;
         border: 1px solid rgba(255, 84, 0, 0.18);
         background: var(--og-accent);
         color: #fff7f2;
@@ -658,7 +656,6 @@
           "</div>" +
           '<div class="og-spec-chip-row">' + chipsMarkup + "</div>" +
           '<div class="og-spec-card-footer">' +
-          '<span class="og-spec-context">' + example.footerText + "</span>" +
           '<a class="og-spec-open" href="./' + example.slug + '.html">Open example</a>' +
           "</div>";
 
