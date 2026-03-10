@@ -8,6 +8,85 @@
     <meta name="author" content="Vishwajeet Mane" />
   </head>
   <body>
+    <aside class="og-badge">
+      <div class="og-badge-top">
+        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
+        <p class="og-badge-status">ready</p>
+      </div>
+      <div class="og-badge-meta">
+        <p class="og-badge-kicker">OPEN GEOMETRY • SHAPES</p>
+        <strong class="og-badge-title">Sphere</strong>
+        <span class="og-badge-desc">UV sphere for equipment envelopes and clearance studies.</span>
+      </div>
+      <div class="og-badge-chip-row">
+          <span class="og-chip og-chip-accent">Radius</span>
+          <span class="og-chip og-chip-accent">Segments</span>
+      </div>
+      <div class="og-badge-footer">
+        <a class="og-badge-link" href="../index.html">Back to Examples</a>
+      </div>
+    </aside>
+    <aside class="og-controls" data-control-panel>
+      <h3>Sphere Parameters</h3>
+      <label class="og-control-row" data-control-key="radius" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Radius</span>
+          <code class="og-control-value" data-control-value>1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.2" max="3" step="0.05" value="1" />
+          <input data-control-number type="number" min="0.2" max="3" step="0.05" value="1" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="widthSegments" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Width Segments</span>
+          <code class="og-control-value" data-control-value>32</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="3" max="96" step="1" value="32" />
+          <input data-control-number type="number" min="3" max="96" step="1" value="32" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="heightSegments" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Height Segments</span>
+          <code class="og-control-value" data-control-value>20</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="2" max="64" step="1" value="20" />
+          <input data-control-number type="number" min="2" max="64" step="1" value="20" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outline</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Fat Outlines</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Fat Outlines" />
+          <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outline Width</span>
+          <code class="og-control-value" data-control-value>4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="1" max="12" step="0.5" value="4" />
+          <input data-control-number type="number" min="1" max="12" step="0.5" value="4" />
+        </div>
+      </label>
+    </aside>
     <div id="app"></div>
     <script type="module">
       import "../src/styles/theme.css";
@@ -16,7 +95,6 @@
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
       import { OpenGeometry, Sphere, Vector3 } from "@og-three";
 
-
       const app = document.getElementById("app");
       if (!app) {
         throw new Error("Missing #app container");
@@ -24,31 +102,6 @@
 
       function formatControlNumber(value) {
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
-      }
-
-      function createBadge(meta) {
-        const badge = document.createElement("div");
-        badge.className = "og-badge";
-        const chipMarkup = meta.chips
-          .map((chip) => '<span class="og-chip og-chip-accent">' + chip + "</span>")
-          .join("");
-
-        badge.innerHTML =
-          '<div class="og-badge-top">' +
-          '<div class="og-badge-icon-wrap"><strong>OG</strong></div>' +
-          '<p class="og-badge-status">' + meta.statusLabel + "</p>" +
-          "</div>" +
-          '<div class="og-badge-meta">' +
-          '<p class="og-badge-kicker">OPEN GEOMETRY • ' + meta.category.toUpperCase() + "</p>" +
-          '<strong class="og-badge-title">' + meta.title + "</strong>" +
-          '<span class="og-badge-desc">' + meta.description + "</span>" +
-          "</div>" +
-          '<div class="og-badge-chip-row">' + chipMarkup + "</div>" +
-          '<div class="og-badge-footer">' +
-          '<a class="og-badge-link" href="../index.html">Back to Examples</a>' +
-          "</div>";
-
-        document.body.appendChild(badge);
       }
 
       function disposeMaterial(material) {
@@ -89,58 +142,31 @@
         return Math.min(max, Math.max(min, value));
       }
 
-      function mountControls(title, definitions, onChange) {
-        const panel = document.createElement("aside");
-        panel.className = "og-controls";
-
-        const heading = document.createElement("h3");
-        heading.textContent = title;
-        panel.appendChild(heading);
+      function bindControls(definitions, onChange) {
+        const panel = document.querySelector("[data-control-panel]");
+        if (!panel) {
+          throw new Error("Missing control panel");
+        }
 
         const state = {};
-        definitions.forEach((definition) => {
-          state[definition.key] = definition.value;
-        });
-
         const emitChange = () => {
           onChange({ ...state });
         };
 
         definitions.forEach((definition) => {
-          const row = document.createElement("label");
-          row.className = "og-control-row";
-
-          const header = document.createElement("div");
-          header.className = "og-control-header";
-
-          const label = document.createElement("span");
-          label.className = "og-control-label-chip";
-          label.textContent = definition.label;
-          header.appendChild(label);
+          state[definition.key] = definition.value;
+          const row = panel.querySelector(`[data-control-key="${definition.key}"]`);
+          if (!row) {
+            throw new Error(`Missing control row for ${definition.key}`);
+          }
 
           if (definition.type === "number") {
-            const valueLabel = document.createElement("code");
-            valueLabel.className = "og-control-value";
-            valueLabel.textContent = formatControlNumber(definition.value);
-            header.appendChild(valueLabel);
-            row.appendChild(header);
-
-            const inputs = document.createElement("div");
-            inputs.className = "og-control-range";
-
-            const rangeInput = document.createElement("input");
-            rangeInput.type = "range";
-            rangeInput.min = String(definition.min);
-            rangeInput.max = String(definition.max);
-            rangeInput.step = String(definition.step || 0.01);
-            rangeInput.value = String(definition.value);
-
-            const numberInput = document.createElement("input");
-            numberInput.type = "number";
-            numberInput.min = String(definition.min);
-            numberInput.max = String(definition.max);
-            numberInput.step = String(definition.step || 0.01);
-            numberInput.value = String(definition.value);
+            const valueLabel = row.querySelector("[data-control-value]");
+            const rangeInput = row.querySelector("[data-control-range]");
+            const numberInput = row.querySelector("[data-control-number]");
+            if (!valueLabel || !rangeInput || !numberInput) {
+              throw new Error(`Missing number controls for ${definition.key}`);
+            }
 
             const updateValue = (raw) => {
               const next = clamp(raw, definition.min, definition.max);
@@ -153,62 +179,38 @@
 
             rangeInput.addEventListener("input", () => updateValue(Number(rangeInput.value)));
             numberInput.addEventListener("change", () => updateValue(Number(numberInput.value)));
-
-            inputs.appendChild(rangeInput);
-            inputs.appendChild(numberInput);
-            row.appendChild(inputs);
-          } else {
-            row.appendChild(header);
-
-            if (definition.type === "boolean") {
-              const boolWrap = document.createElement("div");
-              boolWrap.className = "og-control-bool";
-
-              const toggle = document.createElement("input");
-              toggle.type = "checkbox";
-              toggle.className = "og-toggle";
-              toggle.checked = definition.value;
-              toggle.setAttribute("aria-label", definition.label);
-
-              const boolLabel = document.createElement("span");
-              boolLabel.className = "og-control-bool-state";
-              boolLabel.textContent = definition.value ? "Enabled" : "Disabled";
-
-              toggle.addEventListener("change", () => {
-                state[definition.key] = toggle.checked;
-                boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-                emitChange();
-              });
-
-              boolWrap.appendChild(toggle);
-              boolWrap.appendChild(boolLabel);
-              row.appendChild(boolWrap);
-            } else {
-              const select = document.createElement("select");
-              select.className = "og-control-select";
-              select.setAttribute("aria-label", definition.label);
-
-              definition.options.forEach((option) => {
-                const optionElement = document.createElement("option");
-                optionElement.value = option.value;
-                optionElement.textContent = option.label;
-                optionElement.selected = option.value === definition.value;
-                select.appendChild(optionElement);
-              });
-
-              select.addEventListener("change", () => {
-                state[definition.key] = select.value;
-                emitChange();
-              });
-
-              row.appendChild(select);
-            }
+            valueLabel.textContent = formatControlNumber(definition.value);
+            return;
           }
 
-          panel.appendChild(row);
+          if (definition.type === "boolean") {
+            const toggle = row.querySelector("[data-control-toggle]");
+            const boolLabel = row.querySelector("[data-control-bool-state]");
+            if (!toggle || !boolLabel) {
+              throw new Error(`Missing boolean controls for ${definition.key}`);
+            }
+
+            toggle.checked = Boolean(definition.value);
+            boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
+            toggle.addEventListener("change", () => {
+              state[definition.key] = toggle.checked;
+              boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
+              emitChange();
+            });
+            return;
+          }
+
+          const select = row.querySelector("[data-control-select]");
+          if (!select) {
+            throw new Error(`Missing select control for ${definition.key}`);
+          }
+          select.value = String(definition.value);
+          select.addEventListener("change", () => {
+            state[definition.key] = select.value;
+            emitChange();
+          });
         });
 
-        document.body.appendChild(panel);
         emitChange();
       }
 
@@ -216,7 +218,6 @@
         const settings = options || {};
         document.body.classList.add("og-example-page");
         document.title = meta.title + " | OpenGeometry";
-        createBadge(meta);
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(settings.background || 0xf6f1eb);
@@ -281,7 +282,6 @@
         return { scene, camera, renderer, controls };
       }
 
-
       async function main() {
         const meta = {
         "slug": "shapes/sphere",
@@ -299,7 +299,7 @@
         const { scene } = await createExampleScene(meta);
         let current = null;
 
-        mountControls("Sphere Parameters", [
+        bindControls([
           { type: "number", key: "radius", label: "Radius", min: 0.2, max: 3, step: 0.05, value: 1.0 },
           { type: "number", key: "widthSegments", label: "Width Segments", min: 3, max: 96, step: 1, value: 32 },
           { type: "number", key: "heightSegments", label: "Height Segments", min: 2, max: 64, step: 1, value: 20 },

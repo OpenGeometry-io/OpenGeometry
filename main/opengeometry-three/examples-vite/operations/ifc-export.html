@@ -8,7 +8,216 @@
     <meta name="author" content="Vishwajeet Mane" />
   </head>
   <body>
+    <aside class="og-badge">
+      <div class="og-badge-top">
+        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
+        <p class="og-badge-status">ready</p>
+      </div>
+      <div class="og-badge-meta">
+        <p class="og-badge-kicker">OPEN GEOMETRY • OPERATIONS</p>
+        <strong class="og-badge-title">IFC Export</strong>
+        <span class="og-badge-desc">IFC4 export with user-side semantics sidecar and optional web-ifc parse probe.</span>
+      </div>
+      <div class="og-badge-chip-row">
+        <span class="og-chip og-chip-accent">Semantics JSON</span>
+        <span class="og-chip og-chip-accent">IFC4</span>
+      </div>
+      <div class="og-badge-footer">
+        <a class="og-badge-link" href="../index.html">Back to Examples</a>
+      </div>
+    </aside>
+
+    <aside class="og-controls" data-control-panel>
+      <h3>IFC Export</h3>
+      <p class="og-control-summary">
+        Pick a shape, edit semantics JSON keyed by entity id, and export IFC4.
+      </p>
+
+      <label class="og-control-row" data-control-key="shape" data-control-type="select">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Shape</span>
+        </div>
+        <select class="og-control-select" data-control-select aria-label="Shape">
+          <option value="cuboid" selected>Cuboid</option>
+          <option value="cylinder">Cylinder</option>
+          <option value="sphere">Sphere</option>
+          <option value="wedge">Wedge</option>
+        </select>
+      </label>
+
+      <div class="og-control-group" data-shape-group="cuboid">
+        <label class="og-control-row" data-control-key="cuboidWidth" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Width</span>
+            <code class="og-control-value" data-control-value>1.8</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.8" />
+            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.8" />
+          </div>
+        </label>
+        <label class="og-control-row" data-control-key="cuboidHeight" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Height</span>
+            <code class="og-control-value" data-control-value>1.4</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.4" />
+            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.4" />
+          </div>
+        </label>
+        <label class="og-control-row" data-control-key="cuboidDepth" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Depth</span>
+            <code class="og-control-value" data-control-value>1.1</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.1" />
+            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.1" />
+          </div>
+        </label>
+      </div>
+
+      <div class="og-control-group" data-shape-group="cylinder" hidden>
+        <label class="og-control-row" data-control-key="cylinderRadius" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Radius</span>
+            <code class="og-control-value" data-control-value>0.8</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="0.2" max="3" step="0.05" value="0.8" />
+            <input data-control-number type="number" min="0.2" max="3" step="0.05" value="0.8" />
+          </div>
+        </label>
+        <label class="og-control-row" data-control-key="cylinderHeight" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Height</span>
+            <code class="og-control-value" data-control-value>1.8</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.8" />
+            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.8" />
+          </div>
+        </label>
+        <label class="og-control-row" data-control-key="cylinderSegments" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Segments</span>
+            <code class="og-control-value" data-control-value>36</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="6" max="96" step="1" value="36" />
+            <input data-control-number type="number" min="6" max="96" step="1" value="36" />
+          </div>
+        </label>
+        <label class="og-control-row" data-control-key="cylinderAngleDeg" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Angle (deg)</span>
+            <code class="og-control-value" data-control-value>360</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="20" max="360" step="1" value="360" />
+            <input data-control-number type="number" min="20" max="360" step="1" value="360" />
+          </div>
+        </label>
+      </div>
+
+      <div class="og-control-group" data-shape-group="sphere" hidden>
+        <label class="og-control-row" data-control-key="sphereRadius" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Radius</span>
+            <code class="og-control-value" data-control-value>1</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="0.2" max="3" step="0.05" value="1" />
+            <input data-control-number type="number" min="0.2" max="3" step="0.05" value="1" />
+          </div>
+        </label>
+        <label class="og-control-row" data-control-key="sphereWidthSegments" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Width Segments</span>
+            <code class="og-control-value" data-control-value>32</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="3" max="96" step="1" value="32" />
+            <input data-control-number type="number" min="3" max="96" step="1" value="32" />
+          </div>
+        </label>
+        <label class="og-control-row" data-control-key="sphereHeightSegments" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Height Segments</span>
+            <code class="og-control-value" data-control-value>20</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="2" max="64" step="1" value="20" />
+            <input data-control-number type="number" min="2" max="64" step="1" value="20" />
+          </div>
+        </label>
+      </div>
+
+      <div class="og-control-group" data-shape-group="wedge" hidden>
+        <label class="og-control-row" data-control-key="wedgeWidth" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Width</span>
+            <code class="og-control-value" data-control-value>2</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="2" />
+            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="2" />
+          </div>
+        </label>
+        <label class="og-control-row" data-control-key="wedgeHeight" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Height</span>
+            <code class="og-control-value" data-control-value>1.8</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.8" />
+            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.8" />
+          </div>
+        </label>
+        <label class="og-control-row" data-control-key="wedgeDepth" data-control-type="number">
+          <div class="og-control-header">
+            <span class="og-control-label-chip">Depth</span>
+            <code class="og-control-value" data-control-value>1.4</code>
+          </div>
+          <div class="og-control-range">
+            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.4" />
+            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.4" />
+          </div>
+        </label>
+      </div>
+
+      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outline</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="semantics" data-control-type="textarea">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">IFC Semantics Sidecar</span>
+        </div>
+        <textarea
+          class="og-control-textarea"
+          data-semantics-text
+          aria-label="IFC Semantics Sidecar"
+          spellcheck="false"
+        ></textarea>
+      </label>
+
+      <button type="button" class="og-control-action og-control-action-rose" data-action="export-ifc">
+        Export IFC
+      </button>
+      <pre class="og-control-report" data-report>Generate geometry to enable IFC export.</pre>
+      <a data-download-link hidden></a>
+    </aside>
+
     <div id="app"></div>
+
     <script type="module">
       import "../src/styles/theme.css";
       import * as THREE from "three";
@@ -29,13 +238,27 @@
         throw new Error("Missing #app container");
       }
 
+      const panel = document.querySelector("[data-control-panel]");
+      const shapeSelect = panel?.querySelector('[data-control-key="shape"] [data-control-select]');
+      const outlineToggle = panel?.querySelector('[data-control-key="outline"] [data-control-toggle]');
+      const outlineStatus = panel?.querySelector('[data-control-key="outline"] [data-control-bool-state]');
+      const semanticsEditor = panel?.querySelector("[data-semantics-text]");
+      const exportButton = panel?.querySelector('[data-action="export-ifc"]');
+      const reportNode = panel?.querySelector("[data-report]");
+
+      if (
+        !panel ||
+        !shapeSelect ||
+        !outlineToggle ||
+        !outlineStatus ||
+        !semanticsEditor ||
+        !exportButton ||
+        !reportNode
+      ) {
+        throw new Error("Missing static IFC export UI nodes");
+      }
+
       const ENTITY_ID = "ifc-shape";
-      const SHAPE_LABELS = {
-        cuboid: "Cuboid",
-        cylinder: "Cylinder",
-        sphere: "Sphere",
-        wedge: "Wedge",
-      };
       const SHAPE_CONTROL_DEFS = {
         cuboid: [
           { key: "cuboidWidth", label: "Width", min: 0.2, max: 4, step: 0.05 },
@@ -69,31 +292,6 @@
           return String(Math.round(value));
         }
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
-      }
-
-      function createBadge(meta) {
-        const badge = document.createElement("div");
-        badge.className = "og-badge";
-        const chipMarkup = meta.chips
-          .map((chip) => '<span class="og-chip og-chip-accent">' + chip + "</span>")
-          .join("");
-
-        badge.innerHTML =
-          '<div class="og-badge-top">' +
-          '<div class="og-badge-icon-wrap"><strong>OG</strong></div>' +
-          '<p class="og-badge-status">' + meta.statusLabel + "</p>" +
-          "</div>" +
-          '<div class="og-badge-meta">' +
-          '<p class="og-badge-kicker">OPEN GEOMETRY • ' + meta.category.toUpperCase() + "</p>" +
-          '<strong class="og-badge-title">' + meta.title + "</strong>" +
-          '<span class="og-badge-desc">' + meta.description + "</span>" +
-          "</div>" +
-          '<div class="og-badge-chip-row">' + chipMarkup + "</div>" +
-          '<div class="og-badge-footer">' +
-          '<a class="og-badge-link" href="../index.html">Back to Examples</a>' +
-          "</div>";
-
-        document.body.appendChild(badge);
       }
 
       function disposeMaterial(material) {
@@ -131,9 +329,13 @@
       }
 
       function downloadText(text, filename, mime) {
+        const link = panel.querySelector("[data-download-link]");
+        if (!link) {
+          throw new Error("Missing download link node");
+        }
+
         const blob = new Blob([text], { type: mime });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
         link.href = url;
         link.download = filename;
         link.click();
@@ -211,64 +413,14 @@
         ].join("\n");
       }
 
-      function createControlRow(labelText) {
-        const row = document.createElement("label");
-        row.className = "og-control-row";
+      function bindNumberControl(row, definition, state, onChange) {
+        const valueLabel = row.querySelector("[data-control-value]");
+        const rangeInput = row.querySelector("[data-control-range]");
+        const numberInput = row.querySelector("[data-control-number]");
 
-        const header = document.createElement("div");
-        header.className = "og-control-header";
-
-        const label = document.createElement("span");
-        label.className = "og-control-label-chip";
-        label.textContent = labelText;
-        header.appendChild(label);
-
-        row.appendChild(header);
-        return { row, header };
-      }
-
-      function appendSelectControl(panel, labelText, options, value, onChange) {
-        const { row } = createControlRow(labelText);
-        const select = document.createElement("select");
-        select.className = "og-control-select";
-        select.setAttribute("aria-label", labelText);
-
-        options.forEach((option) => {
-          const optionElement = document.createElement("option");
-          optionElement.value = option.value;
-          optionElement.textContent = option.label;
-          optionElement.selected = option.value === value;
-          select.appendChild(optionElement);
-        });
-
-        select.addEventListener("change", () => {
-          onChange(select.value);
-        });
-
-        row.appendChild(select);
-        panel.appendChild(row);
-      }
-
-      function appendNumberControl(panel, definition, state, onChange) {
-        const { row, header } = createControlRow(definition.label);
-        const valueLabel = document.createElement("code");
-        valueLabel.className = "og-control-value";
-        header.appendChild(valueLabel);
-
-        const inputs = document.createElement("div");
-        inputs.className = "og-control-range";
-
-        const rangeInput = document.createElement("input");
-        rangeInput.type = "range";
-        rangeInput.min = String(definition.min);
-        rangeInput.max = String(definition.max);
-        rangeInput.step = String(definition.step);
-
-        const numberInput = document.createElement("input");
-        numberInput.type = "number";
-        numberInput.min = String(definition.min);
-        numberInput.max = String(definition.max);
-        numberInput.step = String(definition.step);
+        if (!valueLabel || !rangeInput || !numberInput) {
+          throw new Error(`Missing number control nodes for ${definition.key}`);
+        }
 
         const syncDisplay = (value) => {
           state.values[definition.key] = value;
@@ -285,86 +437,14 @@
         };
 
         syncDisplay(state.values[definition.key]);
-
-        rangeInput.addEventListener("input", () => {
-          updateValue(Number(rangeInput.value));
-        });
-        numberInput.addEventListener("change", () => {
-          updateValue(Number(numberInput.value));
-        });
-
-        inputs.appendChild(rangeInput);
-        inputs.appendChild(numberInput);
-        row.appendChild(inputs);
-        panel.appendChild(row);
-      }
-
-      function appendToggleControl(panel, labelText, initialValue, onChange) {
-        const { row } = createControlRow(labelText);
-        const boolWrap = document.createElement("div");
-        boolWrap.className = "og-control-bool";
-
-        const toggle = document.createElement("input");
-        toggle.type = "checkbox";
-        toggle.className = "og-toggle";
-        toggle.checked = initialValue;
-        toggle.setAttribute("aria-label", labelText);
-
-        const status = document.createElement("span");
-        status.className = "og-control-bool-state";
-        status.textContent = initialValue ? "Enabled" : "Disabled";
-
-        toggle.addEventListener("change", () => {
-          status.textContent = toggle.checked ? "Enabled" : "Disabled";
-          onChange(toggle.checked);
-        });
-
-        boolWrap.appendChild(toggle);
-        boolWrap.appendChild(status);
-        row.appendChild(boolWrap);
-        panel.appendChild(row);
-      }
-
-      function appendTextAreaControl(panel, labelText, value) {
-        const { row } = createControlRow(labelText);
-        const textarea = document.createElement("textarea");
-        textarea.value = value;
-        textarea.style.width = "100%";
-        textarea.style.minHeight = "150px";
-        textarea.style.border = "1px solid rgba(95, 61, 46, 0.1)";
-        textarea.style.background = "rgba(255, 255, 255, 0.9)";
-        textarea.style.color = "#242424";
-        textarea.style.padding = "10px 12px";
-        textarea.style.font = '12px/1.35 "IBM Plex Mono", "JetBrains Mono", "SFMono-Regular", monospace';
-        textarea.style.borderRadius = "14px";
-        textarea.style.resize = "vertical";
-        row.appendChild(textarea);
-        panel.appendChild(row);
-        return textarea;
-      }
-
-      function createActionButton(labelText, background) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = labelText;
-        button.style.width = "100%";
-        button.style.marginTop = "0.25rem";
-        button.style.padding = "0.55rem 0.75rem";
-        button.style.cursor = "pointer";
-        button.style.border = "1px solid rgba(95, 61, 46, 0.14)";
-        button.style.cornerShape = "squircle";
-        button.style.borderRadius = "24px";
-        button.style.background = background;
-        button.style.color = "#171717";
-        button.style.font = "600 14px/1.2 inherit";
-        return button;
+        rangeInput.addEventListener("input", () => updateValue(Number(rangeInput.value)));
+        numberInput.addEventListener("change", () => updateValue(Number(numberInput.value)));
       }
 
       async function createExampleScene(meta, options) {
         const settings = options || {};
         document.body.classList.add("og-example-page");
         document.title = meta.title + " | OpenGeometry";
-        createBadge(meta);
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(settings.background || 0xf6f1eb);
@@ -455,25 +535,15 @@
             wedgeDepth: 1.4,
           },
         };
-
-        const panel = document.createElement("aside");
-        panel.className = "og-controls";
-
-        const heading = document.createElement("h3");
-        heading.textContent = "IFC Export";
-        panel.appendChild(heading);
-
-        const summary = document.createElement("p");
-        summary.style.margin = "0 0 0.75rem";
-        summary.style.fontSize = "0.75rem";
-        summary.style.color = "#5f5f5f";
-        summary.textContent =
-          "Pick a shape, edit semantics JSON keyed by entity id, and export IFC4.";
-        panel.appendChild(summary);
+        semanticsEditor.value = defaultSemantics(ENTITY_ID);
 
         const shapeGroups = new Map();
-        let exportButton = null;
-        let reportNode = null;
+
+        const updateGroupVisibility = () => {
+          shapeGroups.forEach((group, shape) => {
+            group.hidden = shape !== state.shape;
+          });
+        };
 
         const renderCurrentShape = () => {
           try {
@@ -572,52 +642,38 @@
           }
         };
 
-        const updateGroupVisibility = () => {
-          shapeGroups.forEach((group, shape) => {
-            group.style.display = shape === state.shape ? "block" : "none";
-          });
-        };
-
-        appendSelectControl(
-          panel,
-          "Shape",
-          Object.keys(SHAPE_LABELS).map((shape) => ({ value: shape, label: SHAPE_LABELS[shape] })),
-          state.shape,
-          (value) => {
-            state.shape = value;
-            updateGroupVisibility();
-            renderCurrentShape();
-          }
-        );
-
         Object.keys(SHAPE_CONTROL_DEFS).forEach((shape) => {
-          const group = document.createElement("div");
-          SHAPE_CONTROL_DEFS[shape].forEach((definition) => {
-            appendNumberControl(group, definition, state, renderCurrentShape);
-          });
+          const group = panel.querySelector(`[data-shape-group="${shape}"]`);
+          if (!group) {
+            throw new Error(`Missing shape group for ${shape}`);
+          }
+
           shapeGroups.set(shape, group);
-          panel.appendChild(group);
+          SHAPE_CONTROL_DEFS[shape].forEach((definition) => {
+            const row = group.querySelector(`[data-control-key="${definition.key}"]`);
+            if (!row) {
+              throw new Error(`Missing row for ${definition.key}`);
+            }
+            bindNumberControl(row, definition, state, renderCurrentShape);
+          });
         });
 
-        appendToggleControl(panel, "Outline", state.outline, (nextValue) => {
-          state.outline = nextValue;
+        shapeSelect.value = state.shape;
+        shapeSelect.addEventListener("change", () => {
+          state.shape = shapeSelect.value;
+          updateGroupVisibility();
           renderCurrentShape();
         });
 
-        const semanticsEditor = appendTextAreaControl(panel, "IFC Semantics Sidecar", defaultSemantics(ENTITY_ID));
+        outlineToggle.checked = state.outline;
+        outlineStatus.textContent = state.outline ? "Enabled" : "Disabled";
+        outlineToggle.addEventListener("change", () => {
+          state.outline = outlineToggle.checked;
+          outlineStatus.textContent = outlineToggle.checked ? "Enabled" : "Disabled";
+          renderCurrentShape();
+        });
 
-        exportButton = createActionButton("Export IFC", "#fb7185");
         exportButton.dataset.filename = "opengeometry-cuboid.ifc";
-        panel.appendChild(exportButton);
-
-        reportNode = document.createElement("pre");
-        reportNode.style.margin = "0.75rem 0 0";
-        reportNode.style.fontSize = "0.75rem";
-        reportNode.style.lineHeight = "1.45";
-        reportNode.style.whiteSpace = "pre-wrap";
-        reportNode.textContent = "Generate geometry to enable IFC export.";
-        panel.appendChild(reportNode);
-
         exportButton.addEventListener("click", async () => {
           try {
             let semantics;
@@ -657,7 +713,6 @@
           }
         });
 
-        document.body.appendChild(panel);
         updateGroupVisibility();
         renderCurrentShape();
       }

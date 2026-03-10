@@ -335,6 +335,13 @@ code {
   letter-spacing: -0.02em;
 }
 
+.og-control-summary {
+  margin: 0 0 12px;
+  color: var(--og-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .og-control-row {
   display: grid;
   gap: 10px;
@@ -418,6 +425,71 @@ code {
   font-size: 12px;
 }
 
+.og-control-color,
+.og-control-textarea {
+  width: 100%;
+  border: 1px solid var(--og-line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--og-text);
+  font: inherit;
+  border-radius: 12px;
+}
+
+.og-control-color {
+  min-height: 42px;
+  padding: 6px;
+}
+
+.og-control-textarea {
+  min-height: 150px;
+  padding: 10px 12px;
+  resize: vertical;
+  font: 12px/1.35 var(--og-mono);
+}
+
+.og-control-group[hidden] {
+  display: none;
+}
+
+.og-control-readonly {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.og-control-action {
+  width: 100%;
+  margin-top: 0.35rem;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid rgba(96, 87, 78, 0.14);
+  border-radius: 24px;
+  cursor: pointer;
+  color: #171717;
+  font: 600 14px/1.2 var(--og-font);
+}
+
+.og-control-action-cyan {
+  background: #22d3ee;
+}
+
+.og-control-action-amber {
+  background: #f59e0b;
+}
+
+.og-control-action-rose {
+  background: #fb7185;
+}
+
+.og-control-report {
+  margin: 0.75rem 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(95, 61, 46, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--og-text);
+  font: 12px/1.45 var(--og-mono);
+  white-space: pre-wrap;
+}
+
 #polygon-description {
   position: fixed;
   left: 16px;
@@ -430,6 +502,19 @@ code {
   color: #fff7f2;
   box-shadow: var(--og-shadow);
   z-index: 25;
+}
+
+#polygon-description strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+#polygon-description p {
+  margin: 0;
+}
+
+#polygon-description p + p {
+  margin-top: 6px;
 }
 
 #stats {

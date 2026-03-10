@@ -8,7 +8,156 @@
     <meta name="author" content="Vishwajeet Mane" />
   </head>
   <body>
+    <aside class="og-badge">
+      <div class="og-badge-top">
+        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
+        <p class="og-badge-status">ready</p>
+      </div>
+      <div class="og-badge-meta">
+        <p class="og-badge-kicker">OPEN GEOMETRY • OPERATIONS</p>
+        <strong class="og-badge-title">Door Export</strong>
+        <span class="og-badge-desc"
+          >Door panel as Cuboid plus frame from swept profile, exported through STL, STEP and IFC.</span
+        >
+      </div>
+      <div class="og-badge-chip-row">
+        <span class="og-chip og-chip-accent">Door Panel</span>
+        <span class="og-chip og-chip-accent">Frame Profile</span>
+        <span class="og-chip og-chip-accent">IFC</span>
+      </div>
+      <div class="og-badge-footer">
+        <a class="og-badge-link" href="../index.html">Back to Examples</a>
+      </div>
+    </aside>
+
+    <aside class="og-controls" data-control-panel>
+      <h3>Door Export</h3>
+      <p class="og-control-summary">
+        Frame is a custom profile sweep. Door panel is a Cuboid. Four doors are placed and exported together.
+      </p>
+
+      <label class="og-control-row" data-control-key="doorWidth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Door Width</span>
+          <code class="og-control-value" data-control-value>0.95</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.6" max="2" step="0.01" value="0.95" />
+          <input data-control-number type="number" min="0.6" max="2" step="0.01" value="0.95" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="doorHeight" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Door Height</span>
+          <code class="og-control-value" data-control-value>2.1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="1.8" max="3" step="0.01" value="2.1" />
+          <input data-control-number type="number" min="1.8" max="3" step="0.01" value="2.1" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="panelThickness" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Panel Thickness</span>
+          <code class="og-control-value" data-control-value>0.04</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.02" max="0.12" step="0.005" value="0.04" />
+          <input data-control-number type="number" min="0.02" max="0.12" step="0.005" value="0.04" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="frameDepth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Frame Depth</span>
+          <code class="og-control-value" data-control-value>0.12</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.06" max="0.3" step="0.005" value="0.12" />
+          <input data-control-number type="number" min="0.06" max="0.3" step="0.005" value="0.12" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="frameFace" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Frame Face</span>
+          <code class="og-control-value" data-control-value>0.05</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.02" max="0.15" step="0.005" value="0.05" />
+          <input data-control-number type="number" min="0.02" max="0.15" step="0.005" value="0.05" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="frameRebate" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Frame Rebate</span>
+          <code class="og-control-value" data-control-value>0.025</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.01" max="0.12" step="0.005" value="0.025" />
+          <input data-control-number type="number" min="0.01" max="0.12" step="0.005" value="0.025" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="frameClearance" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Panel Clearance</span>
+          <code class="og-control-value" data-control-value>0.012</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.002" max="0.04" step="0.001" value="0.012" />
+          <input data-control-number type="number" min="0.002" max="0.04" step="0.001" value="0.012" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showFrame" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Show Frame</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Show Frame" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showPanel" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Show Panel</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Show Panel" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outline</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <button type="button" class="og-control-action og-control-action-cyan" data-action="export-stl">
+        Export Binary STL
+      </button>
+      <button type="button" class="og-control-action og-control-action-amber" data-action="export-step">
+        Export STEP
+      </button>
+      <button type="button" class="og-control-action og-control-action-rose" data-action="export-ifc">
+        Export IFC Door
+      </button>
+      <pre class="og-control-report" data-report>Generate geometry to enable door assembly exports.</pre>
+      <a data-download-link hidden></a>
+    </aside>
+
     <div id="app"></div>
+
     <script type="module">
       import "../src/styles/theme.css";
       import * as THREE from "three";
@@ -26,6 +175,16 @@
       const app = document.getElementById("app");
       if (!app) {
         throw new Error("Missing #app container");
+      }
+
+      const panel = document.querySelector("[data-control-panel]");
+      const reportNode = panel?.querySelector("[data-report]");
+      const stlButton = panel?.querySelector('[data-action="export-stl"]');
+      const stepButton = panel?.querySelector('[data-action="export-step"]');
+      const ifcButton = panel?.querySelector('[data-action="export-ifc"]');
+
+      if (!panel || !reportNode || !stlButton || !stepButton || !ifcButton) {
+        throw new Error("Missing static door export UI nodes");
       }
 
       const PANEL_ENTITY_ID = "ifc-door-panel";
@@ -106,9 +265,13 @@
       }
 
       function downloadText(text, filename, mime) {
+        const link = panel.querySelector("[data-download-link]");
+        if (!link) {
+          throw new Error("Missing download link node");
+        }
+
         const blob = new Blob([text], { type: mime });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
         link.href = url;
         link.download = filename;
         link.click();
@@ -116,9 +279,13 @@
       }
 
       function downloadBytes(bytes, filename, mime) {
+        const link = panel.querySelector("[data-download-link]");
+        if (!link) {
+          throw new Error("Missing download link node");
+        }
+
         const blob = new Blob([bytes], { type: mime });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
         link.href = url;
         link.download = filename;
         link.click();
@@ -225,31 +392,6 @@
         return semantics;
       }
 
-      function createBadge(meta) {
-        const badge = document.createElement("div");
-        badge.className = "og-badge";
-        const chipMarkup = meta.chips
-          .map((chip) => '<span class="og-chip og-chip-accent">' + chip + "</span>")
-          .join("");
-
-        badge.innerHTML =
-          '<div class="og-badge-top">' +
-          '<div class="og-badge-icon-wrap"><strong>OG</strong></div>' +
-          '<p class="og-badge-status">' + meta.statusLabel + "</p>" +
-          "</div>" +
-          '<div class="og-badge-meta">' +
-          '<p class="og-badge-kicker">OPEN GEOMETRY • ' + meta.category.toUpperCase() + "</p>" +
-          '<strong class="og-badge-title">' + meta.title + "</strong>" +
-          '<span class="og-badge-desc">' + meta.description + "</span>" +
-          "</div>" +
-          '<div class="og-badge-chip-row">' + chipMarkup + "</div>" +
-          '<div class="og-badge-footer">' +
-          '<a class="og-badge-link" href="../index.html">Back to Examples</a>' +
-          "</div>";
-
-        document.body.appendChild(badge);
-      }
-
       function disposeMaterial(material) {
         if (!material) {
           return;
@@ -284,42 +426,19 @@
         return next;
       }
 
-      function createControlRow(labelText) {
-        const row = document.createElement("label");
-        row.className = "og-control-row";
+      function bindNumberControl(definition, state, onChange) {
+        const row = panel.querySelector(`[data-control-key="${definition.key}"]`);
+        if (!row) {
+          throw new Error(`Missing row for ${definition.key}`);
+        }
 
-        const header = document.createElement("div");
-        header.className = "og-control-header";
+        const valueLabel = row.querySelector("[data-control-value]");
+        const rangeInput = row.querySelector("[data-control-range]");
+        const numberInput = row.querySelector("[data-control-number]");
 
-        const label = document.createElement("span");
-        label.className = "og-control-label-chip";
-        label.textContent = labelText;
-        header.appendChild(label);
-
-        row.appendChild(header);
-        return { row, header };
-      }
-
-      function appendNumberControl(panel, definition, state, onChange) {
-        const { row, header } = createControlRow(definition.label);
-        const valueLabel = document.createElement("code");
-        valueLabel.className = "og-control-value";
-        header.appendChild(valueLabel);
-
-        const inputs = document.createElement("div");
-        inputs.className = "og-control-range";
-
-        const rangeInput = document.createElement("input");
-        rangeInput.type = "range";
-        rangeInput.min = String(definition.min);
-        rangeInput.max = String(definition.max);
-        rangeInput.step = String(definition.step);
-
-        const numberInput = document.createElement("input");
-        numberInput.type = "number";
-        numberInput.min = String(definition.min);
-        numberInput.max = String(definition.max);
-        numberInput.step = String(definition.step);
+        if (!valueLabel || !rangeInput || !numberInput) {
+          throw new Error(`Missing number control nodes for ${definition.key}`);
+        }
 
         const syncDisplay = (value) => {
           state.values[definition.key] = value;
@@ -335,68 +454,34 @@
         };
 
         syncDisplay(state.values[definition.key]);
-
-        rangeInput.addEventListener("input", () => {
-          updateValue(Number(rangeInput.value));
-        });
-        numberInput.addEventListener("change", () => {
-          updateValue(Number(numberInput.value));
-        });
-
-        inputs.appendChild(rangeInput);
-        inputs.appendChild(numberInput);
-        row.appendChild(inputs);
-        panel.appendChild(row);
+        rangeInput.addEventListener("input", () => updateValue(Number(rangeInput.value)));
+        numberInput.addEventListener("change", () => updateValue(Number(numberInput.value)));
       }
 
-      function appendToggleControl(panel, labelText, initialValue, onChange) {
-        const { row } = createControlRow(labelText);
-        const boolWrap = document.createElement("div");
-        boolWrap.className = "og-control-bool";
+      function bindToggleControl(key, initialValue, onChange) {
+        const row = panel.querySelector(`[data-control-key="${key}"]`);
+        if (!row) {
+          throw new Error(`Missing toggle row for ${key}`);
+        }
 
-        const toggle = document.createElement("input");
-        toggle.type = "checkbox";
-        toggle.className = "og-toggle";
+        const toggle = row.querySelector("[data-control-toggle]");
+        const status = row.querySelector("[data-control-bool-state]");
+        if (!toggle || !status) {
+          throw new Error(`Missing toggle controls for ${key}`);
+        }
+
         toggle.checked = initialValue;
-        toggle.setAttribute("aria-label", labelText);
-
-        const status = document.createElement("span");
-        status.className = "og-control-bool-state";
         status.textContent = initialValue ? "Enabled" : "Disabled";
-
         toggle.addEventListener("change", () => {
           status.textContent = toggle.checked ? "Enabled" : "Disabled";
           onChange(toggle.checked);
         });
-
-        boolWrap.appendChild(toggle);
-        boolWrap.appendChild(status);
-        row.appendChild(boolWrap);
-        panel.appendChild(row);
-      }
-
-      function createActionButton(labelText, background) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = labelText;
-        button.style.width = "100%";
-        button.style.marginTop = "0.35rem";
-        button.style.padding = "0.55rem 0.75rem";
-        button.style.cursor = "pointer";
-        button.style.border = "1px solid rgba(95, 61, 46, 0.14)";
-        button.style.cornerShape = "squircle";
-        button.style.borderRadius = "24px";
-        button.style.background = background;
-        button.style.color = "#171717";
-        button.style.font = "600 14px/1.2 inherit";
-        return button;
       }
 
       async function createExampleScene(meta, options) {
         const settings = options || {};
         document.body.classList.add("og-example-page");
         document.title = meta.title + " | OpenGeometry";
-        createBadge(meta);
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(settings.background || 0xf6f1eb);
@@ -482,27 +567,6 @@
             frameClearance: 0.012,
           },
         };
-
-        const panel = document.createElement("aside");
-        panel.className = "og-controls";
-
-        const heading = document.createElement("h3");
-        heading.textContent = "Door Export";
-        panel.appendChild(heading);
-
-        const summary = document.createElement("p");
-        summary.style.margin = "0 0 0.75rem";
-        summary.style.fontSize = "0.75rem";
-        summary.style.color = "#5f5f5f";
-        summary.textContent =
-          "Frame is a custom profile sweep. Door panel is a Cuboid. Four doors are placed and exported together.";
-        panel.appendChild(summary);
-
-        const reportNode = document.createElement("pre");
-        reportNode.style.margin = "0.75rem 0 0";
-        reportNode.style.fontSize = "0.75rem";
-        reportNode.style.lineHeight = "1.45";
-        reportNode.style.whiteSpace = "pre-wrap";
 
         const renderDoorAssembly = () => {
           try {
@@ -600,25 +664,21 @@
         };
 
         NUMBER_CONTROLS.forEach((definition) => {
-          appendNumberControl(panel, definition, state, renderDoorAssembly);
+          bindNumberControl(definition, state, renderDoorAssembly);
         });
 
-        appendToggleControl(panel, "Show Frame", state.showFrame, (nextValue) => {
+        bindToggleControl("showFrame", state.showFrame, (nextValue) => {
           state.showFrame = nextValue;
           renderDoorAssembly();
         });
-        appendToggleControl(panel, "Show Panel", state.showPanel, (nextValue) => {
+        bindToggleControl("showPanel", state.showPanel, (nextValue) => {
           state.showPanel = nextValue;
           renderDoorAssembly();
         });
-        appendToggleControl(panel, "Outline", state.outline, (nextValue) => {
+        bindToggleControl("outline", state.outline, (nextValue) => {
           state.outline = nextValue;
           renderDoorAssembly();
         });
-
-        const stlButton = createActionButton("Export Binary STL", "#22d3ee");
-        const stepButton = createActionButton("Export STEP", "#f59e0b");
-        const ifcButton = createActionButton("Export IFC Door", "#fb7185");
 
         stlButton.addEventListener("click", () => {
           try {
@@ -710,13 +770,6 @@
           }
         });
 
-        panel.appendChild(stlButton);
-        panel.appendChild(stepButton);
-        panel.appendChild(ifcButton);
-        reportNode.textContent = "Generate geometry to enable door assembly exports.";
-        panel.appendChild(reportNode);
-
-        document.body.appendChild(panel);
         renderDoorAssembly();
       }
 
