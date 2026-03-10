@@ -1,0 +1,12 @@
+[package]
+name = "opengeometry-export-io"
+version = "0.1.0"
+edition = "2021"
+license = "MIT/Apache-2.0"
+description = "File IO exporters (IFC/STL) for OpenGeometry snapshots"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+uuid = { version = "1.17.0", features = ["v5"] }
+stl_io = "0.8"
+opengeometry-export-schema = { path = "../opengeometry-export-schema" }

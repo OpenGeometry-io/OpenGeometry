@@ -226,6 +226,7 @@
       import {
         Cuboid,
         Cylinder,
+        OGFileExporter,
         OGSceneManager,
         OpenGeometry,
         Sphere,
@@ -398,18 +399,19 @@
           `File: ${filename}`,
           `Bytes: ${bytes}`,
           parseMessage,
-          `Input BReps: ${report.input_breps}`,
-          `Input Faces: ${report.input_faces}`,
+          `Input Entities: ${report.input_entities}`,
+          `Input Triangles: ${report.input_triangles}`,
           `Exported Elements: ${report.exported_elements}`,
-          `Exported Faces: ${report.exported_faces}`,
-          `Exported Triangles: ${report.exported_triangles}`,
           `Skipped Entities: ${report.skipped_entities}`,
-          `Skipped Faces: ${report.skipped_faces}`,
-          `Topology Errors: ${report.topology_errors}`,
+          `Skipped Triangles: ${report.skipped_triangles}`,
           `Semantics Applied: ${report.semantics_applied}`,
           `Proxy Fallbacks: ${report.proxy_fallbacks}`,
           `Property Sets Written: ${report.property_sets_written}`,
           `Quantity Sets Written: ${report.quantity_sets_written}`,
+          `Materials Written: ${report.materials_written}`,
+          `Material Assignments Written: ${report.material_assignments_written}`,
+          `Styled Items Written: ${report.styled_items_written}`,
+          `Missing Material Refs: ${report.missing_material_refs}`,
         ].join("\n");
       }
 
@@ -513,6 +515,7 @@
 
         const { scene } = await createExampleScene(meta);
         const manager = new OGSceneManager();
+        const fileExporter = new OGFileExporter();
         const sceneId = manager.createScene("ifc-export-scene");
         let current = null;
 
@@ -697,7 +700,11 @@
               semantics,
             };
 
-            const result = manager.exportSceneToIfc(sceneId, JSON.stringify(config));
+            const snapshotJson = manager.getSceneSerialized(sceneId);
+            const result = fileExporter.exportSceneSnapshotToIfc(
+              snapshotJson,
+              JSON.stringify(config)
+            );
             const report = JSON.parse(result.reportJson);
             const filename = exportButton.dataset.filename || "opengeometry-shape.ifc";
             downloadText(result.text, filename, "model/ifc");

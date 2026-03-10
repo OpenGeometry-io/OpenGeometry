@@ -31,4 +31,5 @@ pub mod primitives {
 
 pub mod brep;
 pub mod export;
+pub mod file_exporter;
 pub mod scenegraph;

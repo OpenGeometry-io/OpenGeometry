@@ -3,6 +3,7 @@
  * @module @opengeometry/kernel-three
  */
 import init, {
+  OGFileExporter,
   OGSceneManager,
   Vector3,
 } from "../opengeometry/pkg/opengeometry";
@@ -92,6 +93,7 @@ export class OpenGeometry {
 }
 
 export {
+  OGFileExporter,
   OGSceneManager,
   Vector3,
   SpotLabel,

@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Door Feature Tree Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Feature tree example with wall opening, swept door frame, and panel recompute"
+    />
+  </head>
+  <body>
+    <aside class="og-badge">
+      <div class="og-badge-top">
+        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
+        <p class="og-badge-status">ready</p>
+      </div>
+      <div class="og-badge-meta">
+        <p class="og-badge-kicker">OPEN GEOMETRY • OPERATIONS</p>
+        <strong class="og-badge-title">Door Feature Tree</strong>
+        <span class="og-badge-desc">
+          Wall opening plus swept frame and panel. Changing wall width updates frame depth.
+        </span>
+      </div>
+      <div class="og-badge-chip-row">
+        <span class="og-chip og-chip-accent">Wall Opening</span>
+        <span class="og-chip og-chip-accent">Sweep Frame</span>
+      </div>
+      <div class="og-badge-footer">
+        <a class="og-badge-link" href="../index.html">Back to Examples</a>
+      </div>
+    </aside>
+
+    <aside class="og-controls" data-control-panel>
+      <h3>Door In Wall</h3>
+      <p class="og-control-summary">
+        The wall is modeled with an opening, then a frame (sweep) and panel are inserted as
+        dependent features.
+      </p>
+
+      <label class="og-control-row" data-control-key="wallWidth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Wall Width</span>
+          <code class="og-control-value" data-control-value>0.24</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.08" max="0.6" step="0.01" value="0.24" />
+          <input data-control-number type="number" min="0.08" max="0.6" step="0.01" value="0.24" />
+        </div>
+      </label>
+
+      <button type="button" class="og-control-action og-control-action-cyan" data-action="seed">
+        Build Wall + Door
+      </button>
+      <button type="button" class="og-control-action" data-action="apply-width">
+        Apply Wall Width Change
+      </button>
+      <button type="button" class="og-control-action" data-action="recompute">
+        Recompute Dirty Nodes
+      </button>
+      <button type="button" class="og-control-action" data-action="mark-wall-dirty">
+        Mark Wall Dirty
+      </button>
+      <button type="button" class="og-control-action" data-action="cycle-test">
+        Try Invalid Loop
+      </button>
+      <button type="button" class="og-control-action og-control-action-magenta" data-action="reset">
+        Reset Scene
+      </button>
+
+      <label class="og-control-row" data-toggle-group="wall" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Suppress Wall</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Suppress Wall" />
+          <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-toggle-group="frame" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Suppress Frame</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Suppress Frame" />
+          <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-toggle-group="panel" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Suppress Panel</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Suppress Panel" />
+          <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+        </div>
+      </label>
+
+      <pre class="og-control-report" data-report>Click "Build Wall + Door" to start.</pre>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { Cuboid, OGSceneManager, OpenGeometry, Sweep, Vector3 } from "@og-three";
+
+      const app = document.getElementById("app");
+      if (!app) {
+        throw new Error("Missing #app container");
+      }
+
+      const panel = document.querySelector("[data-control-panel]");
+      const reportNode = panel?.querySelector("[data-report]");
+
+      if (!panel || !reportNode) {
+        throw new Error("Missing static door feature tree UI nodes");
+      }
+
+      const NODE_IDS = {
+        wall_left: "feature-wall-left",
+        wall_right: "feature-wall-right",
+        wall_lintel: "feature-wall-lintel",
+        frame: "feature-door-frame",
+        panel: "feature-door-panel",
+      };
+
+      const ENTITY_IDS = {
+        wall_left: "entity-wall-left",
+        wall_right: "entity-wall-right",
+        wall_lintel: "entity-wall-lintel",
+        frame: "entity-door-frame",
+        panel: "entity-door-panel",
+      };
+
+      const TOGGLE_GROUPS = {
+        wall: [NODE_IDS.wall_left, NODE_IDS.wall_right, NODE_IDS.wall_lintel],
+        frame: [NODE_IDS.frame],
+        panel: [NODE_IDS.panel],
+      };
+
+      const WALL_TOTAL_WIDTH = 4.2;
+      const WALL_HEIGHT = 2.8;
+      const OPENING_WIDTH = 1.05;
+      const OPENING_HEIGHT = 2.1;
+      const FRAME_FACE = 0.05;
+      const FRAME_REBATE = 0.025;
+      const PANEL_CLEARANCE = 0.012;
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function formatNumber(value) {
+        return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      }
+
+      function clonePoints(points) {
+        return points.map((point) => point.clone());
+      }
+
+      function buildFramePath(width, height, clearance) {
+        const xLeft = -width * 0.5 - clearance;
+        const xRight = width * 0.5 + clearance;
+        return [
+          new Vector3(xLeft, 0, 0),
+          new Vector3(xLeft, height, 0),
+          new Vector3(xRight, height, 0),
+          new Vector3(xRight, 0, 0),
+        ];
+      }
+
+      function buildFrameProfile(frameDepth, frameFace, frameRebate) {
+        const depth = Math.max(frameDepth, frameFace + 0.004, frameRebate + 0.004);
+        const face = clamp(frameFace, 0.002, depth - 0.002);
+        const rebate = clamp(frameRebate, 0.002, depth - 0.002);
+
+        const raw = [
+          new Vector3(depth, 0, depth),
+          new Vector3(rebate, 0, depth),
+          new Vector3(rebate, 0, face),
+          new Vector3(0, 0, face),
+          new Vector3(0, 0, 0),
+          new Vector3(depth, 0, 0),
+        ];
+
+        const avgZ = raw.reduce((sum, point) => sum + point.z, 0) / raw.length;
+        return [new Vector3(depth, 0, avgZ), ...raw];
+      }
+
+      function disposeMaterial(material) {
+        if (!material) {
+          return;
+        }
+        if (Array.isArray(material)) {
+          material.forEach((entry) => entry && entry.dispose && entry.dispose());
+          return;
+        }
+        if (material.dispose) {
+          material.dispose();
+        }
+      }
+
+      function disposeObject3D(object) {
+        object.traverse((node) => {
+          if (node.geometry && node.geometry.dispose) {
+            node.geometry.dispose();
+          }
+          disposeMaterial(node.material);
+        });
+      }
+
+      function replaceSceneObject(scene, previous, next) {
+        if (previous) {
+          previous.parent && previous.parent.remove(previous);
+          disposeObject3D(previous);
+        }
+        scene.add(next);
+        return next;
+      }
+
+      function formatFeatureNode(node) {
+        const deps = node.dependencies && node.dependencies.length ? node.dependencies.join(", ") : "none";
+        return `- ${node.id} | deps: ${deps} | dirty: ${node.dirty} | suppressed: ${node.suppressed}`;
+      }
+
+      function renderEntityGroup(snapshot) {
+        const root = new THREE.Group();
+        const colorByEntity = {
+          [ENTITY_IDS.wall_left]: 0x94a3b8,
+          [ENTITY_IDS.wall_right]: 0x94a3b8,
+          [ENTITY_IDS.wall_lintel]: 0x94a3b8,
+          [ENTITY_IDS.frame]: 0x64748b,
+          [ENTITY_IDS.panel]: 0x2563eb,
+        };
+
+        for (const entity of snapshot.entities || []) {
+          const mesh = entity.mesh || {};
+          if (!Array.isArray(mesh.points) || !Array.isArray(mesh.triangles)) {
+            continue;
+          }
+          if (mesh.points.length < 3 || mesh.triangles.length < 1) {
+            continue;
+          }
+
+          const positions = [];
+          for (const point of mesh.points) {
+            positions.push(Number(point[0]) || 0, Number(point[1]) || 0, Number(point[2]) || 0);
+          }
+
+          const indices = [];
+          for (const triangle of mesh.triangles) {
+            indices.push(triangle[0], triangle[1], triangle[2]);
+          }
+
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+          geometry.setIndex(indices);
+          geometry.computeVertexNormals();
+
+          const body = new THREE.Mesh(
+            geometry,
+            new THREE.MeshStandardMaterial({
+              color: colorByEntity[entity.id] || 0x64748b,
+              roughness: 0.72,
+              metalness: 0.08,
+              transparent: true,
+              opacity: 0.94,
+              side: THREE.DoubleSide,
+            })
+          );
+
+          const wire = new THREE.LineSegments(
+            new THREE.WireframeGeometry(geometry),
+            new THREE.LineBasicMaterial({ color: 0x1f2937, transparent: true, opacity: 0.3 })
+          );
+
+          const group = new THREE.Group();
+          group.name = entity.id;
+          group.add(body);
+          group.add(wire);
+          root.add(group);
+        }
+
+        return root;
+      }
+
+      function createCuboidPayload(config) {
+        const cuboid = new Cuboid(config);
+        const payload = JSON.stringify(cuboid.getBrepData());
+        disposeObject3D(cuboid);
+        return payload;
+      }
+
+      function createSweepPayload(path, profile, color) {
+        const sweep = new Sweep({
+          path: clonePoints(path),
+          profile: clonePoints(profile),
+          color,
+          capStart: true,
+          capEnd: true,
+        });
+        const payload = JSON.stringify(sweep.getBrep());
+        disposeObject3D(sweep);
+        return payload;
+      }
+
+      function buildAssemblyPayloads(state) {
+        const wallWidth = state.values.wallWidth;
+        const sideWidth = Math.max(0.05, (WALL_TOTAL_WIDTH - OPENING_WIDTH) * 0.5);
+        const lintelHeight = Math.max(0.1, WALL_HEIGHT - OPENING_HEIGHT);
+
+        const leftWall = createCuboidPayload({
+          center: new Vector3(-OPENING_WIDTH * 0.5 - sideWidth * 0.5, WALL_HEIGHT * 0.5, 0),
+          width: sideWidth,
+          height: WALL_HEIGHT,
+          depth: wallWidth,
+          color: 0x94a3b8,
+        });
+
+        const rightWall = createCuboidPayload({
+          center: new Vector3(OPENING_WIDTH * 0.5 + sideWidth * 0.5, WALL_HEIGHT * 0.5, 0),
+          width: sideWidth,
+          height: WALL_HEIGHT,
+          depth: wallWidth,
+          color: 0x94a3b8,
+        });
+
+        const lintel = createCuboidPayload({
+          center: new Vector3(0, OPENING_HEIGHT + lintelHeight * 0.5, 0),
+          width: OPENING_WIDTH,
+          height: lintelHeight,
+          depth: wallWidth,
+          color: 0x94a3b8,
+        });
+
+        const doorWidth = Math.max(0.6, OPENING_WIDTH - PANEL_CLEARANCE * 2);
+        const doorHeight = Math.max(1.6, OPENING_HEIGHT - PANEL_CLEARANCE * 2);
+
+        const framePath = buildFramePath(doorWidth, doorHeight, PANEL_CLEARANCE);
+        const frameProfile = buildFrameProfile(wallWidth, FRAME_FACE, FRAME_REBATE);
+        const frame = createSweepPayload(framePath, frameProfile, 0x64748b);
+
+        const panelWidth = Math.max(0.4, doorWidth - PANEL_CLEARANCE * 1.2);
+        const panelHeight = Math.max(0.8, doorHeight - PANEL_CLEARANCE * 1.2);
+        const panelDepth = Math.max(0.03, wallWidth * 0.25);
+        const panel = createCuboidPayload({
+          center: new Vector3(0, panelHeight * 0.5 + PANEL_CLEARANCE, 0),
+          width: panelWidth,
+          height: panelHeight,
+          depth: panelDepth,
+          color: 0x2563eb,
+        });
+
+        return {
+          wall_left: leftWall,
+          wall_right: rightWall,
+          wall_lintel: lintel,
+          frame,
+          panel,
+        };
+      }
+
+      async function createExampleScene(meta, options) {
+        const settings = options || {};
+        document.body.classList.add("og-example-page");
+        document.title = meta.title + " | OpenGeometry";
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(settings.background || 0xf6f1eb);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 4000);
+        const cameraPosition = settings.cameraPosition || [6.6, 5.2, 8.4];
+        camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        const target = settings.target || [0, 1.2, 0];
+        controls.target.set(target[0], target[1], target[2]);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(24, 24, 0xd88b63, 0xe7d4ca));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+        const key = new THREE.DirectionalLight(0xffffff, 0.9);
+        key.position.set(7, 9, 4);
+        scene.add(key);
+
+        const fill = new THREE.DirectionalLight(0xffffff, 0.4);
+        fill.position.set(-6, 4, -7);
+        scene.add(fill);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        function onResize() {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener("resize", onResize);
+
+        function animate() {
+          requestAnimationFrame(animate);
+          controls.update();
+          renderer.render(scene, camera);
+        }
+
+        animate();
+        return { scene };
+      }
+
+      async function main() {
+        const meta = {
+          title: "Door Feature Tree",
+          description: "Wall opening + sweep frame + panel with dependency-driven updates.",
+          statusLabel: "ready",
+          chips: ["Wall Opening", "Sweep Frame"],
+        };
+
+        const { scene } = await createExampleScene(meta);
+        const manager = new OGSceneManager();
+        let sceneId = manager.createScene("feature-tree-door-scene");
+        let rendered = null;
+        let lastAction = "No actions yet.";
+
+        const state = {
+          values: {
+            wallWidth: 0.24,
+          },
+        };
+
+        const suppressionState = {
+          [NODE_IDS.wall_left]: false,
+          [NODE_IDS.wall_right]: false,
+          [NODE_IDS.wall_lintel]: false,
+          [NODE_IDS.frame]: false,
+          [NODE_IDS.panel]: false,
+        };
+
+        const widthRow = panel.querySelector('[data-control-key="wallWidth"]');
+        const widthLabel = widthRow?.querySelector("[data-control-value]");
+        const widthRange = widthRow?.querySelector("[data-control-range]");
+        const widthNumber = widthRow?.querySelector("[data-control-number]");
+
+        if (!widthRow || !widthLabel || !widthRange || !widthNumber) {
+          throw new Error("Missing wall width control nodes");
+        }
+
+        const syncWallWidthUI = () => {
+          const value = clamp(Number(state.values.wallWidth), 0.08, 0.6);
+          state.values.wallWidth = value;
+          widthRange.value = String(value);
+          widthNumber.value = String(value);
+          widthLabel.textContent = formatNumber(value);
+        };
+
+        const readSnapshot = () => JSON.parse(manager.getSceneSerialized(sceneId));
+        const readFeatureTree = () => JSON.parse(manager.listFeatureNodes(sceneId));
+        const getNodeIdSet = () => new Set((readFeatureTree().nodes || []).map((node) => node.id));
+
+        const setToggleState = (groupId, suppressed) => {
+          const row = panel.querySelector(`[data-toggle-group="${groupId}"]`);
+          if (!row) {
+            return;
+          }
+          const toggle = row.querySelector("[data-control-toggle]");
+          const stateNode = row.querySelector("[data-control-bool-state]");
+          if (!toggle || !stateNode) {
+            return;
+          }
+          toggle.checked = suppressed;
+          stateNode.textContent = suppressed ? "Enabled" : "Disabled";
+        };
+
+        const syncReports = () => {
+          const snapshot = readSnapshot();
+          const tree = readFeatureTree();
+          const nodes = tree.nodes || [];
+          const nodeSet = new Set(nodes.map((node) => node.id));
+
+          rendered = replaceSceneObject(scene, rendered, renderEntityGroup(snapshot));
+
+          const lines = [
+            `Last Action: ${lastAction}`,
+            `Scene Entities: ${snapshot.entities?.length || 0}`,
+            `Feature Nodes: ${nodes.length}`,
+            `Wall Width: ${formatNumber(state.values.wallWidth)} m`,
+            `Frame Depth Target: ${formatNumber(state.values.wallWidth)} m`,
+            "",
+            "Nodes:",
+          ];
+
+          if (!nodes.length) {
+            lines.push("- none");
+          } else {
+            for (const node of nodes) {
+              lines.push(formatFeatureNode(node));
+              suppressionState[node.id] = Boolean(node.suppressed);
+            }
+          }
+
+          for (const [groupId, nodeIds] of Object.entries(TOGGLE_GROUPS)) {
+            const existing = nodeIds.filter((nodeId) => nodeSet.has(nodeId));
+            if (!existing.length) {
+              setToggleState(groupId, false);
+              continue;
+            }
+            setToggleState(groupId, existing.every((nodeId) => Boolean(suppressionState[nodeId])));
+          }
+
+          reportNode.textContent = lines.join("\n");
+        };
+
+        const upsertNode = (node) => {
+          manager.upsertFeatureNode(sceneId, JSON.stringify(node));
+        };
+
+        const upsertAssembly = () => {
+          const payloads = buildAssemblyPayloads(state);
+
+          upsertNode({
+            id: NODE_IDS.wall_left,
+            kind: "OGCuboid",
+            entity_id: ENTITY_IDS.wall_left,
+            dependencies: [],
+            suppressed: Boolean(suppressionState[NODE_IDS.wall_left]),
+            payload_json: payloads.wall_left,
+          });
+          upsertNode({
+            id: NODE_IDS.wall_right,
+            kind: "OGCuboid",
+            entity_id: ENTITY_IDS.wall_right,
+            dependencies: [],
+            suppressed: Boolean(suppressionState[NODE_IDS.wall_right]),
+            payload_json: payloads.wall_right,
+          });
+          upsertNode({
+            id: NODE_IDS.wall_lintel,
+            kind: "OGCuboid",
+            entity_id: ENTITY_IDS.wall_lintel,
+            dependencies: [],
+            suppressed: Boolean(suppressionState[NODE_IDS.wall_lintel]),
+            payload_json: payloads.wall_lintel,
+          });
+          upsertNode({
+            id: NODE_IDS.frame,
+            kind: "OGSweep",
+            entity_id: ENTITY_IDS.frame,
+            dependencies: [NODE_IDS.wall_left, NODE_IDS.wall_right, NODE_IDS.wall_lintel],
+            suppressed: Boolean(suppressionState[NODE_IDS.frame]),
+            payload_json: payloads.frame,
+          });
+          upsertNode({
+            id: NODE_IDS.panel,
+            kind: "OGCuboid",
+            entity_id: ENTITY_IDS.panel,
+            dependencies: [NODE_IDS.frame],
+            suppressed: Boolean(suppressionState[NODE_IDS.panel]),
+            payload_json: payloads.panel,
+          });
+
+          manager.recomputeSceneFeatures(sceneId);
+        };
+
+        const runAction = (label, fn) => {
+          try {
+            fn();
+          } catch (error) {
+            lastAction = `${label} failed: ${String(error)}`;
+            syncReports();
+            return;
+          }
+          syncReports();
+        };
+
+        widthRange.addEventListener("input", () => {
+          state.values.wallWidth = clamp(Number(widthRange.value), 0.08, 0.6);
+          syncWallWidthUI();
+        });
+
+        widthNumber.addEventListener("change", () => {
+          state.values.wallWidth = clamp(Number(widthNumber.value), 0.08, 0.6);
+          syncWallWidthUI();
+        });
+
+        panel.querySelector('[data-action="seed"]')?.addEventListener("click", () => {
+          runAction("Build assembly", () => {
+            upsertAssembly();
+            lastAction = "Built wall opening, sweep frame, and door panel.";
+          });
+        });
+
+        panel.querySelector('[data-action="apply-width"]')?.addEventListener("click", () => {
+          runAction("Apply wall width", () => {
+            upsertAssembly();
+            lastAction = `Applied wall width ${formatNumber(state.values.wallWidth)} and updated frame depth.`;
+          });
+        });
+
+        panel.querySelector('[data-action="recompute"]')?.addEventListener("click", () => {
+          runAction("Recompute", () => {
+            manager.recomputeSceneFeatures(sceneId);
+            lastAction = "Recomputed dirty nodes.";
+          });
+        });
+
+        panel.querySelector('[data-action="mark-wall-dirty"]')?.addEventListener("click", () => {
+          runAction("Mark wall dirty", () => {
+            manager.markFeatureNodeDirty(sceneId, NODE_IDS.wall_left);
+            manager.recomputeSceneFeatures(sceneId);
+            lastAction = "Marked wall dirty; dependent frame/panel recomputed.";
+          });
+        });
+
+        panel.querySelector('[data-action="cycle-test"]')?.addEventListener("click", () => {
+          runAction("Cycle test", () => {
+            const payloads = buildAssemblyPayloads(state);
+            upsertNode({
+              id: NODE_IDS.wall_left,
+              kind: "OGCuboid",
+              entity_id: ENTITY_IDS.wall_left,
+              dependencies: [NODE_IDS.panel],
+              suppressed: Boolean(suppressionState[NODE_IDS.wall_left]),
+              payload_json: payloads.wall_left,
+            });
+            lastAction = "Unexpected: invalid loop accepted.";
+          });
+        });
+
+        panel.querySelector('[data-action="reset"]')?.addEventListener("click", () => {
+          runAction("Reset", () => {
+            manager.removeScene(sceneId);
+            sceneId = manager.createScene("feature-tree-door-scene");
+            suppressionState[NODE_IDS.wall_left] = false;
+            suppressionState[NODE_IDS.wall_right] = false;
+            suppressionState[NODE_IDS.wall_lintel] = false;
+            suppressionState[NODE_IDS.frame] = false;
+            suppressionState[NODE_IDS.panel] = false;
+            setToggleState("wall", false);
+            setToggleState("frame", false);
+            setToggleState("panel", false);
+            lastAction = "Scene reset.";
+          });
+        });
+
+        panel.querySelectorAll("[data-toggle-group]").forEach((row) => {
+          const groupId = row.getAttribute("data-toggle-group");
+          const toggle = row.querySelector("[data-control-toggle]");
+          const stateNode = row.querySelector("[data-control-bool-state]");
+          if (!groupId || !toggle || !stateNode) {
+            return;
+          }
+
+          toggle.addEventListener("change", () => {
+            runAction("Toggle suppression", () => {
+              const target = TOGGLE_GROUPS[groupId];
+              if (!target || !target.length) {
+                throw new Error(`Unknown toggle group '${groupId}'`);
+              }
+
+              const suppressed = toggle.checked;
+              const nodeSet = getNodeIdSet();
+              let changed = 0;
+
+              for (const nodeId of target) {
+                if (!nodeSet.has(nodeId)) {
+                  continue;
+                }
+                manager.setFeatureNodeSuppressed(sceneId, nodeId, suppressed);
+                suppressionState[nodeId] = suppressed;
+                changed += 1;
+              }
+
+              if (changed === 0) {
+                throw new Error(`No nodes available for group '${groupId}'`);
+              }
+
+              stateNode.textContent = suppressed ? "Enabled" : "Disabled";
+              lastAction = `Set '${groupId}' suppression=${suppressed} on ${changed} node(s).`;
+            });
+          });
+        });
+
+        syncWallWidthUI();
+        syncReports();
+      }
+
+      main().catch((error) => {
+        reportNode.textContent = `Door feature tree example boot failed: ${String(error)}`;
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+[package]
+name = "opengeometry-export-schema"
+version = "0.1.0"
+edition = "2021"
+license = "MIT/Apache-2.0"
+description = "Canonical export schema for OpenGeometry scene snapshots"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1.0"

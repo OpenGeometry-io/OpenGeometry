@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Burger Feature Tree Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Plain-language feature tree example using a burger ingredient stack"
+    />
+  </head>
+  <body>
+    <aside class="og-badge">
+      <div class="og-badge-top">
+        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
+        <p class="og-badge-status">ready</p>
+      </div>
+      <div class="og-badge-meta">
+        <p class="og-badge-kicker">OPEN GEOMETRY • OPERATIONS</p>
+        <strong class="og-badge-title">Burger Feature Tree</strong>
+        <span class="og-badge-desc">
+          Easy feature tree demo: burger ingredients stacked by dependency.
+        </span>
+      </div>
+      <div class="og-badge-chip-row">
+        <span class="og-chip og-chip-accent">Non-CAD Friendly</span>
+        <span class="og-chip og-chip-accent">Dependencies</span>
+      </div>
+      <div class="og-badge-footer">
+        <a class="og-badge-link" href="../index.html">Back to Examples</a>
+      </div>
+    </aside>
+
+    <aside class="og-controls" data-control-panel>
+      <h3>Burger Builder</h3>
+      <p class="og-control-summary">
+        Think of each ingredient as a feature node. Upper ingredients depend on lower ones.
+      </p>
+
+      <button type="button" class="og-control-action og-control-action-cyan" data-action="seed">
+        Build Burger Stack
+      </button>
+      <button type="button" class="og-control-action" data-action="recompute">
+        Recompute Dirty Nodes
+      </button>
+      <button type="button" class="og-control-action" data-action="mark-patty-dirty">
+        Toggle Thick Patty
+      </button>
+      <button type="button" class="og-control-action" data-action="remove-cheese">
+        Remove Cheese Node
+      </button>
+      <button type="button" class="og-control-action" data-action="cycle-test">
+        Try Invalid Loop
+      </button>
+      <button type="button" class="og-control-action og-control-action-magenta" data-action="reset">
+        Reset Scene
+      </button>
+
+      <label class="og-control-row" data-toggle-group="buns" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Suppress Buns</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Suppress Buns" />
+          <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-toggle-group="patty" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Suppress Patty</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Suppress Patty" />
+          <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-toggle-group="cheese" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Suppress Cheese</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Suppress Cheese" />
+          <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+        </div>
+      </label>
+
+      <pre class="og-control-report" data-report>Click "Build Burger Stack" to start.</pre>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { Cuboid, Cylinder, OGSceneManager, OpenGeometry, Vector3 } from "@og-three";
+
+      const app = document.getElementById("app");
+      if (!app) {
+        throw new Error("Missing #app container");
+      }
+
+      const panel = document.querySelector("[data-control-panel]");
+      const reportNode = panel?.querySelector("[data-report]");
+
+      if (!panel || !reportNode) {
+        throw new Error("Missing static burger UI nodes");
+      }
+
+      const NODE_IDS = {
+        plate: "feature-burger-plate",
+        bottom_bun: "feature-burger-bottom-bun",
+        patty: "feature-burger-patty",
+        cheese: "feature-burger-cheese",
+        top_bun: "feature-burger-top-bun",
+      };
+
+      const ENTITY_IDS = {
+        plate: "entity-burger-plate",
+        bottom_bun: "entity-burger-bottom-bun",
+        patty: "entity-burger-patty",
+        cheese: "entity-burger-cheese",
+        top_bun: "entity-burger-top-bun",
+      };
+
+      const TOGGLE_GROUPS = {
+        buns: [NODE_IDS.bottom_bun, NODE_IDS.top_bun],
+        patty: [NODE_IDS.patty],
+        cheese: [NODE_IDS.cheese],
+      };
+
+      function disposeMaterial(material) {
+        if (!material) {
+          return;
+        }
+        if (Array.isArray(material)) {
+          material.forEach((entry) => entry && entry.dispose && entry.dispose());
+          return;
+        }
+        if (material.dispose) {
+          material.dispose();
+        }
+      }
+
+      function disposeObject3D(object) {
+        object.traverse((node) => {
+          if (node.geometry && node.geometry.dispose) {
+            node.geometry.dispose();
+          }
+          disposeMaterial(node.material);
+        });
+      }
+
+      function replaceSceneObject(scene, previous, next) {
+        if (previous) {
+          previous.parent && previous.parent.remove(previous);
+          disposeObject3D(previous);
+        }
+        scene.add(next);
+        return next;
+      }
+
+      function formatFeatureNode(node) {
+        const deps = node.dependencies && node.dependencies.length ? node.dependencies.join(", ") : "none";
+        return `- ${node.id} | deps: ${deps} | dirty: ${node.dirty} | suppressed: ${node.suppressed}`;
+      }
+
+      function renderEntityGroup(snapshot) {
+        const root = new THREE.Group();
+        const colorByEntity = {
+          [ENTITY_IDS.plate]: 0x94a3b8,
+          [ENTITY_IDS.bottom_bun]: 0xd97706,
+          [ENTITY_IDS.patty]: 0x7c2d12,
+          [ENTITY_IDS.cheese]: 0xfacc15,
+          [ENTITY_IDS.top_bun]: 0xea580c,
+        };
+
+        for (const entity of snapshot.entities || []) {
+          const mesh = entity.mesh || {};
+          if (!Array.isArray(mesh.points) || !Array.isArray(mesh.triangles)) {
+            continue;
+          }
+          if (mesh.points.length < 3 || mesh.triangles.length < 1) {
+            continue;
+          }
+
+          const positions = [];
+          for (const point of mesh.points) {
+            positions.push(Number(point[0]) || 0, Number(point[1]) || 0, Number(point[2]) || 0);
+          }
+
+          const indices = [];
+          for (const triangle of mesh.triangles) {
+            indices.push(triangle[0], triangle[1], triangle[2]);
+          }
+
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+          geometry.setIndex(indices);
+          geometry.computeVertexNormals();
+
+          const body = new THREE.Mesh(
+            geometry,
+            new THREE.MeshStandardMaterial({
+              color: colorByEntity[entity.id] || 0x64748b,
+              roughness: 0.72,
+              metalness: 0.08,
+              transparent: true,
+              opacity: 0.94,
+              side: THREE.DoubleSide,
+            })
+          );
+
+          const wire = new THREE.LineSegments(
+            new THREE.WireframeGeometry(geometry),
+            new THREE.LineBasicMaterial({ color: 0x1f2937, transparent: true, opacity: 0.3 })
+          );
+
+          const group = new THREE.Group();
+          group.name = entity.id;
+          group.add(body);
+          group.add(wire);
+          root.add(group);
+        }
+
+        return root;
+      }
+
+      function createCuboidPayload(config) {
+        const cuboid = new Cuboid(config);
+        const payload = JSON.stringify(cuboid.getBrepData());
+        disposeObject3D(cuboid);
+        return payload;
+      }
+
+      function createCylinderPayload(config) {
+        const cylinder = new Cylinder(config);
+        const payload = JSON.stringify(cylinder.getBrep());
+        disposeObject3D(cylinder);
+        return payload;
+      }
+
+      function buildNodePayloads(state) {
+        const pattyHeight = state.pattyThick ? 0.55 : 0.35;
+        const plateHeight = 0.25;
+        const bottomBunHeight = 0.45;
+        const cheeseHeight = 0.1;
+        const topBunHeight = 0.42;
+
+        const plateTop = plateHeight;
+        const bottomBunTop = plateTop + bottomBunHeight;
+        const pattyTop = bottomBunTop + pattyHeight;
+        const cheeseTop = pattyTop + cheeseHeight;
+        const topBunTop = cheeseTop + topBunHeight;
+
+        return {
+          plate: createCuboidPayload({
+            center: new Vector3(0, plateHeight * 0.5, 0),
+            width: 5.2,
+            height: plateHeight,
+            depth: 5.2,
+            color: 0x94a3b8,
+          }),
+          bottom_bun: createCylinderPayload({
+            center: new Vector3(0, plateTop + bottomBunHeight * 0.5, 0),
+            radius: 1.45,
+            height: bottomBunHeight,
+            segments: 30,
+            angle: Math.PI * 2,
+            color: 0xd97706,
+          }),
+          patty: createCylinderPayload({
+            center: new Vector3(0, bottomBunTop + pattyHeight * 0.5, 0),
+            radius: 1.28,
+            height: pattyHeight,
+            segments: 30,
+            angle: Math.PI * 2,
+            color: 0x7c2d12,
+          }),
+          cheese: createCuboidPayload({
+            center: new Vector3(0, pattyTop + cheeseHeight * 0.5, 0),
+            width: 2.5,
+            height: cheeseHeight,
+            depth: 2.5,
+            color: 0xfacc15,
+          }),
+          top_bun: createCylinderPayload({
+            center: new Vector3(0, cheeseTop + topBunHeight * 0.5, 0),
+            radius: 1.4,
+            height: topBunHeight,
+            segments: 30,
+            angle: Math.PI * 2,
+            color: 0xea580c,
+          }),
+        };
+      }
+
+      async function createExampleScene(meta, options) {
+        const settings = options || {};
+        document.body.classList.add("og-example-page");
+        document.title = meta.title + " | OpenGeometry";
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(settings.background || 0xf6f1eb);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 4000);
+        const cameraPosition = settings.cameraPosition || [6.2, 4.9, 7.5];
+        camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        const target = settings.target || [0, 1.3, 0];
+        controls.target.set(target[0], target[1], target[2]);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(24, 24, 0xd88b63, 0xe7d4ca));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+        const key = new THREE.DirectionalLight(0xffffff, 0.9);
+        key.position.set(7, 9, 4);
+        scene.add(key);
+
+        const fill = new THREE.DirectionalLight(0xffffff, 0.4);
+        fill.position.set(-6, 4, -7);
+        scene.add(fill);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        function onResize() {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener("resize", onResize);
+
+        function animate() {
+          requestAnimationFrame(animate);
+          controls.update();
+          renderer.render(scene, camera);
+        }
+
+        animate();
+        return { scene };
+      }
+
+      async function main() {
+        const meta = {
+          title: "Burger Feature Tree",
+          description: "Ingredient stack as a feature dependency graph.",
+          statusLabel: "ready",
+          chips: ["Non-CAD Friendly", "Dependencies"],
+        };
+
+        const { scene } = await createExampleScene(meta);
+        const manager = new OGSceneManager();
+        let sceneId = manager.createScene("feature-tree-burger-scene");
+        let rendered = null;
+        let lastAction = "No actions yet.";
+        const state = { pattyThick: false };
+
+        const suppressionState = {
+          [NODE_IDS.plate]: false,
+          [NODE_IDS.bottom_bun]: false,
+          [NODE_IDS.patty]: false,
+          [NODE_IDS.cheese]: false,
+          [NODE_IDS.top_bun]: false,
+        };
+
+        const readSnapshot = () => JSON.parse(manager.getSceneSerialized(sceneId));
+        const readFeatureTree = () => JSON.parse(manager.listFeatureNodes(sceneId));
+        const getNodeIdSet = () => new Set((readFeatureTree().nodes || []).map((node) => node.id));
+
+        const setToggleState = (groupId, suppressed) => {
+          const row = panel.querySelector(`[data-toggle-group="${groupId}"]`);
+          if (!row) {
+            return;
+          }
+          const toggle = row.querySelector("[data-control-toggle]");
+          const stateNode = row.querySelector("[data-control-bool-state]");
+          if (!toggle || !stateNode) {
+            return;
+          }
+          toggle.checked = suppressed;
+          stateNode.textContent = suppressed ? "Enabled" : "Disabled";
+        };
+
+        const syncReports = () => {
+          const snapshot = readSnapshot();
+          const tree = readFeatureTree();
+          const nodes = tree.nodes || [];
+          const nodeSet = new Set(nodes.map((node) => node.id));
+
+          rendered = replaceSceneObject(scene, rendered, renderEntityGroup(snapshot));
+
+          const lines = [
+            `Last Action: ${lastAction}`,
+            `Scene Entities: ${snapshot.entities?.length || 0}`,
+            `Feature Nodes: ${nodes.length}`,
+            `Patty Mode: ${state.pattyThick ? "Thick" : "Regular"}`,
+            "",
+            "How to read:",
+            "- deps means ingredient below this one.",
+            "- suppress removes that feature's geometry.",
+            "",
+            "Nodes:",
+          ];
+
+          if (!nodes.length) {
+            lines.push("- none");
+          } else {
+            for (const node of nodes) {
+              lines.push(formatFeatureNode(node));
+              suppressionState[node.id] = Boolean(node.suppressed);
+            }
+          }
+
+          for (const [groupId, nodeIds] of Object.entries(TOGGLE_GROUPS)) {
+            const existing = nodeIds.filter((nodeId) => nodeSet.has(nodeId));
+            if (!existing.length) {
+              setToggleState(groupId, false);
+              continue;
+            }
+            setToggleState(groupId, existing.every((nodeId) => Boolean(suppressionState[nodeId])));
+          }
+
+          reportNode.textContent = lines.join("\n");
+        };
+
+        const upsertNode = (node) => {
+          manager.upsertFeatureNode(sceneId, JSON.stringify(node));
+        };
+
+        const seedTree = () => {
+          const payloads = buildNodePayloads(state);
+
+          upsertNode({
+            id: NODE_IDS.plate,
+            kind: "OGCuboid",
+            entity_id: ENTITY_IDS.plate,
+            dependencies: [],
+            suppressed: Boolean(suppressionState[NODE_IDS.plate]),
+            payload_json: payloads.plate,
+          });
+
+          upsertNode({
+            id: NODE_IDS.bottom_bun,
+            kind: "OGCylinder",
+            entity_id: ENTITY_IDS.bottom_bun,
+            dependencies: [NODE_IDS.plate],
+            suppressed: Boolean(suppressionState[NODE_IDS.bottom_bun]),
+            payload_json: payloads.bottom_bun,
+          });
+
+          upsertNode({
+            id: NODE_IDS.patty,
+            kind: "OGCylinder",
+            entity_id: ENTITY_IDS.patty,
+            dependencies: [NODE_IDS.bottom_bun],
+            suppressed: Boolean(suppressionState[NODE_IDS.patty]),
+            payload_json: payloads.patty,
+          });
+
+          upsertNode({
+            id: NODE_IDS.cheese,
+            kind: "OGCuboid",
+            entity_id: ENTITY_IDS.cheese,
+            dependencies: [NODE_IDS.patty],
+            suppressed: Boolean(suppressionState[NODE_IDS.cheese]),
+            payload_json: payloads.cheese,
+          });
+
+          upsertNode({
+            id: NODE_IDS.top_bun,
+            kind: "OGCylinder",
+            entity_id: ENTITY_IDS.top_bun,
+            dependencies: [NODE_IDS.cheese],
+            suppressed: Boolean(suppressionState[NODE_IDS.top_bun]),
+            payload_json: payloads.top_bun,
+          });
+
+          manager.recomputeSceneFeatures(sceneId);
+          lastAction = "Built burger feature tree and recomputed.";
+          syncReports();
+        };
+
+        const runAction = (label, fn) => {
+          try {
+            fn();
+          } catch (error) {
+            lastAction = `${label} failed: ${String(error)}`;
+            syncReports();
+            return;
+          }
+          syncReports();
+        };
+
+        panel.querySelector('[data-action="seed"]')?.addEventListener("click", () => {
+          runAction("Seed burger tree", seedTree);
+        });
+
+        panel.querySelector('[data-action="recompute"]')?.addEventListener("click", () => {
+          runAction("Recompute", () => {
+            manager.recomputeSceneFeatures(sceneId);
+            lastAction = "Recomputed dirty ingredient nodes.";
+          });
+        });
+
+        panel.querySelector('[data-action="mark-patty-dirty"]')?.addEventListener("click", () => {
+          runAction("Toggle patty", () => {
+            state.pattyThick = !state.pattyThick;
+            const payloads = buildNodePayloads(state);
+            upsertNode({
+              id: NODE_IDS.patty,
+              kind: "OGCylinder",
+              entity_id: ENTITY_IDS.patty,
+              dependencies: [NODE_IDS.bottom_bun],
+              suppressed: Boolean(suppressionState[NODE_IDS.patty]),
+              payload_json: payloads.patty,
+            });
+            upsertNode({
+              id: NODE_IDS.cheese,
+              kind: "OGCuboid",
+              entity_id: ENTITY_IDS.cheese,
+              dependencies: [NODE_IDS.patty],
+              suppressed: Boolean(suppressionState[NODE_IDS.cheese]),
+              payload_json: payloads.cheese,
+            });
+            upsertNode({
+              id: NODE_IDS.top_bun,
+              kind: "OGCylinder",
+              entity_id: ENTITY_IDS.top_bun,
+              dependencies: [NODE_IDS.cheese],
+              suppressed: Boolean(suppressionState[NODE_IDS.top_bun]),
+              payload_json: payloads.top_bun,
+            });
+            manager.recomputeSceneFeatures(sceneId);
+            lastAction = `Patty set to ${state.pattyThick ? "thick" : "regular"} and dependents recomputed.`;
+          });
+        });
+
+        panel.querySelector('[data-action="remove-cheese"]')?.addEventListener("click", () => {
+          runAction("Remove cheese", () => {
+            manager.removeFeatureNode(sceneId, NODE_IDS.cheese);
+            delete suppressionState[NODE_IDS.cheese];
+            lastAction = "Removed cheese feature node.";
+          });
+        });
+
+        panel.querySelector('[data-action="cycle-test"]')?.addEventListener("click", () => {
+          runAction("Cycle test", () => {
+            const payloads = buildNodePayloads(state);
+            upsertNode({
+              id: NODE_IDS.bottom_bun,
+              kind: "OGCylinder",
+              entity_id: ENTITY_IDS.bottom_bun,
+              dependencies: [NODE_IDS.top_bun],
+              suppressed: Boolean(suppressionState[NODE_IDS.bottom_bun]),
+              payload_json: payloads.bottom_bun,
+            });
+            lastAction = "Unexpected: invalid loop accepted.";
+          });
+        });
+
+        panel.querySelector('[data-action="reset"]')?.addEventListener("click", () => {
+          runAction("Reset", () => {
+            manager.removeScene(sceneId);
+            sceneId = manager.createScene("feature-tree-burger-scene");
+            state.pattyThick = false;
+            suppressionState[NODE_IDS.plate] = false;
+            suppressionState[NODE_IDS.bottom_bun] = false;
+            suppressionState[NODE_IDS.patty] = false;
+            suppressionState[NODE_IDS.cheese] = false;
+            suppressionState[NODE_IDS.top_bun] = false;
+            setToggleState("buns", false);
+            setToggleState("patty", false);
+            setToggleState("cheese", false);
+            lastAction = "Scene reset.";
+          });
+        });
+
+        panel.querySelectorAll("[data-toggle-group]").forEach((row) => {
+          const groupId = row.getAttribute("data-toggle-group");
+          const toggle = row.querySelector("[data-control-toggle]");
+          const stateNode = row.querySelector("[data-control-bool-state]");
+          if (!groupId || !toggle || !stateNode) {
+            return;
+          }
+
+          toggle.addEventListener("change", () => {
+            runAction("Toggle suppression", () => {
+              const target = TOGGLE_GROUPS[groupId];
+              if (!target || !target.length) {
+                throw new Error(`Unknown toggle group '${groupId}'`);
+              }
+
+              const suppressed = toggle.checked;
+              const nodeSet = getNodeIdSet();
+              let changed = 0;
+
+              for (const nodeId of target) {
+                if (!nodeSet.has(nodeId)) {
+                  continue;
+                }
+                manager.setFeatureNodeSuppressed(sceneId, nodeId, suppressed);
+                suppressionState[nodeId] = suppressed;
+                changed += 1;
+              }
+
+              if (changed === 0) {
+                throw new Error(`No nodes available for group '${groupId}'`);
+              }
+
+              stateNode.textContent = suppressed ? "Enabled" : "Disabled";
+              lastAction = `Set '${groupId}' suppression=${suppressed} on ${changed} node(s).`;
+            });
+          });
+        });
+
+        syncReports();
+      }
+
+      main().catch((error) => {
+        reportNode.textContent = `Burger feature tree example boot failed: ${String(error)}`;
+      });
+    </script>
+  </body>
+</html>

@@ -108,6 +108,7 @@
       import { OrbitControls } from "https://unpkg.com/three@0.168.0/examples/jsm/controls/OrbitControls.js";
       import init, {
         OGCuboid,
+        OGFileExporter,
         OGSceneManager,
         Vector3,
       } from "../../opengeometry/pkg/opengeometry.js";
@@ -143,6 +144,7 @@
 
       let mesh = null;
       const sceneManager = new OGSceneManager();
+      const fileExporter = new OGFileExporter();
       const sceneId = sceneManager.createScene("legacy-step-export");
       const entityId = "legacy-cuboid";
 
@@ -223,7 +225,11 @@
             validate_topology: true,
             require_closed_shell: true,
           };
-          const result = sceneManager.exportSceneToStep(sceneId, JSON.stringify(config));
+          const snapshotJson = sceneManager.getSceneSerialized(sceneId);
+          const result = fileExporter.exportSceneSnapshotToStep(
+            snapshotJson,
+            JSON.stringify(config)
+          );
           const report = JSON.parse(result.reportJson);
 
           downloadText(result.text, "opengeometry-legacy-scene.step", "application/step");

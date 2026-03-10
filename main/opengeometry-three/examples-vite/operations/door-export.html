@@ -165,6 +165,7 @@
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
       import {
         Cuboid,
+        OGFileExporter,
         OGSceneManager,
         OpenGeometry,
         Polyline,
@@ -296,12 +297,11 @@
         return [
           `File: ${filename}`,
           `Bytes: ${bytes}`,
-          `Input BReps: ${report.input_breps}`,
-          `Input Faces: ${report.input_faces}`,
+          `Input Entities: ${report.input_entities}`,
+          `Input Triangles: ${report.input_triangles}`,
           `Exported Triangles: ${report.exported_triangles}`,
-          `Skipped Faces: ${report.skipped_faces}`,
+          `Skipped Entities: ${report.skipped_entities}`,
           `Skipped Triangles: ${report.skipped_triangles}`,
-          `Topology Errors: ${report.topology_errors}`,
         ].join("\n");
       }
 
@@ -327,18 +327,17 @@
           `IFCDOOR Mentions: ${ifcDoorMentions}`,
           `Expected IFCDOOR Entities: ${expectedEntities}`,
           `IFC Criteria: ${isPass ? "PASS" : "FAIL"}`,
-          `Input BReps: ${report.input_breps}`,
-          `Input Faces: ${report.input_faces}`,
+          `Input Entities: ${report.input_entities}`,
+          `Input Triangles: ${report.input_triangles}`,
           `Exported Elements: ${report.exported_elements}`,
-          `Exported Faces: ${report.exported_faces}`,
-          `Exported Triangles: ${report.exported_triangles}`,
           `Skipped Entities: ${report.skipped_entities}`,
-          `Skipped Faces: ${report.skipped_faces}`,
-          `Topology Errors: ${report.topology_errors}`,
+          `Skipped Triangles: ${report.skipped_triangles}`,
           `Semantics Applied: ${report.semantics_applied}`,
           `Proxy Fallbacks: ${report.proxy_fallbacks}`,
           `Property Sets Written: ${report.property_sets_written}`,
           `Quantity Sets Written: ${report.quantity_sets_written}`,
+          `Materials Written: ${report.materials_written}`,
+          `Material Assignments Written: ${report.material_assignments_written}`,
         ].join("\n");
       }
 
@@ -550,6 +549,7 @@
 
         const { scene } = await createExampleScene(meta);
         const manager = new OGSceneManager();
+        const fileExporter = new OGFileExporter();
         const sceneId = manager.createScene("door-export-scene");
         let current = null;
 
@@ -689,7 +689,11 @@
               validate_topology: true,
             };
 
-            const result = manager.exportSceneToStl(sceneId, JSON.stringify(config));
+            const snapshotJson = manager.getSceneSerialized(sceneId);
+            const result = fileExporter.exportSceneSnapshotToStl(
+              snapshotJson,
+              JSON.stringify(config)
+            );
             const report = JSON.parse(result.reportJson);
             const filename = "opengeometry-door-assembly.stl";
             downloadBytes(result.bytes, filename, "model/stl");
@@ -710,7 +714,11 @@
               require_closed_shell: true,
             };
 
-            const result = manager.exportSceneToStep(sceneId, JSON.stringify(config));
+            const snapshotJson = manager.getSceneSerialized(sceneId);
+            const result = fileExporter.exportSceneSnapshotToStep(
+              snapshotJson,
+              JSON.stringify(config)
+            );
             const report = JSON.parse(result.reportJson);
             const filename = "opengeometry-door-assembly.step";
             downloadText(result.text, filename, "application/step");
@@ -745,7 +753,11 @@
               semantics: buildIfcSemantics(doorWidth, doorHeight, panelWidth, panelHeight),
             };
 
-            const result = manager.exportSceneToIfc(sceneId, JSON.stringify(config));
+            const snapshotJson = manager.getSceneSerialized(sceneId);
+            const result = fileExporter.exportSceneSnapshotToIfc(
+              snapshotJson,
+              JSON.stringify(config)
+            );
             const report = JSON.parse(result.reportJson);
             const filename = "opengeometry-door-assembly.ifc";
             const bytes = new TextEncoder().encode(result.text).length;
