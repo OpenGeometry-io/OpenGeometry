@@ -105,18 +105,6 @@ impl OGPolyline {
             builder.add_wire(&indices, closed_wire).map_err(|err| {
                 JsValue::from_str(&format!("Failed to build polyline wire: {}", err))
             })?;
-
-            if closed_wire {
-                // The wire already consumes directed edges in index order.
-                // Reversing for the face loop avoids duplicate-directed-halfedge collisions
-                // while still building a valid face with twin halfedges.
-                let mut face_indices = indices.clone();
-                face_indices.reverse();
-
-                builder.add_face(&face_indices, &[]).map_err(|err| {
-                    JsValue::from_str(&format!("Failed to build polyline face: {}", err))
-                })?;
-            }
         }
 
         self.brep = builder.build().map_err(|err| {

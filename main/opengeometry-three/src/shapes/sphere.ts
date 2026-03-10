@@ -2,6 +2,12 @@ import * as OGKernel from "../../../opengeometry/pkg/opengeometry";
 import { Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
+import {
+  createShapeOutlineMesh,
+  disposeShapeOutlineMesh,
+  sanitizeOutlineWidth,
+  ShapeOutlineMesh,
+} from "./outline-utils";
 
 export interface ISphereOptions {
   ogid?: string;
@@ -10,6 +16,8 @@ export interface ISphereOptions {
   widthSegments: number;
   heightSegments: number;
   color: number;
+  fatOutlines?: boolean;
+  outlineWidth?: number;
 }
 
 /* eslint-disable no-unused-vars */
@@ -33,10 +41,15 @@ export class Sphere extends THREE.Mesh {
     widthSegments: 24,
     heightSegments: 16,
     color: 0x00ff00,
+    fatOutlines: false,
+    outlineWidth: 1,
   };
 
   private sphere: ISphereKernelInstance;
-  #outlineMesh: THREE.LineSegments | null = null;
+  #outlineMesh: ShapeOutlineMesh | null = null;
+  private _outlineEnabled = false;
+  private _fatOutlines = false;
+  private _outlineWidth = 1;
 
   set radius(value: number) {
     this.options.radius = value;
@@ -80,6 +93,11 @@ export class Sphere extends THREE.Mesh {
     this.validateOptions();
 
     this.options = { ...this.options, ...options };
+    this._fatOutlines = this.options.fatOutlines ?? false;
+    this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
+    this.options.fatOutlines = this._fatOutlines;
+    this.options.outlineWidth = this._outlineWidth;
+
     this.sphere.set_config(
       this.options.center.clone(),
       this.options.radius,
@@ -123,7 +141,7 @@ export class Sphere extends THREE.Mesh {
     this.geometry = geometry;
     this.material = material;
 
-    if (this.#outlineMesh) {
+    if (this._outlineEnabled) {
       this.outline = true;
     }
   }
@@ -137,35 +155,60 @@ export class Sphere extends THREE.Mesh {
   }
 
   set outline(enable: boolean) {
-    if (this.#outlineMesh) {
-      this.remove(this.#outlineMesh);
-      this.#outlineMesh.geometry.dispose();
-      if (Array.isArray(this.#outlineMesh.material)) {
-        this.#outlineMesh.material.forEach((material) => material.dispose());
-      } else {
-        this.#outlineMesh.material.dispose();
-      }
-      this.#outlineMesh = null;
-    }
-
+    this._outlineEnabled = enable;
+    this.clearOutlineMesh();
     if (enable) {
       const outlineBuffer = this.sphere.get_outline_geometry_serialized();
       const lineBuffer = JSON.parse(outlineBuffer) as number[];
-
-      const outlineGeometry = new THREE.BufferGeometry();
-      outlineGeometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(lineBuffer, 3)
-      );
-
-      const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-      this.#outlineMesh = new THREE.LineSegments(outlineGeometry, outlineMaterial);
+      this.#outlineMesh = createShapeOutlineMesh({
+        positions: lineBuffer,
+        color: 0x000000,
+        fatOutlines: this._fatOutlines,
+        outlineWidth: this._outlineWidth,
+      });
       this.add(this.#outlineMesh);
     }
   }
 
+  get outline() {
+    return this._outlineEnabled;
+  }
+
+  set fatOutlines(value: boolean) {
+    this._fatOutlines = value;
+    this.options.fatOutlines = value;
+    if (this._outlineEnabled) {
+      this.outline = true;
+    }
+  }
+
+  get fatOutlines() {
+    return this._fatOutlines;
+  }
+
+  set outlineWidth(value: number) {
+    this._outlineWidth = sanitizeOutlineWidth(value);
+    this.options.outlineWidth = this._outlineWidth;
+    if (this._outlineEnabled) {
+      this.outline = true;
+    }
+  }
+
+  get outlineWidth() {
+    return this._outlineWidth;
+  }
+
   get outlineMesh() {
     return this.#outlineMesh;
+  }
+
+  private clearOutlineMesh() {
+    if (!this.#outlineMesh) {
+      return;
+    }
+    this.remove(this.#outlineMesh);
+    disposeShapeOutlineMesh(this.#outlineMesh);
+    this.#outlineMesh = null;
   }
 
   discardGeometry() {

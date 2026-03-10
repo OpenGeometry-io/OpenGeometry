@@ -20,6 +20,8 @@
   "author": "Vishwajeet Mane",
   "license": "MIT",
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@opengeometry/openmaths": "^0.2.3"
   },
   "devDependencies": {

@@ -1,6 +1,9 @@
 import { OGRectangle, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 
 export interface IRectangleOptions {
   ogid?: string;
@@ -8,6 +11,8 @@ export interface IRectangleOptions {
   width: number;
   breadth: number;
   color: number;
+  fatLines?: boolean;
+  lineWidth?: number;
 }
 
 export interface IRectangleOffsetResult {
@@ -40,6 +45,7 @@ export class Rectangle extends THREE.Line {
   };
 
   private polyLineRectangle: OGRectangle;
+  private fatLine: Line2 | null = null;
 
   // set width(width: number) {
   //   this.options.width = width;
@@ -64,7 +70,17 @@ export class Rectangle extends THREE.Line {
     if (this.material instanceof THREE.LineBasicMaterial) {
       this.material.color.set(color);
     }
+    if (this.fatLine && this.fatLine.material instanceof LineMaterial) {
+      this.fatLine.material.color.set(color);
+    }
   }
+
+  // set lineWidth(lineWidth: number) {
+  //   this.options.lineWidth = lineWidth;
+  //   if (this.material instanceof THREE.LineBasicMaterial) {
+  //     (this.material as THREE.LineBasicMaterial).linewidth = lineWidth;
+  //   }
+  // }
 
   // FINAL: This flow should be used for other primitives
   constructor(options?: IRectangleOptions) {
@@ -87,6 +103,13 @@ export class Rectangle extends THREE.Line {
   setConfig(options: IRectangleOptions) {
     this.validateOptions();
 
+    // Render Config Update
+    // Note: For properties that directly impact rendering (like color), we can update them immediately without regenerating geometry.
+    this.options = { ...this.options, ...options };
+
+    console.log("Updated Rectangle Config:", this.options);
+
+    // Kernel Config Update
     const { width, breadth, center } = options;
     this.polyLineRectangle.set_config(
       center.clone(),
@@ -116,6 +139,37 @@ export class Rectangle extends THREE.Line {
 
     this.geometry = geometry;
     this.material = new THREE.LineBasicMaterial({ color: this.options.color });
+    
+    if (this.options.fatLines) {
+      this.material.visible = false;
+      this.handleFatLines(bufferData);
+    } else {
+      this.material.visible = true;
+      if (this.fatLine) {
+        this.fatLine.visible = false;
+      }
+    }
+  }
+
+  private handleFatLines(bufferData: number[]) {
+    if (!this.fatLine) {
+        this.fatLine = new Line2(new LineGeometry(), new LineMaterial({ color: this.options.color, linewidth: this.options.lineWidth, resolution: new THREE.Vector2(window.innerWidth, window.innerHeight) }));
+        this.add(this.fatLine);
+      }
+
+      const positions = [];
+      for (let i = 0; i < bufferData.length; i += 3) {
+        positions.push(bufferData[i], bufferData[i + 1], bufferData[i + 2]);
+      }
+
+      this.fatLine.geometry.setPositions(positions);
+      (this.fatLine.material as LineMaterial).color.set(this.options.color);
+      (this.fatLine.material as LineMaterial).linewidth = this.options.lineWidth ?? 1;
+      (this.fatLine.material as LineMaterial).resolution.set(window.innerWidth, window.innerHeight);
+
+      this.fatLine.visible = true;
+
+      console.log("Fat lines enabled for Rectangle");
   }
 
   getBrep() {

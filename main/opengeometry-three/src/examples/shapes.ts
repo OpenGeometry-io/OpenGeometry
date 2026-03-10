@@ -12,6 +12,8 @@ import { Wedge } from "../shapes/wedge";
  * Adds a basic shapes showcase to the provided scene.
  */
 export function createShapesExample(scene: THREE.Scene) {
+  const fatOutlineWidth = 4;
+
   const polygon = new Polygon({
     vertices: [
       new Vector3(-3.0, 0.0, -0.5),
@@ -20,7 +22,10 @@ export function createShapesExample(scene: THREE.Scene) {
       new Vector3(-1.5, 0.0, -0.8),
     ],
     color: 0x2563eb,
+    fatOutlines: true,
+    outlineWidth: fatOutlineWidth,
   });
+  polygon.outline = true;
 
   const cuboid = new Cuboid({
     center: new Vector3(0.0, 0.8, -1.2),
@@ -28,6 +33,8 @@ export function createShapesExample(scene: THREE.Scene) {
     height: 1.6,
     depth: 1.0,
     color: 0x10b981,
+    fatOutlines: true,
+    outlineWidth: fatOutlineWidth,
   });
   cuboid.outline = true;
 
@@ -38,6 +45,8 @@ export function createShapesExample(scene: THREE.Scene) {
     segments: 28,
     angle: Math.PI * 2,
     color: 0xf97316,
+    fatOutlines: true,
+    outlineWidth: fatOutlineWidth,
   });
   cylinder.outline = true;
 
@@ -47,6 +56,8 @@ export function createShapesExample(scene: THREE.Scene) {
     height: 1.4,
     depth: 1.0,
     color: 0x7c3aed,
+    fatOutlines: true,
+    outlineWidth: fatOutlineWidth,
   });
   wedge.outline = true;
 
@@ -56,6 +67,8 @@ export function createShapesExample(scene: THREE.Scene) {
     widthSegments: 28,
     heightSegments: 18,
     color: 0x0ea5e9,
+    fatOutlines: true,
+    outlineWidth: fatOutlineWidth,
   });
   sphere.outline = true;
 
@@ -65,6 +78,8 @@ export function createShapesExample(scene: THREE.Scene) {
     height: 1.8,
     depth: 0.3,
     color: 0x9ca3af,
+    fatOutlines: true,
+    outlineWidth: fatOutlineWidth,
   });
   opening.outline = true;
 
@@ -84,6 +99,8 @@ export function createShapesExample(scene: THREE.Scene) {
     color: 0x14b8a6,
     capStart: true,
     capEnd: true,
+    fatOutlines: true,
+    outlineWidth: fatOutlineWidth,
   });
   sweep.outline = true;
 

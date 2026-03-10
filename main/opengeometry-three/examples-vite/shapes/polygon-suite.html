@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Wall from Offsets Example</title>
+    <title>OpenGeometry Polygon Suite Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="OpenGeometry Demo" />
@@ -14,7 +14,9 @@
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Polygon, Polyline, Vector3 } from "@og-three";
+      import { OpenGeometry, Polygon, Vector3 } from "@og-three";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import GUI from "three/examples/jsm/libs/lil-gui.module.min.js";
 
 
       const app = document.getElementById("app");
@@ -285,82 +287,207 @@
 
       async function main() {
         const meta = {
-        "slug": "operations/wall-from-offsets",
-        "category": "operations",
-        "title": "Wall from Offsets",
-        "description": "Composite wall profile assembled from offset centerlines.",
+        "slug": "shapes/polygon-suite",
+        "category": "shapes",
+        "title": "Polygon Suite",
+        "description": "Dataset-backed polygon validation with concave, performance, and multi-hole cases.",
         "statusLabel": "ready",
         "chips": [
-          "Thickness"
+          "Holes",
+          "Concavity"
         ],
-        "footerText": "Thickness"
+        "footerText": "Holes, Concavity"
       };
 
-        function buildCenterline(curveBias) {
-          return [
-            new Vector3(-2.6, 0, -1.9),
-            new Vector3(-1.2, 0, -1.0),
-            new Vector3(-0.2, 0, 0.1),
-            new Vector3(0.7 + curveBias, 0, 0.2),
-            new Vector3(0.1, 0, 1.0),
-            new Vector3(2.6, 0, 2.0)
-          ];
+        const polygonDataset = {
+          Triangle: {
+            vertices: [[0, 0, 0], [3, 0, 0], [1.5, 0, 3]],
+            description: "Basic triangle test for the smallest valid polygon footprint.",
+            category: "Basic Shapes"
+          },
+          Square: {
+            vertices: [[-2, 0, -2], [2, 0, -2], [2, 0, 2], [-2, 0, 2]],
+            description: "Simple rectangular slab used as the baseline fill and outline case.",
+            category: "Basic Shapes"
+          },
+          L_Shape: {
+            vertices: [[0, 0, 0], [6, 0, 0], [6, 0, 4], [10, 0, 4], [10, 0, 10], [0, 0, 10]],
+            description: "Concave architectural footprint for notch handling and triangulation checks.",
+            category: "Concave Cases"
+          },
+          Concave_Polygon: {
+            vertices: [[0, 0, 0], [3, 0, 0], [4, 0, 2], [6, 0, 0], [10, 0, 0], [10, 0, 3], [8, 0, 4], [10, 0, 6], [10, 0, 10], [6, 0, 10], [4, 0, 8], [3, 0, 10], [0, 0, 10], [0, 0, 6], [2, 0, 4], [0, 0, 3]],
+            description: "Complex concave polygon with multiple indentations for triangulation stress.",
+            category: "Concave Cases"
+          },
+          Complex_Multi_Hole: {
+            vertices: [[-12, 0, -8], [12, 0, -8], [12, 0, 8], [-12, 0, 8]],
+            holes: [
+              [[-8, 0, -5], [-8, 0, 1], [-3, 0, 1], [-3, 0, -5]],
+              [[2, 0, -5], [5, 0, -4], [6, 0, -1], [5, 0, 2], [2, 0, 1], [1, 0, -2]],
+              [[0, 0, 4], [0, 0, 6.5], [5, 0, 6.5], [5, 0, 5], [2, 0, 5], [2, 0, 4]]
+            ],
+            description: "Rectangular slab with three interior voids to validate multi-hole redraw stability.",
+            category: "Hole Test Suite"
+          },
+          Highly_Complex: {
+            vertices: [[0, 0, 0], [1, 0, 0], [2, 0, 1], [3, 0, 0], [4, 0, 1], [5, 0, 0], [6, 0, 1], [7, 0, 0], [8, 0, 1], [9, 0, 0], [10, 0, 1], [11, 0, 2], [12, 0, 1], [13, 0, 2], [14, 0, 3], [15, 0, 4], [16, 0, 5], [17, 0, 6], [18, 0, 7], [19, 0, 8], [20, 0, 9], [19, 0, 10], [18, 0, 9], [17, 0, 8], [16, 0, 7], [15, 0, 6], [14, 0, 5], [13, 0, 4], [12, 0, 3], [11, 0, 2], [10, 0, 3], [9, 0, 2], [8, 0, 3], [7, 0, 2], [6, 0, 3], [5, 0, 2], [4, 0, 3], [3, 0, 2], [2, 0, 3], [1, 0, 2], [0, 0, 1]],
+            description: "Large irregular polygon used to inspect performance and triangulation consistency.",
+            category: "Performance Testing"
+          },
+          Building: {
+            vertices: [[66.1, 0, 11.2], [66.1, 0, 9.6], [66.6, 0, 9.6], [66.6, 0, 8.7], [74.3, 0, 8.7], [77.1, 0, 8.7], [77.1, 0, 11.4], [75.0, 0, 11.4], [75.0, 0, 11.3], [74.2, 0, 11.3], [74.2, 0, 10.6], [71.0, 0, 10.6], [71.0, 0, 11.3], [66.6, 0, 11.3], [66.6, 0, 11.2]],
+            description: "Architectural outline sampled from a real-world earcut-oriented building footprint.",
+            category: "Dataset Cases"
+          }
+        };
+
+        function toVector3Loop(points) {
+          return points.map((point) => new Vector3(point[0], point[1], point[2]));
         }
 
-        function buildWallOutline(left, right) {
-          if (!left.length || !right.length) {
-            return [];
+        function applyPolygonMaterial(polygon, color, opacity, wireframe, outline) {
+          polygon.outline = outline;
+
+          if (polygon.material && polygon.material.color) {
+            polygon.material.color.set(color);
           }
 
-          return left.map((point) => point.clone()).concat(right.map((point) => point.clone()).reverse());
+          if (polygon.material) {
+            polygon.material.opacity = opacity;
+            polygon.material.transparent = opacity < 1;
+            polygon.material.wireframe = wireframe;
+          }
         }
 
-        const { scene } = await createExampleScene(meta);
+        const { scene, camera, renderer, controls } = await createExampleScene(meta, {
+          cameraPosition: [0, 20, 20],
+          target: [0, 0, 0]
+        });
+
+        camera.position.set(0, 20, 20);
+        controls.target.set(0, 0, 0);
+        controls.update();
+
+        const stats = new Stats();
+        stats.dom.id = "stats";
+        document.body.appendChild(stats.dom);
+
+        const description = document.createElement("div");
+        description.id = "polygon-description";
+        document.body.appendChild(description);
+
+        const renderBase = renderer.render.bind(renderer);
+        renderer.render = (renderScene, renderCamera) => {
+          stats.begin();
+          renderBase(renderScene, renderCamera);
+          stats.end();
+        };
+
+        const info = {
+          vertices: 0,
+          holes: 0,
+          category: ""
+        };
+
+        const params = {
+          polygonType: "Complex_Multi_Hole",
+          showOutline: true,
+          polygonColor: "#4CAF50",
+          opacity: 0.7,
+          wireframe: false,
+          showStats: true,
+          statsMode: 0
+        };
+
         let current = null;
 
-        mountControls("Wall Parameters", [
-          { type: "number", key: "thickness", label: "Wall Thickness", min: 0.1, max: 2, step: 0.05, value: 0.45 },
-          { type: "number", key: "acute", label: "Acute Threshold", min: 1, max: 179, step: 1, value: 90 },
-          { type: "number", key: "curveBias", label: "Curve Bias", min: -0.8, max: 0.8, step: 0.05, value: 0.0 },
-          { type: "boolean", key: "bevel", label: "Bevel", value: true },
-          { type: "boolean", key: "outline", label: "Outline", value: true },
-          { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
-          { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 }
-        ], (state) => {
-          const centerline = new Polyline({
-            points: buildCenterline(state.curveBias),
-            color: 0x1f2937
-          });
+        function updatePolygonDescription(polygonName) {
+          const polygonData = polygonDataset[polygonName];
+          if (!polygonData) {
+            return;
+          }
 
-          const half = state.thickness * 0.5;
-          const leftOffset = centerline.getOffset(half, state.acute, state.bevel);
-          const rightOffset = centerline.getOffset(-half, state.acute, state.bevel);
+          const holeSummary = polygonData.holes && polygonData.holes.length
+            ? "<br><em>Holes: " + polygonData.holes.length + "</em>"
+            : "";
 
-          const leftPolyline = new Polyline({ points: leftOffset.points, color: 0x22c55e });
-          const rightPolyline = new Polyline({ points: rightOffset.points, color: 0xf97316 });
-          const outline = buildWallOutline(leftOffset.points, rightOffset.points);
+          description.innerHTML =
+            "<strong>" + polygonName + "</strong><br>" +
+            "<em>Category: " + polygonData.category + "</em>" +
+            holeSummary +
+            "<br>" +
+            polygonData.description;
+        }
 
-          if (outline.length < 3) {
+        function createPolygon(polygonName) {
+          const polygonData = polygonDataset[polygonName];
+          if (!polygonData) {
             return;
           }
 
           const polygon = new Polygon({
-            vertices: outline,
-            color: 0x3b82f6,
-            fatOutlines: state.fatOutlines,
-            outlineWidth: state.outlineWidth
+            vertices: toVector3Loop(polygonData.vertices),
+            color: 0x4caf50
           });
+
+          (polygonData.holes || []).forEach((hole) => {
+            polygon.addHole(toVector3Loop(hole));
+          });
+
           polygon.position.y = 0.01;
-          polygon.outline = state.outline;
+          applyPolygonMaterial(polygon, params.polygonColor, params.opacity, params.wireframe, params.showOutline);
 
-          const group = new THREE.Group();
-          group.add(centerline);
-          group.add(leftPolyline);
-          group.add(rightPolyline);
-          group.add(polygon);
+          current = replaceSceneObject(scene, current, polygon);
+          info.vertices = polygonData.vertices.length;
+          info.holes = polygonData.holes ? polygonData.holes.length : 0;
+          info.category = polygonData.category;
+          updatePolygonDescription(polygonName);
+        }
 
-          current = replaceSceneObject(scene, current, group);
+        const gui = new GUI();
+        const polygonFolder = gui.addFolder("Polygon Test Suite");
+        polygonFolder.open();
+        polygonFolder.add(params, "polygonType", Object.keys(polygonDataset)).name("Polygon Shape").onChange((value) => {
+          createPolygon(value);
         });
+        polygonFolder.add(params, "showOutline").name("Show Outline").onChange((value) => {
+          if (current) {
+            applyPolygonMaterial(current, params.polygonColor, params.opacity, params.wireframe, value);
+          }
+        });
+        polygonFolder.addColor(params, "polygonColor").name("Polygon Color").onChange((value) => {
+          if (current) {
+            applyPolygonMaterial(current, value, params.opacity, params.wireframe, params.showOutline);
+          }
+        });
+        polygonFolder.add(params, "opacity", 0, 1, 0.01).name("Opacity").onChange((value) => {
+          if (current) {
+            applyPolygonMaterial(current, params.polygonColor, value, params.wireframe, params.showOutline);
+          }
+        });
+        polygonFolder.add(params, "wireframe").name("Wireframe").onChange((value) => {
+          if (current) {
+            applyPolygonMaterial(current, params.polygonColor, params.opacity, value, params.showOutline);
+          }
+        });
+
+        const performanceFolder = gui.addFolder("Performance");
+        performanceFolder.open();
+        performanceFolder.add(params, "showStats").name("Show FPS Stats").onChange((value) => {
+          stats.dom.style.display = value ? "block" : "none";
+        });
+        performanceFolder.add(params, "statsMode", { FPS: 0, "Frame Time (ms)": 1, "Memory (MB)": 2 }).name("Stats Mode").onChange((value) => {
+          stats.showPanel(Number(value));
+        });
+
+        const infoFolder = gui.addFolder("Polygon Info");
+        infoFolder.open();
+        infoFolder.add(info, "vertices").name("Vertex Count").listen();
+        infoFolder.add(info, "holes").name("Hole Count").listen();
+        infoFolder.add(info, "category").name("Category").listen();
+
+        createPolygon(params.polygonType);
       }
 
       void main();
