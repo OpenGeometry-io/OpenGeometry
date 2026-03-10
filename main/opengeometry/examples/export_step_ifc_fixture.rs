@@ -1,7 +1,8 @@
-use opengeometry::export::{
-    export_brep_to_ifc_text, export_brep_to_step_text, IfcExportConfig, StepExportConfig,
-};
+use opengeometry::export::{export_brep_to_step_text, StepExportConfig};
 use opengeometry::primitives::cuboid::OGCuboid;
+use opengeometry::scenegraph::OGSceneManager;
+use opengeometry_export_io::ifc::{export_snapshot_to_ifc_text, IfcExportConfig};
+use opengeometry_export_schema::ExportSceneSnapshot;
 use openmaths::Vector3;
 use std::env;
 use std::fs;
@@ -28,7 +29,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ifc_config = IfcExportConfig::default();
 
     let (step_text, step_report) = export_brep_to_step_text(cuboid.brep(), &step_config)?;
-    let (ifc_text, ifc_report) = export_brep_to_ifc_text(cuboid.brep(), &ifc_config)?;
+
+    let mut scene_manager = OGSceneManager::new();
+    let scene_id = scene_manager.create_scene("fixture-scene".to_string());
+    let brep_json = serde_json::to_string(cuboid.brep())?;
+    scene_manager
+        .add_brep_entity_to_scene(
+            scene_id.clone(),
+            "validation-cuboid".to_string(),
+            "OGCuboid".to_string(),
+            brep_json,
+        )
+        .map_err(js_err_to_string)?;
+
+    let snapshot_json = scene_manager
+        .get_scene_serialized(scene_id)
+        .map_err(js_err_to_string)?;
+    let snapshot: ExportSceneSnapshot = serde_json::from_str(&snapshot_json)?;
+    let (ifc_text, ifc_report) = export_snapshot_to_ifc_text(&snapshot, &ifc_config)?;
 
     let step_path = out_dir.join("validation-cuboid.step");
     let ifc_path = out_dir.join("validation-cuboid.ifc");
@@ -44,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!(
         "IFC report: elements={}, triangles={}, skipped_entities={}",
-        ifc_report.exported_elements, ifc_report.exported_triangles, ifc_report.skipped_entities
+        ifc_report.exported_elements, ifc_report.input_triangles, ifc_report.skipped_entities
     );
 
     Ok(())

@@ -1,23 +1,21 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 
+use opengeometry_export_schema::{
+    ExportEntity, ExportFeatureNode, ExportFeatureTree, ExportMesh, ExportScene,
+    ExportSceneSnapshot,
+};
+use openmaths::Vector3;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
 use crate::brep::Brep;
-use crate::export::ifc::{
-    export_brep_to_ifc_text, export_scene_entities_to_ifc_text, IfcEntityInput, IfcExportConfig,
-    IfcExportReport,
-};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::export::pdf::{export_scene_to_pdf_with_config, PdfExportConfig};
 use crate::export::projection::{
     project_brep_to_scene, CameraParameters, HlrOptions, Scene2D, Scene2DLines,
 };
-use crate::export::step::{
-    export_brep_to_step_text, export_breps_to_step_text, StepExportConfig, StepExportReport,
-};
-use crate::export::stl::{
-    export_brep_to_stl_bytes, export_breps_to_stl_bytes, StlExportConfig, StlExportReport,
-};
+use crate::operations::triangulate::triangulate_polygon_with_holes;
 use crate::primitives::arc::OGArc;
 use crate::primitives::cuboid::OGCuboid;
 use crate::primitives::cylinder::OGCylinder;
@@ -28,14 +26,7 @@ use crate::primitives::rectangle::OGRectangle;
 use crate::primitives::sphere::OGSphere;
 use crate::primitives::wedge::OGWedge;
 
-#[cfg(not(target_arch = "wasm32"))]
-use crate::export::ifc::export_scene_entities_to_ifc_file;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::export::pdf::{export_scene_to_pdf_with_config, PdfExportConfig};
-#[cfg(not(target_arch = "wasm32"))]
-use crate::export::step::export_breps_to_step_file;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::export::stl::export_breps_to_stl_file;
+const MESH_EPSILON: f64 = 1.0e-12;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SceneEntity {
@@ -45,10 +36,46 @@ pub struct SceneEntity {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+pub struct SceneFeatureNode {
+    pub id: String,
+    pub kind: String,
+    pub entity_id: String,
+    #[serde(default)]
+    pub dependencies: Vec<String>,
+    #[serde(default)]
+    pub suppressed: bool,
+    #[serde(default)]
+    pub dirty: bool,
+    pub payload_json: String,
+}
+
+impl SceneFeatureNode {
+    fn to_export_node(&self) -> ExportFeatureNode {
+        ExportFeatureNode {
+            id: self.id.clone(),
+            kind: self.kind.clone(),
+            entity_id: self.entity_id.clone(),
+            dependencies: self.dependencies.clone(),
+            suppressed: self.suppressed,
+            dirty: self.dirty,
+            payload_json: Some(self.payload_json.clone()),
+        }
+    }
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+pub struct SceneFeatureTree {
+    #[serde(default)]
+    pub nodes: Vec<SceneFeatureNode>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct OGScene {
     pub id: String,
     pub name: String,
     pub entities: Vec<SceneEntity>,
+    #[serde(default)]
+    pub feature_tree: SceneFeatureTree,
 }
 
 impl OGScene {
@@ -57,6 +84,7 @@ impl OGScene {
             id: Uuid::new_v4().to_string(),
             name: name.into(),
             entities: Vec::new(),
+            feature_tree: SceneFeatureTree::default(),
         }
     }
 
@@ -82,6 +110,311 @@ impl OGScene {
         }
         projected
     }
+
+    fn get_feature_node(&self, node_id: &str) -> Option<&SceneFeatureNode> {
+        self.feature_tree
+            .nodes
+            .iter()
+            .find(|node| node.id == node_id)
+    }
+
+    fn get_feature_node_mut(&mut self, node_id: &str) -> Option<&mut SceneFeatureNode> {
+        self.feature_tree
+            .nodes
+            .iter_mut()
+            .find(|node| node.id == node_id)
+    }
+
+    fn remove_feature_nodes_for_entity(&mut self, entity_id: &str) {
+        self.feature_tree
+            .nodes
+            .retain(|node| node.entity_id != entity_id);
+    }
+
+    fn upsert_feature_node(&mut self, mut node: SceneFeatureNode) -> Result<(), String> {
+        if node.id.trim().is_empty() {
+            return Err("Feature node id cannot be empty".to_string());
+        }
+        if node.entity_id.trim().is_empty() {
+            return Err(format!("Feature node '{}' has empty entity_id", node.id));
+        }
+        if node.payload_json.trim().is_empty() {
+            return Err(format!("Feature node '{}' has empty payload_json", node.id));
+        }
+
+        node.dirty = true;
+        let changed_id = node.id.clone();
+
+        if let Some(existing) = self.get_feature_node_mut(&node.id) {
+            *existing = node;
+        } else {
+            self.feature_tree.nodes.push(node);
+        }
+
+        self.validate_feature_tree()?;
+        self.mark_dirty_with_descendants(&changed_id);
+
+        self.recompute_dirty_features()
+    }
+
+    fn remove_feature_node(&mut self, node_id: &str) -> Result<bool, String> {
+        let Some(position) = self
+            .feature_tree
+            .nodes
+            .iter()
+            .position(|node| node.id == node_id)
+        else {
+            return Ok(false);
+        };
+
+        let removed = self.feature_tree.nodes.remove(position);
+        self.remove_entity(&removed.entity_id);
+
+        let dependents: Vec<String> = self
+            .feature_tree
+            .nodes
+            .iter()
+            .filter(|node| node.dependencies.iter().any(|dep| dep == node_id))
+            .map(|node| node.id.clone())
+            .collect();
+
+        for dep in dependents {
+            if let Some(node) = self.get_feature_node_mut(&dep) {
+                node.dependencies.retain(|candidate| candidate != node_id);
+                node.dirty = true;
+            }
+        }
+
+        self.recompute_dirty_features()?;
+        Ok(true)
+    }
+
+    fn set_feature_node_suppressed(
+        &mut self,
+        node_id: &str,
+        suppressed: bool,
+    ) -> Result<(), String> {
+        let Some(node) = self.get_feature_node_mut(node_id) else {
+            return Err(format!("Feature node '{}' does not exist", node_id));
+        };
+
+        node.suppressed = suppressed;
+        node.dirty = true;
+        self.mark_dirty_with_descendants(node_id);
+        self.recompute_dirty_features()
+    }
+
+    fn mark_feature_node_dirty(&mut self, node_id: &str) -> Result<(), String> {
+        if self.get_feature_node(node_id).is_none() {
+            return Err(format!("Feature node '{}' does not exist", node_id));
+        }
+        self.mark_dirty_with_descendants(node_id);
+        Ok(())
+    }
+
+    fn mark_dirty_with_descendants(&mut self, node_id: &str) {
+        let mut reverse = HashMap::<String, Vec<String>>::new();
+        for node in &self.feature_tree.nodes {
+            for dep in &node.dependencies {
+                reverse
+                    .entry(dep.clone())
+                    .or_default()
+                    .push(node.id.clone());
+            }
+        }
+
+        let mut queue = VecDeque::<String>::new();
+        let mut visited = HashSet::<String>::new();
+        queue.push_back(node_id.to_string());
+
+        while let Some(current) = queue.pop_front() {
+            if !visited.insert(current.clone()) {
+                continue;
+            }
+
+            if let Some(node) = self.get_feature_node_mut(&current) {
+                node.dirty = true;
+            }
+
+            if let Some(children) = reverse.get(&current) {
+                for child in children {
+                    queue.push_back(child.clone());
+                }
+            }
+        }
+    }
+
+    fn validate_feature_tree(&self) -> Result<(), String> {
+        let mut node_ids = HashSet::<String>::new();
+        for node in &self.feature_tree.nodes {
+            if !node_ids.insert(node.id.clone()) {
+                return Err(format!("Duplicate feature node id '{}'", node.id));
+            }
+        }
+
+        for node in &self.feature_tree.nodes {
+            for dep in &node.dependencies {
+                if !node_ids.contains(dep) {
+                    return Err(format!(
+                        "Feature node '{}' references missing dependency '{}'",
+                        node.id, dep
+                    ));
+                }
+            }
+        }
+
+        self.topological_order().map(|_| ())
+    }
+
+    fn topological_order(&self) -> Result<Vec<String>, String> {
+        let mut indegree = HashMap::<String, usize>::new();
+        let mut outgoing = HashMap::<String, Vec<String>>::new();
+
+        for node in &self.feature_tree.nodes {
+            indegree.insert(node.id.clone(), node.dependencies.len());
+            for dep in &node.dependencies {
+                outgoing
+                    .entry(dep.clone())
+                    .or_default()
+                    .push(node.id.clone());
+            }
+        }
+
+        let mut queue = VecDeque::<String>::new();
+        for (node_id, degree) in &indegree {
+            if *degree == 0 {
+                queue.push_back(node_id.clone());
+            }
+        }
+
+        let mut ordered = Vec::<String>::new();
+        while let Some(node_id) = queue.pop_front() {
+            ordered.push(node_id.clone());
+            if let Some(children) = outgoing.get(&node_id) {
+                for child in children {
+                    if let Some(entry) = indegree.get_mut(child) {
+                        *entry -= 1;
+                        if *entry == 0 {
+                            queue.push_back(child.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        if ordered.len() != self.feature_tree.nodes.len() {
+            return Err("Feature tree contains a cyclic dependency".to_string());
+        }
+
+        Ok(ordered)
+    }
+
+    fn recompute_dirty_features(&mut self) -> Result<(), String> {
+        self.validate_feature_tree()?;
+
+        let dirty_roots: Vec<String> = self
+            .feature_tree
+            .nodes
+            .iter()
+            .filter(|node| node.dirty)
+            .map(|node| node.id.clone())
+            .collect();
+
+        if dirty_roots.is_empty() {
+            return Ok(());
+        }
+
+        let mut impacted = HashSet::<String>::new();
+        let mut reverse = HashMap::<String, Vec<String>>::new();
+        for node in &self.feature_tree.nodes {
+            for dep in &node.dependencies {
+                reverse
+                    .entry(dep.clone())
+                    .or_default()
+                    .push(node.id.clone());
+            }
+        }
+
+        let mut queue = VecDeque::<String>::new();
+        for node in dirty_roots {
+            queue.push_back(node);
+        }
+
+        while let Some(current) = queue.pop_front() {
+            if !impacted.insert(current.clone()) {
+                continue;
+            }
+            if let Some(children) = reverse.get(&current) {
+                for child in children {
+                    queue.push_back(child.clone());
+                }
+            }
+        }
+
+        let topo = self.topological_order()?;
+        for node_id in topo {
+            if !impacted.contains(&node_id) {
+                continue;
+            }
+
+            let (suppressed, entity_id, kind, payload_json) = {
+                let Some(node) = self.get_feature_node(&node_id) else {
+                    continue;
+                };
+                (
+                    node.suppressed,
+                    node.entity_id.clone(),
+                    node.kind.clone(),
+                    node.payload_json.clone(),
+                )
+            };
+
+            if suppressed {
+                self.remove_entity(&entity_id);
+                if let Some(node) = self.get_feature_node_mut(&node_id) {
+                    node.dirty = false;
+                }
+                continue;
+            }
+
+            let brep: Brep = serde_json::from_str(&payload_json).map_err(|err| {
+                format!(
+                    "Feature node '{}' payload_json is invalid BRep JSON: {}",
+                    node_id, err
+                )
+            })?;
+
+            brep.validate_topology().map_err(|err| {
+                format!(
+                    "Feature node '{}' has invalid BRep topology: {}",
+                    node_id, err
+                )
+            })?;
+
+            self.upsert_entity(SceneEntity {
+                id: entity_id,
+                kind,
+                brep,
+            });
+
+            if let Some(node) = self.get_feature_node_mut(&node_id) {
+                node.dirty = false;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn export_feature_tree(&self) -> ExportFeatureTree {
+        ExportFeatureTree {
+            nodes: self
+                .feature_tree
+                .nodes
+                .iter()
+                .map(|node| node.to_export_node())
+                .collect(),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -92,90 +425,15 @@ pub struct SceneSummary {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct StlExportPayload {
-    pub bytes: Vec<u8>,
-    pub report: StlExportReport,
-}
-
-#[wasm_bindgen]
-pub struct OGStlExportResult {
-    bytes: Vec<u8>,
-    report_json: String,
-}
-
-impl OGStlExportResult {
-    fn from_parts(bytes: Vec<u8>, report: StlExportReport) -> Result<Self, String> {
-        let report_json = serde_json::to_string(&report)
-            .map_err(|err| format!("Failed to serialize STL export report: {}", err))?;
-        Ok(Self { bytes, report_json })
-    }
-}
-
-#[wasm_bindgen]
-impl OGStlExportResult {
-    #[wasm_bindgen(getter)]
-    pub fn bytes(&self) -> Vec<u8> {
-        self.bytes.clone()
-    }
-
-    #[wasm_bindgen(getter, js_name = reportJson)]
-    pub fn report_json(&self) -> String {
-        self.report_json.clone()
-    }
-}
-
-#[wasm_bindgen]
-pub struct OGStepExportResult {
-    text: String,
-    report_json: String,
-}
-
-impl OGStepExportResult {
-    fn from_parts(text: String, report: StepExportReport) -> Result<Self, String> {
-        let report_json = serde_json::to_string(&report)
-            .map_err(|err| format!("Failed to serialize STEP export report: {}", err))?;
-        Ok(Self { text, report_json })
-    }
-}
-
-#[wasm_bindgen]
-impl OGStepExportResult {
-    #[wasm_bindgen(getter)]
-    pub fn text(&self) -> String {
-        self.text.clone()
-    }
-
-    #[wasm_bindgen(getter, js_name = reportJson)]
-    pub fn report_json(&self) -> String {
-        self.report_json.clone()
-    }
-}
-
-#[wasm_bindgen]
-pub struct OGIfcExportResult {
-    text: String,
-    report_json: String,
-}
-
-impl OGIfcExportResult {
-    fn from_parts(text: String, report: IfcExportReport) -> Result<Self, String> {
-        let report_json = serde_json::to_string(&report)
-            .map_err(|err| format!("Failed to serialize IFC export report: {}", err))?;
-        Ok(Self { text, report_json })
-    }
-}
-
-#[wasm_bindgen]
-impl OGIfcExportResult {
-    #[wasm_bindgen(getter)]
-    pub fn text(&self) -> String {
-        self.text.clone()
-    }
-
-    #[wasm_bindgen(getter, js_name = reportJson)]
-    pub fn report_json(&self) -> String {
-        self.report_json.clone()
-    }
+struct FeatureNodeInput {
+    pub id: String,
+    pub kind: String,
+    pub entity_id: String,
+    #[serde(default)]
+    pub dependencies: Vec<String>,
+    #[serde(default)]
+    pub suppressed: bool,
+    pub payload_json: String,
 }
 
 #[wasm_bindgen]
@@ -229,31 +487,7 @@ impl OGSceneManager {
         }
     }
 
-    fn parse_stl_config_json(config_json: Option<String>) -> Result<StlExportConfig, String> {
-        match config_json {
-            Some(payload) if !payload.trim().is_empty() => serde_json::from_str(&payload)
-                .map_err(|err| format!("Invalid STL config JSON payload: {}", err)),
-            _ => Ok(StlExportConfig::default()),
-        }
-    }
-
-    fn parse_step_config_json(config_json: Option<String>) -> Result<StepExportConfig, String> {
-        match config_json {
-            Some(payload) if !payload.trim().is_empty() => serde_json::from_str(&payload)
-                .map_err(|err| format!("Invalid STEP config JSON payload: {}", err)),
-            _ => Ok(StepExportConfig::default()),
-        }
-    }
-
-    fn parse_ifc_config_json(config_json: Option<String>) -> Result<IfcExportConfig, String> {
-        match config_json {
-            Some(payload) if !payload.trim().is_empty() => serde_json::from_str(&payload)
-                .map_err(|err| format!("Invalid IFC config JSON payload: {}", err)),
-            _ => Ok(IfcExportConfig::default()),
-        }
-    }
-
-    fn upsert_entity_brep(
+    fn upsert_entity_feature(
         &mut self,
         scene_id: &str,
         entity_id: String,
@@ -261,12 +495,29 @@ impl OGSceneManager {
         brep: Brep,
     ) -> Result<(), String> {
         let scene = self.get_scene_mut(scene_id)?;
-        scene.upsert_entity(SceneEntity {
-            id: entity_id,
-            kind,
-            brep,
-        });
-        Ok(())
+
+        let payload_json = serde_json::to_string(&brep)
+            .map_err(|err| format!("Failed to serialize BRep payload: {}", err))?;
+
+        let dependencies = scene
+            .get_feature_node(&entity_id)
+            .map(|node| node.dependencies.clone())
+            .unwrap_or_default();
+
+        let suppressed = scene
+            .get_feature_node(&entity_id)
+            .map(|node| node.suppressed)
+            .unwrap_or(false);
+
+        scene.upsert_feature_node(SceneFeatureNode {
+            id: entity_id.clone(),
+            kind: kind.clone(),
+            entity_id,
+            dependencies,
+            suppressed,
+            dirty: true,
+            payload_json,
+        })
     }
 
     fn scene_id_or_current(&self, scene_id: Option<String>) -> Result<String, String> {
@@ -274,6 +525,40 @@ impl OGSceneManager {
             Some(id) => Ok(id),
             None => self.current_scene_id_result(),
         }
+    }
+
+    fn build_scene_snapshot(&self, scene_id: &str) -> Result<ExportSceneSnapshot, String> {
+        let scene = self.get_scene(scene_id)?;
+
+        let mut entities = Vec::with_capacity(scene.entities.len());
+        for entity in &scene.entities {
+            let mesh = tessellate_brep_to_mesh(&entity.brep);
+            let brep_json = serde_json::to_string(&entity.brep).map_err(|err| {
+                format!(
+                    "Failed to serialize scene BRep for '{}': {}",
+                    entity.id, err
+                )
+            })?;
+
+            entities.push(ExportEntity {
+                id: entity.id.clone(),
+                kind: entity.kind.clone(),
+                mesh,
+                semantics: None,
+                material_id: None,
+                brep_json: Some(brep_json),
+            });
+        }
+
+        Ok(ExportSceneSnapshot {
+            scene: ExportScene {
+                id: scene.id.clone(),
+                name: scene.name.clone(),
+            },
+            entities,
+            feature_tree: scene.export_feature_tree(),
+            ..ExportSceneSnapshot::default()
+        })
     }
 
     pub fn create_scene_internal(&mut self, name: impl Into<String>) -> String {
@@ -291,7 +576,7 @@ impl OGSceneManager {
         kind: impl Into<String>,
         brep: &Brep,
     ) -> Result<(), String> {
-        self.upsert_entity_brep(scene_id, entity_id.into(), kind.into(), brep.clone())
+        self.upsert_entity_feature(scene_id, entity_id.into(), kind.into(), brep.clone())
     }
 
     pub fn add_line_to_scene_internal(
@@ -452,111 +737,6 @@ impl OGSceneManager {
         serde_json::to_string_pretty(&projected_lines)
             .map_err(|err| format!("Failed to serialize projected line scene: {}", err))
     }
-
-    pub fn export_scene_to_stl_bytes_internal(
-        &self,
-        scene_id: &str,
-        config: &StlExportConfig,
-    ) -> Result<(Vec<u8>, StlExportReport), String> {
-        let scene = self.get_scene(scene_id)?;
-        let breps: Vec<&Brep> = scene.entities.iter().map(|entity| &entity.brep).collect();
-        export_breps_to_stl_bytes(breps, config).map_err(|err| err.to_string())
-    }
-
-    pub fn export_brep_serialized_to_stl_bytes_internal(
-        &self,
-        brep_serialized: &str,
-        config: &StlExportConfig,
-    ) -> Result<(Vec<u8>, StlExportReport), String> {
-        let brep: Brep = serde_json::from_str(brep_serialized)
-            .map_err(|err| format!("Failed to deserialize BRep JSON payload: {}", err))?;
-        export_brep_to_stl_bytes(&brep, config).map_err(|err| err.to_string())
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn export_scene_to_stl_file_internal(
-        &self,
-        scene_id: &str,
-        file_path: &str,
-        config: &StlExportConfig,
-    ) -> Result<StlExportReport, String> {
-        let scene = self.get_scene(scene_id)?;
-        let breps: Vec<&Brep> = scene.entities.iter().map(|entity| &entity.brep).collect();
-        export_breps_to_stl_file(breps, file_path, config).map_err(|err| err.to_string())
-    }
-
-    pub fn export_scene_to_step_text_internal(
-        &self,
-        scene_id: &str,
-        config: &StepExportConfig,
-    ) -> Result<(String, StepExportReport), String> {
-        let scene = self.get_scene(scene_id)?;
-        let breps: Vec<&Brep> = scene.entities.iter().map(|entity| &entity.brep).collect();
-        export_breps_to_step_text(breps, config).map_err(|err| err.to_string())
-    }
-
-    pub fn export_brep_serialized_to_step_text_internal(
-        &self,
-        brep_serialized: &str,
-        config: &StepExportConfig,
-    ) -> Result<(String, StepExportReport), String> {
-        let brep: Brep = serde_json::from_str(brep_serialized)
-            .map_err(|err| format!("Failed to deserialize BRep JSON payload: {}", err))?;
-        export_brep_to_step_text(&brep, config).map_err(|err| err.to_string())
-    }
-
-    pub fn export_scene_to_ifc_text_internal(
-        &self,
-        scene_id: &str,
-        config: &IfcExportConfig,
-    ) -> Result<(String, IfcExportReport), String> {
-        let scene = self.get_scene(scene_id)?;
-        let entities = scene.entities.iter().map(|entity| IfcEntityInput {
-            entity_id: entity.id.as_str(),
-            kind: entity.kind.as_str(),
-            brep: &entity.brep,
-        });
-        export_scene_entities_to_ifc_text(entities, config).map_err(|err| err.to_string())
-    }
-
-    pub fn export_brep_serialized_to_ifc_text_internal(
-        &self,
-        brep_serialized: &str,
-        config: &IfcExportConfig,
-    ) -> Result<(String, IfcExportReport), String> {
-        let brep: Brep = serde_json::from_str(brep_serialized)
-            .map_err(|err| format!("Failed to deserialize BRep JSON payload: {}", err))?;
-        export_brep_to_ifc_text(&brep, config).map_err(|err| err.to_string())
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn export_scene_to_step_file_internal(
-        &self,
-        scene_id: &str,
-        file_path: &str,
-        config: &StepExportConfig,
-    ) -> Result<StepExportReport, String> {
-        let scene = self.get_scene(scene_id)?;
-        let breps: Vec<&Brep> = scene.entities.iter().map(|entity| &entity.brep).collect();
-        export_breps_to_step_file(breps, file_path, config).map_err(|err| err.to_string())
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn export_scene_to_ifc_file_internal(
-        &self,
-        scene_id: &str,
-        file_path: &str,
-        config: &IfcExportConfig,
-    ) -> Result<IfcExportReport, String> {
-        let scene = self.get_scene(scene_id)?;
-        let entities = scene.entities.iter().map(|entity| IfcEntityInput {
-            entity_id: entity.id.as_str(),
-            kind: entity.kind.as_str(),
-            brep: &entity.brep,
-        });
-        export_scene_entities_to_ifc_file(entities, file_path, config)
-            .map_err(|err| err.to_string())
-    }
 }
 
 #[wasm_bindgen]
@@ -614,12 +794,13 @@ impl OGSceneManager {
 
     #[wasm_bindgen(js_name = getSceneSerialized)]
     pub fn get_scene_serialized(&self, scene_id: String) -> Result<String, JsValue> {
-        let scene = self
-            .get_scene(&scene_id)
+        let snapshot = self
+            .build_scene_snapshot(&scene_id)
             .map_err(|err| JsValue::from_str(&err))?;
 
-        serde_json::to_string(scene)
-            .map_err(|err| JsValue::from_str(&format!("Failed to serialize scene: {}", err)))
+        serde_json::to_string(&snapshot).map_err(|err| {
+            JsValue::from_str(&format!("Failed to serialize scene snapshot: {}", err))
+        })
     }
 
     #[wasm_bindgen(js_name = removeEntityFromScene)]
@@ -631,7 +812,9 @@ impl OGSceneManager {
         let scene = self
             .get_scene_mut(&scene_id)
             .map_err(|err| JsValue::from_str(&err))?;
-        Ok(scene.remove_entity(&entity_id))
+        let removed = scene.remove_entity(&entity_id);
+        scene.remove_feature_nodes_for_entity(&entity_id);
+        Ok(removed)
     }
 
     #[wasm_bindgen(js_name = addBrepEntityToScene)]
@@ -653,7 +836,7 @@ impl OGSceneManager {
             ))
         })?;
 
-        self.upsert_entity_brep(&scene_id, entity_id, kind, brep)
+        self.upsert_entity_feature(&scene_id, entity_id, kind, brep)
             .map_err(|err| JsValue::from_str(&err))
     }
 
@@ -877,6 +1060,101 @@ impl OGSceneManager {
         self.add_wedge_to_scene(scene_id, entity_id, wedge)
     }
 
+    #[wasm_bindgen(js_name = upsertFeatureNode)]
+    pub fn upsert_feature_node(
+        &mut self,
+        scene_id: String,
+        feature_node_json: String,
+    ) -> Result<(), JsValue> {
+        let input: FeatureNodeInput = serde_json::from_str(&feature_node_json).map_err(|err| {
+            JsValue::from_str(&format!(
+                "Invalid feature node JSON payload for scene '{}': {}",
+                scene_id, err
+            ))
+        })?;
+
+        let scene = self
+            .get_scene_mut(&scene_id)
+            .map_err(|err| JsValue::from_str(&err))?;
+
+        scene
+            .upsert_feature_node(SceneFeatureNode {
+                id: input.id,
+                kind: input.kind,
+                entity_id: input.entity_id,
+                dependencies: input.dependencies,
+                suppressed: input.suppressed,
+                dirty: true,
+                payload_json: input.payload_json,
+            })
+            .map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = removeFeatureNode)]
+    pub fn remove_feature_node(
+        &mut self,
+        scene_id: String,
+        node_id: String,
+    ) -> Result<bool, JsValue> {
+        let scene = self
+            .get_scene_mut(&scene_id)
+            .map_err(|err| JsValue::from_str(&err))?;
+
+        scene
+            .remove_feature_node(&node_id)
+            .map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = setFeatureNodeSuppressed)]
+    pub fn set_feature_node_suppressed(
+        &mut self,
+        scene_id: String,
+        node_id: String,
+        suppressed: bool,
+    ) -> Result<(), JsValue> {
+        let scene = self
+            .get_scene_mut(&scene_id)
+            .map_err(|err| JsValue::from_str(&err))?;
+
+        scene
+            .set_feature_node_suppressed(&node_id, suppressed)
+            .map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = recomputeSceneFeatures)]
+    pub fn recompute_scene_features(&mut self, scene_id: String) -> Result<(), JsValue> {
+        let scene = self
+            .get_scene_mut(&scene_id)
+            .map_err(|err| JsValue::from_str(&err))?;
+        scene
+            .recompute_dirty_features()
+            .map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = markFeatureNodeDirty)]
+    pub fn mark_feature_node_dirty(
+        &mut self,
+        scene_id: String,
+        node_id: String,
+    ) -> Result<(), JsValue> {
+        let scene = self
+            .get_scene_mut(&scene_id)
+            .map_err(|err| JsValue::from_str(&err))?;
+        scene
+            .mark_feature_node_dirty(&node_id)
+            .map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = listFeatureNodes)]
+    pub fn list_feature_nodes(&self, scene_id: String) -> Result<String, JsValue> {
+        let scene = self
+            .get_scene(&scene_id)
+            .map_err(|err| JsValue::from_str(&err))?;
+
+        serde_json::to_string(&scene.feature_tree)
+            .map_err(|err| JsValue::from_str(&format!("Failed to serialize feature tree: {}", err)))
+    }
+
     #[wasm_bindgen(js_name = projectTo2DCamera)]
     pub fn project_to_2d_camera(
         &self,
@@ -957,183 +1235,6 @@ impl OGSceneManager {
         self.project_to_2d_lines(scene_id, camera_json, hlr_json)
     }
 
-    #[wasm_bindgen(js_name = exportBrepToStl)]
-    pub fn export_brep_to_stl(
-        &self,
-        brep_serialized: String,
-        config_json: Option<String>,
-    ) -> Result<OGStlExportResult, JsValue> {
-        let config =
-            Self::parse_stl_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
-        let (bytes, report) = self
-            .export_brep_serialized_to_stl_bytes_internal(&brep_serialized, &config)
-            .map_err(|err| JsValue::from_str(&err))?;
-
-        OGStlExportResult::from_parts(bytes, report).map_err(|err| JsValue::from_str(&err))
-    }
-
-    #[wasm_bindgen(js_name = exportSceneToStl)]
-    pub fn export_scene_to_stl(
-        &self,
-        scene_id: String,
-        config_json: Option<String>,
-    ) -> Result<OGStlExportResult, JsValue> {
-        let config =
-            Self::parse_stl_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
-        let (bytes, report) = self
-            .export_scene_to_stl_bytes_internal(&scene_id, &config)
-            .map_err(|err| JsValue::from_str(&err))?;
-
-        OGStlExportResult::from_parts(bytes, report).map_err(|err| JsValue::from_str(&err))
-    }
-
-    #[wasm_bindgen(js_name = exportCurrentSceneToStl)]
-    pub fn export_current_scene_to_stl(
-        &self,
-        config_json: Option<String>,
-    ) -> Result<OGStlExportResult, JsValue> {
-        let scene_id = self
-            .scene_id_or_current(None)
-            .map_err(|err| JsValue::from_str(&err))?;
-        self.export_scene_to_stl(scene_id, config_json)
-    }
-
-    #[wasm_bindgen(js_name = exportBrepToStep)]
-    pub fn export_brep_to_step(
-        &self,
-        brep_serialized: String,
-        config_json: Option<String>,
-    ) -> Result<OGStepExportResult, JsValue> {
-        let config =
-            Self::parse_step_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
-        let (text, report) = self
-            .export_brep_serialized_to_step_text_internal(&brep_serialized, &config)
-            .map_err(|err| JsValue::from_str(&err))?;
-
-        OGStepExportResult::from_parts(text, report).map_err(|err| JsValue::from_str(&err))
-    }
-
-    #[wasm_bindgen(js_name = exportSceneToStep)]
-    pub fn export_scene_to_step(
-        &self,
-        scene_id: String,
-        config_json: Option<String>,
-    ) -> Result<OGStepExportResult, JsValue> {
-        let config =
-            Self::parse_step_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
-        let (text, report) = self
-            .export_scene_to_step_text_internal(&scene_id, &config)
-            .map_err(|err| JsValue::from_str(&err))?;
-
-        OGStepExportResult::from_parts(text, report).map_err(|err| JsValue::from_str(&err))
-    }
-
-    #[wasm_bindgen(js_name = exportCurrentSceneToStep)]
-    pub fn export_current_scene_to_step(
-        &self,
-        config_json: Option<String>,
-    ) -> Result<OGStepExportResult, JsValue> {
-        let scene_id = self
-            .scene_id_or_current(None)
-            .map_err(|err| JsValue::from_str(&err))?;
-        self.export_scene_to_step(scene_id, config_json)
-    }
-
-    #[wasm_bindgen(js_name = exportBrepToIfc)]
-    pub fn export_brep_to_ifc(
-        &self,
-        brep_serialized: String,
-        config_json: Option<String>,
-    ) -> Result<OGIfcExportResult, JsValue> {
-        let config =
-            Self::parse_ifc_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
-        let (text, report) = self
-            .export_brep_serialized_to_ifc_text_internal(&brep_serialized, &config)
-            .map_err(|err| JsValue::from_str(&err))?;
-
-        OGIfcExportResult::from_parts(text, report).map_err(|err| JsValue::from_str(&err))
-    }
-
-    #[wasm_bindgen(js_name = exportSceneToIfc)]
-    pub fn export_scene_to_ifc(
-        &self,
-        scene_id: String,
-        config_json: Option<String>,
-    ) -> Result<OGIfcExportResult, JsValue> {
-        let config =
-            Self::parse_ifc_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
-        let (text, report) = self
-            .export_scene_to_ifc_text_internal(&scene_id, &config)
-            .map_err(|err| JsValue::from_str(&err))?;
-
-        OGIfcExportResult::from_parts(text, report).map_err(|err| JsValue::from_str(&err))
-    }
-
-    #[wasm_bindgen(js_name = exportCurrentSceneToIfc)]
-    pub fn export_current_scene_to_ifc(
-        &self,
-        config_json: Option<String>,
-    ) -> Result<OGIfcExportResult, JsValue> {
-        let scene_id = self
-            .scene_id_or_current(None)
-            .map_err(|err| JsValue::from_str(&err))?;
-        self.export_scene_to_ifc(scene_id, config_json)
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    #[wasm_bindgen(js_name = exportSceneToStlFile)]
-    pub fn export_scene_to_stl_file(
-        &self,
-        scene_id: String,
-        file_path: String,
-        config_json: Option<String>,
-    ) -> Result<String, JsValue> {
-        let config =
-            Self::parse_stl_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
-        let report = self
-            .export_scene_to_stl_file_internal(&scene_id, &file_path, &config)
-            .map_err(|err| JsValue::from_str(&err))?;
-        serde_json::to_string(&report).map_err(|err| {
-            JsValue::from_str(&format!("Failed to serialize STL export report: {}", err))
-        })
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    #[wasm_bindgen(js_name = exportSceneToStepFile)]
-    pub fn export_scene_to_step_file(
-        &self,
-        scene_id: String,
-        file_path: String,
-        config_json: Option<String>,
-    ) -> Result<String, JsValue> {
-        let config =
-            Self::parse_step_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
-        let report = self
-            .export_scene_to_step_file_internal(&scene_id, &file_path, &config)
-            .map_err(|err| JsValue::from_str(&err))?;
-        serde_json::to_string(&report).map_err(|err| {
-            JsValue::from_str(&format!("Failed to serialize STEP export report: {}", err))
-        })
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    #[wasm_bindgen(js_name = exportSceneToIfcFile)]
-    pub fn export_scene_to_ifc_file(
-        &self,
-        scene_id: String,
-        file_path: String,
-        config_json: Option<String>,
-    ) -> Result<String, JsValue> {
-        let config =
-            Self::parse_ifc_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
-        let report = self
-            .export_scene_to_ifc_file_internal(&scene_id, &file_path, &config)
-            .map_err(|err| JsValue::from_str(&err))?;
-        serde_json::to_string(&report).map_err(|err| {
-            JsValue::from_str(&format!("Failed to serialize IFC export report: {}", err))
-        })
-    }
-
     #[cfg(not(target_arch = "wasm32"))]
     #[wasm_bindgen(js_name = projectToPDF)]
     pub fn project_to_pdf(
@@ -1157,12 +1258,115 @@ impl OGSceneManager {
     }
 }
 
+fn tessellate_brep_to_mesh(brep: &Brep) -> ExportMesh {
+    let mut points = Vec::<[f64; 3]>::new();
+    let mut triangles = Vec::<[usize; 3]>::new();
+    let mut point_map = HashMap::<String, usize>::new();
+
+    for face in &brep.faces {
+        let (outer_vertices, holes_vertices) = brep.get_vertices_and_holes_by_face_id(face.id);
+
+        if outer_vertices.len() < 3 {
+            continue;
+        }
+        if holes_vertices.iter().any(|hole| hole.len() < 3) {
+            continue;
+        }
+
+        let triangle_indices = triangulate_polygon_with_holes(&outer_vertices, &holes_vertices);
+        if triangle_indices.is_empty() {
+            continue;
+        }
+
+        let mut all_vertices = outer_vertices;
+        for hole in holes_vertices {
+            all_vertices.extend(hole);
+        }
+
+        for triangle in triangle_indices {
+            let Some((&a, &b, &c)) = all_vertices
+                .get(triangle[0])
+                .zip(all_vertices.get(triangle[1]))
+                .zip(all_vertices.get(triangle[2]))
+                .map(|((a, b), c)| (a, b, c))
+            else {
+                continue;
+            };
+
+            if !is_finite_vec3(a) || !is_finite_vec3(b) || !is_finite_vec3(c) {
+                continue;
+            }
+
+            if is_degenerate_triangle(a, b, c) {
+                continue;
+            }
+
+            let i0 = get_or_create_mesh_point(&mut points, &mut point_map, a);
+            let i1 = get_or_create_mesh_point(&mut points, &mut point_map, b);
+            let i2 = get_or_create_mesh_point(&mut points, &mut point_map, c);
+
+            triangles.push([i0, i1, i2]);
+        }
+    }
+
+    ExportMesh { points, triangles }
+}
+
+fn get_or_create_mesh_point(
+    points: &mut Vec<[f64; 3]>,
+    point_map: &mut HashMap<String, usize>,
+    point: Vector3,
+) -> usize {
+    let key = format!("{:.9}|{:.9}|{:.9}", point.x, point.y, point.z);
+    if let Some(index) = point_map.get(&key) {
+        return *index;
+    }
+
+    let index = points.len();
+    points.push([point.x, point.y, point.z]);
+    point_map.insert(key, index);
+    index
+}
+
+fn is_finite_vec3(point: Vector3) -> bool {
+    point.x.is_finite() && point.y.is_finite() && point.z.is_finite()
+}
+
+fn is_degenerate_triangle(a: Vector3, b: Vector3, c: Vector3) -> bool {
+    let ab = [b.x - a.x, b.y - a.y, b.z - a.z];
+    let ac = [c.x - a.x, c.y - a.y, c.z - a.z];
+
+    let cross = [
+        ab[1] * ac[2] - ab[2] * ac[1],
+        ab[2] * ac[0] - ab[0] * ac[2],
+        ab[0] * ac[1] - ab[1] * ac[0],
+    ];
+
+    let area_sq = cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2];
+    !area_sq.is_finite() || area_sq <= MESH_EPSILON
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::brep::{Brep, BrepBuilder};
-    use openmaths::Vector3;
-    use uuid::Uuid;
+    use crate::brep::BrepBuilder;
+
+    fn tetrahedron_brep() -> Brep {
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(0.5, 0.8660254, 0.0),
+            Vector3::new(0.5, 0.2886751, 0.8164966),
+        ]);
+
+        builder.add_face(&[0, 2, 1], &[]).unwrap();
+        builder.add_face(&[0, 1, 3], &[]).unwrap();
+        builder.add_face(&[1, 2, 3], &[]).unwrap();
+        builder.add_face(&[2, 0, 3], &[]).unwrap();
+
+        builder.build().unwrap()
+    }
 
     #[test]
     fn test_scene_projection_from_edge_entity() {
@@ -1190,95 +1394,63 @@ mod tests {
     }
 
     #[test]
-    fn test_scene_stl_export_binary_payload() {
-        let mut manager = OGSceneManager::new();
-        let scene_id = manager.create_scene_internal("stl-scene");
+    fn rejects_feature_tree_cycles() {
+        let mut scene = OGScene::new("feature-scene");
+        let brep = serde_json::to_string(&tetrahedron_brep()).unwrap();
 
-        let mut builder = BrepBuilder::new(Uuid::new_v4());
-        builder.add_vertices(&[
-            Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(1.0, 0.0, 0.0),
-            Vector3::new(0.0, 1.0, 0.0),
-        ]);
-        builder.add_face(&[0, 1, 2], &[]).unwrap();
-        let brep: Brep = builder.build().unwrap();
+        scene
+            .upsert_feature_node(SceneFeatureNode {
+                id: "a".to_string(),
+                kind: "OGCuboid".to_string(),
+                entity_id: "entity-a".to_string(),
+                dependencies: vec!["b".to_string()],
+                suppressed: false,
+                dirty: true,
+                payload_json: brep.clone(),
+            })
+            .unwrap_err();
 
-        manager
-            .add_brep_entity_to_scene_internal(&scene_id, "tri-1", "Triangle", &brep)
+        scene
+            .upsert_feature_node(SceneFeatureNode {
+                id: "a".to_string(),
+                kind: "OGCuboid".to_string(),
+                entity_id: "entity-a".to_string(),
+                dependencies: vec![],
+                suppressed: false,
+                dirty: true,
+                payload_json: brep.clone(),
+            })
             .unwrap();
 
-        let (bytes, report) = manager
-            .export_scene_to_stl_bytes_internal(&scene_id, &StlExportConfig::default())
-            .unwrap();
+        let result = scene.upsert_feature_node(SceneFeatureNode {
+            id: "b".to_string(),
+            kind: "OGCuboid".to_string(),
+            entity_id: "entity-b".to_string(),
+            dependencies: vec!["a".to_string(), "b".to_string()],
+            suppressed: false,
+            dirty: true,
+            payload_json: brep,
+        });
 
-        assert!(bytes.len() >= 84);
-        let triangle_count = u32::from_le_bytes([bytes[80], bytes[81], bytes[82], bytes[83]]);
-        assert_eq!(triangle_count as usize, report.exported_triangles);
-        assert_eq!(report.exported_triangles, 1);
+        assert!(result.is_err());
     }
 
     #[test]
-    fn test_scene_step_export_text_payload() {
+    fn serializes_scene_snapshot_with_feature_tree() {
         let mut manager = OGSceneManager::new();
-        let scene_id = manager.create_scene_internal("step-scene");
-
-        let mut builder = BrepBuilder::new(Uuid::new_v4());
-        builder.add_vertices(&[
-            Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(1.0, 0.0, 0.0),
-            Vector3::new(0.5, 0.8660254, 0.0),
-            Vector3::new(0.5, 0.2886751, 0.8164966),
-        ]);
-        builder.add_face(&[0, 2, 1], &[]).unwrap();
-        builder.add_face(&[0, 1, 3], &[]).unwrap();
-        builder.add_face(&[1, 2, 3], &[]).unwrap();
-        builder.add_face(&[2, 0, 3], &[]).unwrap();
-        let brep: Brep = builder.build().unwrap();
+        let scene_id = manager.create_scene_internal("snapshot-scene");
+        let brep = tetrahedron_brep();
 
         manager
             .add_brep_entity_to_scene_internal(&scene_id, "tetra-1", "Tetrahedron", &brep)
             .unwrap();
 
-        let (text, report) = manager
-            .export_scene_to_step_text_internal(&scene_id, &StepExportConfig::default())
-            .unwrap();
+        let json = manager.get_scene_serialized(scene_id.clone()).unwrap();
+        let snapshot: ExportSceneSnapshot = serde_json::from_str(&json).unwrap();
 
-        assert!(text.starts_with("ISO-10303-21;"));
-        assert!(text.contains("FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));"));
-        assert!(text.contains("MANIFOLD_SOLID_BREP"));
-        assert_eq!(report.exported_solids, 1);
-    }
-
-    #[test]
-    fn test_scene_ifc_export_text_payload() {
-        let mut manager = OGSceneManager::new();
-        let scene_id = manager.create_scene_internal("ifc-scene");
-
-        let mut builder = BrepBuilder::new(Uuid::new_v4());
-        builder.add_vertices(&[
-            Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(1.0, 0.0, 0.0),
-            Vector3::new(0.5, 0.8660254, 0.0),
-            Vector3::new(0.5, 0.2886751, 0.8164966),
-        ]);
-        builder.add_face(&[0, 2, 1], &[]).unwrap();
-        builder.add_face(&[0, 1, 3], &[]).unwrap();
-        builder.add_face(&[1, 2, 3], &[]).unwrap();
-        builder.add_face(&[2, 0, 3], &[]).unwrap();
-        let brep: Brep = builder.build().unwrap();
-
-        manager
-            .add_brep_entity_to_scene_internal(&scene_id, "tetra-1", "Tetrahedron", &brep)
-            .unwrap();
-
-        let (text, report) = manager
-            .export_scene_to_ifc_text_internal(&scene_id, &IfcExportConfig::default())
-            .unwrap();
-
-        assert!(text.starts_with("ISO-10303-21;"));
-        assert!(text.contains("FILE_SCHEMA(('IFC4'));"));
-        assert!(text.contains("IFCPROJECT("));
-        assert!(text.contains("IFCTRIANGULATEDFACESET("));
-        assert_eq!(report.exported_elements, 1);
+        assert_eq!(snapshot.scene.id, scene_id);
+        assert_eq!(snapshot.entities.len(), 1);
+        assert_eq!(snapshot.feature_tree.nodes.len(), 1);
+        assert!(snapshot.entities[0].mesh.triangles.len() >= 4);
     }
 }

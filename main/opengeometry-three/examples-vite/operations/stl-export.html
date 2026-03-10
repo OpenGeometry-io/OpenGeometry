@@ -214,6 +214,7 @@
       import {
         Cuboid,
         Cylinder,
+        OGFileExporter,
         OGSceneManager,
         OpenGeometry,
         Sphere,
@@ -325,12 +326,11 @@
         return [
           `File: ${filename}`,
           `Bytes: ${bytes}`,
-          `Input BReps: ${report.input_breps}`,
-          `Input Faces: ${report.input_faces}`,
+          `Input Entities: ${report.input_entities}`,
+          `Input Triangles: ${report.input_triangles}`,
           `Exported Triangles: ${report.exported_triangles}`,
-          `Skipped Faces: ${report.skipped_faces}`,
+          `Skipped Entities: ${report.skipped_entities}`,
           `Skipped Triangles: ${report.skipped_triangles}`,
-          `Topology Errors: ${report.topology_errors}`,
         ].join("\n");
       }
 
@@ -434,6 +434,7 @@
 
         const { scene } = await createExampleScene(meta);
         const manager = new OGSceneManager();
+        const fileExporter = new OGFileExporter();
         const sceneId = manager.createScene("stl-export-scene");
         let current = null;
 
@@ -603,7 +604,11 @@
               validate_topology: true,
             };
 
-            const result = manager.exportSceneToStl(sceneId, JSON.stringify(config));
+            const snapshotJson = manager.getSceneSerialized(sceneId);
+            const result = fileExporter.exportSceneSnapshotToStl(
+              snapshotJson,
+              JSON.stringify(config)
+            );
             const report = JSON.parse(result.reportJson);
             const filename = exportButton.dataset.filename || "opengeometry-shape.stl";
             downloadBytes(result.bytes, filename, "model/stl");

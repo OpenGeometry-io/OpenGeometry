@@ -108,6 +108,7 @@
       import { OrbitControls } from "https://unpkg.com/three@0.168.0/examples/jsm/controls/OrbitControls.js";
       import init, {
         OGCuboid,
+        OGFileExporter,
         OGSceneManager,
         Vector3,
       } from "../../opengeometry/pkg/opengeometry.js";
@@ -143,6 +144,7 @@
 
       let mesh = null;
       const sceneManager = new OGSceneManager();
+      const fileExporter = new OGFileExporter();
       const sceneId = sceneManager.createScene("legacy-stl-export");
       const entityId = "legacy-cuboid";
 
@@ -221,18 +223,21 @@
             error_policy: "BestEffort",
             validate_topology: true,
           };
-          const result = sceneManager.exportSceneToStl(sceneId, JSON.stringify(config));
+          const snapshotJson = sceneManager.getSceneSerialized(sceneId);
+          const result = fileExporter.exportSceneSnapshotToStl(
+            snapshotJson,
+            JSON.stringify(config)
+          );
           const report = JSON.parse(result.reportJson);
 
           downloadBytes(result.bytes, "opengeometry-legacy-scene.stl");
           reportNode.textContent = [
             `Bytes: ${result.bytes.length}`,
-            `Input BReps: ${report.input_breps}`,
-            `Input Faces: ${report.input_faces}`,
+            `Input Entities: ${report.input_entities}`,
+            `Input Triangles: ${report.input_triangles}`,
             `Exported Triangles: ${report.exported_triangles}`,
-            `Skipped Faces: ${report.skipped_faces}`,
+            `Skipped Entities: ${report.skipped_entities}`,
             `Skipped Triangles: ${report.skipped_triangles}`,
-            `Topology Errors: ${report.topology_errors}`,
           ].join("\n");
         } catch (error) {
           reportNode.textContent = `Export failed: ${String(error)}`;

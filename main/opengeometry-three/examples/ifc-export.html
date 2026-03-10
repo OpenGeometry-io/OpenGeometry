@@ -126,6 +126,7 @@
       import { OrbitControls } from "https://unpkg.com/three@0.168.0/examples/jsm/controls/OrbitControls.js";
       import init, {
         OGCuboid,
+        OGFileExporter,
         OGSceneManager,
         Vector3,
       } from "../../opengeometry/pkg/opengeometry.js";
@@ -161,6 +162,7 @@
 
       let mesh = null;
       const sceneManager = new OGSceneManager();
+      const fileExporter = new OGFileExporter();
       const sceneId = sceneManager.createScene("legacy-ifc-export");
       const entityId = "legacy-cuboid";
 
@@ -288,7 +290,11 @@
             semantics,
           };
 
-          const result = sceneManager.exportSceneToIfc(sceneId, JSON.stringify(config));
+          const snapshotJson = sceneManager.getSceneSerialized(sceneId);
+          const result = fileExporter.exportSceneSnapshotToIfc(
+            snapshotJson,
+            JSON.stringify(config)
+          );
           const report = JSON.parse(result.reportJson);
           const parseMessage = await tryWebIfcParse(result.text);
 
@@ -296,14 +302,11 @@
           reportNode.textContent = [
             `Bytes: ${new TextEncoder().encode(result.text).length}`,
             parseMessage,
-            `Input BReps: ${report.input_breps}`,
-            `Input Faces: ${report.input_faces}`,
+            `Input Entities: ${report.input_entities}`,
+            `Input Triangles: ${report.input_triangles}`,
             `Exported Elements: ${report.exported_elements}`,
-            `Exported Faces: ${report.exported_faces}`,
-            `Exported Triangles: ${report.exported_triangles}`,
             `Skipped Entities: ${report.skipped_entities}`,
-            `Skipped Faces: ${report.skipped_faces}`,
-            `Topology Errors: ${report.topology_errors}`,
+            `Skipped Triangles: ${report.skipped_triangles}`,
             `Semantics Applied: ${report.semantics_applied}`,
             `Proxy Fallbacks: ${report.proxy_fallbacks}`,
             `Property Sets Written: ${report.property_sets_written}`,

@@ -214,6 +214,7 @@
       import {
         Cuboid,
         Cylinder,
+        OGFileExporter,
         OGSceneManager,
         OpenGeometry,
         Sphere,
@@ -436,6 +437,7 @@
 
         const { scene } = await createExampleScene(meta);
         const manager = new OGSceneManager();
+        const fileExporter = new OGFileExporter();
         const sceneId = manager.createScene("step-export-scene");
         let current = null;
 
@@ -607,7 +609,11 @@
               require_closed_shell: true,
             };
 
-            const result = manager.exportSceneToStep(sceneId, JSON.stringify(config));
+            const snapshotJson = manager.getSceneSerialized(sceneId);
+            const result = fileExporter.exportSceneSnapshotToStep(
+              snapshotJson,
+              JSON.stringify(config)
+            );
             const report = JSON.parse(result.reportJson);
             const filename = exportButton.dataset.filename || "opengeometry-shape.step";
             downloadText(result.text, filename, "application/step");

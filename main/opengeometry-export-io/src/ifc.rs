@@ -1,14 +1,13 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use openmaths::Vector3;
+use opengeometry_export_schema::{
+    ExportMaterial, ExportMesh, ExportSceneSnapshot, IfcEntitySemantics,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::brep::Brep;
-use crate::operations::triangulate::triangulate_polygon_with_holes;
-
-use super::part21::{sanitize_string_literal, Part21Writer};
+use crate::part21::{sanitize_string_literal, Part21Writer};
 
 const IFC_LENGTH_EPSILON: f64 = 1.0e-12;
 const IFC_CLASS_PROXY: &str = "IFCBUILDINGELEMENTPROXY";
@@ -58,19 +57,6 @@ impl IfcSchemaVersion {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct IfcEntitySemantics {
-    pub ifc_class: Option<String>,
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub object_type: Option<String>,
-    pub tag: Option<String>,
-    #[serde(default)]
-    pub property_sets: HashMap<String, HashMap<String, String>>,
-    #[serde(default)]
-    pub quantity_sets: HashMap<String, HashMap<String, f64>>,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct IfcExportConfig {
     pub schema: IfcSchemaVersion,
@@ -80,9 +66,6 @@ pub struct IfcExportConfig {
     pub storey_name: Option<String>,
     pub scale: f64,
     pub error_policy: IfcErrorPolicy,
-    pub validate_topology: bool,
-    pub require_closed_shell: bool,
-    pub semantics: Option<HashMap<String, IfcEntitySemantics>>,
 }
 
 impl Default for IfcExportConfig {
@@ -95,36 +78,33 @@ impl Default for IfcExportConfig {
             storey_name: Some("OpenGeometry Storey".to_string()),
             scale: 1.0,
             error_policy: IfcErrorPolicy::BestEffort,
-            validate_topology: true,
-            require_closed_shell: true,
-            semantics: None,
         }
     }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct IfcExportReport {
-    pub input_breps: usize,
-    pub input_faces: usize,
+    pub input_entities: usize,
+    pub input_triangles: usize,
     pub exported_elements: usize,
-    pub exported_faces: usize,
-    pub exported_triangles: usize,
     pub skipped_entities: usize,
-    pub skipped_faces: usize,
-    pub topology_errors: usize,
+    pub skipped_triangles: usize,
     pub semantics_applied: usize,
     pub proxy_fallbacks: usize,
     pub property_sets_written: usize,
     pub quantity_sets_written: usize,
+    pub materials_written: usize,
+    pub material_assignments_written: usize,
+    pub styled_items_written: usize,
+    pub missing_material_refs: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum IfcExportError {
     EmptyInput,
-    InvalidTopology(String),
-    UnsupportedEntity(String),
+    InvalidMesh(String),
     InvalidSemantics(String),
-    MeshGeneration(String),
+    InvalidMaterial(String),
     Serialization(String),
     Io(String),
 }
@@ -132,11 +112,10 @@ pub enum IfcExportError {
 impl fmt::Display for IfcExportError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            IfcExportError::EmptyInput => write!(f, "No BREP input provided for IFC export"),
-            IfcExportError::InvalidTopology(msg) => write!(f, "Invalid topology: {}", msg),
-            IfcExportError::UnsupportedEntity(msg) => write!(f, "Unsupported BREP: {}", msg),
+            IfcExportError::EmptyInput => write!(f, "No input entities provided for IFC export"),
+            IfcExportError::InvalidMesh(msg) => write!(f, "Invalid mesh data: {}", msg),
             IfcExportError::InvalidSemantics(msg) => write!(f, "Invalid IFC semantics: {}", msg),
-            IfcExportError::MeshGeneration(msg) => write!(f, "Mesh generation failed: {}", msg),
+            IfcExportError::InvalidMaterial(msg) => write!(f, "Invalid IFC material data: {}", msg),
             IfcExportError::Serialization(msg) => write!(f, "IFC serialization failed: {}", msg),
             IfcExportError::Io(msg) => write!(f, "IFC I/O failed: {}", msg),
         }
@@ -145,133 +124,42 @@ impl fmt::Display for IfcExportError {
 
 impl std::error::Error for IfcExportError {}
 
-#[derive(Clone, Copy)]
-pub struct IfcEntityInput<'a> {
-    pub entity_id: &'a str,
-    pub kind: &'a str,
-    pub brep: &'a Brep,
-}
-
-#[derive(Clone)]
-struct IfcOwnedEntity<'a> {
-    entity_id: String,
-    kind: String,
-    brep: &'a Brep,
-}
-
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct TessellatedMesh {
-    points: Vec<Vector3>,
-    faces: Vec<[usize; 3]>,
+    points: Vec<[f64; 3]>,
+    triangles: Vec<[usize; 3]>,
 }
 
-pub fn export_brep_to_ifc_text(
-    brep: &Brep,
-    config: &IfcExportConfig,
-) -> Result<(String, IfcExportReport), IfcExportError> {
-    let owned = vec![IfcOwnedEntity {
-        entity_id: "brep-0".to_string(),
-        kind: "BREP".to_string(),
-        brep,
-    }];
-    export_owned_entities_to_ifc_text(&owned, config)
+#[derive(Clone, Copy)]
+struct MaterialBindings {
+    material_id: usize,
+    style_assignment_id: Option<usize>,
 }
 
-pub fn export_breps_to_ifc_text<'a, I>(
-    breps: I,
-    config: &IfcExportConfig,
-) -> Result<(String, IfcExportReport), IfcExportError>
-where
-    I: IntoIterator<Item = &'a Brep>,
-{
-    let mut owned = Vec::new();
-    for (index, brep) in breps.into_iter().enumerate() {
-        owned.push(IfcOwnedEntity {
-            entity_id: format!("brep-{}", index),
-            kind: "BREP".to_string(),
-            brep,
-        });
-    }
-
-    export_owned_entities_to_ifc_text(&owned, config)
-}
-
-pub fn export_scene_entities_to_ifc_text<'a, I>(
-    entities: I,
-    config: &IfcExportConfig,
-) -> Result<(String, IfcExportReport), IfcExportError>
-where
-    I: IntoIterator<Item = IfcEntityInput<'a>>,
-{
-    let owned: Vec<IfcOwnedEntity<'a>> = entities
-        .into_iter()
-        .map(|entity| IfcOwnedEntity {
-            entity_id: entity.entity_id.to_string(),
-            kind: entity.kind.to_string(),
-            brep: entity.brep,
-        })
-        .collect();
-
-    export_owned_entities_to_ifc_text(&owned, config)
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub fn export_brep_to_ifc_file(
-    brep: &Brep,
-    file_path: &str,
-    config: &IfcExportConfig,
-) -> Result<IfcExportReport, IfcExportError> {
-    let (text, report) = export_brep_to_ifc_text(brep, config)?;
-    std::fs::write(file_path, text).map_err(|err| IfcExportError::Io(err.to_string()))?;
-    Ok(report)
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub fn export_breps_to_ifc_file<'a, I>(
-    breps: I,
-    file_path: &str,
-    config: &IfcExportConfig,
-) -> Result<IfcExportReport, IfcExportError>
-where
-    I: IntoIterator<Item = &'a Brep>,
-{
-    let (text, report) = export_breps_to_ifc_text(breps, config)?;
-    std::fs::write(file_path, text).map_err(|err| IfcExportError::Io(err.to_string()))?;
-    Ok(report)
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub fn export_scene_entities_to_ifc_file<'a, I>(
-    entities: I,
-    file_path: &str,
-    config: &IfcExportConfig,
-) -> Result<IfcExportReport, IfcExportError>
-where
-    I: IntoIterator<Item = IfcEntityInput<'a>>,
-{
-    let (text, report) = export_scene_entities_to_ifc_text(entities, config)?;
-    std::fs::write(file_path, text).map_err(|err| IfcExportError::Io(err.to_string()))?;
-    Ok(report)
-}
-
-fn export_owned_entities_to_ifc_text<'a>(
-    entities: &[IfcOwnedEntity<'a>],
+pub fn export_snapshot_to_ifc_text(
+    snapshot: &ExportSceneSnapshot,
     config: &IfcExportConfig,
 ) -> Result<(String, IfcExportReport), IfcExportError> {
     let scale = validate_config(config)?;
-
-    if entities.is_empty() {
+    if snapshot.entities.is_empty() {
         return Err(IfcExportError::EmptyInput);
     }
 
     let mut report = IfcExportReport {
-        input_breps: entities.len(),
+        input_entities: snapshot.entities.len(),
         ..IfcExportReport::default()
     };
 
     let project_name = config
         .project_name
         .clone()
+        .or_else(|| {
+            if snapshot.scene.name.is_empty() {
+                None
+            } else {
+                Some(snapshot.scene.name.clone())
+            }
+        })
         .unwrap_or_else(|| "OpenGeometry Project".to_string());
 
     let mut writer = Part21Writer::new(config.schema.as_file_schema());
@@ -385,61 +273,37 @@ fn export_owned_entities_to_ifc_text<'a>(
         Part21Writer::reference(storey)
     ));
 
+    let material_map: HashMap<&str, &ExportMaterial> = snapshot
+        .materials
+        .iter()
+        .map(|material| (material.id.as_str(), material))
+        .collect();
+    let mut material_cache: HashMap<String, MaterialBindings> = HashMap::new();
+
     let mut element_ids = Vec::new();
 
-    for entity in entities {
-        let brep = entity.brep;
-
-        if config.validate_topology {
-            if let Err(error) = brep.validate_topology() {
-                if config.error_policy == IfcErrorPolicy::Strict {
-                    return Err(IfcExportError::InvalidTopology(format!(
-                        "Entity '{}' failed topology validation: {}",
-                        entity.entity_id, error
-                    )));
-                }
-                report.topology_errors += 1;
-                report.skipped_entities += 1;
-                continue;
-            }
-        }
-
-        if config.require_closed_shell && !is_closed_solid(brep) {
-            if config.error_policy == IfcErrorPolicy::Strict {
-                return Err(IfcExportError::UnsupportedEntity(format!(
-                    "Entity '{}' is not a closed-shell solid",
-                    entity.entity_id
-                )));
-            }
-            report.skipped_entities += 1;
-            continue;
-        }
-
-        let mesh = triangulate_entity_mesh(
-            entity,
+    for entity in &snapshot.entities {
+        let mesh = sanitize_mesh(
+            &entity.id,
+            &entity.mesh,
             scale,
             config.error_policy,
             &mut report,
-            format!("entity '{}'", entity.entity_id),
         )?;
 
-        if mesh.faces.is_empty() || mesh.points.is_empty() {
+        if mesh.points.is_empty() || mesh.triangles.is_empty() {
             if config.error_policy == IfcErrorPolicy::Strict {
-                return Err(IfcExportError::MeshGeneration(format!(
+                return Err(IfcExportError::InvalidMesh(format!(
                     "Entity '{}' generated no exportable mesh",
-                    entity.entity_id
+                    entity.id
                 )));
             }
             report.skipped_entities += 1;
             continue;
         }
 
-        let semantics = config
-            .semantics
-            .as_ref()
-            .and_then(|map| map.get(&entity.entity_id));
-
-        let class_name = resolve_ifc_class(&entity.entity_id, semantics, config, &mut report)?;
+        let class_name =
+            resolve_ifc_class(&entity.id, entity.semantics.as_ref(), config, &mut report)?;
 
         let mesh_point_list = writer.add_entity(format!(
             "IFCCARTESIANPOINTLIST3D({})",
@@ -449,7 +313,7 @@ fn export_owned_entities_to_ifc_text<'a>(
         let mesh_faceset = writer.add_entity(format!(
             "IFCTRIANGULATEDFACESET({},$,.T.,{},$)",
             Part21Writer::reference(mesh_point_list),
-            format_ifc_face_index_list(&mesh.faces)
+            format_ifc_face_index_list(&mesh.triangles)
         ));
 
         let shape_representation = writer.add_entity(format!(
@@ -469,24 +333,32 @@ fn export_owned_entities_to_ifc_text<'a>(
             Part21Writer::reference(world_axis)
         ));
 
-        let default_name = format!("{}-{}", entity.kind, entity.entity_id);
-        let name = semantics
+        let default_name = format!("{}-{}", entity.kind, entity.id);
+        let name = entity
+            .semantics
+            .as_ref()
             .and_then(|sem| sem.name.clone())
             .unwrap_or(default_name);
-        let description = semantics
+        let description = entity
+            .semantics
+            .as_ref()
             .and_then(|sem| sem.description.clone())
             .unwrap_or_default();
-        let object_type = semantics
+        let object_type = entity
+            .semantics
+            .as_ref()
             .and_then(|sem| sem.object_type.clone())
             .unwrap_or_else(|| entity.kind.clone());
-        let tag = semantics
+        let tag = entity
+            .semantics
+            .as_ref()
             .and_then(|sem| sem.tag.clone())
-            .unwrap_or_else(|| entity.entity_id.clone());
+            .unwrap_or_else(|| entity.id.clone());
 
         let element_expr = format!(
             "{}('{}',$,'{}',{},'{}',{},{},'{}',.NOTDEFINED.)",
             class_name,
-            ifc_guid(&format!("element-{}", entity.entity_id)),
+            ifc_guid(&format!("element-{}", entity.id)),
             sanitize_string_literal(&name),
             if description.is_empty() {
                 "$".to_string()
@@ -502,31 +374,53 @@ fn export_owned_entities_to_ifc_text<'a>(
         let element_id = writer.add_entity(element_expr);
         element_ids.push(element_id);
 
-        if let Some(semantics) = semantics {
-            write_property_sets(
-                &mut writer,
-                element_id,
-                &entity.entity_id,
-                semantics,
-                &mut report,
-            );
-            write_quantity_sets(
-                &mut writer,
-                element_id,
-                &entity.entity_id,
-                semantics,
-                &mut report,
-            );
+        if let Some(semantics) = &entity.semantics {
+            write_property_sets(&mut writer, element_id, &entity.id, semantics, &mut report);
+            write_quantity_sets(&mut writer, element_id, &entity.id, semantics, &mut report);
+        }
+
+        if let Some(material_key) = entity.material_id.as_deref() {
+            let material = material_map.get(material_key).copied();
+            if let Some(material) = material {
+                let bindings = ensure_material_bindings(
+                    &mut writer,
+                    material,
+                    &mut material_cache,
+                    &mut report,
+                );
+
+                writer.add_entity(format!(
+                    "IFCRELASSOCIATESMATERIAL('{}',$,$,$,({}),{})",
+                    ifc_guid(&format!("rel-mat-{}", entity.id)),
+                    Part21Writer::reference(element_id),
+                    Part21Writer::reference(bindings.material_id)
+                ));
+                report.material_assignments_written += 1;
+
+                if let Some(style_assignment_id) = bindings.style_assignment_id {
+                    writer.add_entity(format!(
+                        "IFCSTYLEDITEM({},({}),$)",
+                        Part21Writer::reference(mesh_faceset),
+                        Part21Writer::reference(style_assignment_id)
+                    ));
+                    report.styled_items_written += 1;
+                }
+            } else if config.error_policy == IfcErrorPolicy::Strict {
+                return Err(IfcExportError::InvalidMaterial(format!(
+                    "Entity '{}' references missing material '{}'",
+                    entity.id, material_key
+                )));
+            } else {
+                report.missing_material_refs += 1;
+            }
         }
 
         report.exported_elements += 1;
-        report.exported_triangles += mesh.faces.len();
-        report.exported_faces += mesh.faces.len();
     }
 
     if element_ids.is_empty() {
-        return Err(IfcExportError::MeshGeneration(
-            "No elements were exported from the provided BREP inputs".to_string(),
+        return Err(IfcExportError::InvalidMesh(
+            "No elements were exported from the provided snapshot".to_string(),
         ));
     }
 
@@ -541,176 +435,167 @@ fn export_owned_entities_to_ifc_text<'a>(
     Ok((text, report))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub fn export_snapshot_to_ifc_file(
+    snapshot: &ExportSceneSnapshot,
+    file_path: &str,
+    config: &IfcExportConfig,
+) -> Result<IfcExportReport, IfcExportError> {
+    let (text, report) = export_snapshot_to_ifc_text(snapshot, config)?;
+    std::fs::write(file_path, text).map_err(|err| IfcExportError::Io(err.to_string()))?;
+    Ok(report)
+}
+
+fn ensure_material_bindings(
+    writer: &mut Part21Writer,
+    material: &ExportMaterial,
+    cache: &mut HashMap<String, MaterialBindings>,
+    report: &mut IfcExportReport,
+) -> MaterialBindings {
+    if let Some(existing) = cache.get(&material.id) {
+        return *existing;
+    }
+
+    let material_entity = writer.add_entity(format!(
+        "IFCMATERIAL('{}',{},{} )",
+        sanitize_string_literal(if material.name.is_empty() {
+            "Material"
+        } else {
+            &material.name
+        }),
+        format_optional_string(material.description.as_deref()),
+        format_optional_string(material.category.as_deref())
+    ));
+
+    report.materials_written += 1;
+
+    let style_assignment_id = material.color.as_ref().map(|color| {
+        let rgb = writer.add_entity(format!(
+            "IFCCOLOURRGB($,{},{},{})",
+            format_real(clamp01(color.red)),
+            format_real(clamp01(color.green)),
+            format_real(clamp01(color.blue))
+        ));
+
+        let rendering = writer.add_entity(format!(
+            "IFCSURFACESTYLERENDERING({},$,$,$,$,$,$,$,.NOTDEFINED.)",
+            Part21Writer::reference(rgb)
+        ));
+
+        let style = writer.add_entity(format!(
+            "IFCSURFACESTYLE('{}',.BOTH.,({}))",
+            sanitize_string_literal(if material.name.is_empty() {
+                "MaterialStyle"
+            } else {
+                &material.name
+            }),
+            Part21Writer::reference(rendering)
+        ));
+
+        writer.add_entity(format!(
+            "IFCPRESENTATIONSTYLEASSIGNMENT(({}))",
+            Part21Writer::reference(style)
+        ))
+    });
+
+    let bindings = MaterialBindings {
+        material_id: material_entity,
+        style_assignment_id,
+    };
+
+    cache.insert(material.id.clone(), bindings);
+    bindings
+}
+
+fn format_optional_string(value: Option<&str>) -> String {
+    match value {
+        Some(raw) if !raw.trim().is_empty() => {
+            format!("'{}'", sanitize_string_literal(raw.trim()))
+        }
+        _ => "$".to_string(),
+    }
+}
+
 fn validate_config(config: &IfcExportConfig) -> Result<f64, IfcExportError> {
     if !config.scale.is_finite() || config.scale <= 0.0 {
-        return Err(IfcExportError::MeshGeneration(
+        return Err(IfcExportError::InvalidMesh(
             "IFC scale must be a finite positive value".to_string(),
         ));
     }
     Ok(config.scale)
 }
 
-fn is_closed_solid(brep: &Brep) -> bool {
-    if brep.faces.is_empty() || brep.edges.is_empty() {
-        return false;
-    }
-
-    if !brep.shells.is_empty() && brep.shells.iter().all(|shell| !shell.is_closed) {
-        return false;
-    }
-
-    brep.edges.iter().all(|edge| edge.twin_halfedge.is_some())
-}
-
-fn triangulate_entity_mesh(
-    entity: &IfcOwnedEntity<'_>,
+fn sanitize_mesh(
+    entity_id: &str,
+    mesh: &ExportMesh,
     scale: f64,
     policy: IfcErrorPolicy,
     report: &mut IfcExportReport,
-    label: String,
 ) -> Result<TessellatedMesh, IfcExportError> {
-    let mut points = Vec::<Vector3>::new();
-    let mut point_map = HashMap::<String, usize>::new();
-    let mut faces = Vec::<[usize; 3]>::new();
-
-    for face in &entity.brep.faces {
-        report.input_faces += 1;
-
-        let (outer_vertices, holes_vertices) =
-            entity.brep.get_vertices_and_holes_by_face_id(face.id);
-
-        if outer_vertices.len() < 3 {
+    let mut points = Vec::with_capacity(mesh.points.len());
+    for (index, point) in mesh.points.iter().enumerate() {
+        let scaled = [point[0] * scale, point[1] * scale, point[2] * scale];
+        if !scaled[0].is_finite() || !scaled[1].is_finite() || !scaled[2].is_finite() {
             if policy == IfcErrorPolicy::Strict {
-                return Err(IfcExportError::MeshGeneration(format!(
-                    "{} face {} has fewer than 3 vertices",
-                    label, face.id
+                return Err(IfcExportError::InvalidMesh(format!(
+                    "Entity '{}' point {} has non-finite coordinates",
+                    entity_id, index
                 )));
             }
-            report.skipped_faces += 1;
-            continue;
+            report.skipped_entities += 1;
+            return Ok(TessellatedMesh::default());
         }
-
-        if holes_vertices.iter().any(|hole| hole.len() < 3) {
-            if policy == IfcErrorPolicy::Strict {
-                return Err(IfcExportError::MeshGeneration(format!(
-                    "{} face {} has invalid hole loops",
-                    label, face.id
-                )));
-            }
-            report.skipped_faces += 1;
-            continue;
-        }
-
-        let triangle_indices = triangulate_polygon_with_holes(&outer_vertices, &holes_vertices);
-        if triangle_indices.is_empty() {
-            if policy == IfcErrorPolicy::Strict {
-                return Err(IfcExportError::MeshGeneration(format!(
-                    "{} face {} produced no triangles",
-                    label, face.id
-                )));
-            }
-            report.skipped_faces += 1;
-            continue;
-        }
-
-        let mut all_vertices = outer_vertices;
-        for hole in holes_vertices {
-            all_vertices.extend(hole);
-        }
-
-        let mut face_has_triangle = false;
-
-        for triangle in triangle_indices {
-            let Some((&a, &b, &c)) = all_vertices
-                .get(triangle[0])
-                .zip(all_vertices.get(triangle[1]))
-                .zip(all_vertices.get(triangle[2]))
-                .map(|((a, b), c)| (a, b, c))
-            else {
-                if policy == IfcErrorPolicy::Strict {
-                    return Err(IfcExportError::MeshGeneration(format!(
-                        "{} face {} emitted out-of-range triangle indices",
-                        label, face.id
-                    )));
-                }
-                continue;
-            };
-
-            if !is_finite_vec3(a) || !is_finite_vec3(b) || !is_finite_vec3(c) {
-                if policy == IfcErrorPolicy::Strict {
-                    return Err(IfcExportError::MeshGeneration(format!(
-                        "{} face {} has non-finite coordinates",
-                        label, face.id
-                    )));
-                }
-                continue;
-            }
-
-            let scaled = [
-                Vector3::new(a.x * scale, a.y * scale, a.z * scale),
-                Vector3::new(b.x * scale, b.y * scale, b.z * scale),
-                Vector3::new(c.x * scale, c.y * scale, c.z * scale),
-            ];
-
-            if is_degenerate_triangle(scaled[0], scaled[1], scaled[2]) {
-                if policy == IfcErrorPolicy::Strict {
-                    return Err(IfcExportError::MeshGeneration(format!(
-                        "{} face {} contains degenerate triangle",
-                        label, face.id
-                    )));
-                }
-                continue;
-            }
-
-            let i0 = get_or_create_mesh_point(&mut points, &mut point_map, scaled[0]);
-            let i1 = get_or_create_mesh_point(&mut points, &mut point_map, scaled[1]);
-            let i2 = get_or_create_mesh_point(&mut points, &mut point_map, scaled[2]);
-
-            faces.push([i0 + 1, i1 + 1, i2 + 1]);
-            face_has_triangle = true;
-        }
-
-        if !face_has_triangle {
-            if policy == IfcErrorPolicy::Strict {
-                return Err(IfcExportError::MeshGeneration(format!(
-                    "{} face {} yielded no valid triangles",
-                    label, face.id
-                )));
-            }
-            report.skipped_faces += 1;
-        }
+        points.push(scaled);
     }
 
-    Ok(TessellatedMesh { points, faces })
-}
+    let mut triangles = Vec::new();
+    for triangle in &mesh.triangles {
+        report.input_triangles += 1;
 
-fn get_or_create_mesh_point(
-    points: &mut Vec<Vector3>,
-    point_map: &mut HashMap<String, usize>,
-    point: Vector3,
-) -> usize {
-    let key = format!("{:.9}|{:.9}|{:.9}", point.x, point.y, point.z);
-    if let Some(index) = point_map.get(&key) {
-        return *index;
+        if triangle[0] >= points.len() || triangle[1] >= points.len() || triangle[2] >= points.len()
+        {
+            if policy == IfcErrorPolicy::Strict {
+                return Err(IfcExportError::InvalidMesh(format!(
+                    "Entity '{}' has out-of-range triangle indices",
+                    entity_id
+                )));
+            }
+            report.skipped_triangles += 1;
+            continue;
+        }
+
+        let a = points[triangle[0]];
+        let b = points[triangle[1]];
+        let c = points[triangle[2]];
+
+        if is_degenerate_triangle(a, b, c) {
+            if policy == IfcErrorPolicy::Strict {
+                return Err(IfcExportError::InvalidMesh(format!(
+                    "Entity '{}' contains degenerate triangle",
+                    entity_id
+                )));
+            }
+            report.skipped_triangles += 1;
+            continue;
+        }
+
+        triangles.push([triangle[0] + 1, triangle[1] + 1, triangle[2] + 1]);
     }
 
-    let index = points.len();
-    points.push(point);
-    point_map.insert(key, index);
-    index
+    Ok(TessellatedMesh { points, triangles })
 }
 
-fn resolve_ifc_class(
+fn resolve_ifc_class<'a>(
     entity_id: &str,
-    semantics: Option<&IfcEntitySemantics>,
+    semantics: Option<&'a IfcEntitySemantics>,
     config: &IfcExportConfig,
     report: &mut IfcExportReport,
-) -> Result<&'static str, IfcExportError> {
+) -> Result<&'a str, IfcExportError> {
     let Some(semantics) = semantics else {
         return Ok(IFC_CLASS_PROXY);
     };
 
-    let Some(raw_class) = semantics.ifc_class.as_ref() else {
+    let Some(raw_class) = semantics.ifc_class.as_deref() else {
         return Ok(IFC_CLASS_PROXY);
     };
 
@@ -835,15 +720,15 @@ fn format_real(value: f64) -> String {
     out
 }
 
-fn format_ifc_coord_list(points: &[Vector3]) -> String {
+fn format_ifc_coord_list(points: &[[f64; 3]]) -> String {
     let coords = points
         .iter()
         .map(|point| {
             format!(
                 "({},{},{})",
-                format_real(point.x),
-                format_real(point.y),
-                format_real(point.z)
+                format_real(point[0]),
+                format_real(point[1]),
+                format_real(point[2])
             )
         })
         .collect::<Vec<_>>()
@@ -862,13 +747,9 @@ fn format_ifc_face_index_list(faces: &[[usize; 3]]) -> String {
     format!("({})", entries)
 }
 
-fn is_finite_vec3(point: Vector3) -> bool {
-    point.x.is_finite() && point.y.is_finite() && point.z.is_finite()
-}
-
-fn is_degenerate_triangle(a: Vector3, b: Vector3, c: Vector3) -> bool {
-    let ab = [b.x - a.x, b.y - a.y, b.z - a.z];
-    let ac = [c.x - a.x, c.y - a.y, c.z - a.z];
+fn is_degenerate_triangle(a: [f64; 3], b: [f64; 3], c: [f64; 3]) -> bool {
+    let ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    let ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
 
     let cross = [
         ab[1] * ac[2] - ab[2] * ac[1],
@@ -896,86 +777,72 @@ fn ifc_guid(seed: &str) -> String {
     String::from_utf8(out.to_vec()).unwrap_or_else(|_| "0000000000000000000000".to_string())
 }
 
+fn clamp01(value: f64) -> f64 {
+    if value.is_nan() {
+        return 0.0;
+    }
+    value.clamp(0.0, 1.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::brep::BrepBuilder;
+    use opengeometry_export_schema::{
+        ExportColor, ExportEntity, ExportFeatureTree, ExportMaterial, ExportMesh, ExportScene,
+        ExportSceneSnapshot, IfcEntitySemantics,
+    };
 
-    fn tetrahedron_brep() -> Brep {
-        let mut builder = BrepBuilder::new(Uuid::new_v4());
-        builder.add_vertices(&[
-            Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(1.0, 0.0, 0.0),
-            Vector3::new(0.5, 0.8660254, 0.0),
-            Vector3::new(0.5, 0.2886751, 0.8164966),
-        ]);
+    fn sample_snapshot() -> ExportSceneSnapshot {
+        let mut semantics = IfcEntitySemantics::default();
+        semantics.ifc_class = Some("IFCWALL".to_string());
+        semantics.name = Some("Wall A".to_string());
 
-        builder.add_face(&[0, 2, 1], &[]).unwrap();
-        builder.add_face(&[0, 1, 3], &[]).unwrap();
-        builder.add_face(&[1, 2, 3], &[]).unwrap();
-        builder.add_face(&[2, 0, 3], &[]).unwrap();
-
-        builder.build().unwrap()
+        ExportSceneSnapshot {
+            scene: ExportScene {
+                id: "scene-1".to_string(),
+                name: "Sample Scene".to_string(),
+            },
+            entities: vec![ExportEntity {
+                id: "wall-1".to_string(),
+                kind: "OGCuboid".to_string(),
+                mesh: ExportMesh {
+                    points: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+                    triangles: vec![[0, 1, 2]],
+                },
+                semantics: Some(semantics),
+                material_id: Some("mat-1".to_string()),
+                brep_json: None,
+            }],
+            feature_tree: ExportFeatureTree::default(),
+            materials: vec![ExportMaterial {
+                id: "mat-1".to_string(),
+                name: "Paint".to_string(),
+                description: None,
+                category: Some("Finish".to_string()),
+                color: Some(ExportColor {
+                    red: 0.8,
+                    green: 0.2,
+                    blue: 0.2,
+                    alpha: 1.0,
+                }),
+            }],
+            ..ExportSceneSnapshot::default()
+        }
     }
 
     #[test]
-    fn exports_ifc_spf_document() {
-        let brep = tetrahedron_brep();
-        let (text, report) =
-            export_brep_to_ifc_text(&brep, &IfcExportConfig::default()).expect("ifc export");
+    fn exports_ifc_snapshot_with_materials() {
+        let snapshot = sample_snapshot();
+        let (text, report) = export_snapshot_to_ifc_text(&snapshot, &IfcExportConfig::default())
+            .expect("ifc export");
 
         assert!(text.starts_with("ISO-10303-21;"));
-        assert!(text.contains("FILE_SCHEMA(('IFC4'));"));
-        assert!(text.contains("IFCPROJECT("));
-        assert!(text.contains("IFCTRIANGULATEDFACESET("));
-        assert!(report.exported_elements >= 1);
-        assert!(report.exported_triangles >= 4);
-    }
-
-    #[test]
-    fn applies_semantics_class_when_supported() {
-        let brep = tetrahedron_brep();
-
-        let mut semantics = HashMap::new();
-        semantics.insert(
-            "brep-0".to_string(),
-            IfcEntitySemantics {
-                ifc_class: Some("IFCWALL".to_string()),
-                name: Some("Wall A".to_string()),
-                ..IfcEntitySemantics::default()
-            },
-        );
-
-        let config = IfcExportConfig {
-            semantics: Some(semantics),
-            ..IfcExportConfig::default()
-        };
-
-        let (text, report) = export_brep_to_ifc_text(&brep, &config).expect("ifc export");
         assert!(text.contains("IFCWALL("));
-        assert_eq!(report.semantics_applied, 1);
-    }
-
-    #[test]
-    fn strict_rejects_invalid_ifc_class() {
-        let brep = tetrahedron_brep();
-
-        let mut semantics = HashMap::new();
-        semantics.insert(
-            "brep-0".to_string(),
-            IfcEntitySemantics {
-                ifc_class: Some("IFCUNKNOWN".to_string()),
-                ..IfcEntitySemantics::default()
-            },
-        );
-
-        let config = IfcExportConfig {
-            semantics: Some(semantics),
-            error_policy: IfcErrorPolicy::Strict,
-            ..IfcExportConfig::default()
-        };
-
-        let result = export_brep_to_ifc_text(&brep, &config);
-        assert!(result.is_err());
+        assert!(text.contains("IFCMATERIAL("));
+        assert!(text.contains("IFCRELASSOCIATESMATERIAL("));
+        assert!(text.contains("IFCSTYLEDITEM("));
+        assert_eq!(report.exported_elements, 1);
+        assert_eq!(report.materials_written, 1);
+        assert_eq!(report.material_assignments_written, 1);
     }
 }
