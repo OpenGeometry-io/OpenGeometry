@@ -166,7 +166,7 @@
       import {
         Cuboid,
         OGSceneManager,
-        OpenGeometry,
+        AXISMODE, OpenGeometry,
         Polyline,
         Sweep,
         Vector3,
@@ -517,7 +517,7 @@
         fill.position.set(-6, 4, -7);
         scene.add(fill);
 
-        await OpenGeometry.create({ wasmURL: wasmUrl });
+        await OpenGeometry.create({ wasmURL: wasmUrl, axisMode: AXISMODE.ZUP });
 
         function onResize() {
           camera.aspect = window.innerWidth / window.innerHeight;

@@ -17,7 +17,7 @@
 
   <script type="module">
     import {
-      OpenGeometry,
+      AXISMODE, OpenGeometry,
       BasePoly,
       Vector3D,
       Arc,
@@ -44,7 +44,8 @@
       openGeometry = await OpenGeometry.create({
         container: app,
         scene,
-        camera
+        camera,
+        axisMode: AXISMODE.ZFRONT
       });
 
       // grid

@@ -215,7 +215,7 @@
         Cuboid,
         Cylinder,
         OGSceneManager,
-        OpenGeometry,
+        AXISMODE, OpenGeometry,
         Sphere,
         Vector3,
         Wedge,
@@ -401,7 +401,7 @@
         fill.position.set(-5, 3, -6);
         scene.add(fill);
 
-        await OpenGeometry.create({ wasmURL: wasmUrl });
+        await OpenGeometry.create({ wasmURL: wasmUrl, axisMode: AXISMODE.ZFRONT });
 
         function onResize() {
           camera.aspect = window.innerWidth / window.innerHeight;

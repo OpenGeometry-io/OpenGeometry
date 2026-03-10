@@ -75,7 +75,7 @@
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Rectangle, Vector3 } from "@og-three";
+      import { AXISMODE, OpenGeometry, Rectangle, Vector3 } from "@og-three";
 
       const app = document.getElementById("app");
       if (!app) {
@@ -244,7 +244,7 @@
         fill.position.set(-5, 3, -6);
         scene.add(fill);
 
-        await OpenGeometry.create({ wasmURL: wasmUrl });
+        await OpenGeometry.create({ wasmURL: wasmUrl, axisMode: AXISMODE.ZFRONT });
 
         function onResize() {
           camera.aspect = window.innerWidth / window.innerHeight;

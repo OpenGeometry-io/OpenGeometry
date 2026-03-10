@@ -9,7 +9,11 @@ import init, {
 // Vector3 is also available in opengeometry package
 // import { Vector3 } from "@opengeometry/openmaths";
 import { SpotLabel } from "./src/markup/spotMarker";
-import { OPEN_GEOMETRY_THREE_VERSION, OpenGeometryOptions } from "./src/base-types";
+import {
+  AXISMODE,
+  OPEN_GEOMETRY_THREE_VERSION,
+  OpenGeometryOptions,
+} from "./src/base-types";
 
 export type OUTLINE_TYPE = "front" | "side" | "top";
 
@@ -31,11 +35,16 @@ export interface OGIfcExportResult {
 export class OpenGeometry {
   static version = OPEN_GEOMETRY_THREE_VERSION;
   static instance: OpenGeometry | null = null;
+  private static _axisMode: AXISMODE | null = null;
 
   private _enableDebug: boolean = false;
 
   get enableDebug() {
     return this._enableDebug;
+  }
+
+  static get axisMode() {
+    return OpenGeometry._axisMode;
   }
 
   /**
@@ -70,14 +79,26 @@ export class OpenGeometry {
    * @example
    * ```ts
    * const openGeometry = await OpenGeometry.create({
-   *   container: document.getElementById('myContainer')!,
-   *   scene: threeScene,
-   *   camera: threeCamera,
-   *   wasmURL: '/assets/opengeometry.wasm'
+   *   wasmURL: '/assets/opengeometry.wasm',
+   *   axisMode: AXISMODE.ZFRONT
    * });
    * ```
    */
-  static async create(options: OpenGeometryOptions) {
+  static async create(options: OpenGeometryOptions = {}) {
+    const resolvedAxisMode = OpenGeometry.resolveAxisMode(options.axisMode);
+
+    if (
+      OpenGeometry._axisMode !== null &&
+      resolvedAxisMode !== OpenGeometry._axisMode
+    ) {
+      throw new Error(
+        `OpenGeometry is already initialized with axisMode '${OpenGeometry._axisMode}'. ` +
+          `Received '${resolvedAxisMode}'. axisMode is global and cannot be changed after initialization.`
+      );
+    }
+
+    OpenGeometry._axisMode = resolvedAxisMode;
+
     if (!OpenGeometry.instance) {
       const og = new OpenGeometry();
       await og.setup(options.wasmURL);
@@ -86,15 +107,38 @@ export class OpenGeometry {
     return OpenGeometry.instance;
   }
 
+  private static resolveAxisMode(inputAxisMode?: AXISMODE): AXISMODE {
+    if (inputAxisMode === undefined && OpenGeometry._axisMode !== null) {
+      return OpenGeometry._axisMode;
+    }
+
+    const axisMode = inputAxisMode === undefined ? AXISMODE.ZFRONT : inputAxisMode;
+    const objectWithValues = Object as unknown as {
+      values<T extends object>(obj: T): Array<T[keyof T]>;
+    };
+    const validAxisModes = objectWithValues.values(AXISMODE);
+    if (validAxisModes.indexOf(axisMode) === -1) {
+      throw new Error(
+        `Invalid axisMode '${String(axisMode)}'. Allowed values: ${validAxisModes.join(", ")}.`
+      );
+    }
+
+    return axisMode;
+  }
+
   private async setup(wasmURL?: string) {
     await init(wasmURL);
   }
 }
 
 export {
+  AXISMODE,
   OGSceneManager,
   Vector3,
   SpotLabel,
+}
+export type {
+  OpenGeometryOptions,
 }
 
 /**

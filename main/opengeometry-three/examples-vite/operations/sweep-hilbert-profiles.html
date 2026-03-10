@@ -115,7 +115,7 @@
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Arc, Polyline, Rectangle, Sweep, Vector3 } from "@og-three";
+      import { AXISMODE, OpenGeometry, Arc, Polyline, Rectangle, Sweep, Vector3 } from "@og-three";
       import { hilbert3D } from "three/examples/jsm/utils/GeometryUtils.js";
 
       const app = document.getElementById("app");
@@ -285,7 +285,7 @@
         fill.position.set(-5, 3, -6);
         scene.add(fill);
 
-        await OpenGeometry.create({ wasmURL: wasmUrl });
+        await OpenGeometry.create({ wasmURL: wasmUrl, axisMode: AXISMODE.ZFRONT });
 
         function onResize() {
           camera.aspect = window.innerWidth / window.innerHeight;
