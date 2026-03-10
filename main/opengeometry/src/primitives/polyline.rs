@@ -222,3 +222,28 @@ impl OGPolyline {
             .points
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn closed_polyline_builds_wire_and_face_without_duplicate_halfedge_error() {
+        let mut polyline = OGPolyline::new("polyline-test".to_string());
+        let points = vec![
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(2.0, 0.0, 0.0),
+            Vector3::new(2.0, 0.0, 2.0),
+            Vector3::new(0.0, 0.0, 2.0),
+            Vector3::new(0.0, 0.0, 0.0),
+        ];
+
+        polyline
+            .set_config(points)
+            .expect("closed polyline should build without duplicate directed halfedge");
+
+        assert!(polyline.is_closed());
+        assert_eq!(polyline.brep.wires.len(), 1);
+        assert_eq!(polyline.brep.faces.len(), 1);
+    }
+}

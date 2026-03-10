@@ -191,8 +191,12 @@ fn line_buffer_from_brep(brep: &Brep) -> Vec<f64> {
     let mut line_buffer = Vec::with_capacity(brep.edges.len() * 6);
 
     for edge in &brep.edges {
-        let start = brep.vertices.get(edge.v1 as usize);
-        let end = brep.vertices.get(edge.v2 as usize);
+        let Some((start_id, end_id)) = brep.get_edge_endpoints(edge.id) else {
+            continue;
+        };
+
+        let start = brep.vertices.get(start_id as usize);
+        let end = brep.vertices.get(end_id as usize);
 
         if let (Some(start), Some(end)) = (start, end) {
             line_buffer.push(start.position.x);

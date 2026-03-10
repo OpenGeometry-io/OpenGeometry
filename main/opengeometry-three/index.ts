@@ -3,7 +3,8 @@
  * @module @opengeometry/kernel-three
  */
 import init, {
-  Vector3
+  OGSceneManager,
+  Vector3,
 } from "../opengeometry/pkg/opengeometry";
 // Vector3 is also available in opengeometry package
 // import { Vector3 } from "@opengeometry/openmaths";
@@ -11,6 +12,21 @@ import { SpotLabel } from "./src/markup/spotMarker";
 import { OPEN_GEOMETRY_THREE_VERSION, OpenGeometryOptions } from "./src/base-types";
 
 export type OUTLINE_TYPE = "front" | "side" | "top";
+
+export interface OGStlExportResult {
+  bytes: Uint8Array;
+  reportJson: string;
+}
+
+export interface OGStepExportResult {
+  text: string;
+  reportJson: string;
+}
+
+export interface OGIfcExportResult {
+  text: string;
+  reportJson: string;
+}
 
 export class OpenGeometry {
   static version = OPEN_GEOMETRY_THREE_VERSION;
@@ -76,6 +92,7 @@ export class OpenGeometry {
 }
 
 export {
+  OGSceneManager,
   Vector3,
   SpotLabel,
 }

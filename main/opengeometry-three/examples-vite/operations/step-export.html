@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry STEP Export Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OpenGeometry STEP export example" />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import {
+        Cuboid,
+        Cylinder,
+        OGSceneManager,
+        OpenGeometry,
+        Sphere,
+        Vector3,
+        Wedge,
+      } from "@og-three";
+
+      const app = document.getElementById("app");
+      if (!app) {
+        throw new Error("Missing #app container");
+      }
+
+      const ENTITY_ID = "step-shape";
+      const SHAPE_LABELS = {
+        cuboid: "Cuboid",
+        cylinder: "Cylinder",
+        sphere: "Sphere",
+        wedge: "Wedge",
+      };
+      const SHAPE_CONTROL_DEFS = {
+        cuboid: [
+          { key: "cuboidWidth", label: "Width", min: 0.2, max: 4, step: 0.05 },
+          { key: "cuboidHeight", label: "Height", min: 0.2, max: 4, step: 0.05 },
+          { key: "cuboidDepth", label: "Depth", min: 0.2, max: 4, step: 0.05 },
+        ],
+        cylinder: [
+          { key: "cylinderRadius", label: "Radius", min: 0.2, max: 3, step: 0.05 },
+          { key: "cylinderHeight", label: "Height", min: 0.2, max: 4, step: 0.05 },
+          { key: "cylinderSegments", label: "Segments", min: 6, max: 96, step: 1, integer: true },
+          { key: "cylinderAngleDeg", label: "Angle (deg)", min: 20, max: 360, step: 1, integer: true },
+        ],
+        sphere: [
+          { key: "sphereRadius", label: "Radius", min: 0.2, max: 3, step: 0.05 },
+          { key: "sphereWidthSegments", label: "Width Segments", min: 3, max: 96, step: 1, integer: true },
+          { key: "sphereHeightSegments", label: "Height Segments", min: 2, max: 64, step: 1, integer: true },
+        ],
+        wedge: [
+          { key: "wedgeWidth", label: "Width", min: 0.2, max: 4, step: 0.05 },
+          { key: "wedgeHeight", label: "Height", min: 0.2, max: 4, step: 0.05 },
+          { key: "wedgeDepth", label: "Depth", min: 0.2, max: 4, step: 0.05 },
+        ],
+      };
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function formatControlNumber(value, integer) {
+        if (integer) {
+          return String(Math.round(value));
+        }
+        return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      }
+
+      function createBadge(meta) {
+        const badge = document.createElement("div");
+        badge.className = "og-badge";
+        const chipMarkup = meta.chips
+          .map((chip) => '<span class="og-chip og-chip-accent">' + chip + "</span>")
+          .join("");
+
+        badge.innerHTML =
+          '<div class="og-badge-top">' +
+          '<div class="og-badge-icon-wrap"><strong>OG</strong></div>' +
+          '<p class="og-badge-status">' + meta.statusLabel + "</p>" +
+          "</div>" +
+          '<div class="og-badge-meta">' +
+          '<p class="og-badge-kicker">OPEN GEOMETRY • ' + meta.category.toUpperCase() + "</p>" +
+          '<strong class="og-badge-title">' + meta.title + "</strong>" +
+          '<span class="og-badge-desc">' + meta.description + "</span>" +
+          "</div>" +
+          '<div class="og-badge-chip-row">' + chipMarkup + "</div>" +
+          '<div class="og-badge-footer">' +
+          '<span class="og-badge-context">' + meta.footerText + "</span>" +
+          '<a class="og-badge-link" href="../index.html">Back to Examples</a>' +
+          "</div>";
+
+        document.body.appendChild(badge);
+      }
+
+      function disposeMaterial(material) {
+        if (!material) {
+          return;
+        }
+
+        if (Array.isArray(material)) {
+          material.forEach((entry) => entry && entry.dispose && entry.dispose());
+          return;
+        }
+
+        if (material.dispose) {
+          material.dispose();
+        }
+      }
+
+      function disposeObject3D(object) {
+        object.traverse((node) => {
+          if (node.geometry && node.geometry.dispose) {
+            node.geometry.dispose();
+          }
+          disposeMaterial(node.material);
+        });
+      }
+
+      function replaceSceneObject(scene, previous, next) {
+        if (previous) {
+          previous.parent && previous.parent.remove(previous);
+          disposeObject3D(previous);
+        }
+
+        scene.add(next);
+        return next;
+      }
+
+      function downloadText(text, filename, mime) {
+        const blob = new Blob([text], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function formatReport(report, bytes, filename) {
+        return [
+          `File: ${filename}`,
+          `Bytes: ${bytes}`,
+          `Input BReps: ${report.input_breps}`,
+          `Input Faces: ${report.input_faces}`,
+          `Exported Solids: ${report.exported_solids}`,
+          `Exported Faces: ${report.exported_faces}`,
+          `Exported Triangles: ${report.exported_triangles}`,
+          `Skipped Entities: ${report.skipped_entities}`,
+          `Skipped Faces: ${report.skipped_faces}`,
+          `Topology Errors: ${report.topology_errors}`,
+        ].join("\n");
+      }
+
+      function createControlRow(labelText) {
+        const row = document.createElement("label");
+        row.className = "og-control-row";
+
+        const header = document.createElement("div");
+        header.className = "og-control-header";
+
+        const label = document.createElement("span");
+        label.className = "og-control-label-chip";
+        label.textContent = labelText;
+        header.appendChild(label);
+
+        row.appendChild(header);
+        return { row, header };
+      }
+
+      function appendSelectControl(panel, labelText, options, value, onChange) {
+        const { row } = createControlRow(labelText);
+        const select = document.createElement("select");
+        select.className = "og-control-select";
+        select.setAttribute("aria-label", labelText);
+
+        options.forEach((option) => {
+          const optionElement = document.createElement("option");
+          optionElement.value = option.value;
+          optionElement.textContent = option.label;
+          optionElement.selected = option.value === value;
+          select.appendChild(optionElement);
+        });
+
+        select.addEventListener("change", () => {
+          onChange(select.value);
+        });
+
+        row.appendChild(select);
+        panel.appendChild(row);
+        return select;
+      }
+
+      function appendNumberControl(panel, definition, state, onChange) {
+        const { row, header } = createControlRow(definition.label);
+        const valueLabel = document.createElement("code");
+        valueLabel.className = "og-control-value";
+        header.appendChild(valueLabel);
+
+        const inputs = document.createElement("div");
+        inputs.className = "og-control-range";
+
+        const rangeInput = document.createElement("input");
+        rangeInput.type = "range";
+        rangeInput.min = String(definition.min);
+        rangeInput.max = String(definition.max);
+        rangeInput.step = String(definition.step);
+
+        const numberInput = document.createElement("input");
+        numberInput.type = "number";
+        numberInput.min = String(definition.min);
+        numberInput.max = String(definition.max);
+        numberInput.step = String(definition.step);
+
+        const syncDisplay = (value) => {
+          state.values[definition.key] = value;
+          rangeInput.value = String(value);
+          numberInput.value = String(value);
+          valueLabel.textContent = formatControlNumber(value, definition.integer);
+        };
+
+        const updateValue = (raw) => {
+          const constrained = clamp(raw, definition.min, definition.max);
+          const nextValue = definition.integer ? Math.round(constrained) : constrained;
+          syncDisplay(nextValue);
+          onChange();
+        };
+
+        syncDisplay(state.values[definition.key]);
+
+        rangeInput.addEventListener("input", () => {
+          updateValue(Number(rangeInput.value));
+        });
+        numberInput.addEventListener("change", () => {
+          updateValue(Number(numberInput.value));
+        });
+
+        inputs.appendChild(rangeInput);
+        inputs.appendChild(numberInput);
+        row.appendChild(inputs);
+        panel.appendChild(row);
+      }
+
+      function appendToggleControl(panel, labelText, initialValue, onChange) {
+        const { row } = createControlRow(labelText);
+        const boolWrap = document.createElement("div");
+        boolWrap.className = "og-control-bool";
+
+        const toggle = document.createElement("input");
+        toggle.type = "checkbox";
+        toggle.className = "og-toggle";
+        toggle.checked = initialValue;
+        toggle.setAttribute("aria-label", labelText);
+
+        const status = document.createElement("span");
+        status.className = "og-control-bool-state";
+        status.textContent = initialValue ? "Enabled" : "Disabled";
+
+        toggle.addEventListener("change", () => {
+          status.textContent = toggle.checked ? "Enabled" : "Disabled";
+          onChange(toggle.checked);
+        });
+
+        boolWrap.appendChild(toggle);
+        boolWrap.appendChild(status);
+        row.appendChild(boolWrap);
+        panel.appendChild(row);
+      }
+
+      function createActionButton(labelText, background) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = labelText;
+        button.style.width = "100%";
+        button.style.marginTop = "0.25rem";
+        button.style.padding = "0.55rem 0.75rem";
+        button.style.cursor = "pointer";
+        button.style.border = "1px solid rgba(95, 61, 46, 0.14)";
+        button.style.borderRadius = "14px";
+        button.style.background = background;
+        button.style.color = "#171717";
+        button.style.font = "600 14px/1.2 inherit";
+        return button;
+      }
+
+      async function createExampleScene(meta, options) {
+        const settings = options || {};
+        document.body.classList.add("og-example-page");
+        document.title = meta.title + " | OpenGeometry";
+        createBadge(meta);
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(settings.background || 0xf6f1eb);
+
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          4000
+        );
+        const cameraPosition = settings.cameraPosition || [5.8, 4.4, 7.4];
+        camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        const target = settings.target || [0, 0.9, 0];
+        controls.target.set(target[0], target[1], target[2]);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+
+        const key = new THREE.DirectionalLight(0xffffff, 0.9);
+        key.position.set(6, 8, 4);
+        scene.add(key);
+
+        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
+        fill.position.set(-5, 3, -6);
+        scene.add(fill);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        function onResize() {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener("resize", onResize);
+
+        function animate() {
+          requestAnimationFrame(animate);
+          controls.update();
+          renderer.render(scene, camera);
+        }
+
+        animate();
+        return { scene };
+      }
+
+      async function main() {
+        const meta = {
+          slug: "operations/step-export",
+          category: "operations",
+          title: "STEP Export",
+          description: "STEP Part-21 export workflow with scene-level reporting and download.",
+          statusLabel: "ready",
+          chips: ["STEP", "Shape"],
+          footerText: "Scene Export",
+        };
+
+        const { scene } = await createExampleScene(meta);
+        const manager = new OGSceneManager();
+        const sceneId = manager.createScene("step-export-scene");
+        let current = null;
+
+        const state = {
+          shape: "cuboid",
+          outline: true,
+          values: {
+            cuboidWidth: 1.8,
+            cuboidHeight: 1.4,
+            cuboidDepth: 1.1,
+            cylinderRadius: 0.8,
+            cylinderHeight: 1.8,
+            cylinderSegments: 36,
+            cylinderAngleDeg: 360,
+            sphereRadius: 1,
+            sphereWidthSegments: 32,
+            sphereHeightSegments: 20,
+            wedgeWidth: 2,
+            wedgeHeight: 1.8,
+            wedgeDepth: 1.4,
+          },
+        };
+
+        const panel = document.createElement("aside");
+        panel.className = "og-controls";
+
+        const heading = document.createElement("h3");
+        heading.textContent = "STEP Export";
+        panel.appendChild(heading);
+
+        const summary = document.createElement("p");
+        summary.style.margin = "0 0 0.75rem";
+        summary.style.fontSize = "0.75rem";
+        summary.style.color = "#5f5f5f";
+        summary.textContent =
+          "Pick a shape, tune parameters, and export a STEP Part-21 model with best-effort reporting.";
+        panel.appendChild(summary);
+
+        const shapeGroups = new Map();
+        let exportButton = null;
+        let reportNode = null;
+
+        const renderCurrentShape = () => {
+          try {
+            let object;
+            let kind;
+            let brepData;
+            let fileName;
+            let readyText;
+
+            switch (state.shape) {
+              case "cuboid": {
+                const width = state.values.cuboidWidth;
+                const height = state.values.cuboidHeight;
+                const depth = state.values.cuboidDepth;
+                const cuboid = new Cuboid({
+                  center: new Vector3(0, height * 0.5, 0),
+                  width,
+                  height,
+                  depth,
+                  color: 0x0ea5e9,
+                });
+                cuboid.outline = state.outline;
+                object = cuboid;
+                kind = "OGCuboid";
+                brepData = cuboid.getBrepData();
+                fileName = "opengeometry-cuboid.step";
+                readyText = `Ready: Cuboid (W=${width.toFixed(2)}, H=${height.toFixed(2)}, D=${depth.toFixed(2)})`;
+                break;
+              }
+              case "cylinder": {
+                const radius = state.values.cylinderRadius;
+                const height = state.values.cylinderHeight;
+                const segments = Math.max(3, Math.floor(state.values.cylinderSegments));
+                const angleDeg = Math.floor(state.values.cylinderAngleDeg);
+                const cylinder = new Cylinder({
+                  center: new Vector3(0, height * 0.5, 0),
+                  radius,
+                  height,
+                  segments,
+                  angle: (angleDeg * Math.PI) / 180,
+                  color: 0xf59e0b,
+                });
+                cylinder.outline = state.outline;
+                object = cylinder;
+                kind = "OGCylinder";
+                brepData = cylinder.getBrep();
+                fileName = "opengeometry-cylinder.step";
+                readyText = `Ready: Cylinder (R=${radius.toFixed(2)}, H=${height.toFixed(2)}, Seg=${segments}, Angle=${angleDeg}deg)`;
+                break;
+              }
+              case "sphere": {
+                const radius = state.values.sphereRadius;
+                const widthSegments = Math.max(3, Math.floor(state.values.sphereWidthSegments));
+                const heightSegments = Math.max(2, Math.floor(state.values.sphereHeightSegments));
+                const sphere = new Sphere({
+                  center: new Vector3(0, radius, 0),
+                  radius,
+                  widthSegments,
+                  heightSegments,
+                  color: 0x0891b2,
+                });
+                sphere.outline = state.outline;
+                object = sphere;
+                kind = "OGSphere";
+                brepData = sphere.getBrep();
+                fileName = "opengeometry-sphere.step";
+                readyText = `Ready: Sphere (R=${radius.toFixed(2)}, WSeg=${widthSegments}, HSeg=${heightSegments})`;
+                break;
+              }
+              default: {
+                const width = state.values.wedgeWidth;
+                const height = state.values.wedgeHeight;
+                const depth = state.values.wedgeDepth;
+                const wedge = new Wedge({
+                  center: new Vector3(0, height * 0.5, 0),
+                  width,
+                  height,
+                  depth,
+                  color: 0x7c3aed,
+                });
+                wedge.outline = state.outline;
+                object = wedge;
+                kind = "OGWedge";
+                brepData = wedge.getBrepData();
+                fileName = "opengeometry-wedge.step";
+                readyText = `Ready: Wedge (W=${width.toFixed(2)}, H=${height.toFixed(2)}, D=${depth.toFixed(2)})`;
+              }
+            }
+
+            current = replaceSceneObject(scene, current, object);
+            manager.addBrepEntityToScene(sceneId, ENTITY_ID, kind, JSON.stringify(brepData));
+            exportButton.dataset.filename = fileName;
+            reportNode.textContent = readyText;
+          } catch (error) {
+            reportNode.textContent = `Shape update failed: ${String(error)}`;
+          }
+        };
+
+        const updateGroupVisibility = () => {
+          shapeGroups.forEach((group, shape) => {
+            group.style.display = shape === state.shape ? "block" : "none";
+          });
+        };
+
+        appendSelectControl(
+          panel,
+          "Shape",
+          Object.keys(SHAPE_LABELS).map((shape) => ({ value: shape, label: SHAPE_LABELS[shape] })),
+          state.shape,
+          (value) => {
+            state.shape = value;
+            updateGroupVisibility();
+            renderCurrentShape();
+          }
+        );
+
+        Object.keys(SHAPE_CONTROL_DEFS).forEach((shape) => {
+          const group = document.createElement("div");
+          SHAPE_CONTROL_DEFS[shape].forEach((definition) => {
+            appendNumberControl(group, definition, state, renderCurrentShape);
+          });
+          shapeGroups.set(shape, group);
+          panel.appendChild(group);
+        });
+
+        appendToggleControl(panel, "Outline", state.outline, (nextValue) => {
+          state.outline = nextValue;
+          renderCurrentShape();
+        });
+
+        exportButton = createActionButton("Export STEP", "#f18f33");
+        exportButton.dataset.filename = "opengeometry-cuboid.step";
+        panel.appendChild(exportButton);
+
+        reportNode = document.createElement("pre");
+        reportNode.style.margin = "0.75rem 0 0";
+        reportNode.style.fontSize = "0.75rem";
+        reportNode.style.lineHeight = "1.45";
+        reportNode.style.whiteSpace = "pre-wrap";
+        reportNode.textContent = "Generate geometry to enable STEP export.";
+        panel.appendChild(reportNode);
+
+        exportButton.addEventListener("click", () => {
+          try {
+            const config = {
+              schema: "AutomotiveDesign",
+              product_name: "OpenGeometry STEP Export",
+              scale: 1,
+              error_policy: "BestEffort",
+              validate_topology: true,
+              require_closed_shell: true,
+            };
+
+            const result = manager.exportSceneToStep(sceneId, JSON.stringify(config));
+            const report = JSON.parse(result.reportJson);
+            const filename = exportButton.dataset.filename || "opengeometry-shape.step";
+            downloadText(result.text, filename, "application/step");
+            reportNode.textContent = formatReport(
+              report,
+              new TextEncoder().encode(result.text).length,
+              filename
+            );
+          } catch (error) {
+            reportNode.textContent = `Export failed: ${String(error)}`;
+          }
+        });
+
+        document.body.appendChild(panel);
+        updateGroupVisibility();
+        renderCurrentShape();
+      }
+
+      void main();
+    </script>
+  </body>
+</html>

@@ -327,9 +327,11 @@ fn compute_path_tangent(path: &[Vec3f], is_closed: bool, index: usize) -> Vec3f 
     let count = path.len();
 
     if is_closed {
-        let prev = path[(index + count - 1) % count];
-        let next = path[(index + 1) % count];
-        return next.sub(prev);
+        return blend_corner_tangent(
+            path[(index + count - 1) % count],
+            path[index],
+            path[(index + 1) % count],
+        );
     }
 
     if index == 0 {
@@ -337,7 +339,30 @@ fn compute_path_tangent(path: &[Vec3f], is_closed: bool, index: usize) -> Vec3f 
     } else if index == count - 1 {
         path[count - 1].sub(path[count - 2])
     } else {
-        path[index + 1].sub(path[index - 1])
+        blend_corner_tangent(path[index - 1], path[index], path[index + 1])
+    }
+}
+
+fn blend_corner_tangent(prev: Vec3f, current: Vec3f, next: Vec3f) -> Vec3f {
+    let incoming = current.sub(prev);
+    let outgoing = next.sub(current);
+
+    match (incoming.normalized(), outgoing.normalized()) {
+        (Some(in_dir), Some(out_dir)) => {
+            let blended = in_dir.add(out_dir);
+            if blended.norm_sq() <= EPSILON * EPSILON {
+                if outgoing.norm_sq() > EPSILON * EPSILON {
+                    outgoing
+                } else {
+                    incoming
+                }
+            } else {
+                blended
+            }
+        }
+        (Some(_), None) => incoming,
+        (None, Some(_)) => outgoing,
+        (None, None) => Vec3f::new(0.0, 1.0, 0.0),
     }
 }
 
@@ -432,7 +457,7 @@ fn rotate_around_axis(vector: Vec3f, axis: Vec3f, angle: f64) -> Vec3f {
 
 #[cfg(test)]
 mod tests {
-    use super::{sweep_profile_along_path, SweepOptions};
+    use super::{compute_path_tangent, sweep_profile_along_path, SweepOptions, Vec3f};
     use openmaths::Vector3;
 
     fn rectangle_profile(width: f64, depth: f64) -> Vec<Vector3> {
@@ -495,5 +520,63 @@ mod tests {
 
         assert_eq!(brep.vertices.len(), 16);
         assert_eq!(brep.faces.len(), 16);
+    }
+
+    fn assert_direction_close(actual: Vec3f, expected: Vec3f) {
+        let actual = actual
+            .normalized()
+            .expect("actual direction must be non-degenerate");
+        let expected = expected
+            .normalized()
+            .expect("expected direction must be non-degenerate");
+        let error = actual.sub(expected).norm();
+        assert!(
+            error <= 1.0e-9,
+            "direction mismatch: actual=({:.6},{:.6},{:.6}) expected=({:.6},{:.6},{:.6}) error={:.3e}",
+            actual.x,
+            actual.y,
+            actual.z,
+            expected.x,
+            expected.y,
+            expected.z,
+            error
+        );
+    }
+
+    #[test]
+    fn corner_tangent_uses_angle_bisector_for_unequal_segments() {
+        let path = vec![
+            Vec3f::new(0.0, 0.0, 0.0),
+            Vec3f::new(0.0, 2.0, 0.0),
+            Vec3f::new(5.0, 2.0, 0.0),
+            Vec3f::new(5.0, 0.0, 0.0),
+        ];
+
+        let left_corner_tangent = compute_path_tangent(&path, false, 1);
+        let right_corner_tangent = compute_path_tangent(&path, false, 2);
+
+        assert_direction_close(left_corner_tangent, Vec3f::new(1.0, 1.0, 0.0));
+        assert_direction_close(right_corner_tangent, Vec3f::new(1.0, -1.0, 0.0));
+    }
+
+    #[test]
+    fn corner_tangent_is_not_weighted_by_neighbor_segment_length() {
+        let short_segments = vec![
+            Vec3f::new(0.0, 0.0, 0.0),
+            Vec3f::new(0.0, 1.0, 0.0),
+            Vec3f::new(1.0, 1.0, 0.0),
+        ];
+
+        let long_segments = vec![
+            Vec3f::new(0.0, 0.0, 0.0),
+            Vec3f::new(0.0, 4.0, 0.0),
+            Vec3f::new(8.0, 4.0, 0.0),
+        ];
+
+        let short_tangent = compute_path_tangent(&short_segments, false, 1);
+        let long_tangent = compute_path_tangent(&long_segments, false, 1);
+
+        assert_direction_close(short_tangent, Vec3f::new(1.0, 1.0, 0.0));
+        assert_direction_close(long_tangent, Vec3f::new(1.0, 1.0, 0.0));
     }
 }

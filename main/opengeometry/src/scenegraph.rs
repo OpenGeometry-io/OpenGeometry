@@ -5,8 +5,18 @@ use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
 use crate::brep::Brep;
+use crate::export::ifc::{
+    export_brep_to_ifc_text, export_scene_entities_to_ifc_text, IfcEntityInput, IfcExportConfig,
+    IfcExportReport,
+};
 use crate::export::projection::{
     project_brep_to_scene, CameraParameters, HlrOptions, Scene2D, Scene2DLines,
+};
+use crate::export::step::{
+    export_brep_to_step_text, export_breps_to_step_text, StepExportConfig, StepExportReport,
+};
+use crate::export::stl::{
+    export_brep_to_stl_bytes, export_breps_to_stl_bytes, StlExportConfig, StlExportReport,
 };
 use crate::primitives::arc::OGArc;
 use crate::primitives::cuboid::OGCuboid;
@@ -19,7 +29,13 @@ use crate::primitives::sphere::OGSphere;
 use crate::primitives::wedge::OGWedge;
 
 #[cfg(not(target_arch = "wasm32"))]
+use crate::export::ifc::export_scene_entities_to_ifc_file;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::export::pdf::{export_scene_to_pdf_with_config, PdfExportConfig};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::export::step::export_breps_to_step_file;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::export::stl::export_breps_to_stl_file;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SceneEntity {
@@ -75,6 +91,93 @@ pub struct SceneSummary {
     pub entity_count: usize,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct StlExportPayload {
+    pub bytes: Vec<u8>,
+    pub report: StlExportReport,
+}
+
+#[wasm_bindgen]
+pub struct OGStlExportResult {
+    bytes: Vec<u8>,
+    report_json: String,
+}
+
+impl OGStlExportResult {
+    fn from_parts(bytes: Vec<u8>, report: StlExportReport) -> Result<Self, String> {
+        let report_json = serde_json::to_string(&report)
+            .map_err(|err| format!("Failed to serialize STL export report: {}", err))?;
+        Ok(Self { bytes, report_json })
+    }
+}
+
+#[wasm_bindgen]
+impl OGStlExportResult {
+    #[wasm_bindgen(getter)]
+    pub fn bytes(&self) -> Vec<u8> {
+        self.bytes.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = reportJson)]
+    pub fn report_json(&self) -> String {
+        self.report_json.clone()
+    }
+}
+
+#[wasm_bindgen]
+pub struct OGStepExportResult {
+    text: String,
+    report_json: String,
+}
+
+impl OGStepExportResult {
+    fn from_parts(text: String, report: StepExportReport) -> Result<Self, String> {
+        let report_json = serde_json::to_string(&report)
+            .map_err(|err| format!("Failed to serialize STEP export report: {}", err))?;
+        Ok(Self { text, report_json })
+    }
+}
+
+#[wasm_bindgen]
+impl OGStepExportResult {
+    #[wasm_bindgen(getter)]
+    pub fn text(&self) -> String {
+        self.text.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = reportJson)]
+    pub fn report_json(&self) -> String {
+        self.report_json.clone()
+    }
+}
+
+#[wasm_bindgen]
+pub struct OGIfcExportResult {
+    text: String,
+    report_json: String,
+}
+
+impl OGIfcExportResult {
+    fn from_parts(text: String, report: IfcExportReport) -> Result<Self, String> {
+        let report_json = serde_json::to_string(&report)
+            .map_err(|err| format!("Failed to serialize IFC export report: {}", err))?;
+        Ok(Self { text, report_json })
+    }
+}
+
+#[wasm_bindgen]
+impl OGIfcExportResult {
+    #[wasm_bindgen(getter)]
+    pub fn text(&self) -> String {
+        self.text.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = reportJson)]
+    pub fn report_json(&self) -> String {
+        self.report_json.clone()
+    }
+}
+
 #[wasm_bindgen]
 pub struct OGSceneManager {
     scenes: HashMap<String, OGScene>,
@@ -123,6 +226,30 @@ impl OGSceneManager {
             Some(payload) if !payload.trim().is_empty() => serde_json::from_str(&payload)
                 .map_err(|err| format!("Invalid HLR JSON payload: {}", err)),
             _ => Ok(HlrOptions::default()),
+        }
+    }
+
+    fn parse_stl_config_json(config_json: Option<String>) -> Result<StlExportConfig, String> {
+        match config_json {
+            Some(payload) if !payload.trim().is_empty() => serde_json::from_str(&payload)
+                .map_err(|err| format!("Invalid STL config JSON payload: {}", err)),
+            _ => Ok(StlExportConfig::default()),
+        }
+    }
+
+    fn parse_step_config_json(config_json: Option<String>) -> Result<StepExportConfig, String> {
+        match config_json {
+            Some(payload) if !payload.trim().is_empty() => serde_json::from_str(&payload)
+                .map_err(|err| format!("Invalid STEP config JSON payload: {}", err)),
+            _ => Ok(StepExportConfig::default()),
+        }
+    }
+
+    fn parse_ifc_config_json(config_json: Option<String>) -> Result<IfcExportConfig, String> {
+        match config_json {
+            Some(payload) if !payload.trim().is_empty() => serde_json::from_str(&payload)
+                .map_err(|err| format!("Invalid IFC config JSON payload: {}", err)),
+            _ => Ok(IfcExportConfig::default()),
         }
     }
 
@@ -325,6 +452,111 @@ impl OGSceneManager {
         serde_json::to_string_pretty(&projected_lines)
             .map_err(|err| format!("Failed to serialize projected line scene: {}", err))
     }
+
+    pub fn export_scene_to_stl_bytes_internal(
+        &self,
+        scene_id: &str,
+        config: &StlExportConfig,
+    ) -> Result<(Vec<u8>, StlExportReport), String> {
+        let scene = self.get_scene(scene_id)?;
+        let breps: Vec<&Brep> = scene.entities.iter().map(|entity| &entity.brep).collect();
+        export_breps_to_stl_bytes(breps, config).map_err(|err| err.to_string())
+    }
+
+    pub fn export_brep_serialized_to_stl_bytes_internal(
+        &self,
+        brep_serialized: &str,
+        config: &StlExportConfig,
+    ) -> Result<(Vec<u8>, StlExportReport), String> {
+        let brep: Brep = serde_json::from_str(brep_serialized)
+            .map_err(|err| format!("Failed to deserialize BRep JSON payload: {}", err))?;
+        export_brep_to_stl_bytes(&brep, config).map_err(|err| err.to_string())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn export_scene_to_stl_file_internal(
+        &self,
+        scene_id: &str,
+        file_path: &str,
+        config: &StlExportConfig,
+    ) -> Result<StlExportReport, String> {
+        let scene = self.get_scene(scene_id)?;
+        let breps: Vec<&Brep> = scene.entities.iter().map(|entity| &entity.brep).collect();
+        export_breps_to_stl_file(breps, file_path, config).map_err(|err| err.to_string())
+    }
+
+    pub fn export_scene_to_step_text_internal(
+        &self,
+        scene_id: &str,
+        config: &StepExportConfig,
+    ) -> Result<(String, StepExportReport), String> {
+        let scene = self.get_scene(scene_id)?;
+        let breps: Vec<&Brep> = scene.entities.iter().map(|entity| &entity.brep).collect();
+        export_breps_to_step_text(breps, config).map_err(|err| err.to_string())
+    }
+
+    pub fn export_brep_serialized_to_step_text_internal(
+        &self,
+        brep_serialized: &str,
+        config: &StepExportConfig,
+    ) -> Result<(String, StepExportReport), String> {
+        let brep: Brep = serde_json::from_str(brep_serialized)
+            .map_err(|err| format!("Failed to deserialize BRep JSON payload: {}", err))?;
+        export_brep_to_step_text(&brep, config).map_err(|err| err.to_string())
+    }
+
+    pub fn export_scene_to_ifc_text_internal(
+        &self,
+        scene_id: &str,
+        config: &IfcExportConfig,
+    ) -> Result<(String, IfcExportReport), String> {
+        let scene = self.get_scene(scene_id)?;
+        let entities = scene.entities.iter().map(|entity| IfcEntityInput {
+            entity_id: entity.id.as_str(),
+            kind: entity.kind.as_str(),
+            brep: &entity.brep,
+        });
+        export_scene_entities_to_ifc_text(entities, config).map_err(|err| err.to_string())
+    }
+
+    pub fn export_brep_serialized_to_ifc_text_internal(
+        &self,
+        brep_serialized: &str,
+        config: &IfcExportConfig,
+    ) -> Result<(String, IfcExportReport), String> {
+        let brep: Brep = serde_json::from_str(brep_serialized)
+            .map_err(|err| format!("Failed to deserialize BRep JSON payload: {}", err))?;
+        export_brep_to_ifc_text(&brep, config).map_err(|err| err.to_string())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn export_scene_to_step_file_internal(
+        &self,
+        scene_id: &str,
+        file_path: &str,
+        config: &StepExportConfig,
+    ) -> Result<StepExportReport, String> {
+        let scene = self.get_scene(scene_id)?;
+        let breps: Vec<&Brep> = scene.entities.iter().map(|entity| &entity.brep).collect();
+        export_breps_to_step_file(breps, file_path, config).map_err(|err| err.to_string())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn export_scene_to_ifc_file_internal(
+        &self,
+        scene_id: &str,
+        file_path: &str,
+        config: &IfcExportConfig,
+    ) -> Result<IfcExportReport, String> {
+        let scene = self.get_scene(scene_id)?;
+        let entities = scene.entities.iter().map(|entity| IfcEntityInput {
+            entity_id: entity.id.as_str(),
+            kind: entity.kind.as_str(),
+            brep: &entity.brep,
+        });
+        export_scene_entities_to_ifc_file(entities, file_path, config)
+            .map_err(|err| err.to_string())
+    }
 }
 
 #[wasm_bindgen]
@@ -412,6 +644,13 @@ impl OGSceneManager {
     ) -> Result<(), JsValue> {
         let brep: Brep = serde_json::from_str(&brep_serialized).map_err(|err| {
             JsValue::from_str(&format!("Failed to deserialize BRep JSON payload: {}", err))
+        })?;
+
+        brep.validate_topology().map_err(|err| {
+            JsValue::from_str(&format!(
+                "Invalid BRep topology for '{}': {}",
+                entity_id, err
+            ))
         })?;
 
         self.upsert_entity_brep(&scene_id, entity_id, kind, brep)
@@ -718,6 +957,183 @@ impl OGSceneManager {
         self.project_to_2d_lines(scene_id, camera_json, hlr_json)
     }
 
+    #[wasm_bindgen(js_name = exportBrepToStl)]
+    pub fn export_brep_to_stl(
+        &self,
+        brep_serialized: String,
+        config_json: Option<String>,
+    ) -> Result<OGStlExportResult, JsValue> {
+        let config =
+            Self::parse_stl_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
+        let (bytes, report) = self
+            .export_brep_serialized_to_stl_bytes_internal(&brep_serialized, &config)
+            .map_err(|err| JsValue::from_str(&err))?;
+
+        OGStlExportResult::from_parts(bytes, report).map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = exportSceneToStl)]
+    pub fn export_scene_to_stl(
+        &self,
+        scene_id: String,
+        config_json: Option<String>,
+    ) -> Result<OGStlExportResult, JsValue> {
+        let config =
+            Self::parse_stl_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
+        let (bytes, report) = self
+            .export_scene_to_stl_bytes_internal(&scene_id, &config)
+            .map_err(|err| JsValue::from_str(&err))?;
+
+        OGStlExportResult::from_parts(bytes, report).map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = exportCurrentSceneToStl)]
+    pub fn export_current_scene_to_stl(
+        &self,
+        config_json: Option<String>,
+    ) -> Result<OGStlExportResult, JsValue> {
+        let scene_id = self
+            .scene_id_or_current(None)
+            .map_err(|err| JsValue::from_str(&err))?;
+        self.export_scene_to_stl(scene_id, config_json)
+    }
+
+    #[wasm_bindgen(js_name = exportBrepToStep)]
+    pub fn export_brep_to_step(
+        &self,
+        brep_serialized: String,
+        config_json: Option<String>,
+    ) -> Result<OGStepExportResult, JsValue> {
+        let config =
+            Self::parse_step_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
+        let (text, report) = self
+            .export_brep_serialized_to_step_text_internal(&brep_serialized, &config)
+            .map_err(|err| JsValue::from_str(&err))?;
+
+        OGStepExportResult::from_parts(text, report).map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = exportSceneToStep)]
+    pub fn export_scene_to_step(
+        &self,
+        scene_id: String,
+        config_json: Option<String>,
+    ) -> Result<OGStepExportResult, JsValue> {
+        let config =
+            Self::parse_step_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
+        let (text, report) = self
+            .export_scene_to_step_text_internal(&scene_id, &config)
+            .map_err(|err| JsValue::from_str(&err))?;
+
+        OGStepExportResult::from_parts(text, report).map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = exportCurrentSceneToStep)]
+    pub fn export_current_scene_to_step(
+        &self,
+        config_json: Option<String>,
+    ) -> Result<OGStepExportResult, JsValue> {
+        let scene_id = self
+            .scene_id_or_current(None)
+            .map_err(|err| JsValue::from_str(&err))?;
+        self.export_scene_to_step(scene_id, config_json)
+    }
+
+    #[wasm_bindgen(js_name = exportBrepToIfc)]
+    pub fn export_brep_to_ifc(
+        &self,
+        brep_serialized: String,
+        config_json: Option<String>,
+    ) -> Result<OGIfcExportResult, JsValue> {
+        let config =
+            Self::parse_ifc_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
+        let (text, report) = self
+            .export_brep_serialized_to_ifc_text_internal(&brep_serialized, &config)
+            .map_err(|err| JsValue::from_str(&err))?;
+
+        OGIfcExportResult::from_parts(text, report).map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = exportSceneToIfc)]
+    pub fn export_scene_to_ifc(
+        &self,
+        scene_id: String,
+        config_json: Option<String>,
+    ) -> Result<OGIfcExportResult, JsValue> {
+        let config =
+            Self::parse_ifc_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
+        let (text, report) = self
+            .export_scene_to_ifc_text_internal(&scene_id, &config)
+            .map_err(|err| JsValue::from_str(&err))?;
+
+        OGIfcExportResult::from_parts(text, report).map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen(js_name = exportCurrentSceneToIfc)]
+    pub fn export_current_scene_to_ifc(
+        &self,
+        config_json: Option<String>,
+    ) -> Result<OGIfcExportResult, JsValue> {
+        let scene_id = self
+            .scene_id_or_current(None)
+            .map_err(|err| JsValue::from_str(&err))?;
+        self.export_scene_to_ifc(scene_id, config_json)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[wasm_bindgen(js_name = exportSceneToStlFile)]
+    pub fn export_scene_to_stl_file(
+        &self,
+        scene_id: String,
+        file_path: String,
+        config_json: Option<String>,
+    ) -> Result<String, JsValue> {
+        let config =
+            Self::parse_stl_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
+        let report = self
+            .export_scene_to_stl_file_internal(&scene_id, &file_path, &config)
+            .map_err(|err| JsValue::from_str(&err))?;
+        serde_json::to_string(&report).map_err(|err| {
+            JsValue::from_str(&format!("Failed to serialize STL export report: {}", err))
+        })
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[wasm_bindgen(js_name = exportSceneToStepFile)]
+    pub fn export_scene_to_step_file(
+        &self,
+        scene_id: String,
+        file_path: String,
+        config_json: Option<String>,
+    ) -> Result<String, JsValue> {
+        let config =
+            Self::parse_step_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
+        let report = self
+            .export_scene_to_step_file_internal(&scene_id, &file_path, &config)
+            .map_err(|err| JsValue::from_str(&err))?;
+        serde_json::to_string(&report).map_err(|err| {
+            JsValue::from_str(&format!("Failed to serialize STEP export report: {}", err))
+        })
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[wasm_bindgen(js_name = exportSceneToIfcFile)]
+    pub fn export_scene_to_ifc_file(
+        &self,
+        scene_id: String,
+        file_path: String,
+        config_json: Option<String>,
+    ) -> Result<String, JsValue> {
+        let config =
+            Self::parse_ifc_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
+        let report = self
+            .export_scene_to_ifc_file_internal(&scene_id, &file_path, &config)
+            .map_err(|err| JsValue::from_str(&err))?;
+        serde_json::to_string(&report).map_err(|err| {
+            JsValue::from_str(&format!("Failed to serialize IFC export report: {}", err))
+        })
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     #[wasm_bindgen(js_name = projectToPDF)]
     pub fn project_to_pdf(
@@ -771,5 +1187,98 @@ mod tests {
             .unwrap();
 
         assert!(!scene_2d.is_empty());
+    }
+
+    #[test]
+    fn test_scene_stl_export_binary_payload() {
+        let mut manager = OGSceneManager::new();
+        let scene_id = manager.create_scene_internal("stl-scene");
+
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        ]);
+        builder.add_face(&[0, 1, 2], &[]).unwrap();
+        let brep: Brep = builder.build().unwrap();
+
+        manager
+            .add_brep_entity_to_scene_internal(&scene_id, "tri-1", "Triangle", &brep)
+            .unwrap();
+
+        let (bytes, report) = manager
+            .export_scene_to_stl_bytes_internal(&scene_id, &StlExportConfig::default())
+            .unwrap();
+
+        assert!(bytes.len() >= 84);
+        let triangle_count = u32::from_le_bytes([bytes[80], bytes[81], bytes[82], bytes[83]]);
+        assert_eq!(triangle_count as usize, report.exported_triangles);
+        assert_eq!(report.exported_triangles, 1);
+    }
+
+    #[test]
+    fn test_scene_step_export_text_payload() {
+        let mut manager = OGSceneManager::new();
+        let scene_id = manager.create_scene_internal("step-scene");
+
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(0.5, 0.8660254, 0.0),
+            Vector3::new(0.5, 0.2886751, 0.8164966),
+        ]);
+        builder.add_face(&[0, 2, 1], &[]).unwrap();
+        builder.add_face(&[0, 1, 3], &[]).unwrap();
+        builder.add_face(&[1, 2, 3], &[]).unwrap();
+        builder.add_face(&[2, 0, 3], &[]).unwrap();
+        let brep: Brep = builder.build().unwrap();
+
+        manager
+            .add_brep_entity_to_scene_internal(&scene_id, "tetra-1", "Tetrahedron", &brep)
+            .unwrap();
+
+        let (text, report) = manager
+            .export_scene_to_step_text_internal(&scene_id, &StepExportConfig::default())
+            .unwrap();
+
+        assert!(text.starts_with("ISO-10303-21;"));
+        assert!(text.contains("FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));"));
+        assert!(text.contains("MANIFOLD_SOLID_BREP"));
+        assert_eq!(report.exported_solids, 1);
+    }
+
+    #[test]
+    fn test_scene_ifc_export_text_payload() {
+        let mut manager = OGSceneManager::new();
+        let scene_id = manager.create_scene_internal("ifc-scene");
+
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(0.5, 0.8660254, 0.0),
+            Vector3::new(0.5, 0.2886751, 0.8164966),
+        ]);
+        builder.add_face(&[0, 2, 1], &[]).unwrap();
+        builder.add_face(&[0, 1, 3], &[]).unwrap();
+        builder.add_face(&[1, 2, 3], &[]).unwrap();
+        builder.add_face(&[2, 0, 3], &[]).unwrap();
+        let brep: Brep = builder.build().unwrap();
+
+        manager
+            .add_brep_entity_to_scene_internal(&scene_id, "tetra-1", "Tetrahedron", &brep)
+            .unwrap();
+
+        let (text, report) = manager
+            .export_scene_to_ifc_text_internal(&scene_id, &IfcExportConfig::default())
+            .unwrap();
+
+        assert!(text.starts_with("ISO-10303-21;"));
+        assert!(text.contains("FILE_SCHEMA(('IFC4'));"));
+        assert!(text.contains("IFCPROJECT("));
+        assert!(text.contains("IFCTRIANGULATEDFACESET("));
+        assert_eq!(report.exported_elements, 1);
     }
 }

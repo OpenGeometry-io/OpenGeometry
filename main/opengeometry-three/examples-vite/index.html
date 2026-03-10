@@ -47,7 +47,7 @@
 
       #app {
         width: 100%;
-        height: 100%;
+        min-height: 100vh;
       }
 
       .og-specs-shell {
@@ -95,46 +95,6 @@
         margin-top: 26px;
       }
 
-      .og-support {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 18px;
-        margin-top: 28px;
-        padding: 20px 22px;
-        border: 1px solid rgba(255, 84, 0, 0.18);
-        border-radius: var(--og-squircle);
-        background: linear-gradient(145deg, rgba(255, 248, 242, 0.96), rgba(250, 239, 230, 0.92));
-        box-shadow: var(--og-shadow);
-      }
-
-      .og-support-copy {
-        display: grid;
-        gap: 6px;
-      }
-
-      .og-support-kicker {
-        margin: 0;
-        color: var(--og-accent);
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-      }
-
-      .og-support-title {
-        margin: 0;
-        font-size: 22px;
-        font-weight: 650;
-        letter-spacing: -0.02em;
-      }
-
-      .og-support-text {
-        margin: 0;
-        color: var(--og-muted);
-        font-size: 14px;
-      }
-
       .og-specs-section-head {
         display: flex;
         align-items: baseline;
@@ -172,11 +132,11 @@
       .og-spec-card {
         display: grid;
         gap: 16px;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(250, 242, 235, 0.96));
-        border: 1px solid var(--og-line);
         min-height: 312px;
         padding: 18px 18px 16px;
+        border: 1px solid var(--og-line);
         border-radius: var(--og-squircle);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(250, 242, 235, 0.96));
         box-shadow: var(--og-shadow);
         transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
       }
@@ -189,8 +149,8 @@
 
       .og-spec-card-head {
         display: flex;
-        justify-content: space-between;
         align-items: start;
+        justify-content: space-between;
         gap: 12px;
       }
 
@@ -204,9 +164,6 @@
         background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(255, 235, 223, 0.92));
         border: 1px solid rgba(255, 84, 0, 0.18);
         color: var(--og-accent);
-        font: 700 11px/1 var(--og-mono);
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
       }
 
       .og-spec-card-brand svg {
@@ -252,7 +209,6 @@
       .og-chip {
         display: inline-flex;
         flex: 0 0 auto;
-        align-self: flex-start;
         align-items: center;
         justify-content: center;
         height: 28px;
@@ -282,6 +238,12 @@
         border-top: 1px solid rgba(95, 61, 46, 0.08);
       }
 
+      .og-spec-context {
+        color: var(--og-muted-soft);
+        font-size: 12px;
+        letter-spacing: 0.02em;
+      }
+
       .og-spec-open {
         display: inline-flex;
         align-items: center;
@@ -295,6 +257,46 @@
         font-weight: 600;
         text-decoration: none;
         box-shadow: 0 10px 18px rgba(76, 63, 54, 0.16);
+      }
+
+      .og-support {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-top: 28px;
+        padding: 20px 22px;
+        border: 1px solid rgba(255, 84, 0, 0.18);
+        border-radius: var(--og-squircle);
+        background: linear-gradient(145deg, rgba(255, 248, 242, 0.96), rgba(250, 239, 230, 0.92));
+        box-shadow: var(--og-shadow);
+      }
+
+      .og-support-copy {
+        display: grid;
+        gap: 6px;
+      }
+
+      .og-support-kicker {
+        margin: 0;
+        color: var(--og-accent);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .og-support-title {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+      }
+
+      .og-support-text {
+        margin: 0;
+        color: var(--og-muted);
+        font-size: 14px;
       }
 
       .og-support-link {
@@ -345,11 +347,7 @@
           font-size: 24px;
         }
 
-        .og-spec-card-footer {
-          flex-direction: column;
-          align-items: stretch;
-        }
-
+        .og-spec-card-footer,
         .og-support {
           flex-direction: column;
           align-items: stretch;
@@ -380,144 +378,338 @@
         faWarehouse,
       } from "@fortawesome/free-solid-svg-icons";
 
+      const app = document.getElementById("app");
+      if (!app) {
+        throw new Error("Missing #app container");
+      }
+
       const categoryLabels = {
         primitives: "Primitives",
         shapes: "Shapes",
         operations: "Operations",
       };
 
-      const examples = [
-        { slug: "primitives/arc", category: "primitives", title: "Arc", description: "Circular arc with angle span and segmentation control.", statusLabel: "ready", chips: ["Radius", "Span"], footerText: "Radius, Span" },
-        { slug: "primitives/curve", category: "primitives", title: "Curve", description: "Control-point curve for route and profile sketching.", statusLabel: "ready", chips: ["Sag", "Lift"], footerText: "Sag, Lift" },
-        { slug: "primitives/line", category: "primitives", title: "Line", description: "Two-point line primitive with direct endpoint control.", statusLabel: "ready", chips: ["Length", "Angle"], footerText: "Length, Angle" },
-        { slug: "primitives/polyline", category: "primitives", title: "Polyline", description: "Open and closed path definitions for profile work.", statusLabel: "ready", chips: ["Closure", "Span"], footerText: "Closure, Span" },
-        { slug: "primitives/rectangle", category: "primitives", title: "Rectangle", description: "Parametric rectangular primitive for base profiles.", statusLabel: "ready", chips: ["Width", "Breadth"], footerText: "Width, Breadth" },
-        { slug: "shapes/cuboid", category: "shapes", title: "Cuboid", description: "Rectangular solid for rooms, equipment blocks and massing.", statusLabel: "ready", chips: ["Width", "Height", "Depth"], footerText: "Width, Height, Depth" },
-        { slug: "shapes/cylinder", category: "shapes", title: "Cylinder", description: "Cylindrical volume for ducts, pipes and mechanical shafts.", statusLabel: "ready", chips: ["Radius", "Height", "Segments"], footerText: "Radius, Height, Segments" },
-        { slug: "shapes/opening", category: "shapes", title: "Opening", description: "Opening helper volume for void and penetration previews.", statusLabel: "ready", chips: ["Width", "Height", "Depth"], footerText: "Width, Height, Depth" },
-        { slug: "shapes/polygon", category: "shapes", title: "Polygon", description: "Planar polygon triangulation for surfaces and slabs.", statusLabel: "ready", chips: ["Sides", "Radius"], footerText: "Sides, Radius" },
-        { slug: "shapes/polygon-suite", category: "shapes", title: "Polygon Suite", description: "Dataset-backed polygon validation with concave, performance, and multi-hole cases.", statusLabel: "ready", chips: ["Holes", "Concavity"], footerText: "Holes, Concavity" },
-        { slug: "shapes/sphere", category: "shapes", title: "Sphere", description: "UV sphere for equipment envelopes and clearance studies.", statusLabel: "ready", chips: ["Radius", "Segments"], footerText: "Radius, Segments" },
-        { slug: "shapes/sweep", category: "shapes", title: "Sweep", description: "Profile along path sweep for framing and custom sections.", statusLabel: "ready", chips: ["Path", "Caps"], footerText: "Path, Caps" },
-        { slug: "shapes/wedge", category: "shapes", title: "Wedge", description: "Tapered solid for ramps and sloped technical elements.", statusLabel: "ready", chips: ["Width", "Height", "Depth"], footerText: "Width, Height, Depth" },
-        { slug: "operations/offset", category: "operations", title: "Offset", description: "Offset generation with acute-corner and bevel parameters.", statusLabel: "ready", chips: ["Offset", "Bevel"], footerText: "Offset, Bevel" },
-        { slug: "operations/sweep-path-profile", category: "operations", title: "Sweep Path + Profile", description: "Operation-level sweep from path primitive + profile primitive.", statusLabel: "ready", chips: ["Path", "Caps"], footerText: "Path, Caps" },
-        { slug: "operations/sweep-hilbert-profiles", category: "operations", title: "Sweep Hilbert Profiles", description: "Locked Hilbert3D path with switchable kernel and custom section profiles.", statusLabel: "ready", chips: ["Hilbert Path", "Profiles", "Sweep"], footerText: "Profile Type, Caps, Outlines" },
-        { slug: "operations/wall-from-offsets", category: "operations", title: "Wall from Offsets", description: "Composite wall profile assembled from offset centerlines.", statusLabel: "ready", chips: ["Thickness"], footerText: "Thickness" },
-      ];
-
-      const iconBySlug = {
-        line: faSlash,
-        polyline: faDrawPolygon,
+      const iconMap = {
         arc: faCompassDrafting,
-        rectangle: faVectorSquare,
         curve: faBezierCurve,
+        line: faSlash,
+        polyline: faRoute,
+        rectangle: faVectorSquare,
+        cuboid: faCube,
+        cylinder: faWarehouse,
+        opening: faUpRightAndDownLeftFromCenter,
         polygon: faDrawPolygon,
         "polygon-suite": faLayerGroup,
-        cuboid: faCube,
-        cylinder: faDatabase,
-        wedge: faMountain,
-        opening: faDoorOpen,
-        sweep: faRoad,
         sphere: faGlobe,
-        offset: faUpRightAndDownLeftFromCenter,
-        "wall-from-offsets": faWarehouse,
+        sweep: faShapes,
+        wedge: faMountain,
+        offset: faCompassDrafting,
         "sweep-path-profile": faRoute,
-        "sweep-hilbert-profiles": faRoute,
+        "sweep-hilbert-profiles": faRoad,
+        "wall-from-offsets": faLayerGroup,
+        "step-export": faDatabase,
+        "stl-export": faDatabase,
+        "ifc-export": faDatabase,
+        "door-export": faDoorOpen,
       };
 
-      function getExamplesByCategory(category) {
-        return examples.filter((example) => example.category === category);
-      }
+      const examples = [
+        {
+          slug: "primitives/arc",
+          category: "primitives",
+          iconKey: "arc",
+          title: "Arc",
+          description: "Circular arc with angle span and segmentation control.",
+          statusLabel: "ready",
+          chips: ["Radius", "Span"],
+          footerText: "Radius, Span",
+        },
+        {
+          slug: "primitives/curve",
+          category: "primitives",
+          iconKey: "curve",
+          title: "Curve",
+          description: "Control-point curve for route and profile sketching.",
+          statusLabel: "ready",
+          chips: ["Sag", "Lift"],
+          footerText: "Sag, Lift",
+        },
+        {
+          slug: "primitives/line",
+          category: "primitives",
+          iconKey: "line",
+          title: "Line",
+          description: "Two-point line primitive with direct endpoint control.",
+          statusLabel: "ready",
+          chips: ["Length", "Angle"],
+          footerText: "Length, Angle",
+        },
+        {
+          slug: "primitives/polyline",
+          category: "primitives",
+          iconKey: "polyline",
+          title: "Polyline",
+          description: "Open and closed path definitions for profile work.",
+          statusLabel: "ready",
+          chips: ["Closure", "Span"],
+          footerText: "Closure, Span",
+        },
+        {
+          slug: "primitives/rectangle",
+          category: "primitives",
+          iconKey: "rectangle",
+          title: "Rectangle",
+          description: "Parametric rectangular primitive for base profiles.",
+          statusLabel: "ready",
+          chips: ["Width", "Breadth"],
+          footerText: "Width, Breadth",
+        },
+        {
+          slug: "shapes/cuboid",
+          category: "shapes",
+          iconKey: "cuboid",
+          title: "Cuboid",
+          description: "Rectangular solid for rooms, equipment blocks and massing.",
+          statusLabel: "ready",
+          chips: ["Width", "Height", "Depth"],
+          footerText: "Width, Height, Depth",
+        },
+        {
+          slug: "shapes/cylinder",
+          category: "shapes",
+          iconKey: "cylinder",
+          title: "Cylinder",
+          description: "Cylindrical volume for ducts, pipes and mechanical shafts.",
+          statusLabel: "ready",
+          chips: ["Radius", "Height", "Segments"],
+          footerText: "Radius, Height, Segments",
+        },
+        {
+          slug: "shapes/opening",
+          category: "shapes",
+          iconKey: "opening",
+          title: "Opening",
+          description: "Opening helper volume for void and penetration previews.",
+          statusLabel: "ready",
+          chips: ["Width", "Height", "Depth"],
+          footerText: "Width, Height, Depth",
+        },
+        {
+          slug: "shapes/polygon",
+          category: "shapes",
+          iconKey: "polygon",
+          title: "Polygon",
+          description: "Planar polygon triangulation for surfaces and slabs.",
+          statusLabel: "ready",
+          chips: ["Sides", "Radius"],
+          footerText: "Sides, Radius",
+        },
+        {
+          slug: "shapes/polygon-suite",
+          category: "shapes",
+          iconKey: "polygon-suite",
+          title: "Polygon Suite",
+          description: "Dataset-backed polygon validation with concave, performance, and multi-hole cases.",
+          statusLabel: "ready",
+          chips: ["Holes", "Concavity"],
+          footerText: "Holes, Concavity",
+        },
+        {
+          slug: "shapes/sphere",
+          category: "shapes",
+          iconKey: "sphere",
+          title: "Sphere",
+          description: "UV sphere for equipment envelopes and clearance studies.",
+          statusLabel: "ready",
+          chips: ["Radius", "Segments"],
+          footerText: "Radius, Segments",
+        },
+        {
+          slug: "shapes/sweep",
+          category: "shapes",
+          iconKey: "sweep",
+          title: "Sweep",
+          description: "Profile along path sweep for framing and custom sections.",
+          statusLabel: "ready",
+          chips: ["Path", "Caps"],
+          footerText: "Path, Caps",
+        },
+        {
+          slug: "shapes/wedge",
+          category: "shapes",
+          iconKey: "wedge",
+          title: "Wedge",
+          description: "Tapered solid for ramps and sloped technical elements.",
+          statusLabel: "ready",
+          chips: ["Width", "Height", "Depth"],
+          footerText: "Width, Height, Depth",
+        },
+        {
+          slug: "operations/door-export",
+          category: "operations",
+          iconKey: "door-export",
+          title: "Door Export",
+          description: "Door panel as Cuboid plus frame from swept profile, exported through STL, STEP and IFC.",
+          statusLabel: "ready",
+          chips: ["Door Panel", "Frame Profile", "IFC"],
+          footerText: "Door Assembly",
+        },
+        {
+          slug: "operations/ifc-export",
+          category: "operations",
+          iconKey: "ifc-export",
+          title: "IFC Export",
+          description: "IFC4 export with user-side semantics sidecar and optional web-ifc parse probe.",
+          statusLabel: "ready",
+          chips: ["Semantics JSON", "IFC4"],
+          footerText: "BIM Export",
+        },
+        {
+          slug: "operations/offset",
+          category: "operations",
+          iconKey: "offset",
+          title: "Offset",
+          description: "Offset generation with acute-corner and bevel parameters.",
+          statusLabel: "ready",
+          chips: ["Offset", "Bevel"],
+          footerText: "Offset, Bevel",
+        },
+        {
+          slug: "operations/step-export",
+          category: "operations",
+          iconKey: "step-export",
+          title: "STEP Export",
+          description: "STEP Part-21 export workflow with scene-level reporting and download.",
+          statusLabel: "ready",
+          chips: ["STEP", "Shape"],
+          footerText: "Scene Export",
+        },
+        {
+          slug: "operations/stl-export",
+          category: "operations",
+          iconKey: "stl-export",
+          title: "STL Export",
+          description: "Binary STL export workflow with scene-level reporting and download.",
+          statusLabel: "ready",
+          chips: ["Binary STL", "Shape"],
+          footerText: "Scene Export",
+        },
+        {
+          slug: "operations/sweep-hilbert-profiles",
+          category: "operations",
+          iconKey: "sweep-hilbert-profiles",
+          title: "Sweep Hilbert Profiles",
+          description: "Locked Hilbert3D path with switchable kernel and custom section profiles.",
+          statusLabel: "ready",
+          chips: ["Hilbert Path", "Profiles", "Sweep"],
+          footerText: "Profile Type, Caps, Outlines",
+        },
+        {
+          slug: "operations/sweep-path-profile",
+          category: "operations",
+          iconKey: "sweep-path-profile",
+          title: "Sweep Path + Profile",
+          description: "Operation-level sweep from path primitive plus profile primitive.",
+          statusLabel: "ready",
+          chips: ["Path", "Caps"],
+          footerText: "Path, Caps",
+        },
+        {
+          slug: "operations/wall-from-offsets",
+          category: "operations",
+          iconKey: "wall-from-offsets",
+          title: "Wall from Offsets",
+          description: "Composite wall profile assembled from offset centerlines.",
+          statusLabel: "ready",
+          chips: ["Offsets", "Thickness"],
+          footerText: "Composite Wall",
+        },
+      ];
 
-      function getExampleIconMarkup(slug) {
-        const key = slug.split("/").pop() || slug;
-        const selected = iconBySlug[key] || faShapes;
-        return icon(selected).html.join("");
+      function getIconMarkup(iconKey) {
+        const iconDefinition = iconMap[iconKey] || faShapes;
+        return icon(iconDefinition).html.join("");
       }
 
       function getDiscordIconMarkup() {
-        return `
-          <svg viewBox="0 0 127.14 96.36" aria-hidden="true" focusable="false">
-            <path fill="currentColor" d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.73,56.6.53,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2.06a75.57,75.57,0,0,0,64.32,0c.87.72,1.76,1.4,2.66,2.06a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.59,80.2h0C129.24,52.84,122.06,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,59.94,31,52.85S36.06,40,42.45,40s11.58,5.81,11.46,12.85S48.84,65.69,42.45,65.69Zm42.24,0c-6.27,0-11.45-5.75-11.45-12.84S78.3,40,84.69,40s11.57,5.81,11.45,12.85S91.08,65.69,84.69,65.69Z"></path>
-          </svg>
-        `;
+        return (
+          '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none">' +
+          '<path d="M19.54 5.17a16.7 16.7 0 0 0-4.13-1.3l-.2.4a14.6 14.6 0 0 1 3.95 1.36 13.9 13.9 0 0 0-3.99-1.23 16.1 16.1 0 0 0-6.34 0A13.9 13.9 0 0 0 4.84 5.63a14.6 14.6 0 0 1 3.95-1.36l-.2-.4a16.7 16.7 0 0 0-4.13 1.3C1.84 9.1 1.15 12.93 1.5 16.72a16.8 16.8 0 0 0 5.07 2.57l1.09-1.76a10.7 10.7 0 0 1-1.72-.83l.42-.3c3.32 1.57 6.92 1.57 10.19 0l.42.3c-.54.33-1.12.61-1.72.83l1.09 1.76a16.8 16.8 0 0 0 5.07-2.57c.41-4.39-.7-8.18-2.87-11.55ZM8.68 14.4c-.99 0-1.8-.92-1.8-2.04 0-1.13.8-2.04 1.8-2.04.99 0 1.8.92 1.8 2.04 0 1.12-.81 2.04-1.8 2.04Zm6.64 0c-.99 0-1.8-.92-1.8-2.04 0-1.13.8-2.04 1.8-2.04.99 0 1.8.92 1.8 2.04 0 1.12-.81 2.04-1.8 2.04Z" fill="currentColor"/>' +
+          "</svg>"
+        );
       }
 
-      const app = document.getElementById("app");
-      if (!app) {
-        throw new Error("Missing #app container");
+      function createCard(example) {
+        const article = document.createElement("article");
+        article.className = "og-spec-card";
+
+        const chipsMarkup = example.chips
+          .map((chip) => '<span class="og-chip"><span>' + chip + "</span></span>")
+          .join("");
+
+        article.innerHTML =
+          '<div class="og-spec-card-head">' +
+          '<div class="og-spec-card-brand" aria-hidden="true">' + getIconMarkup(example.iconKey) + "</div>" +
+          '<p class="og-spec-badge">' + example.statusLabel + "</p>" +
+          "</div>" +
+          "<div>" +
+          '<h3 class="og-spec-card-title">' + example.title + "</h3>" +
+          '<p class="og-spec-desc">' + example.description + "</p>" +
+          "</div>" +
+          '<div class="og-spec-chip-row">' + chipsMarkup + "</div>" +
+          '<div class="og-spec-card-footer">' +
+          '<span class="og-spec-context">' + example.footerText + "</span>" +
+          '<a class="og-spec-open" href="./' + example.slug + '.html">Open example</a>' +
+          "</div>";
+
+        return article;
       }
 
       const shell = document.createElement("main");
       shell.className = "og-specs-shell";
+      shell.innerHTML =
+        '<section class="og-specs-head">' +
+        "<div>" +
+        '<p class="og-specs-note">OpenGeometry Three Example Catalog</p>' +
+        '<h1 class="og-specs-title">Examples</h1>' +
+        "</div>" +
+        '<p class="og-specs-note">Standalone Vite-served pages for primitives, shapes, and operation workflows. Read any example in one file and open it directly from this catalog.</p>' +
+        "</section>";
 
-      const head = document.createElement("header");
-      head.className = "og-specs-head";
-      head.innerHTML = `
-        <div>
-          <p class="og-specs-note">OpenGeometry Technical Sandbox</p>
-          <h1 class="og-specs-title">Examples</h1>
-        </div>
-        <p class="og-specs-note">Build command: <code>npm --prefix main/opengeometry-three run build-example-three</code></p>
-      `;
-      shell.appendChild(head);
-
-      for (const category of ["primitives", "shapes", "operations"]) {
-        const items = getExamplesByCategory(category);
+      Object.keys(categoryLabels).forEach((category) => {
+        const sectionExamples = examples.filter((example) => example.category === category);
         const section = document.createElement("section");
         section.className = "og-specs-section";
 
-        const heading = document.createElement("div");
-        heading.className = "og-specs-section-head";
-        heading.innerHTML = `
-          <h2 class="og-specs-section-title">${categoryLabels[category]}</h2>
-          <p class="og-specs-count">${items.length} items</p>
-        `;
-        section.appendChild(heading);
+        const head = document.createElement("div");
+        head.className = "og-specs-section-head";
+        head.innerHTML =
+          '<h2 class="og-specs-section-title">' + categoryLabels[category] + "</h2>" +
+          '<p class="og-specs-count">' + sectionExamples.length + " items</p>";
 
         const grid = document.createElement("div");
         grid.className = "og-specs-grid";
+        sectionExamples.forEach((example) => {
+          grid.appendChild(createCard(example));
+        });
 
-        for (const example of items) {
-          const card = document.createElement("article");
-          card.className = "og-spec-card";
-          const chips = example.chips
-            .map((chip) => `<div class="og-chip"><span>${chip}</span></div>`)
-            .join("");
-
-          card.innerHTML = `
-            <div class="og-spec-card-head">
-              <div class="og-spec-card-brand">${getExampleIconMarkup(example.slug)}</div>
-              <p class="og-spec-badge">${example.statusLabel}</p>
-            </div>
-            <div>
-              <h3 class="og-spec-card-title">${example.title}</h3>
-              <p class="og-spec-desc">${example.description}</p>
-            </div>
-            <div class="og-spec-chip-row">${chips}</div>
-            <div class="og-spec-card-footer">
-              <a class="og-spec-open" href="./${example.slug}.html">Open example</a>
-            </div>
-          `;
-
-          grid.appendChild(card);
-        }
-
+        section.appendChild(head);
         section.appendChild(grid);
         shell.appendChild(section);
-      }
+      });
 
       const support = document.createElement("section");
       support.className = "og-support";
-      support.innerHTML = `
-        <div class="og-support-copy">
-          <p class="og-support-kicker">Need Help?</p>
-          <h2 class="og-support-title">Didn’t find what you were looking for?</h2>
-          <p class="og-support-text">Reach out to us on Discord and tell us what example or workflow you want next.</p>
-        </div>
-        <a class="og-support-link" href="https://discord.gg/BUBcPU8w" target="_blank" rel="noreferrer">${getDiscordIconMarkup()}<span>Join Discord</span></a>
-      `;
+      support.innerHTML =
+        '<div class="og-support-copy">' +
+        '<p class="og-support-kicker">Need Help</p>' +
+        '<h2 class="og-support-title">Talk to the OpenGeometry team</h2>' +
+        '<p class="og-support-text">Use Discord for example issues, geometry questions, and requests for new standalone demos.</p>' +
+        "</div>" +
+        '<a class="og-support-link" href="https://discord.gg/BUBcPU8w" target="_blank" rel="noreferrer">' +
+        getDiscordIconMarkup() +
+        "<span>Join Discord</span>" +
+        "</a>";
       shell.appendChild(support);
 
       app.replaceChildren(shell);
