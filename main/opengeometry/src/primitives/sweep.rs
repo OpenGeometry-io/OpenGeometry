@@ -99,7 +99,8 @@ impl OGSweep {
             cap_end: self.cap_end,
         };
 
-        self.brep = sweep_profile_along_path(&self.path_points, &self.profile_points, options);
+        self.brep = sweep_profile_along_path(&self.path_points, &self.profile_points, options)
+            .map_err(|err| JsValue::from_str(&format!("Sweep generation failed: {}", err)))?;
         self.brep
             .validate_topology()
             .map_err(|err| JsValue::from_str(&format!("Invalid sweep topology: {}", err)))?;

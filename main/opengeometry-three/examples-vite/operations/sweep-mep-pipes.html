@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Sweep MEP Pipes Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OpenGeometry Demo" />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
+  <body>
+    <aside class="og-badge">
+      <div class="og-badge-top">
+        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
+        <p class="og-badge-status">ready</p>
+      </div>
+      <div class="og-badge-meta">
+        <p class="og-badge-kicker">OPEN GEOMETRY • OPERATIONS</p>
+        <strong class="og-badge-title">Sweep MEP Pipes</strong>
+        <span class="og-badge-desc">Adjustable multi-run MEP sweep benchmark using primitive-backed path/profile inputs.</span>
+      </div>
+      <div class="og-badge-chip-row">
+        <span class="og-chip og-chip-accent">Arc + Rectangle</span>
+        <span class="og-chip og-chip-accent">Legend</span>
+        <span class="og-chip og-chip-accent">FPS</span>
+      </div>
+      <div class="og-badge-footer">
+        <a class="og-badge-link" href="../index.html">Back to Examples</a>
+      </div>
+    </aside>
+
+    <aside class="og-controls" data-control-panel>
+      <h3>MEP Sweep Benchmark Parameters</h3>
+      <p class="og-control-summary">
+        Red pipes use arc profiles. Blue pipes use rectangle profiles.
+        Joint strategy is split into miter mains and bevel branches.
+      </p>
+
+      <label class="og-control-row" data-control-key="runCount" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Run Count</span>
+          <code class="og-control-value" data-control-value>10</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="2" max="20" step="1" value="10" />
+          <input data-control-number type="number" min="2" max="20" step="1" value="10" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="branchCount" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Branches / Run</span>
+          <code class="og-control-value" data-control-value>12</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="2" max="28" step="1" value="12" />
+          <input data-control-number type="number" min="2" max="28" step="1" value="12" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="laneSpacing" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Run Spacing</span>
+          <code class="og-control-value" data-control-value>3.2</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="2" max="6" step="0.1" value="3.2" />
+          <input data-control-number type="number" min="2" max="6" step="0.1" value="3.2" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="runLength" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Run Length</span>
+          <code class="og-control-value" data-control-value>26</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="8" max="42" step="1" value="26" />
+          <input data-control-number type="number" min="8" max="42" step="1" value="26" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="mainElevation" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Main Elevation</span>
+          <code class="og-control-value" data-control-value>2.8</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="1" max="5" step="0.05" value="2.8" />
+          <input data-control-number type="number" min="1" max="5" step="0.05" value="2.8" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="branchDrop" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Branch Drop</span>
+          <code class="og-control-value" data-control-value>1.1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.3" max="2.4" step="0.05" value="1.1" />
+          <input data-control-number type="number" min="0.3" max="2.4" step="0.05" value="1.1" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="branchReach" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Branch Reach</span>
+          <code class="og-control-value" data-control-value>1.45</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.5" max="3" step="0.05" value="1.45" />
+          <input data-control-number type="number" min="0.5" max="3" step="0.05" value="1.45" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="profileScale" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Profile Scale</span>
+          <code class="og-control-value" data-control-value>1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.5" max="2" step="0.05" value="1" />
+          <input data-control-number type="number" min="0.5" max="2" step="0.05" value="1" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="wallHeight" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Wall Height</span>
+          <code class="og-control-value" data-control-value>3.4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="1.5" max="6" step="0.1" value="3.4" />
+          <input data-control-number type="number" min="1.5" max="6" step="0.1" value="3.4" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showWalls" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Show Cuboid Walls</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Show Cuboid Walls" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outline</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Fat Outlines</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Fat Outlines" />
+          <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outline Width</span>
+          <code class="og-control-value" data-control-value>4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="1" max="12" step="0.5" value="4" />
+          <input data-control-number type="number" min="1" max="12" step="0.5" value="4" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showStats" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Show FPS Stats</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Show FPS Stats" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="statsMode" data-control-type="select">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Stats Mode</span>
+        </div>
+        <select class="og-control-select" data-control-select aria-label="Stats Mode">
+          <option value="0" selected>FPS</option>
+          <option value="1">MS</option>
+          <option value="2">MB</option>
+        </select>
+      </label>
+
+      <div class="og-control-row">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Generated Pipes</span>
+          <code data-info-total>0</code>
+        </div>
+        <p class="og-control-summary">
+          Arc Main <strong data-info-arc-main>0</strong> · Arc Branch <strong data-info-arc-branch>0</strong><br />
+          Rect Main <strong data-info-rect-main>0</strong> · Rect Branch <strong data-info-rect-branch>0</strong>
+        </p>
+      </div>
+
+      <pre class="og-control-report" data-report>Generate geometry to see MEP pipe config summary and per-type samples.</pre>
+    </aside>
+
+    <aside
+      class="og-controls"
+      id="pipe-legend"
+      style="top: 176px; right: auto; left: 16px; width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 196px); z-index: 25;"
+    >
+      <h3>Pipe Legend</h3>
+      <p class="og-control-summary">Color, profile, and joint strategy used for each generated pipe category.</p>
+
+      <div class="og-control-row">
+        <div class="og-control-header">
+          <span class="og-control-label-chip" style="background: rgba(231, 76, 87, 0.15); color: #8f2028;">Arc Main</span>
+          <code data-legend-count="arc-main">0</code>
+        </div>
+        <p class="og-control-summary">Red · Arc profile · Hard miter sweep</p>
+      </div>
+
+      <div class="og-control-row">
+        <div class="og-control-header">
+          <span class="og-control-label-chip" style="background: rgba(231, 76, 87, 0.15); color: #8f2028;">Arc Branch</span>
+          <code data-legend-count="arc-branch">0</code>
+        </div>
+        <p class="og-control-summary">Red · Arc profile · Hard miter sweep</p>
+      </div>
+
+      <div class="og-control-row">
+        <div class="og-control-header">
+          <span class="og-control-label-chip" style="background: rgba(70, 112, 245, 0.15); color: #1f3c91;">Rect Main</span>
+          <code data-legend-count="rect-main">0</code>
+        </div>
+        <p class="og-control-summary">Blue · Rectangle profile · Hard miter sweep</p>
+      </div>
+
+      <div class="og-control-row">
+        <div class="og-control-header">
+          <span class="og-control-label-chip" style="background: rgba(70, 112, 245, 0.15); color: #1f3c91;">Rect Branch</span>
+          <code data-legend-count="rect-branch">0</code>
+        </div>
+        <p class="og-control-summary">Blue · Rectangle profile · Hard miter sweep</p>
+      </div>
+    </aside>
+
+    <div id="stats" style="left: 16px; bottom: 16px;"></div>
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { OpenGeometry, Arc, Cuboid, Polyline, Rectangle, Sweep, Vector3 } from "@og-three";
+
+      const app = document.getElementById("app");
+      if (!app) {
+        throw new Error("Missing #app container");
+      }
+
+      const panel = document.querySelector("[data-control-panel]");
+      const statsHost = document.getElementById("stats");
+      const reportNode = panel?.querySelector("[data-report]");
+      const infoTotal = panel?.querySelector("[data-info-total]");
+      const infoArcMain = panel?.querySelector("[data-info-arc-main]");
+      const infoArcBranch = panel?.querySelector("[data-info-arc-branch]");
+      const infoRectMain = panel?.querySelector("[data-info-rect-main]");
+      const infoRectBranch = panel?.querySelector("[data-info-rect-branch]");
+
+      const legendCountNodes = {
+        "arc-main": document.querySelector('[data-legend-count="arc-main"]'),
+        "arc-branch": document.querySelector('[data-legend-count="arc-branch"]'),
+        "rect-main": document.querySelector('[data-legend-count="rect-main"]'),
+        "rect-branch": document.querySelector('[data-legend-count="rect-branch"]'),
+      };
+
+      if (
+        !panel ||
+        !statsHost ||
+        !reportNode ||
+        !infoTotal ||
+        !infoArcMain ||
+        !infoArcBranch ||
+        !infoRectMain ||
+        !infoRectBranch ||
+        !legendCountNodes["arc-main"] ||
+        !legendCountNodes["arc-branch"] ||
+        !legendCountNodes["rect-main"] ||
+        !legendCountNodes["rect-branch"]
+      ) {
+        throw new Error("Missing static sweep-mep-pipes UI nodes");
+      }
+
+      const PIPE_TYPES = {
+        "arc-main": {
+          label: "Arc Main",
+          color: 0xe74c57,
+          colorHex: "#e74c57",
+          profile: "arc",
+        },
+        "arc-branch": {
+          label: "Arc Branch",
+          color: 0xe74c57,
+          colorHex: "#e74c57",
+          profile: "arc",
+        },
+        "rect-main": {
+          label: "Rect Main",
+          color: 0x4b76f0,
+          colorHex: "#4b76f0",
+          profile: "rectangle",
+        },
+        "rect-branch": {
+          label: "Rect Branch",
+          color: 0x4b76f0,
+          colorHex: "#4b76f0",
+          profile: "rectangle",
+        },
+      };
+
+      function formatControlNumber(value) {
+        return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function disposeMaterial(material) {
+        if (!material) {
+          return;
+        }
+
+        if (Array.isArray(material)) {
+          material.forEach((entry) => entry && entry.dispose && entry.dispose());
+          return;
+        }
+
+        if (material.dispose) {
+          material.dispose();
+        }
+      }
+
+      function disposeObject3D(object) {
+        object.traverse((node) => {
+          if (node.geometry && node.geometry.dispose) {
+            node.geometry.dispose();
+          }
+          disposeMaterial(node.material);
+        });
+      }
+
+      function replaceSceneObject(scene, previous, next) {
+        if (previous) {
+          previous.parent && previous.parent.remove(previous);
+          disposeObject3D(previous);
+        }
+
+        scene.add(next);
+        return next;
+      }
+
+      function bindControls(definitions, onChange) {
+        const state = {};
+        const emitChange = () => {
+          onChange({ ...state });
+        };
+
+        definitions.forEach((definition) => {
+          state[definition.key] = definition.value;
+          const row = panel.querySelector(`[data-control-key="${definition.key}"]`);
+          if (!row) {
+            throw new Error(`Missing control row for ${definition.key}`);
+          }
+
+          if (definition.type === "number") {
+            const valueLabel = row.querySelector("[data-control-value]");
+            const rangeInput = row.querySelector("[data-control-range]");
+            const numberInput = row.querySelector("[data-control-number]");
+            if (!valueLabel || !rangeInput || !numberInput) {
+              throw new Error(`Missing number controls for ${definition.key}`);
+            }
+
+            const updateValue = (raw) => {
+              const next = clamp(raw, definition.min, definition.max);
+              state[definition.key] = next;
+              rangeInput.value = String(next);
+              numberInput.value = String(next);
+              valueLabel.textContent = formatControlNumber(next);
+              emitChange();
+            };
+
+            rangeInput.addEventListener("input", () => updateValue(Number(rangeInput.value)));
+            numberInput.addEventListener("change", () => updateValue(Number(numberInput.value)));
+            valueLabel.textContent = formatControlNumber(definition.value);
+            return;
+          }
+
+          if (definition.type === "boolean") {
+            const toggle = row.querySelector("[data-control-toggle]");
+            const boolLabel = row.querySelector("[data-control-bool-state]");
+            if (!toggle || !boolLabel) {
+              throw new Error(`Missing boolean controls for ${definition.key}`);
+            }
+
+            toggle.checked = Boolean(definition.value);
+            boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
+            toggle.addEventListener("change", () => {
+              state[definition.key] = toggle.checked;
+              boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
+              emitChange();
+            });
+            return;
+          }
+
+          const select = row.querySelector("[data-control-select]");
+          if (!select) {
+            throw new Error(`Missing select control for ${definition.key}`);
+          }
+
+          select.value = String(definition.value);
+          select.addEventListener("change", () => {
+            state[definition.key] = select.value;
+            emitChange();
+          });
+        });
+
+        emitChange();
+      }
+
+      function toVector3List(vertices) {
+        return vertices.map((vertex) => new Vector3(vertex.position.x, vertex.position.y, vertex.position.z));
+      }
+
+      function readLineGeometryPoints(object) {
+        const positions = object.geometry && object.geometry.getAttribute("position");
+        if (!positions || positions.itemSize !== 3) {
+          throw new Error("Profile preview geometry is missing line positions.");
+        }
+
+        const points = [];
+        for (let index = 0; index < positions.count; index += 1) {
+          points.push(new Vector3(positions.getX(index), positions.getY(index), positions.getZ(index)));
+        }
+
+        if (points.length >= 3) {
+          const first = points[0];
+          const last = points[points.length - 1];
+          const dx = first.x - last.x;
+          const dy = first.y - last.y;
+          const dz = first.z - last.z;
+          if (dx * dx + dy * dy + dz * dz <= 1.0e-12) {
+            points.pop();
+          }
+        }
+
+        return points;
+      }
+
+      function buildMainPath(x, zStart, runLength, elevation, sway, inletDepth) {
+        return [
+          new Vector3(x - sway, elevation - 0.44, zStart - inletDepth),
+          new Vector3(x - sway, elevation, zStart - inletDepth * 0.55),
+          new Vector3(x, elevation, zStart + runLength * 0.34),
+          new Vector3(x + sway, elevation + 0.06, zStart + runLength * 0.66),
+          new Vector3(x, elevation, zStart + runLength + 1.0),
+        ];
+      }
+
+      function buildBranchPath(xStart, xEnd, z, elevation, drop, zOffset) {
+        const reducedElevation = Math.max(0.2, elevation - drop);
+        return [
+          new Vector3(xStart, elevation, z),
+          new Vector3(xStart, reducedElevation, z + zOffset),
+          new Vector3(xEnd, reducedElevation, z + zOffset),
+          new Vector3(xEnd, elevation - 0.1, z + zOffset),
+        ];
+      }
+
+      function formatPipeVector(point) {
+        return {
+          x: Number(point.x.toFixed(3)),
+          y: Number(point.y.toFixed(3)),
+          z: Number(point.z.toFixed(3)),
+        };
+      }
+
+      function updateLegendAndInfo(counts) {
+        const total = counts["arc-main"] + counts["arc-branch"] + counts["rect-main"] + counts["rect-branch"];
+
+        legendCountNodes["arc-main"].textContent = String(counts["arc-main"]);
+        legendCountNodes["arc-branch"].textContent = String(counts["arc-branch"]);
+        legendCountNodes["rect-main"].textContent = String(counts["rect-main"]);
+        legendCountNodes["rect-branch"].textContent = String(counts["rect-branch"]);
+
+        infoTotal.textContent = String(total);
+        infoArcMain.textContent = String(counts["arc-main"]);
+        infoArcBranch.textContent = String(counts["arc-branch"]);
+        infoRectMain.textContent = String(counts["rect-main"]);
+        infoRectBranch.textContent = String(counts["rect-branch"]);
+
+        return total;
+      }
+
+      function buildReportText(total, counts, samples, state, wallCount) {
+        return [
+          "Sweep MEP Pipes Config Summary",
+          `Total Pipes: ${total}`,
+          `Run Count: ${Math.round(state.runCount)} | Branches / Run: ${Math.round(state.branchCount)} | Walls/Blocks: ${wallCount}`,
+          `Run Length: ${formatControlNumber(state.runLength)} | Run Spacing: ${formatControlNumber(state.laneSpacing)} | Main Elevation: ${formatControlNumber(state.mainElevation)}`,
+          `Branch Drop: ${formatControlNumber(state.branchDrop)} | Branch Reach: ${formatControlNumber(state.branchReach)} | Profile Scale: ${formatControlNumber(state.profileScale)}`,
+          "",
+          `Arc Main: ${counts["arc-main"]}`,
+          `Arc Branch: ${counts["arc-branch"]}`,
+          `Rect Main: ${counts["rect-main"]}`,
+          `Rect Branch: ${counts["rect-branch"]}`,
+          "",
+          "Sample Configs (one per type):",
+          `Arc Main:\n${JSON.stringify(samples["arc-main"], null, 2)}`,
+          `Arc Branch:\n${JSON.stringify(samples["arc-branch"], null, 2)}`,
+          `Rect Main:\n${JSON.stringify(samples["rect-main"], null, 2)}`,
+          `Rect Branch:\n${JSON.stringify(samples["rect-branch"], null, 2)}`,
+        ].join("\n");
+      }
+
+      async function createExampleScene(meta, options) {
+        const settings = options || {};
+        document.body.classList.add("og-example-page");
+        document.title = meta.title + " | OpenGeometry";
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(settings.background || 0xf6f1eb);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 4000);
+        const cameraPosition = settings.cameraPosition || [24, 17, 28];
+        camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        const target = settings.target || [0, 2.2, 12];
+        controls.target.set(target[0], target[1], target[2]);
+        controls.update();
+
+        scene.add(
+          new THREE.GridHelper(
+            settings.gridSize || 100,
+            settings.gridDivisions || 100,
+            settings.gridPrimary || 0xd88b63,
+            settings.gridSecondary || 0xe7d4ca
+          )
+        );
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.74));
+
+        const keyLight = new THREE.DirectionalLight(0xffffff, 0.86);
+        keyLight.position.set(12, 18, 8);
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0xfff2e0, 0.5);
+        fillLight.position.set(-10, 7, -7);
+        scene.add(fillLight);
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        function animate() {
+          requestAnimationFrame(animate);
+          controls.update();
+          renderer.render(scene, camera);
+        }
+
+        animate();
+        return { scene, camera, renderer, controls };
+      }
+
+      async function main() {
+        const meta = {
+          slug: "operations/sweep-mep-pipes",
+          category: "operations",
+          title: "Sweep MEP Pipes",
+          description: "Adjustable multi-run MEP sweep benchmark using primitive-backed path/profile inputs.",
+          statusLabel: "ready",
+          chips: ["Arc + Rectangle", "Legend", "FPS"],
+          footerText: "MEP, Sweep, Performance",
+        };
+
+        const { scene, controls, renderer } = await createExampleScene(meta, {
+          cameraPosition: [23, 15, 30],
+          target: [0, 2.4, 13],
+        });
+
+        const stats = new Stats();
+        statsHost.replaceChildren(stats.dom);
+
+        const renderBase = renderer.render.bind(renderer);
+        renderer.render = (renderScene, renderCamera) => {
+          stats.begin();
+          renderBase(renderScene, renderCamera);
+          stats.end();
+        };
+
+        let current = null;
+
+        bindControls(
+          [
+            { type: "number", key: "runCount", label: "Run Count", min: 2, max: 20, step: 1, value: 10 },
+            { type: "number", key: "branchCount", label: "Branches / Run", min: 2, max: 28, step: 1, value: 12 },
+            { type: "number", key: "laneSpacing", label: "Run Spacing", min: 2, max: 6, step: 0.1, value: 3.2 },
+            { type: "number", key: "runLength", label: "Run Length", min: 8, max: 42, step: 1, value: 26 },
+            { type: "number", key: "mainElevation", label: "Main Elevation", min: 1, max: 5, step: 0.05, value: 2.8 },
+            { type: "number", key: "branchDrop", label: "Branch Drop", min: 0.3, max: 2.4, step: 0.05, value: 1.1 },
+            { type: "number", key: "branchReach", label: "Branch Reach", min: 0.5, max: 3, step: 0.05, value: 1.45 },
+            { type: "number", key: "profileScale", label: "Profile Scale", min: 0.5, max: 2, step: 0.05, value: 1 },
+            { type: "number", key: "wallHeight", label: "Wall Height", min: 1.5, max: 6, step: 0.1, value: 3.4 },
+            { type: "boolean", key: "showWalls", label: "Show Cuboid Walls", value: true },
+            { type: "boolean", key: "outline", label: "Outline", value: true },
+            { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
+            { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 },
+            { type: "boolean", key: "showStats", label: "Show FPS Stats", value: true },
+            {
+              type: "select",
+              key: "statsMode",
+              label: "Stats Mode",
+              value: 0,
+              options: [
+                { label: "FPS", value: 0 },
+                { label: "MS", value: 1 },
+                { label: "MB", value: 2 },
+              ],
+            },
+          ],
+          (state) => {
+            const runCount = Math.round(state.runCount);
+            const branchCount = Math.round(state.branchCount);
+            const laneHalf = (runCount - 1) * 0.5;
+            const laneSpacing = state.laneSpacing;
+            const runLength = state.runLength;
+            const zStart = 0;
+            const branchStart = runLength * 0.1;
+            const branchSpan = runLength * 0.8;
+            const branchSpacing = branchCount > 1 ? branchSpan / (branchCount - 1) : 0;
+            const mainOffset = laneSpacing * 0.23;
+
+            const arcMainRadius = 0.18 * state.profileScale;
+            const arcBranchRadius = 0.12 * state.profileScale;
+            const rectMainWidth = 0.34 * state.profileScale;
+            const rectMainDepth = 0.22 * state.profileScale;
+            const rectBranchWidth = 0.25 * state.profileScale;
+            const rectBranchDepth = 0.16 * state.profileScale;
+
+            statsHost.style.display = state.showStats ? "block" : "none";
+            stats.showPanel(Number(state.statsMode));
+
+            const arcMainPrimitive = new Arc({
+              center: new Vector3(0, 0, 0),
+              radius: arcMainRadius,
+              startAngle: 0,
+              endAngle: Math.PI * 2,
+              segments: 48,
+              color: PIPE_TYPES["arc-main"].color,
+            });
+            const arcMainProfile = readLineGeometryPoints(arcMainPrimitive);
+            disposeObject3D(arcMainPrimitive);
+
+            const arcBranchPrimitive = new Arc({
+              center: new Vector3(0, 0, 0),
+              radius: arcBranchRadius,
+              startAngle: 0,
+              endAngle: Math.PI * 2,
+              segments: 36,
+              color: PIPE_TYPES["arc-branch"].color,
+            });
+            const arcBranchProfile = readLineGeometryPoints(arcBranchPrimitive);
+            disposeObject3D(arcBranchPrimitive);
+
+            const rectMainPrimitive = new Rectangle({
+              center: new Vector3(0, 0, 0),
+              width: rectMainWidth,
+              breadth: rectMainDepth,
+              color: PIPE_TYPES["rect-main"].color,
+            });
+            const rectMainProfile = toVector3List(rectMainPrimitive.getBrep().vertices);
+            disposeObject3D(rectMainPrimitive);
+
+            const rectBranchPrimitive = new Rectangle({
+              center: new Vector3(0, 0, 0),
+              width: rectBranchWidth,
+              breadth: rectBranchDepth,
+              color: PIPE_TYPES["rect-branch"].color,
+            });
+            const rectBranchProfile = toVector3List(rectBranchPrimitive.getBrep().vertices);
+            disposeObject3D(rectBranchPrimitive);
+
+            const profileByType = {
+              "arc-main": arcMainProfile,
+              "arc-branch": arcBranchProfile,
+              "rect-main": rectMainProfile,
+              "rect-branch": rectBranchProfile,
+            };
+
+            const profileMetrics = {
+              "arc-main": { radius: Number(arcMainRadius.toFixed(3)) },
+              "arc-branch": { radius: Number(arcBranchRadius.toFixed(3)) },
+              "rect-main": {
+                width: Number(rectMainWidth.toFixed(3)),
+                depth: Number(rectMainDepth.toFixed(3)),
+              },
+              "rect-branch": {
+                width: Number(rectBranchWidth.toFixed(3)),
+                depth: Number(rectBranchDepth.toFixed(3)),
+              },
+            };
+
+            const counts = {
+              "arc-main": 0,
+              "arc-branch": 0,
+              "rect-main": 0,
+              "rect-branch": 0,
+            };
+
+            const firstSampleByType = {
+              "arc-main": null,
+              "arc-branch": null,
+              "rect-main": null,
+              "rect-branch": null,
+            };
+
+            const summaryRows = [];
+            const pipeConfigs = [];
+            const group = new THREE.Group();
+
+            function createSweepPipe(typeKey, laneIndex, branchIndex, rawPathPoints) {
+              const type = PIPE_TYPES[typeKey];
+              const profilePoints = profileByType[typeKey].map((point) => point.clone());
+
+              const pathPrimitive = new Polyline({
+                points: rawPathPoints.map((point) => point.clone()),
+                color: type.color,
+              });
+
+              const pipePath = pathPrimitive.options.points.map((point) => point.clone());
+              const sweep = new Sweep({
+                path: pipePath,
+                profile: profilePoints,
+                color: type.color,
+                capStart: true,
+                capEnd: true,
+                fatOutlines: state.fatOutlines,
+                outlineWidth: state.outlineWidth,
+              });
+              sweep.outline = state.outline;
+
+              group.add(sweep);
+              disposeObject3D(pathPrimitive);
+
+              counts[typeKey] += 1;
+
+              const configRecord = {
+                id: `${typeKey}-run${laneIndex}${branchIndex === null ? "" : `-branch${branchIndex}`}`,
+                type: type.label,
+                typeKey,
+                profile: type.profile,
+                profileParams: profileMetrics[typeKey],
+                jointMode: "hard-miter",
+                color: type.colorHex,
+                laneIndex,
+                branchIndex,
+                capStart: true,
+                capEnd: true,
+                outline: state.outline,
+                fatOutlines: state.fatOutlines,
+                outlineWidth: Number(state.outlineWidth),
+                pathPoints: pipePath.map(formatPipeVector),
+              };
+
+              pipeConfigs.push(configRecord);
+              if (!firstSampleByType[typeKey]) {
+                firstSampleByType[typeKey] = configRecord;
+              }
+            }
+
+            for (let laneIndex = 0; laneIndex < runCount; laneIndex += 1) {
+              const laneCenter = (laneIndex - laneHalf) * laneSpacing;
+              const arcMainX = laneCenter - mainOffset;
+              const rectMainX = laneCenter + mainOffset;
+
+              createSweepPipe(
+                "arc-main",
+                laneIndex,
+                null,
+                buildMainPath(arcMainX, zStart, runLength, state.mainElevation, 0.22, 1.5)
+              );
+
+              createSweepPipe(
+                "rect-main",
+                laneIndex,
+                null,
+                buildMainPath(rectMainX, zStart + 0.2, runLength, state.mainElevation - 0.14, -0.2, 1.1)
+              );
+
+              for (let branchIndex = 0; branchIndex < branchCount; branchIndex += 1) {
+                const branchZ = branchStart + branchSpacing * branchIndex;
+
+                createSweepPipe(
+                  "arc-branch",
+                  laneIndex,
+                  branchIndex,
+                  buildBranchPath(
+                    arcMainX,
+                    arcMainX + state.branchReach,
+                    branchZ,
+                    state.mainElevation,
+                    state.branchDrop,
+                    branchIndex % 2 === 0 ? 0.08 : -0.08
+                  )
+                );
+
+                createSweepPipe(
+                  "rect-branch",
+                  laneIndex,
+                  branchIndex,
+                  buildBranchPath(
+                    rectMainX,
+                    rectMainX - state.branchReach,
+                    branchZ + 0.22,
+                    state.mainElevation - 0.14,
+                    state.branchDrop * 0.88,
+                    branchIndex % 2 === 0 ? -0.05 : 0.05
+                  )
+                );
+              }
+            }
+
+            let wallCount = 0;
+            if (state.showWalls) {
+              const sideInset = laneSpacing * 0.92;
+              const minX = -laneHalf * laneSpacing - sideInset;
+              const maxX = laneHalf * laneSpacing + sideInset;
+              const wallDepth = runLength + 3.6;
+
+              const leftWall = new Cuboid({
+                center: new Vector3(minX, state.wallHeight * 0.5, runLength * 0.5),
+                width: 0.24,
+                height: state.wallHeight,
+                depth: wallDepth,
+                color: 0x9d4f4f,
+                fatOutlines: state.fatOutlines,
+                outlineWidth: state.outlineWidth,
+              });
+              leftWall.outline = state.outline;
+              group.add(leftWall);
+              wallCount += 1;
+
+              const rightWall = new Cuboid({
+                center: new Vector3(maxX, state.wallHeight * 0.5, runLength * 0.5),
+                width: 0.24,
+                height: state.wallHeight,
+                depth: wallDepth,
+                color: 0x9d4f4f,
+                fatOutlines: state.fatOutlines,
+                outlineWidth: state.outlineWidth,
+              });
+              rightWall.outline = state.outline;
+              group.add(rightWall);
+              wallCount += 1;
+
+              for (let laneIndex = 0; laneIndex < runCount; laneIndex += 1) {
+                const laneCenter = (laneIndex - laneHalf) * laneSpacing;
+                const equipmentBlock = new Cuboid({
+                  center: new Vector3(laneCenter, 0.26, -1.45),
+                  width: 1.1,
+                  height: 0.52,
+                  depth: 0.84,
+                  color: 0x666e75,
+                  fatOutlines: state.fatOutlines,
+                  outlineWidth: state.outlineWidth,
+                });
+                equipmentBlock.outline = state.outline;
+                group.add(equipmentBlock);
+                wallCount += 1;
+              }
+            }
+
+            const totalPipes = updateLegendAndInfo(counts);
+
+            summaryRows.push(
+              { type: PIPE_TYPES["arc-main"].label, count: counts["arc-main"], profile: "Arc", joints: "Hard miter" },
+              { type: PIPE_TYPES["arc-branch"].label, count: counts["arc-branch"], profile: "Arc", joints: "Hard miter" },
+              { type: PIPE_TYPES["rect-main"].label, count: counts["rect-main"], profile: "Rectangle", joints: "Hard miter" },
+              { type: PIPE_TYPES["rect-branch"].label, count: counts["rect-branch"], profile: "Rectangle", joints: "Hard miter" }
+            );
+
+            reportNode.textContent = buildReportText(totalPipes, counts, firstSampleByType, state, wallCount);
+
+            console.groupCollapsed(`[sweep-mep-pipes] Generated ${totalPipes} pipes`);
+            console.table(summaryRows);
+            console.log("Full pipe config array", pipeConfigs);
+            console.log("Wall/cuboid count", wallCount);
+            console.groupEnd();
+
+            current = replaceSceneObject(scene, current, group);
+
+            const focusTarget = new THREE.Vector3(0, Math.max(1.2, state.mainElevation * 0.9), runLength * 0.5);
+            controls.target.lerp(focusTarget, 0.32);
+            controls.update();
+          }
+        );
+      }
+
+      void main();
+    </script>
+  </body>
+</html>
