@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Sweep Pipe Network</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OpenGeometry Demo" />
+  </head>
+  <body>
+    <aside class="og-badge">
+      <div class="og-badge-top">
+        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
+        <p class="og-badge-status">ready</p>
+      </div>
+      <div class="og-badge-meta">
+        <p class="og-badge-kicker">OPEN GEOMETRY • OPERATIONS</p>
+        <strong class="og-badge-title">Sweep Pipe Network</strong>
+        <span class="og-badge-desc">Pipe routing demo using sweep path+profile with walls, legend, and FPS monitor.</span>
+      </div>
+      <div class="og-badge-chip-row">
+        <span class="og-chip og-chip-accent">Sweep</span>
+        <span class="og-chip og-chip-accent">Path + Profile</span>
+        <span class="og-chip og-chip-accent">Legend</span>
+      </div>
+      <div class="og-badge-footer">
+        <a class="og-badge-link" href="../index.html">Back to Examples</a>
+      </div>
+    </aside>
+
+    <aside class="og-controls" data-control-panel>
+      <h3>Pipe Network Controls</h3>
+      <label class="og-control-row">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Show Outlines</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-toggle-outlines type="checkbox" class="og-toggle" aria-label="Show Outlines" checked />
+          <span class="og-control-bool-state" data-outline-state>Enabled</span>
+        </div>
+      </label>
+      <div class="og-control-row">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Pipe Legend</span>
+        </div>
+        <div data-pipe-legend class="og-legend-list"></div>
+      </div>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { Cuboid, OpenGeometry, Sweep, Vector3 } from "@og-three";
+
+      const app = document.getElementById("app");
+      const legendRoot = document.querySelector("[data-pipe-legend]");
+      const outlineToggle = document.querySelector("[data-toggle-outlines]");
+      const outlineState = document.querySelector("[data-outline-state]");
+
+      if (!app || !legendRoot || !outlineToggle || !outlineState) {
+        throw new Error("Missing required DOM nodes for the pipe network example.");
+      }
+
+      const settings = {
+        outlines: true,
+      };
+
+      const wallConfigs = [
+        { center: [0, 0.5, 0], width: 16, height: 1, depth: 0.2 },
+        { center: [0, 0.5, -8], width: 16, height: 1, depth: 0.2 },
+        { center: [-8, 0.5, -4], width: 0.2, height: 1, depth: 8 },
+        { center: [8, 0.5, -4], width: 0.2, height: 1, depth: 8 },
+        { center: [0, 0.5, -4], width: 4, height: 1, depth: 0.2 },
+      ];
+
+      const pipeTypes = [
+        {
+          key: "supply-air",
+          label: "Supply Air",
+          color: 0x5470ff,
+          width: 0.26,
+          depth: 0.2,
+          elevation: 2.3,
+          capStart: true,
+          capEnd: true,
+          paths: [
+            [[-7, -6], [-3, -6], [-3, -1], [3, -1], [3, -6], [7, -6]],
+            [[-3, -1], [-5, 1.5], [-6.4, 2.4]],
+            [[3, -1], [5, 1.5], [6.4, 2.4]],
+          ],
+        },
+        {
+          key: "return-air",
+          label: "Return Air",
+          color: 0xff6e61,
+          width: 0.3,
+          depth: 0.22,
+          elevation: 2.05,
+          capStart: false,
+          capEnd: true,
+          paths: [
+            [[-7, -5.2], [-2, -5.2], [-2, 1.3], [2, 1.3], [2, -5.2], [7, -5.2]],
+            [[-2, 1.3], [-2, 3.2], [0, 3.8], [2, 3.2]],
+          ],
+        },
+        {
+          key: "chilled-water",
+          label: "Chilled Water",
+          color: 0x2aa889,
+          width: 0.18,
+          depth: 0.18,
+          elevation: 1.7,
+          capStart: true,
+          capEnd: false,
+          paths: [
+            [[-6.4, -2], [-1.2, -2], [-1.2, 2.4], [1.2, 2.4], [1.2, -2], [6.4, -2]],
+            [[0, 2.4], [0, 4.2], [1.5, 5.2]],
+          ],
+        },
+        {
+          key: "drain",
+          label: "Drain",
+          color: 0x7d62d9,
+          width: 0.14,
+          depth: 0.14,
+          elevation: 0.65,
+          capStart: true,
+          capEnd: true,
+          paths: [
+            [[-7, -1], [-5.5, -1], [-4, -3.5], [-2, -3.5], [0, -1], [2, -1], [4, -3.5], [5.5, -3.5], [7, -1]],
+          ],
+        },
+      ];
+
+      function buildProfile(width, depth) {
+        const halfW = width * 0.5;
+        const halfD = depth * 0.5;
+        return [
+          new Vector3(-halfW, 0, -halfD),
+          new Vector3(halfW, 0, -halfD),
+          new Vector3(halfW, 0, halfD),
+          new Vector3(-halfW, 0, halfD),
+        ];
+      }
+
+      function buildPath(path, elevation) {
+        return path.map(([x, z]) => new Vector3(x, elevation, z));
+      }
+
+      function makePathLine(path, color) {
+        const geometry = new THREE.BufferGeometry().setFromPoints(path.map((point) => new THREE.Vector3(point.x, point.y, point.z)));
+        const material = new THREE.LineDashedMaterial({ color, dashSize: 0.2, gapSize: 0.12 });
+        const line = new THREE.Line(geometry, material);
+        line.computeLineDistances();
+        return line;
+      }
+
+      function updateOutlineState() {
+        outlineState.textContent = settings.outlines ? "Enabled" : "Disabled";
+      }
+
+      function renderLegend() {
+        legendRoot.innerHTML = "";
+        pipeTypes.forEach((pipe) => {
+          const row = document.createElement("div");
+          row.className = "og-legend-item";
+          row.innerHTML = `
+            <span class="og-legend-swatch" style="background:#${pipe.color.toString(16).padStart(6, "0")}"></span>
+            <div class="og-legend-copy">
+              <strong>${pipe.label}</strong>
+              <span>${pipe.width.toFixed(2)}m × ${pipe.depth.toFixed(2)}m @ ${pipe.elevation.toFixed(2)}m</span>
+            </div>
+          `;
+          legendRoot.appendChild(row);
+        });
+      }
+
+      async function bootstrap() {
+        document.body.classList.add("og-example-page");
+
+        await OpenGeometry.init(wasmUrl);
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf6f1eb);
+
+        const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 1500);
+        camera.position.set(15, 14, 18);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "absolute";
+        stats.dom.style.top = "10px";
+        stats.dom.style.left = "10px";
+        app.appendChild(stats.dom);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 1.4, -2);
+
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x7a685e, 1.1);
+        scene.add(hemi);
+
+        const dir = new THREE.DirectionalLight(0xffffff, 1.25);
+        dir.position.set(9, 14, 8);
+        scene.add(dir);
+
+        const floor = new THREE.Mesh(
+          new THREE.PlaneGeometry(24, 24),
+          new THREE.MeshStandardMaterial({ color: 0xefe8df, roughness: 0.95, metalness: 0 })
+        );
+        floor.rotation.x = -Math.PI * 0.5;
+        floor.position.y = 0;
+        scene.add(floor);
+
+        const grid = new THREE.GridHelper(24, 24, 0xb9a99d, 0xd2c6bc);
+        grid.position.y = 0.01;
+        scene.add(grid);
+
+        const wallMeshes = wallConfigs.map((wall, index) => {
+          const mesh = new Cuboid({
+            center: new Vector3(wall.center[0], wall.center[1], wall.center[2]),
+            width: wall.width,
+            height: wall.height,
+            depth: wall.depth,
+            color: index === 4 ? 0xd1beb0 : 0xc8b4a6,
+            fatOutlines: true,
+            outlineWidth: 1.8,
+          });
+          mesh.outline = settings.outlines;
+          scene.add(mesh);
+          return mesh;
+        });
+
+        const sweeps = [];
+        const pathLines = [];
+
+        pipeTypes.forEach((pipe) => {
+          pipe.paths.forEach((pathDef) => {
+            const path = buildPath(pathDef, pipe.elevation);
+            const profile = buildProfile(pipe.width, pipe.depth);
+            const sweep = new Sweep({
+              path,
+              profile,
+              color: pipe.color,
+              capStart: pipe.capStart,
+              capEnd: pipe.capEnd,
+              fatOutlines: true,
+              outlineWidth: 2.2,
+            });
+            sweep.outline = settings.outlines;
+            scene.add(sweep);
+            sweeps.push(sweep);
+
+            const pathLine = makePathLine(path, pipe.color);
+            scene.add(pathLine);
+            pathLines.push(pathLine);
+          });
+        });
+
+        const networkConfig = {
+          walls: wallConfigs,
+          showOutlines: settings.outlines,
+          pipes: pipeTypes.map((pipe) => ({
+            key: pipe.key,
+            label: pipe.label,
+            color: `#${pipe.color.toString(16).padStart(6, "0")}`,
+            profile: { width: pipe.width, depth: pipe.depth },
+            elevation: pipe.elevation,
+            capStart: pipe.capStart,
+            capEnd: pipe.capEnd,
+            pathCount: pipe.paths.length,
+            paths: pipe.paths,
+          })),
+        };
+
+        console.groupCollapsed("Sweep Pipe Network Config");
+        console.log(networkConfig);
+        console.groupEnd();
+
+        outlineToggle.addEventListener("change", () => {
+          settings.outlines = outlineToggle.checked;
+          updateOutlineState();
+
+          wallMeshes.forEach((wall) => {
+            wall.outline = settings.outlines;
+          });
+
+          sweeps.forEach((sweep) => {
+            sweep.outline = settings.outlines;
+          });
+
+          pathLines.forEach((line) => {
+            line.visible = settings.outlines;
+          });
+        });
+
+        updateOutlineState();
+        renderLegend();
+
+        const onResize = () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+        window.addEventListener("resize", onResize);
+
+        renderer.setAnimationLoop(() => {
+          stats.begin();
+          controls.update();
+          renderer.render(scene, camera);
+          stats.end();
+        });
+      }
+
+      bootstrap().catch((error) => {
+        console.error("Failed to initialize sweep pipe network example", error);
+      });
+    </script>
+
+    <style>
+      .og-legend-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .og-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .og-legend-swatch {
+        width: 16px;
+        height: 16px;
+        border-radius: 5px;
+        border: 1px solid rgba(0, 0, 0, 0.2);
+      }
+
+      .og-legend-copy {
+        display: grid;
+        gap: 2px;
+      }
+
+      .og-legend-copy strong {
+        font-size: 12px;
+      }
+
+      .og-legend-copy span {
+        font-size: 11px;
+        color: #4b3d34;
+      }
+    </style>
+  </body>
+</html>
