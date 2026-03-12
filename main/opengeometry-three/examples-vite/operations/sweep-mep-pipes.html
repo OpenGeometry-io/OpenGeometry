@@ -196,7 +196,7 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OGSceneManager, OpenGeometry, Arc, Cuboid, Polyline, Rectangle, Sweep, Vector3 } from "@og-three";
+      import { OGSceneManager, OpenGeometry, Arc, Cuboid, Rectangle, Sweep, Vector3 } from "@og-three";
 
       const app = document.getElementById("app");
       if (!app) {
@@ -319,23 +319,23 @@
         return points;
       }
 
-      function buildMainPath(x, zStart, runLength, elevation, sway, inletDepth) {
+      function buildMainPath(x, zStart, runLength, elevation, inletDepth) {
         return [
-          new Vector3(x - sway, elevation - 0.44, zStart - inletDepth),
-          new Vector3(x - sway, elevation, zStart - inletDepth * 0.55),
+          new Vector3(x, elevation - 0.44, zStart - inletDepth),
+          new Vector3(x, elevation, zStart - inletDepth * 0.55),
           new Vector3(x, elevation, zStart + runLength * 0.34),
-          new Vector3(x + sway, elevation + 0.06, zStart + runLength * 0.66),
+          new Vector3(x, elevation + 0.06, zStart + runLength * 0.66),
           new Vector3(x, elevation, zStart + runLength + 1.0),
         ];
       }
 
-      function buildBranchPath(xStart, xEnd, z, elevation, drop, zOffset) {
+      function buildBranchPath(xStart, xEnd, z, elevation, drop) {
         const reducedElevation = Math.max(0.2, elevation - drop);
         return [
           new Vector3(xStart, elevation, z),
-          new Vector3(xStart, reducedElevation, z + zOffset),
-          new Vector3(xEnd, reducedElevation, z + zOffset),
-          new Vector3(xEnd, elevation - 0.1, z + zOffset),
+          new Vector3(xStart, reducedElevation, z),
+          new Vector3(xEnd, reducedElevation, z),
+          new Vector3(xEnd, elevation - 0.1, z),
         ];
       }
 
@@ -801,14 +801,14 @@
             "arc-main",
             laneIndex,
             null,
-            buildMainPath(arcMainX, 0, config.runLength, config.mainElevation, 0.22, 1.5)
+            buildMainPath(arcMainX, 0, config.runLength, config.mainElevation, 1.5)
           );
 
           createSweepPipe(
             "rect-main",
             laneIndex,
             null,
-            buildMainPath(rectMainX, 0.2, config.runLength, config.mainElevation - 0.14, -0.2, 1.1)
+            buildMainPath(rectMainX, 0.2, config.runLength, config.mainElevation - 0.14, 1.1)
           );
 
           for (let branchIndex = 0; branchIndex < branchCount; branchIndex += 1) {
@@ -823,8 +823,7 @@
                 arcMainX + config.branchReach,
                 branchZ,
                 config.mainElevation,
-                config.branchDrop,
-                branchIndex % 2 === 0 ? 0.08 : -0.08
+                config.branchDrop
               )
             );
 
@@ -837,8 +836,7 @@
                 rectMainX - config.branchReach,
                 branchZ + 0.22,
                 config.mainElevation - 0.14,
-                config.branchDrop * 0.88,
-                branchIndex % 2 === 0 ? -0.05 : 0.05
+                config.branchDrop * 0.88
               )
             );
           }

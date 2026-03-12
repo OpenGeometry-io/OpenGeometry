@@ -340,11 +340,24 @@ fn sanitize_profile(profile: &[Vector3]) -> Result<ProfileData, SweepError> {
         }
     }
 
-    let Some(reference_axis) = cleaned.iter().find_map(|point| {
-        let delta = point.sub(centroid);
-        let projected = delta.sub(normal.scale(delta.dot(normal)));
-        projected.normalized()
-    }) else {
+    let reference_axis = cleaned
+        .iter()
+        .enumerate()
+        .find_map(|(index, point)| {
+            let next = cleaned[(index + 1) % cleaned.len()];
+            let edge = next.sub(*point);
+            let projected = edge.sub(normal.scale(edge.dot(normal)));
+            projected.normalized()
+        })
+        .or_else(|| {
+            cleaned.iter().find_map(|point| {
+                let delta = point.sub(centroid);
+                let projected = delta.sub(normal.scale(delta.dot(normal)));
+                projected.normalized()
+            })
+        });
+
+    let Some(reference_axis) = reference_axis else {
         return Err(SweepError::new(
             SweepErrorKind::InvalidProfile,
             "Sweep profile collapses to its centroid after planar projection.",
@@ -784,6 +797,32 @@ mod tests {
         }
     }
 
+    fn assert_section_edges_axis_aligned(section: &[Vec3f]) {
+        for index in 0..section.len() {
+            let current = section[index];
+            let next = section[(index + 1) % section.len()];
+            let delta = next.sub(current);
+
+            assert!(
+                delta.z.abs() <= 1.0e-6,
+                "section edge {} drifted off the cross-section plane: dz={:.3e}",
+                index,
+                delta.z
+            );
+
+            let aligned_x = delta.y.abs() <= 1.0e-6 && delta.x.abs() > 1.0e-6;
+            let aligned_y = delta.x.abs() <= 1.0e-6 && delta.y.abs() > 1.0e-6;
+
+            assert!(
+                aligned_x || aligned_y,
+                "section edge {} is rotated off-axis: dx={:.6}, dy={:.6}",
+                index,
+                delta.x,
+                delta.y
+            );
+        }
+    }
+
     fn assert_corner_projection_preserves_rectangle(
         prepared: &PreparedSweep,
         corner_index: usize,
@@ -907,6 +946,18 @@ mod tests {
         let prepared =
             build_prepared_sweep(&path, &profile).expect("prepared sweep should succeed");
         assert_corner_projection_preserves_rectangle(&prepared, 1, 0, 1, 1.2, 0.8);
+    }
+
+    #[test]
+    fn straight_path_keeps_rectangle_edges_axis_aligned() {
+        let path = vec![Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 3.0)];
+        let profile = rectangle_profile(1.0, 0.5);
+
+        let prepared =
+            build_prepared_sweep(&path, &profile).expect("prepared sweep should succeed");
+
+        assert_section_edges_axis_aligned(&prepared.sections[0]);
+        assert_section_edges_axis_aligned(&prepared.sections[1]);
     }
 
     #[test]
