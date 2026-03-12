@@ -6,29 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="OpenGeometry Demo" />
     <meta name="author" content="Vishwajeet Mane" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=keyboard_backspace" />
   </head>
-  <body>
-    <aside class="og-badge">
-      <div class="og-badge-top">
-        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
-        <p class="og-badge-status">ready</p>
-      </div>
-      <div class="og-badge-meta">
-        <p class="og-badge-kicker">OPEN GEOMETRY • SHAPES</p>
-        <strong class="og-badge-title">Cuboid</strong>
-        <span class="og-badge-desc">Rectangular solid for rooms, equipment blocks and massing.</span>
-      </div>
-      <div class="og-badge-chip-row">
-          <span class="og-chip og-chip-accent">Width</span>
-          <span class="og-chip og-chip-accent">Height</span>
-          <span class="og-chip og-chip-accent">Depth</span>
-      </div>
-      <div class="og-badge-footer">
-        <a class="og-badge-link" href="../index.html">Back to Examples</a>
-      </div>
-    </aside>
+  <body style="width: 100%; height: 100%; overflow: hidden;">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">
+        <span class="material-symbols-outlined">
+          keyboard_backspace
+        </span>
+      </a>
+      <span class="og-badge-title">Cuboid</span>
+    </div>
     <aside class="og-controls" data-control-panel>
-      <h3>Cuboid Parameters</h3>
+      <h3>Parameters</h3>
       <label class="og-control-row" data-control-key="width" data-control-type="number">
         <div class="og-control-header">
           <span class="og-control-label-chip">Width</span>
@@ -97,131 +87,70 @@
       import { OpenGeometry, Cuboid, Vector3 } from "@og-three";
 
       const app = document.getElementById("app");
-      if (!app) {
-        throw new Error("Missing #app container");
-      }
+
+      // Global Cuboid Variable
+      let cuboid;
+
+      // Storing Parameters for Geometry
+      let config = {};
 
       function formatControlNumber(value) {
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
       }
 
-      function disposeMaterial(material) {
-        if (!material) {
-          return;
-        }
+      // This function will be used to link the UI controls with the Cuboid geometry parameters
+      // Using setConfig to update the config object and then applying those changes to the cuboid geometry
+      function setUIControls() {
+        const controlElements = document.querySelectorAll("[data-control-key]");
 
-        if (Array.isArray(material)) {
-          material.forEach((entry) => entry && entry.dispose && entry.dispose());
-          return;
-        }
+        controlElements.forEach((element) => {
+          const key = element.getAttribute("data-control-key");
+          const type = element.getAttribute("data-control-type");
 
-        if (material.dispose) {
-          material.dispose();
-        }
-      }
+          if (type === "number") {
+            const rangeInput = element.querySelector('input[type="range"]');
+            const numberInput = element.querySelector('input[type="number"]');
+            const valueDisplay = element.querySelector("[data-control-value]");
 
-      function disposeObject3D(object) {
-        object.traverse((node) => {
-          if (node.geometry && node.geometry.dispose) {
-            node.geometry.dispose();
-          }
-          disposeMaterial(node.material);
-        });
-      }
-
-      function replaceSceneObject(scene, previous, next) {
-        if (previous) {
-          previous.parent && previous.parent.remove(previous);
-          disposeObject3D(previous);
-        }
-
-        scene.add(next);
-        return next;
-      }
-
-      function clamp(value, min, max) {
-        return Math.min(max, Math.max(min, value));
-      }
-
-      function bindControls(definitions, onChange) {
-        const panel = document.querySelector("[data-control-panel]");
-        if (!panel) {
-          throw new Error("Missing control panel");
-        }
-
-        const state = {};
-        const emitChange = () => {
-          onChange({ ...state });
-        };
-
-        definitions.forEach((definition) => {
-          state[definition.key] = definition.value;
-          const row = panel.querySelector(`[data-control-key="${definition.key}"]`);
-          if (!row) {
-            throw new Error(`Missing control row for ${definition.key}`);
-          }
-
-          if (definition.type === "number") {
-            const valueLabel = row.querySelector("[data-control-value]");
-            const rangeInput = row.querySelector("[data-control-range]");
-            const numberInput = row.querySelector("[data-control-number]");
-            if (!valueLabel || !rangeInput || !numberInput) {
-              throw new Error(`Missing number controls for ${definition.key}`);
-            }
-
-            const updateValue = (raw) => {
-              const next = clamp(raw, definition.min, definition.max);
-              state[definition.key] = next;
-              rangeInput.value = String(next);
-              numberInput.value = String(next);
-              valueLabel.textContent = formatControlNumber(next);
-              emitChange();
+            const onChange = (value) => {
+              config[key] = parseFloat(value);
+              valueDisplay.textContent = formatControlNumber(value);
+              updateCuboid();
             };
 
-            rangeInput.addEventListener("input", () => updateValue(Number(rangeInput.value)));
-            numberInput.addEventListener("change", () => updateValue(Number(numberInput.value)));
-            valueLabel.textContent = formatControlNumber(definition.value);
-            return;
-          }
+            rangeInput.addEventListener("input", (e) => onChange(e.target.value));
+            numberInput.addEventListener("input", (e) => onChange(e.target.value));
+          } else if (type === "boolean") {
+            const toggleInput = element.querySelector('input[type="checkbox"]');
+            const boolStateDisplay = element.querySelector("[data-control-bool-state]");
 
-          if (definition.type === "boolean") {
-            const toggle = row.querySelector("[data-control-toggle]");
-            const boolLabel = row.querySelector("[data-control-bool-state]");
-            if (!toggle || !boolLabel) {
-              throw new Error(`Missing boolean controls for ${definition.key}`);
-            }
-
-            toggle.checked = Boolean(definition.value);
-            boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-            toggle.addEventListener("change", () => {
-              state[definition.key] = toggle.checked;
-              boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-              emitChange();
+            toggleInput.addEventListener("change", (e) => {
+              config[key] = e.target.checked;
+              boolStateDisplay.textContent = e.target.checked ? "Enabled" : "Disabled";
+              updateCuboid();
             });
-            return;
           }
-
-          const select = row.querySelector("[data-control-select]");
-          if (!select) {
-            throw new Error(`Missing select control for ${definition.key}`);
-          }
-          select.value = String(definition.value);
-          select.addEventListener("change", () => {
-            state[definition.key] = select.value;
-            emitChange();
-          });
         });
-
-        emitChange();
       }
 
-      async function createExampleScene(meta, options) {
-        const settings = options || {};
-        document.body.classList.add("og-example-page");
-        document.title = meta.title + " | OpenGeometry";
+      // This function applies the current config parameters to the cuboid geometry
+      function updateCuboid() {
+        if (!cuboid) return;
+        cuboid.setConfig({
+          width: config.width,
+          height: config.height,
+          depth: config.depth,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth
+        });
 
+        cuboid.outline = config.outline;
+      }
+
+      async function main() {
+        // Simple Three.js Scene Setup
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(settings.background || 0xf6f1eb);
+        scene.background = new THREE.Color(0xf6f1eb);
 
         const camera = new THREE.PerspectiveCamera(
           55,
@@ -230,8 +159,7 @@
           4000
         );
 
-        const cameraPosition = settings.cameraPosition || [5.5, 4.2, 6.5];
-        camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+        camera.position.set(5.5, 4.2, 6.5);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -240,19 +168,13 @@
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        const target = settings.target || [0, 0.8, 0];
-        controls.target.set(target[0], target[1], target[2]);
+        controls.target.set(0, 0.8, 0);
         controls.update();
 
-        scene.add(
-          new THREE.GridHelper(
-            settings.gridSize || 32,
-            settings.gridDivisions || 32,
-            settings.gridPrimary || 0xd88b63,
-            settings.gridSecondary || 0xe7d4ca
-          )
-        );
+        // Grid Helper
+        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
 
+        // Lights Setup
         scene.add(new THREE.AmbientLight(0xffffff, 0.72));
 
         const key = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -263,7 +185,31 @@
         fill.position.set(-5, 3, -6);
         scene.add(fill);
 
+        // Initialize OpenGeometry
         await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        // Initial Cuboid Geometry Parameters
+        config = {
+          width: 1.8,
+          height: 1.6,
+          depth: 1.2,
+          outline: true,
+          fatOutlines: false,
+          outlineWidth: 4
+        };
+
+        cuboid = new Cuboid({
+          center: new Vector3(0, 0.8, 0),
+          width: config.width,
+          height: config.height,
+          depth: config.depth,
+          color: 0x10b981,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth
+        });
+
+        cuboid.outline = config.outline;
+        scene.add(cuboid);
 
         function onResize() {
           camera.aspect = window.innerWidth / window.innerHeight;
@@ -280,48 +226,8 @@
         }
 
         animate();
-        return { scene, camera, renderer, controls };
-      }
 
-      async function main() {
-        const meta = {
-        "slug": "shapes/cuboid",
-        "category": "shapes",
-        "title": "Cuboid",
-        "description": "Rectangular solid for rooms, equipment blocks and massing.",
-        "statusLabel": "ready",
-        "chips": [
-          "Width",
-          "Height",
-          "Depth"
-        ],
-        "footerText": "Width, Height, Depth"
-      };
-
-        const { scene } = await createExampleScene(meta);
-        let current = null;
-
-        bindControls([
-          { type: "number", key: "width", label: "Width", min: 0.2, max: 4, step: 0.05, value: 1.8 },
-          { type: "number", key: "height", label: "Height", min: 0.2, max: 4, step: 0.05, value: 1.6 },
-          { type: "number", key: "depth", label: "Depth", min: 0.2, max: 4, step: 0.05, value: 1.2 },
-          { type: "boolean", key: "outline", label: "Outline", value: true },
-          { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
-          { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 }
-        ], (state) => {
-          const cuboid = new Cuboid({
-            center: new Vector3(0, state.height * 0.5, 0),
-            width: state.width,
-            height: state.height,
-            depth: state.depth,
-            color: 0x10b981,
-            fatOutlines: state.fatOutlines,
-            outlineWidth: state.outlineWidth
-          });
-          cuboid.outline = state.outline;
-
-          current = replaceSceneObject(scene, current, cuboid);
-        });
+        setUIControls();
       }
 
       void main();
