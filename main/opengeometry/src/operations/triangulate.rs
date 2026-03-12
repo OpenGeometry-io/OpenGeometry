@@ -86,21 +86,30 @@ pub fn triangulate_polygon_with_holes(
         .map(|chunk| [chunk[0], chunk[1], chunk[2]])
         .collect();
 
-    // if first index of first triangle is odd, reverse all triangles
-    // explanation here: If the first triangle is defined in a clockwise manner, we reverse it to ensure a consistent winding order.
-    // TODO: This is a temporary fix. A more robust solution would involve checking the winding order of the entire polygon and its holes.
-    if triangle_indices.len() > 0 && triangle_indices[0][0] % 2 == 1 {
-        let triangle_indices: Vec<[usize; 3]> = triangle_indices
-            .into_iter()
-            .map(|mut tri| {
-                tri.reverse();
-                tri
-            })
-            .collect();
-        return triangle_indices;
-    } else {
-        return triangle_indices;
-    }
+    let all_vertices: Vec<Vector3> = face_vertices
+        .iter()
+        .copied()
+        .chain(holes.iter().flatten().copied())
+        .collect();
+
+    triangle_indices
+        .into_iter()
+        .filter_map(|mut tri| {
+            let a = *all_vertices.get(tri[0])?;
+            let b = *all_vertices.get(tri[1])?;
+            let c = *all_vertices.get(tri[2])?;
+
+            let ab = Vector3::new(b.x - a.x, b.y - a.y, b.z - a.z);
+            let ac = Vector3::new(c.x - a.x, c.y - a.y, c.z - a.z);
+            let triangle_normal = ab.cross(&ac);
+
+            if triangle_normal.dot(&normal) < 0.0 {
+                tri.swap(1, 2);
+            }
+
+            Some(tri)
+        })
+        .collect()
 }
 
 /**

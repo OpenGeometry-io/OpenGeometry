@@ -14,6 +14,8 @@ use openmaths::Vector3;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::operations::triangulate::triangulate_polygon_with_holes;
+
 pub use builder::BrepBuilder;
 pub use edge::Edge;
 pub use error::{BrepError, BrepErrorKind};
@@ -107,6 +109,45 @@ impl Brep {
                 segments.push((from, to));
             }
         }
+        segments
+    }
+
+    /// Collects only feature edges whose adjacent faces form a visible crease
+    /// or whose topology leaves them on a boundary.
+    pub fn collect_feature_outline_segments(&self, crease_cos_threshold: f64) -> Vec<(u32, u32)> {
+        let mut segments = Vec::new();
+
+        for edge in &self.edges {
+            let Some((from, to)) = self.get_edge_endpoints(edge.id) else {
+                continue;
+            };
+
+            let Some(halfedge) = self.halfedges.get(edge.halfedge as usize) else {
+                continue;
+            };
+
+            let primary_face = halfedge
+                .face
+                .and_then(|face_id| self.faces.get(face_id as usize));
+            let twin_face = edge
+                .twin_halfedge
+                .and_then(|halfedge_id| self.halfedges.get(halfedge_id as usize))
+                .and_then(|halfedge_ref| halfedge_ref.face)
+                .and_then(|face_id| self.faces.get(face_id as usize));
+
+            let include = match (primary_face, twin_face) {
+                (Some(a), Some(b)) => {
+                    let dot = a.normal.dot(&b.normal);
+                    dot < crease_cos_threshold
+                }
+                _ => true,
+            };
+
+            if include {
+                segments.push((from, to));
+            }
+        }
+
         segments
     }
 
@@ -254,6 +295,74 @@ impl Brep {
         }
 
         (face_vertices, holes_vertices)
+    }
+
+    /// Flattens every face into a triangle vertex buffer suitable for
+    /// immediate-mode rendering consumers.
+    pub fn get_triangle_vertex_buffer(&self) -> Vec<f64> {
+        let mut vertex_buffer = Vec::new();
+
+        for face in &self.faces {
+            let (face_vertices, holes_vertices) = self.get_vertices_and_holes_by_face_id(face.id);
+            if face_vertices.len() < 3 {
+                continue;
+            }
+
+            let triangles = triangulate_polygon_with_holes(&face_vertices, &holes_vertices);
+            let all_vertices: Vec<Vector3> = face_vertices
+                .into_iter()
+                .chain(holes_vertices.into_iter().flatten())
+                .collect();
+
+            for triangle in triangles {
+                for vertex_index in triangle {
+                    let Some(vertex) = all_vertices.get(vertex_index) else {
+                        continue;
+                    };
+                    vertex_buffer.push(vertex.x);
+                    vertex_buffer.push(vertex.y);
+                    vertex_buffer.push(vertex.z);
+                }
+            }
+        }
+
+        vertex_buffer
+    }
+
+    /// Serializes every edge in the BRep as a flat line-segment buffer.
+    pub fn get_outline_vertex_buffer(&self) -> Vec<f64> {
+        self.outline_buffer_from_segments(self.collect_outline_segments())
+    }
+
+    /// Serializes only feature/boundary edges to keep outlines readable on
+    /// heavily faceted boolean results.
+    pub fn get_feature_outline_vertex_buffer(&self, crease_cos_threshold: f64) -> Vec<f64> {
+        self.outline_buffer_from_segments(
+            self.collect_feature_outline_segments(crease_cos_threshold),
+        )
+    }
+
+    fn outline_buffer_from_segments(&self, segments: Vec<(u32, u32)>) -> Vec<f64> {
+        let mut vertex_buffer = Vec::new();
+
+        for (start_id, end_id) in segments {
+            let Some(start_vertex) = self.vertices.get(start_id as usize) else {
+                continue;
+            };
+            let Some(end_vertex) = self.vertices.get(end_id as usize) else {
+                continue;
+            };
+
+            vertex_buffer.push(start_vertex.position.x);
+            vertex_buffer.push(start_vertex.position.y);
+            vertex_buffer.push(start_vertex.position.z);
+
+            vertex_buffer.push(end_vertex.position.x);
+            vertex_buffer.push(end_vertex.position.y);
+            vertex_buffer.push(end_vertex.position.z);
+        }
+
+        vertex_buffer
     }
 
     pub fn validate_topology(&self) -> Result<(), BrepError> {

@@ -109,3 +109,7 @@ export * from './src/shapes/';
  * Reusable example builders for quickly wiring demo scenes.
  */
 export * from './src/examples/';
+/**
+ * Kernel-backed modeling operations.
+ */
+export * from './src/operations/';

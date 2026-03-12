@@ -29,6 +29,7 @@ pub mod primitives {
     pub mod wedge;
 }
 
+pub mod booleans;
 pub mod brep;
 pub mod export;
 pub mod scenegraph;

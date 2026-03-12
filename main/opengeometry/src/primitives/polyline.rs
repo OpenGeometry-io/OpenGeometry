@@ -228,7 +228,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn closed_polyline_builds_wire_and_face_without_duplicate_halfedge_error() {
+    fn closed_polyline_builds_wire_without_duplicate_halfedge_error() {
         let mut polyline = OGPolyline::new("polyline-test".to_string());
         let points = vec![
             Vector3::new(0.0, 0.0, 0.0),
@@ -244,6 +244,6 @@ mod tests {
 
         assert!(polyline.is_closed());
         assert_eq!(polyline.brep.wires.len(), 1);
-        assert_eq!(polyline.brep.faces.len(), 1);
+        assert_eq!(polyline.brep.faces.len(), 0);
     }
 }
