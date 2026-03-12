@@ -98,43 +98,52 @@
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
       }
 
-      // This function will be used to link the UI controls with the Cuboid geometry parameters
-      // Using setConfig to update the config object and then applying those changes to the cuboid geometry
+      // Connect each UI control to the cuboid config.
       function setUIControls() {
-        const controlElements = document.querySelectorAll("[data-control-key]");
+        const controls = document.querySelectorAll("[data-control-key]");
 
-        controlElements.forEach((element) => {
-          const key = element.getAttribute("data-control-key");
-          const type = element.getAttribute("data-control-type");
+        controls.forEach((control) => {
+          const key = control.getAttribute("data-control-key");
+          const type = control.getAttribute("data-control-type");
 
           if (type === "number") {
-            const rangeInput = element.querySelector('input[type="range"]');
-            const numberInput = element.querySelector('input[type="number"]');
-            const valueDisplay = element.querySelector("[data-control-value]");
+            const rangeInput = control.querySelector("[data-control-range]");
+            const numberInput = control.querySelector("[data-control-number]");
+            const valueDisplay = control.querySelector("[data-control-value]");
 
-            const onChange = (value) => {
-              config[key] = parseFloat(value);
-              valueDisplay.textContent = formatControlNumber(value);
-              updateCuboid();
-            };
+            const setNumberValue = (value) => {
+              const numericValue = parseFloat(value);
+              if (!Number.isFinite(numericValue)) return;
 
-            rangeInput.addEventListener("input", (e) => onChange(e.target.value));
-            numberInput.addEventListener("input", (e) => onChange(e.target.value));
-          } else if (type === "boolean") {
-            const toggleInput = element.querySelector('input[type="checkbox"]');
-            const boolStateDisplay = element.querySelector("[data-control-bool-state]");
+              config[key] = numericValue;
+              rangeInput.value = String(numericValue);
+              numberInput.value = String(numericValue);
+              valueDisplay.textContent = formatControlNumber(numericValue);
+              updateGeometry();
+            }
 
-            toggleInput.addEventListener("change", (e) => {
-              config[key] = e.target.checked;
-              boolStateDisplay.textContent = e.target.checked ? "Enabled" : "Disabled";
-              updateCuboid();
-            });
+            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
+            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
+          }
+
+          if (type === "boolean") {
+            const toggleInput = control.querySelector("[data-control-toggle]");
+            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+
+            const setBooleanValue = (checked) => {
+              config[key] = checked;
+              toggleInput.checked = checked;
+              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
+              updateGeometry();
+            }
+
+            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
           }
         });
       }
 
       // This function applies the current config parameters to the cuboid geometry
-      function updateCuboid() {
+      function updateGeometry() {
         if (!cuboid) return;
         cuboid.setConfig({
           width: config.width,
