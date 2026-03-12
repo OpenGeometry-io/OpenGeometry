@@ -20,6 +20,8 @@ export interface ICylinderOptions {
   outlineWidth?: number;
 }
 
+export type CylinderConfigUpdate = Partial<ICylinderOptions>;
+
 export class Cylinder extends THREE.Mesh {
   ogid: string;
   options: ICylinderOptions = {
@@ -46,7 +48,7 @@ export class Cylinder extends THREE.Mesh {
 
   set color(color: number) {
     this.options.color = color;
-    if (this.material instanceof THREE.LineBasicMaterial) {
+    if (this.material instanceof THREE.MeshStandardMaterial) {
       this.material.color.set(color);
     }
   }
@@ -68,25 +70,48 @@ export class Cylinder extends THREE.Mesh {
     }
   }
 
-  setConfig(options: ICylinderOptions) {
+  setConfig(options: CylinderConfigUpdate) {
     this.validateOptions();
 
-    this.options = { ...this.options, ...options };
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "center" in options ||
+      "radius" in options ||
+      "height" in options ||
+      "segments" in options ||
+      "angle" in options;
+    const colorChanged = "color" in options;
+    const outlineStyleChanged =
+      "fatOutlines" in options ||
+      "outlineWidth" in options;
+
+    this.options = nextOptions;
     this._fatOutlines = this.options.fatOutlines ?? false;
     this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
     this.options.fatOutlines = this._fatOutlines;
     this.options.outlineWidth = this._outlineWidth;
 
-    const { radius, height, segments, angle, center } = this.options;
-    this.cylinder.set_config(
-      center?.clone(),
-      radius,
-      height,
-      angle,
-      segments
-    );
+    if (geometryChanged) {
+      const { radius, height, segments, angle, center } = this.options;
+      this.cylinder.set_config(
+        center.clone(),
+        radius,
+        height,
+        angle,
+        segments
+      );
 
-    this.generateGeometry();
+      this.generateGeometry();
+      return;
+    }
+
+    if (colorChanged) {
+      this.color = this.options.color;
+    }
+
+    if (outlineStyleChanged && this._outlineEnabled) {
+      this.outline = true;
+    }
   }
 
   cleanGeometry() {

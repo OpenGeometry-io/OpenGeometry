@@ -1,94 +1,80 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Arc Example</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="OpenGeometry Demo" />
-    <meta name="author" content="Vishwajeet Mane" />
-  </head>
-  <body>
-    <aside class="og-badge">
-      <div class="og-badge-top">
-        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
-        <p class="og-badge-status">ready</p>
-      </div>
-      <div class="og-badge-meta">
-        <p class="og-badge-kicker">OPEN GEOMETRY • PRIMITIVES</p>
-        <strong class="og-badge-title">Arc</strong>
-        <span class="og-badge-desc">Circular arc with angle span and segmentation control.</span>
-      </div>
-      <div class="og-badge-chip-row">
-          <span class="og-chip og-chip-accent">Radius</span>
-          <span class="og-chip og-chip-accent">Span</span>
-      </div>
-      <div class="og-badge-footer">
-        <a class="og-badge-link" href="../index.html">Back to Examples</a>
-      </div>
-    </aside>
+      <title>OpenGeometry Arc Example</title>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta name="description" content="OpenGeometry Demo" />
+      <meta name="author" content="Vishwajeet Mane" />
+    </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Arc</span>
+    </div>
     <aside class="og-controls" data-control-panel>
-      <h3>Arc Parameters</h3>
-      <label class="og-control-row" data-control-key="radius" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Radius</span>
-          <code class="og-control-value" data-control-value>1.2</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.2" />
-          <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.2" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="startDeg" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Start (deg)</span>
-          <code class="og-control-value" data-control-value>0</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="0" max="360" step="1" value="0" />
-          <input data-control-number type="number" min="0" max="360" step="1" value="0" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="endDeg" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">End (deg)</span>
-          <code class="og-control-value" data-control-value>300</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="1" max="360" step="1" value="300" />
-          <input data-control-number type="number" min="1" max="360" step="1" value="300" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="segments" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Segments</span>
-          <code class="og-control-value" data-control-value>48</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="4" max="128" step="1" value="48" />
-          <input data-control-number type="number" min="4" max="128" step="1" value="48" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="centerX" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Center X</span>
-          <code class="og-control-value" data-control-value>0</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="-3" max="3" step="0.1" value="0" />
-          <input data-control-number type="number" min="-3" max="3" step="0.1" value="0" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="centerZ" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Center Z</span>
-          <code class="og-control-value" data-control-value>0</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="-3" max="3" step="0.1" value="0" />
-          <input data-control-number type="number" min="-3" max="3" step="0.1" value="0" />
-        </div>
-      </label>
-    </aside>
+          <h3>Arc Parameters</h3>
+          <label class="og-control-row" data-control-key="radius" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Radius</span>
+              <code class="og-control-value" data-control-value>1.2</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.2" />
+              <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.2" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="startDeg" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Start (deg)</span>
+              <code class="og-control-value" data-control-value>0</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="0" max="360" step="1" value="0" />
+              <input data-control-number type="number" min="0" max="360" step="1" value="0" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="endDeg" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">End (deg)</span>
+              <code class="og-control-value" data-control-value>300</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="1" max="360" step="1" value="300" />
+              <input data-control-number type="number" min="1" max="360" step="1" value="300" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="segments" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Segments</span>
+              <code class="og-control-value" data-control-value>48</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="4" max="128" step="1" value="48" />
+              <input data-control-number type="number" min="4" max="128" step="1" value="48" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="centerX" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Center X</span>
+              <code class="og-control-value" data-control-value>0</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="-3" max="3" step="0.1" value="0" />
+              <input data-control-number type="number" min="-3" max="3" step="0.1" value="0" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="centerZ" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Center Z</span>
+              <code class="og-control-value" data-control-value>0</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="-3" max="3" step="0.1" value="0" />
+              <input data-control-number type="number" min="-3" max="3" step="0.1" value="0" />
+            </div>
+          </label>
+        </aside>
     <div id="app"></div>
     <script type="module">
       import "../src/styles/theme.css";
@@ -102,127 +88,81 @@
         throw new Error("Missing #app container");
       }
 
+      let arc;
+      let config = {
+        radius: 1.2,
+        startDeg: 0,
+        endDeg: 300,
+        segments: 48,
+        centerX: 0,
+        centerZ: 0,
+      };
+
       function formatControlNumber(value) {
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
       }
 
-      function disposeMaterial(material) {
-        if (!material) {
-          return;
-        }
+      function setUIControls() {
+        const controls = document.querySelectorAll("[data-control-key]");
 
-        if (Array.isArray(material)) {
-          material.forEach((entry) => entry && entry.dispose && entry.dispose());
-          return;
-        }
+        controls.forEach((control) => {
+          const key = control.getAttribute("data-control-key");
+          const type = control.getAttribute("data-control-type");
 
-        if (material.dispose) {
-          material.dispose();
-        }
-      }
+          if (type === "number") {
+            const rangeInput = control.querySelector("[data-control-range]");
+            const numberInput = control.querySelector("[data-control-number]");
+            const valueDisplay = control.querySelector("[data-control-value]");
 
-      function disposeObject3D(object) {
-        object.traverse((node) => {
-          if (node.geometry && node.geometry.dispose) {
-            node.geometry.dispose();
+            function setNumberValue(value) {
+              const numericValue = parseFloat(value);
+              if (!Number.isFinite(numericValue)) return;
+
+              config[key] = numericValue;
+              rangeInput.value = String(numericValue);
+              numberInput.value = String(numericValue);
+              valueDisplay.textContent = formatControlNumber(numericValue);
+              updateGeometry();
+            }
+
+            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
+            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
           }
-          disposeMaterial(node.material);
+
+          if (type === "boolean") {
+            const toggleInput = control.querySelector("[data-control-toggle]");
+            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+
+            function setBooleanValue(checked) {
+              config[key] = checked;
+              toggleInput.checked = checked;
+              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
+              updateGeometry();
+            }
+
+            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
+          }
         });
       }
 
-      function replaceSceneObject(scene, previous, next) {
-        if (previous) {
-          previous.parent && previous.parent.remove(previous);
-          disposeObject3D(previous);
-        }
+      function updateGeometry() {
+        if (!arc) return;
+        const start = (config.startDeg * Math.PI) / 180;
+        const end = (config.endDeg * Math.PI) / 180;
 
-        scene.add(next);
-        return next;
-      }
-
-      function clamp(value, min, max) {
-        return Math.min(max, Math.max(min, value));
-      }
-
-      function bindControls(definitions, onChange) {
-        const panel = document.querySelector("[data-control-panel]");
-        if (!panel) {
-          throw new Error("Missing control panel");
-        }
-
-        const state = {};
-        const emitChange = () => {
-          onChange({ ...state });
-        };
-
-        definitions.forEach((definition) => {
-          state[definition.key] = definition.value;
-          const row = panel.querySelector(`[data-control-key="${definition.key}"]`);
-          if (!row) {
-            throw new Error(`Missing control row for ${definition.key}`);
-          }
-
-          if (definition.type === "number") {
-            const valueLabel = row.querySelector("[data-control-value]");
-            const rangeInput = row.querySelector("[data-control-range]");
-            const numberInput = row.querySelector("[data-control-number]");
-            if (!valueLabel || !rangeInput || !numberInput) {
-              throw new Error(`Missing number controls for ${definition.key}`);
-            }
-
-            const updateValue = (raw) => {
-              const next = clamp(raw, definition.min, definition.max);
-              state[definition.key] = next;
-              rangeInput.value = String(next);
-              numberInput.value = String(next);
-              valueLabel.textContent = formatControlNumber(next);
-              emitChange();
-            };
-
-            rangeInput.addEventListener("input", () => updateValue(Number(rangeInput.value)));
-            numberInput.addEventListener("change", () => updateValue(Number(numberInput.value)));
-            valueLabel.textContent = formatControlNumber(definition.value);
-            return;
-          }
-
-          if (definition.type === "boolean") {
-            const toggle = row.querySelector("[data-control-toggle]");
-            const boolLabel = row.querySelector("[data-control-bool-state]");
-            if (!toggle || !boolLabel) {
-              throw new Error(`Missing boolean controls for ${definition.key}`);
-            }
-
-            toggle.checked = Boolean(definition.value);
-            boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-            toggle.addEventListener("change", () => {
-              state[definition.key] = toggle.checked;
-              boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-              emitChange();
-            });
-            return;
-          }
-
-          const select = row.querySelector("[data-control-select]");
-          if (!select) {
-            throw new Error(`Missing select control for ${definition.key}`);
-          }
-          select.value = String(definition.value);
-          select.addEventListener("change", () => {
-            state[definition.key] = select.value;
-            emitChange();
-          });
+        arc.setConfig({
+          center: new Vector3(config.centerX, 0, config.centerZ),
+          radius: config.radius,
+          startAngle: Math.min(start, end),
+          endAngle: Math.max(start, end),
+          segments: Math.floor(config.segments),
+          color: 0xdc2626,
         });
-
-        emitChange();
       }
 
-      async function createExampleScene(meta, options) {
-        const settings = options || {};
-        document.body.classList.add("og-example-page");
-        document.title = meta.title + " | OpenGeometry";
-
+      async function main() {
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(settings.background || 0xf6f1eb);
+        scene.background = new THREE.Color(0xf6f1eb);
 
         const camera = new THREE.PerspectiveCamera(
           55,
@@ -231,8 +171,7 @@
           4000
         );
 
-        const cameraPosition = settings.cameraPosition || [5.5, 4.2, 6.5];
-        camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+        camera.position.set(5.5, 4.2, 6.5);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -241,19 +180,10 @@
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        const target = settings.target || [0, 0.8, 0];
-        controls.target.set(target[0], target[1], target[2]);
+        controls.target.set(0, 0.8, 0);
         controls.update();
 
-        scene.add(
-          new THREE.GridHelper(
-            settings.gridSize || 32,
-            settings.gridDivisions || 32,
-            settings.gridPrimary || 0xd88b63,
-            settings.gridSecondary || 0xe7d4ca
-          )
-        );
-
+        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
         scene.add(new THREE.AmbientLight(0xffffff, 0.72));
 
         const key = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -265,6 +195,18 @@
         scene.add(fill);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        arc = new Arc({
+          center: new Vector3(config.centerX, 0, config.centerZ),
+          radius: config.radius,
+          startAngle: (config.startDeg * Math.PI) / 180,
+          endAngle: (config.endDeg * Math.PI) / 180,
+          segments: Math.floor(config.segments),
+          color: 0xdc2626,
+        });
+        scene.add(arc);
+
+        updateGeometry();
 
         function onResize() {
           camera.aspect = window.innerWidth / window.innerHeight;
@@ -281,48 +223,7 @@
         }
 
         animate();
-        return { scene, camera, renderer, controls };
-      }
-
-      async function main() {
-        const meta = {
-        "slug": "primitives/arc",
-        "category": "primitives",
-        "title": "Arc",
-        "description": "Circular arc with angle span and segmentation control.",
-        "statusLabel": "ready",
-        "chips": [
-          "Radius",
-          "Span"
-        ],
-        "footerText": "Radius, Span"
-      };
-
-        const { scene } = await createExampleScene(meta);
-        let current = null;
-
-        bindControls([
-          { type: "number", key: "radius", label: "Radius", min: 0.2, max: 4, step: 0.05, value: 1.2 },
-          { type: "number", key: "startDeg", label: "Start (deg)", min: 0, max: 360, step: 1, value: 0 },
-          { type: "number", key: "endDeg", label: "End (deg)", min: 1, max: 360, step: 1, value: 300 },
-          { type: "number", key: "segments", label: "Segments", min: 4, max: 128, step: 1, value: 48 },
-          { type: "number", key: "centerX", label: "Center X", min: -3, max: 3, step: 0.1, value: 0 },
-          { type: "number", key: "centerZ", label: "Center Z", min: -3, max: 3, step: 0.1, value: 0 }
-        ], (state) => {
-          const start = (state.startDeg * Math.PI) / 180;
-          const end = (state.endDeg * Math.PI) / 180;
-
-          const arc = new Arc({
-            center: new Vector3(state.centerX, 0, state.centerZ),
-            radius: state.radius,
-            startAngle: Math.min(start, end),
-            endAngle: Math.max(start, end),
-            segments: Math.floor(state.segments),
-            color: 0xdc2626
-          });
-
-          current = replaceSceneObject(scene, current, arc);
-        });
+        setUIControls();
       }
 
       void main();

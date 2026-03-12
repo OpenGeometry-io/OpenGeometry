@@ -19,6 +19,8 @@ export interface IWedgeOptions {
   outlineWidth?: number;
 }
 
+export type WedgeConfigUpdate = Partial<IWedgeOptions>;
+
 export class Wedge extends THREE.Mesh {
   ogid: string;
   options: IWedgeOptions = {
@@ -61,20 +63,40 @@ export class Wedge extends THREE.Mesh {
     }
   }
 
-  setConfig(options: IWedgeOptions) {
+  setConfig(options: WedgeConfigUpdate) {
     this.validateOptions();
 
-    this.options = { ...this.options, ...options };
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "center" in options ||
+      "width" in options ||
+      "height" in options ||
+      "depth" in options;
+    const colorChanged = "color" in options;
+    const outlineStyleChanged =
+      "fatOutlines" in options ||
+      "outlineWidth" in options;
+
+    this.options = nextOptions;
     this._fatOutlines = this.options.fatOutlines ?? false;
     this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
     this.options.fatOutlines = this._fatOutlines;
     this.options.outlineWidth = this._outlineWidth;
 
-    const { width, height, depth, center, color } = this.options;
-    this.wedge.set_config(center.clone(), width, height, depth);
-    this.options.color = color;
+    if (geometryChanged) {
+      const { width, height, depth, center } = this.options;
+      this.wedge.set_config(center.clone(), width, height, depth);
+      this.generateGeometry();
+      return;
+    }
 
-    this.generateGeometry();
+    if (colorChanged) {
+      this.color = this.options.color;
+    }
+
+    if (outlineStyleChanged && this._outlineEnabled) {
+      this.outline = true;
+    }
   }
 
   cleanGeometry() {

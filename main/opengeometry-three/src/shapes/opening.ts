@@ -19,6 +19,8 @@ export interface IOpeningOptions {
   outlineWidth?: number;
 }
 
+export type OpeningConfigUpdate = Partial<IOpeningOptions>;
+
 export class Opening extends THREE.Mesh {
   ogid: string;
   options: IOpeningOptions = {
@@ -81,24 +83,46 @@ export class Opening extends THREE.Mesh {
     }
   }
 
-  setConfig(options: IOpeningOptions) {
+  setConfig(options: OpeningConfigUpdate) {
     this.validateOptions();
 
-    this.options = { ...this.options, ...options };
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "center" in options ||
+      "width" in options ||
+      "height" in options ||
+      "depth" in options;
+    const colorChanged = "color" in options;
+    const outlineStyleChanged =
+      "fatOutlines" in options ||
+      "outlineWidth" in options;
+
+    this.options = nextOptions;
     this._fatOutlines = this.options.fatOutlines ?? false;
     this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
     this.options.fatOutlines = this._fatOutlines;
     this.options.outlineWidth = this._outlineWidth;
 
-    const { width, height, depth, center } = this.options;
-    this.opening.set_config(
-      center?.clone(),
-      width,
-      height,
-      depth
-    );
+    if (geometryChanged) {
+      const { width, height, depth, center } = this.options;
+      this.opening.set_config(
+        center.clone(),
+        width,
+        height,
+        depth
+      );
 
-    this.generateGeometry();
+      this.generateGeometry();
+      return;
+    }
+
+    if (colorChanged && this.material instanceof THREE.MeshStandardMaterial) {
+      this.material.color.set(this.options.color);
+    }
+
+    if (outlineStyleChanged && this._outlineEnabled) {
+      this.outline = true;
+    }
   }
 
   cleanGeometry() {

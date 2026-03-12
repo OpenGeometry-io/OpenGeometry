@@ -20,6 +20,8 @@ export interface ISweepOptions {
   outlineWidth?: number;
 }
 
+export type SweepConfigUpdate = Partial<ISweepOptions>;
+
 /* eslint-disable no-unused-vars */
 interface ISweepKernelInstance {
   set_config_with_caps: (
@@ -99,22 +101,44 @@ export class Sweep extends THREE.Mesh {
     }
   }
 
-  setConfig(options: ISweepOptions) {
-    this.options = { ...this.options, ...options };
+  setConfig(options: SweepConfigUpdate) {
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "path" in options ||
+      "profile" in options ||
+      "capStart" in options ||
+      "capEnd" in options;
+    const colorChanged = "color" in options;
+    const outlineStyleChanged =
+      "fatOutlines" in options ||
+      "outlineWidth" in options;
+
+    this.options = nextOptions;
     this._fatOutlines = this.options.fatOutlines ?? false;
     this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
     this.options.fatOutlines = this._fatOutlines;
     this.options.outlineWidth = this._outlineWidth;
 
-    this.validateOptions();
+    if (geometryChanged) {
+      this.validateOptions();
 
-    const path = this.options.path.map((point) => point.clone());
-    const profile = this.options.profile.map((point) => point.clone());
-    const capStart = this.options.capStart ?? true;
-    const capEnd = this.options.capEnd ?? true;
+      const path = this.options.path.map((point) => point.clone());
+      const profile = this.options.profile.map((point) => point.clone());
+      const capStart = this.options.capStart ?? true;
+      const capEnd = this.options.capEnd ?? true;
 
-    this.sweep.set_config_with_caps(path, profile, capStart, capEnd);
-    this.generateGeometry();
+      this.sweep.set_config_with_caps(path, profile, capStart, capEnd);
+      this.generateGeometry();
+      return;
+    }
+
+    if (colorChanged) {
+      this.color = this.options.color;
+    }
+
+    if (outlineStyleChanged && this._outlineEnabled) {
+      this.outline = true;
+    }
   }
 
   cleanGeometry() {

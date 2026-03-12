@@ -15,6 +15,8 @@ export interface IRectangleOptions {
   lineWidth?: number;
 }
 
+export type RectangleConfigUpdate = Partial<IRectangleOptions>;
+
 export interface IRectangleOffsetResult {
   points: Vector3[];
   beveledVertexIndices: number[];
@@ -100,28 +102,90 @@ export class Rectangle extends THREE.Line {
     }
   }
 
-  setConfig(options: IRectangleOptions) {
+  setConfig(options: RectangleConfigUpdate) {
     this.validateOptions();
 
-    // Render Config Update
-    // Note: For properties that directly impact rendering (like color), we can update them immediately without regenerating geometry.
-    this.options = { ...this.options, ...options };
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "center" in options ||
+      "width" in options ||
+      "breadth" in options;
+    const renderChanged =
+      "color" in options ||
+      "fatLines" in options ||
+      "lineWidth" in options;
 
-    console.log("Updated Rectangle Config:", this.options);
+    this.options = nextOptions;
 
-    // Kernel Config Update
-    const { width, breadth, center } = options;
-    this.polyLineRectangle.set_config(
-      center.clone(),
-      width,
-      breadth,
-    );
+    if (geometryChanged) {
+      this.polyLineRectangle.set_config(
+        nextOptions.center.clone(),
+        nextOptions.width,
+        nextOptions.breadth,
+      );
+      this.generateGeometry();
+      return;
+    }
 
-    this.generateGeometry();
+    if (renderChanged) {
+      this.updateRenderStyle();
+    }
   }
 
   getConfig() {
     return this.options;
+  }
+
+  private getCurrentPositions() {
+    const attribute = this.geometry.getAttribute("position");
+    if (!attribute || attribute.itemSize !== 3) {
+      return [];
+    }
+
+    const positions = [];
+    for (let index = 0; index < attribute.count; index += 1) {
+      positions.push(
+        attribute.getX(index),
+        attribute.getY(index),
+        attribute.getZ(index)
+      );
+    }
+
+    return positions;
+  }
+
+  private updateRenderStyle(bufferData?: number[]) {
+    const positions = bufferData ?? this.getCurrentPositions();
+
+    if (this.options.fatLines) {
+      if (!this.fatLine) {
+        this.fatLine = new Line2(
+          new LineGeometry(),
+          new LineMaterial({
+            color: this.options.color,
+            linewidth: this.options.lineWidth,
+            resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+          })
+        );
+        this.add(this.fatLine);
+      }
+
+      this.fatLine.geometry.setPositions(positions);
+      (this.fatLine.material as LineMaterial).color.set(this.options.color);
+      (this.fatLine.material as LineMaterial).linewidth = this.options.lineWidth ?? 1;
+      (this.fatLine.material as LineMaterial).resolution.set(
+        window.innerWidth,
+        window.innerHeight
+      );
+      this.fatLine.visible = true;
+    } else if (this.fatLine) {
+      this.fatLine.visible = false;
+    }
+
+    if (this.material instanceof THREE.LineBasicMaterial) {
+      this.material.color.set(this.options.color);
+      this.material.visible = !this.options.fatLines;
+    }
   }
 
   private generateGeometry() {
@@ -139,37 +203,7 @@ export class Rectangle extends THREE.Line {
 
     this.geometry = geometry;
     this.material = new THREE.LineBasicMaterial({ color: this.options.color });
-    
-    if (this.options.fatLines) {
-      this.material.visible = false;
-      this.handleFatLines(bufferData);
-    } else {
-      this.material.visible = true;
-      if (this.fatLine) {
-        this.fatLine.visible = false;
-      }
-    }
-  }
-
-  private handleFatLines(bufferData: number[]) {
-    if (!this.fatLine) {
-        this.fatLine = new Line2(new LineGeometry(), new LineMaterial({ color: this.options.color, linewidth: this.options.lineWidth, resolution: new THREE.Vector2(window.innerWidth, window.innerHeight) }));
-        this.add(this.fatLine);
-      }
-
-      const positions = [];
-      for (let i = 0; i < bufferData.length; i += 3) {
-        positions.push(bufferData[i], bufferData[i + 1], bufferData[i + 2]);
-      }
-
-      this.fatLine.geometry.setPositions(positions);
-      (this.fatLine.material as LineMaterial).color.set(this.options.color);
-      (this.fatLine.material as LineMaterial).linewidth = this.options.lineWidth ?? 1;
-      (this.fatLine.material as LineMaterial).resolution.set(window.innerWidth, window.innerHeight);
-
-      this.fatLine.visible = true;
-
-      console.log("Fat lines enabled for Rectangle");
+    this.updateRenderStyle(bufferData);
   }
 
   getBrep() {

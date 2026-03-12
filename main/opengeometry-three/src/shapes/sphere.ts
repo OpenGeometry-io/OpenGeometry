@@ -20,6 +20,8 @@ export interface ISphereOptions {
   outlineWidth?: number;
 }
 
+export type SphereConfigUpdate = Partial<ISphereOptions>;
+
 /* eslint-disable no-unused-vars */
 interface ISphereKernelInstance {
   set_config: (
@@ -89,23 +91,45 @@ export class Sphere extends THREE.Mesh {
     }
   }
 
-  setConfig(options: ISphereOptions) {
+  setConfig(options: SphereConfigUpdate) {
     this.validateOptions();
 
-    this.options = { ...this.options, ...options };
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "center" in options ||
+      "radius" in options ||
+      "widthSegments" in options ||
+      "heightSegments" in options;
+    const colorChanged = "color" in options;
+    const outlineStyleChanged =
+      "fatOutlines" in options ||
+      "outlineWidth" in options;
+
+    this.options = nextOptions;
     this._fatOutlines = this.options.fatOutlines ?? false;
     this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
     this.options.fatOutlines = this._fatOutlines;
     this.options.outlineWidth = this._outlineWidth;
 
-    this.sphere.set_config(
-      this.options.center.clone(),
-      this.options.radius,
-      this.options.widthSegments,
-      this.options.heightSegments
-    );
+    if (geometryChanged) {
+      this.sphere.set_config(
+        this.options.center.clone(),
+        this.options.radius,
+        this.options.widthSegments,
+        this.options.heightSegments
+      );
 
-    this.generateGeometry();
+      this.generateGeometry();
+      return;
+    }
+
+    if (colorChanged) {
+      this.color = this.options.color;
+    }
+
+    if (outlineStyleChanged && this._outlineEnabled) {
+      this.outline = true;
+    }
   }
 
   cleanGeometry() {

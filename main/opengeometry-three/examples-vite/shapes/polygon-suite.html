@@ -4,33 +4,20 @@
     <title>OpenGeometry Polygon Suite Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="OpenGeometry Demo" />
+    <meta name="description" content="OpenGeometry polygon suite example" />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
-  <body>
-    <aside class="og-badge">
-      <div class="og-badge-top">
-        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
-        <p class="og-badge-status">ready</p>
-      </div>
-      <div class="og-badge-meta">
-        <p class="og-badge-kicker">OPEN GEOMETRY • SHAPES</p>
-        <strong class="og-badge-title">Polygon Suite</strong>
-        <span class="og-badge-desc"
-          >Dataset-backed polygon validation with concave, performance, and multi-hole cases.</span
-        >
-      </div>
-      <div class="og-badge-chip-row">
-        <span class="og-chip og-chip-accent">Holes</span>
-        <span class="og-chip og-chip-accent">Concavity</span>
-      </div>
-      <div class="og-badge-footer">
-        <a class="og-badge-link" href="../index.html">Back to Examples</a>
-      </div>
-    </aside>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Polygon Suite</span>
+    </div>
 
     <aside class="og-controls" data-control-panel>
       <h3>Polygon Test Suite</h3>
+      <p class="og-control-summary">
+        Choose a dataset-backed polygon case. Dataset details are logged to the console.
+      </p>
 
       <label class="og-control-row" data-control-key="polygonType" data-control-type="select">
         <div class="og-control-header">
@@ -62,7 +49,13 @@
           <span class="og-control-label-chip">Polygon Color</span>
           <code class="og-control-value" data-control-value>#4CAF50</code>
         </div>
-        <input class="og-control-color" data-control-color type="color" value="#4caf50" aria-label="Polygon Color" />
+        <input
+          class="og-control-color"
+          data-control-color
+          type="color"
+          value="#4caf50"
+          aria-label="Polygon Color"
+        />
       </label>
 
       <label class="og-control-row" data-control-key="opacity" data-control-type="number">
@@ -106,46 +99,18 @@
           <option value="2">Memory (MB)</option>
         </select>
       </label>
-
-      <div class="og-control-row og-control-readonly">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Vertex Count</span>
-          <code class="og-control-value" data-info-vertices>0</code>
-        </div>
-      </div>
-
-      <div class="og-control-row og-control-readonly">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Hole Count</span>
-          <code class="og-control-value" data-info-holes>0</code>
-        </div>
-      </div>
-
-      <div class="og-control-row og-control-readonly">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Category</span>
-          <code class="og-control-value" data-info-category>-</code>
-        </div>
-      </div>
     </aside>
 
-    <aside id="polygon-description">
-      <strong data-desc-name>Complex_Multi_Hole</strong>
-      <p data-desc-category>Category: Hole Test Suite</p>
-      <p data-desc-holes>Holes: 3</p>
-      <p data-desc-text>Rectangular slab with three interior voids to validate multi-hole redraw stability.</p>
-    </aside>
     <div id="stats"></div>
-
     <div id="app"></div>
 
     <script type="module">
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
       import { OpenGeometry, Polygon, Vector3 } from "@og-three";
-      import Stats from "three/examples/jsm/libs/stats.module.js";
 
       const app = document.getElementById("app");
       if (!app) {
@@ -154,77 +119,342 @@
 
       const panel = document.querySelector("[data-control-panel]");
       const statsHost = document.getElementById("stats");
-      const descriptionName = document.querySelector("[data-desc-name]");
-      const descriptionCategory = document.querySelector("[data-desc-category]");
-      const descriptionHoles = document.querySelector("[data-desc-holes]");
-      const descriptionText = document.querySelector("[data-desc-text]");
-      const infoVertices = panel?.querySelector("[data-info-vertices]");
-      const infoHoles = panel?.querySelector("[data-info-holes]");
-      const infoCategory = panel?.querySelector("[data-info-category]");
 
-      if (
-        !panel ||
-        !statsHost ||
-        !descriptionName ||
-        !descriptionCategory ||
-        !descriptionHoles ||
-        !descriptionText ||
-        !infoVertices ||
-        !infoHoles ||
-        !infoCategory
-      ) {
+      if (!panel || !statsHost) {
         throw new Error("Missing static polygon-suite UI nodes");
+      }
+
+      const polygonDataset = {
+        Triangle: {
+          vertices: [
+            [0, 0, 0],
+            [3, 0, 0],
+            [1.5, 0, 3],
+          ],
+          description: "Basic triangle test for the smallest valid polygon footprint.",
+          category: "Basic Shapes",
+        },
+        Square: {
+          vertices: [
+            [-2, 0, -2],
+            [2, 0, -2],
+            [2, 0, 2],
+            [-2, 0, 2],
+          ],
+          description: "Simple rectangular slab used as the baseline fill and outline case.",
+          category: "Basic Shapes",
+        },
+        L_Shape: {
+          vertices: [
+            [0, 0, 0],
+            [6, 0, 0],
+            [6, 0, 4],
+            [10, 0, 4],
+            [10, 0, 10],
+            [0, 0, 10],
+          ],
+          description: "Concave architectural footprint for notch handling and triangulation checks.",
+          category: "Concave Cases",
+        },
+        Concave_Polygon: {
+          vertices: [
+            [0, 0, 0],
+            [3, 0, 0],
+            [4, 0, 2],
+            [6, 0, 0],
+            [10, 0, 0],
+            [10, 0, 3],
+            [8, 0, 4],
+            [10, 0, 6],
+            [10, 0, 10],
+            [6, 0, 10],
+            [4, 0, 8],
+            [3, 0, 10],
+            [0, 0, 10],
+            [0, 0, 6],
+            [2, 0, 4],
+            [0, 0, 3],
+          ],
+          description: "Complex concave polygon with multiple indentations for triangulation stress.",
+          category: "Concave Cases",
+        },
+        Complex_Multi_Hole: {
+          vertices: [
+            [-12, 0, -8],
+            [12, 0, -8],
+            [12, 0, 8],
+            [-12, 0, 8],
+          ],
+          holes: [
+            [
+              [-8, 0, -5],
+              [-8, 0, 1],
+              [-3, 0, 1],
+              [-3, 0, -5],
+            ],
+            [
+              [2, 0, -5],
+              [5, 0, -4],
+              [6, 0, -1],
+              [5, 0, 2],
+              [2, 0, 1],
+              [1, 0, -2],
+            ],
+            [
+              [0, 0, 4],
+              [0, 0, 6.5],
+              [5, 0, 6.5],
+              [5, 0, 5],
+              [2, 0, 5],
+              [2, 0, 4],
+            ],
+          ],
+          description:
+            "Rectangular slab with three interior voids to validate multi-hole redraw stability.",
+          category: "Hole Test Suite",
+        },
+        Highly_Complex: {
+          vertices: [
+            [0, 0, 0],
+            [1, 0, 0],
+            [2, 0, 1],
+            [3, 0, 0],
+            [4, 0, 1],
+            [5, 0, 0],
+            [6, 0, 1],
+            [7, 0, 0],
+            [8, 0, 1],
+            [9, 0, 0],
+            [10, 0, 1],
+            [11, 0, 2],
+            [12, 0, 1],
+            [13, 0, 2],
+            [14, 0, 3],
+            [15, 0, 4],
+            [16, 0, 5],
+            [17, 0, 6],
+            [18, 0, 7],
+            [19, 0, 8],
+            [20, 0, 9],
+            [19, 0, 10],
+            [18, 0, 9],
+            [17, 0, 8],
+            [16, 0, 7],
+            [15, 0, 6],
+            [14, 0, 5],
+            [13, 0, 4],
+            [12, 0, 3],
+            [11, 0, 2],
+            [10, 0, 3],
+            [9, 0, 2],
+            [8, 0, 3],
+            [7, 0, 2],
+            [6, 0, 3],
+            [5, 0, 2],
+            [4, 0, 3],
+            [3, 0, 2],
+            [2, 0, 3],
+            [1, 0, 2],
+            [0, 0, 1],
+          ],
+          description: "Large irregular polygon used to inspect performance and triangulation consistency.",
+          category: "Performance Testing",
+        },
+        Building: {
+          vertices: [
+            [66.1, 0, 11.2],
+            [66.1, 0, 9.6],
+            [66.6, 0, 9.6],
+            [66.6, 0, 8.7],
+            [74.3, 0, 8.7],
+            [77.1, 0, 8.7],
+            [77.1, 0, 11.4],
+            [75.0, 0, 11.4],
+            [75.0, 0, 11.3],
+            [74.2, 0, 11.3],
+            [74.2, 0, 10.6],
+            [71.0, 0, 10.6],
+            [71.0, 0, 11.3],
+            [66.6, 0, 11.3],
+            [66.6, 0, 11.2],
+          ],
+          description:
+            "Architectural outline sampled from a real-world earcut-oriented building footprint.",
+          category: "Dataset Cases",
+        },
+      };
+
+      let polygon;
+      let config = {
+        polygonType: "Complex_Multi_Hole",
+        showOutline: true,
+        polygonColor: "#4CAF50",
+        opacity: 0.7,
+        wireframe: false,
+        showStats: true,
+        statsMode: 0,
+      };
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
       }
 
       function formatControlNumber(value) {
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
       }
 
-      function clamp(value, min, max) {
-        return Math.min(max, Math.max(min, value));
+      function toVector3Loop(points) {
+        return points.map((point) => new Vector3(point[0], point[1], point[2]));
       }
 
-      function disposeMaterial(material) {
-        if (!material) {
-          return;
+      function hexToColorNumber(hexColor) {
+        return parseInt(hexColor.slice(1), 16);
+      }
+
+      function applyPolygonMaterial() {
+        polygon.outline = config.showOutline;
+
+        if (polygon.material && polygon.material.color) {
+          polygon.material.color.set(config.polygonColor);
         }
 
-        if (Array.isArray(material)) {
-          material.forEach((entry) => entry && entry.dispose && entry.dispose());
-          return;
-        }
-
-        if (material.dispose) {
-          material.dispose();
+        if (polygon.material) {
+          polygon.material.opacity = config.opacity;
+          polygon.material.transparent = config.opacity < 1;
+          polygon.material.wireframe = config.wireframe;
         }
       }
 
-      function disposeObject3D(object) {
-        object.traverse((node) => {
-          if (node.geometry && node.geometry.dispose) {
-            node.geometry.dispose();
+      function setUIControls() {
+        const controls = panel.querySelectorAll("[data-control-key]");
+
+        controls.forEach((control) => {
+          const key = control.getAttribute("data-control-key");
+          const type = control.getAttribute("data-control-type");
+
+          if (type === "number") {
+            const rangeInput = control.querySelector("[data-control-range]");
+            const numberInput = control.querySelector("[data-control-number]");
+            const valueDisplay = control.querySelector("[data-control-value]");
+
+            const min = parseFloat(rangeInput.min);
+            const max = parseFloat(rangeInput.max);
+
+            function setNumberValue(value, shouldUpdate = true) {
+              const numericValue = parseFloat(value);
+              if (!Number.isFinite(numericValue)) {
+                return;
+              }
+
+              const clampedValue = clamp(numericValue, min, max);
+              config[key] = clampedValue;
+              rangeInput.value = String(clampedValue);
+              numberInput.value = String(clampedValue);
+              valueDisplay.textContent = formatControlNumber(clampedValue);
+
+              if (shouldUpdate) {
+                updateGeometry();
+              }
+            }
+
+            setNumberValue(config[key], false);
+            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
+            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
           }
-          disposeMaterial(node.material);
+
+          if (type === "boolean") {
+            const toggleInput = control.querySelector("[data-control-toggle]");
+            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+
+            function setBooleanValue(checked, shouldUpdate = true) {
+              config[key] = checked;
+              toggleInput.checked = checked;
+              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
+
+              if (shouldUpdate) {
+                updateGeometry();
+              }
+            }
+
+            setBooleanValue(Boolean(config[key]), false);
+            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
+          }
+
+          if (type === "select") {
+            const selectInput = control.querySelector("[data-control-select]");
+
+            function setSelectValue(value, shouldUpdate = true) {
+              config[key] = key === "statsMode" ? Number(value) : value;
+              selectInput.value = String(value);
+
+              if (shouldUpdate) {
+                updateGeometry();
+              }
+            }
+
+            setSelectValue(config[key], false);
+            selectInput.addEventListener("change", () => setSelectValue(selectInput.value));
+          }
+
+          if (type === "color") {
+            const colorInput = control.querySelector("[data-control-color]");
+            const valueDisplay = control.querySelector("[data-control-value]");
+
+            function setColorValue(value, shouldUpdate = true) {
+              config[key] = value;
+              colorInput.value = value;
+              valueDisplay.textContent = value.toUpperCase();
+
+              if (shouldUpdate) {
+                updateGeometry();
+              }
+            }
+
+            setColorValue(config[key], false);
+            colorInput.addEventListener("input", () => setColorValue(colorInput.value));
+          }
         });
       }
 
-      function replaceSceneObject(scene, previous, next) {
-        if (previous) {
-          previous.parent && previous.parent.remove(previous);
-          disposeObject3D(previous);
+      function updateGeometry() {
+        if (!polygon) {
+          return;
         }
 
-        scene.add(next);
-        return next;
+        const polygonData = polygonDataset[config.polygonType];
+        if (!polygonData) {
+          return;
+        }
+
+        polygon.setConfig({
+          vertices: toVector3Loop(polygonData.vertices),
+          holes: (polygonData.holes || []).map((hole) => toVector3Loop(hole)),
+          color: hexToColorNumber(config.polygonColor),
+        });
+
+        applyPolygonMaterial();
+        statsHost.style.display = config.showStats ? "block" : "none";
+        stats.showPanel(Number(config.statsMode));
+
+        console.groupCollapsed(`[polygon-suite] ${config.polygonType}`);
+        console.log({
+          category: polygonData.category,
+          description: polygonData.description,
+          vertexCount: polygonData.vertices.length,
+          holeCount: polygonData.holes ? polygonData.holes.length : 0,
+          color: config.polygonColor,
+          opacity: config.opacity,
+          wireframe: config.wireframe,
+          outline: config.showOutline,
+        });
+        console.groupEnd();
       }
 
-      async function createExampleScene(meta, options) {
-        const settings = options || {};
-        document.body.classList.add("og-example-page");
-        document.title = meta.title + " | OpenGeometry";
+      const stats = new Stats();
 
+      async function main() {
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(settings.background || 0xf6f1eb);
+        scene.background = new THREE.Color(0xf6f1eb);
 
         const camera = new THREE.PerspectiveCamera(
           55,
@@ -232,9 +462,7 @@
           0.1,
           4000
         );
-
-        const cameraPosition = settings.cameraPosition || [5.5, 4.2, 6.5];
-        camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+        camera.position.set(0, 20, 20);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -243,19 +471,10 @@
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        const target = settings.target || [0, 0.8, 0];
-        controls.target.set(target[0], target[1], target[2]);
+        controls.target.set(0, 0, 0);
         controls.update();
 
-        scene.add(
-          new THREE.GridHelper(
-            settings.gridSize || 32,
-            settings.gridDivisions || 32,
-            settings.gridPrimary || 0xd88b63,
-            settings.gridSecondary || 0xe7d4ca
-          )
-        );
-
+        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
         scene.add(new THREE.AmbientLight(0xffffff, 0.72));
 
         const key = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -267,6 +486,22 @@
         scene.add(fill);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        polygon = new Polygon({
+          vertices: toVector3Loop(polygonDataset[config.polygonType].vertices),
+          holes: (polygonDataset[config.polygonType].holes || []).map((hole) => toVector3Loop(hole)),
+          color: hexToColorNumber(config.polygonColor),
+        });
+        polygon.position.y = 0.01;
+        scene.add(polygon);
+
+        statsHost.replaceChildren(stats.dom);
+        const renderBase = renderer.render.bind(renderer);
+        renderer.render = (renderScene, renderCamera) => {
+          stats.begin();
+          renderBase(renderScene, renderCamera);
+          stats.end();
+        };
 
         function onResize() {
           camera.aspect = window.innerWidth / window.innerHeight;
@@ -283,410 +518,9 @@
         }
 
         animate();
-        return { scene, camera, renderer, controls };
-      }
 
-      function bindBooleanControl(key, initialValue, onChange) {
-        const row = panel.querySelector(`[data-control-key="${key}"]`);
-        if (!row) {
-          throw new Error(`Missing toggle row for ${key}`);
-        }
-
-        const toggle = row.querySelector("[data-control-toggle]");
-        const status = row.querySelector("[data-control-bool-state]");
-        if (!toggle || !status) {
-          throw new Error(`Missing toggle controls for ${key}`);
-        }
-
-        toggle.checked = initialValue;
-        status.textContent = initialValue ? "Enabled" : "Disabled";
-        toggle.addEventListener("change", () => {
-          status.textContent = toggle.checked ? "Enabled" : "Disabled";
-          onChange(toggle.checked);
-        });
-      }
-
-      function bindNumberControl(key, min, max, step, initialValue, onChange) {
-        const row = panel.querySelector(`[data-control-key="${key}"]`);
-        if (!row) {
-          throw new Error(`Missing number row for ${key}`);
-        }
-
-        const valueLabel = row.querySelector("[data-control-value]");
-        const rangeInput = row.querySelector("[data-control-range]");
-        const numberInput = row.querySelector("[data-control-number]");
-        if (!valueLabel || !rangeInput || !numberInput) {
-          throw new Error(`Missing number controls for ${key}`);
-        }
-
-        const sync = (value) => {
-          const constrained = clamp(value, min, max);
-          rangeInput.value = String(constrained);
-          numberInput.value = String(constrained);
-          valueLabel.textContent = formatControlNumber(constrained);
-          return constrained;
-        };
-
-        sync(initialValue);
-
-        const update = (raw) => {
-          const next = sync(raw);
-          onChange(next);
-        };
-
-        rangeInput.addEventListener("input", () => update(Number(rangeInput.value)));
-        numberInput.addEventListener("change", () => update(Number(numberInput.value)));
-      }
-
-      function bindSelectControl(key, initialValue, onChange) {
-        const row = panel.querySelector(`[data-control-key="${key}"]`);
-        if (!row) {
-          throw new Error(`Missing select row for ${key}`);
-        }
-
-        const select = row.querySelector("[data-control-select]");
-        if (!select) {
-          throw new Error(`Missing select control for ${key}`);
-        }
-
-        select.value = String(initialValue);
-        select.addEventListener("change", () => {
-          onChange(select.value);
-        });
-      }
-
-      function bindColorControl(initialValue, onChange) {
-        const row = panel.querySelector('[data-control-key="polygonColor"]');
-        if (!row) {
-          throw new Error("Missing color row");
-        }
-
-        const input = row.querySelector("[data-control-color]");
-        const valueLabel = row.querySelector("[data-control-value]");
-        if (!input || !valueLabel) {
-          throw new Error("Missing color controls");
-        }
-
-        input.value = initialValue;
-        valueLabel.textContent = initialValue.toUpperCase();
-        input.addEventListener("input", () => {
-          valueLabel.textContent = input.value.toUpperCase();
-          onChange(input.value);
-        });
-      }
-
-      async function main() {
-        const meta = {
-          slug: "shapes/polygon-suite",
-          category: "shapes",
-          title: "Polygon Suite",
-          description:
-            "Dataset-backed polygon validation with concave, performance, and multi-hole cases.",
-          statusLabel: "ready",
-          chips: ["Holes", "Concavity"],
-          footerText: "Holes, Concavity",
-        };
-
-        const polygonDataset = {
-          Triangle: {
-            vertices: [
-              [0, 0, 0],
-              [3, 0, 0],
-              [1.5, 0, 3],
-            ],
-            description: "Basic triangle test for the smallest valid polygon footprint.",
-            category: "Basic Shapes",
-          },
-          Square: {
-            vertices: [
-              [-2, 0, -2],
-              [2, 0, -2],
-              [2, 0, 2],
-              [-2, 0, 2],
-            ],
-            description: "Simple rectangular slab used as the baseline fill and outline case.",
-            category: "Basic Shapes",
-          },
-          L_Shape: {
-            vertices: [
-              [0, 0, 0],
-              [6, 0, 0],
-              [6, 0, 4],
-              [10, 0, 4],
-              [10, 0, 10],
-              [0, 0, 10],
-            ],
-            description: "Concave architectural footprint for notch handling and triangulation checks.",
-            category: "Concave Cases",
-          },
-          Concave_Polygon: {
-            vertices: [
-              [0, 0, 0],
-              [3, 0, 0],
-              [4, 0, 2],
-              [6, 0, 0],
-              [10, 0, 0],
-              [10, 0, 3],
-              [8, 0, 4],
-              [10, 0, 6],
-              [10, 0, 10],
-              [6, 0, 10],
-              [4, 0, 8],
-              [3, 0, 10],
-              [0, 0, 10],
-              [0, 0, 6],
-              [2, 0, 4],
-              [0, 0, 3],
-            ],
-            description: "Complex concave polygon with multiple indentations for triangulation stress.",
-            category: "Concave Cases",
-          },
-          Complex_Multi_Hole: {
-            vertices: [
-              [-12, 0, -8],
-              [12, 0, -8],
-              [12, 0, 8],
-              [-12, 0, 8],
-            ],
-            holes: [
-              [
-                [-8, 0, -5],
-                [-8, 0, 1],
-                [-3, 0, 1],
-                [-3, 0, -5],
-              ],
-              [
-                [2, 0, -5],
-                [5, 0, -4],
-                [6, 0, -1],
-                [5, 0, 2],
-                [2, 0, 1],
-                [1, 0, -2],
-              ],
-              [
-                [0, 0, 4],
-                [0, 0, 6.5],
-                [5, 0, 6.5],
-                [5, 0, 5],
-                [2, 0, 5],
-                [2, 0, 4],
-              ],
-            ],
-            description:
-              "Rectangular slab with three interior voids to validate multi-hole redraw stability.",
-            category: "Hole Test Suite",
-          },
-          Highly_Complex: {
-            vertices: [
-              [0, 0, 0],
-              [1, 0, 0],
-              [2, 0, 1],
-              [3, 0, 0],
-              [4, 0, 1],
-              [5, 0, 0],
-              [6, 0, 1],
-              [7, 0, 0],
-              [8, 0, 1],
-              [9, 0, 0],
-              [10, 0, 1],
-              [11, 0, 2],
-              [12, 0, 1],
-              [13, 0, 2],
-              [14, 0, 3],
-              [15, 0, 4],
-              [16, 0, 5],
-              [17, 0, 6],
-              [18, 0, 7],
-              [19, 0, 8],
-              [20, 0, 9],
-              [19, 0, 10],
-              [18, 0, 9],
-              [17, 0, 8],
-              [16, 0, 7],
-              [15, 0, 6],
-              [14, 0, 5],
-              [13, 0, 4],
-              [12, 0, 3],
-              [11, 0, 2],
-              [10, 0, 3],
-              [9, 0, 2],
-              [8, 0, 3],
-              [7, 0, 2],
-              [6, 0, 3],
-              [5, 0, 2],
-              [4, 0, 3],
-              [3, 0, 2],
-              [2, 0, 3],
-              [1, 0, 2],
-              [0, 0, 1],
-            ],
-            description: "Large irregular polygon used to inspect performance and triangulation consistency.",
-            category: "Performance Testing",
-          },
-          Building: {
-            vertices: [
-              [66.1, 0, 11.2],
-              [66.1, 0, 9.6],
-              [66.6, 0, 9.6],
-              [66.6, 0, 8.7],
-              [74.3, 0, 8.7],
-              [77.1, 0, 8.7],
-              [77.1, 0, 11.4],
-              [75.0, 0, 11.4],
-              [75.0, 0, 11.3],
-              [74.2, 0, 11.3],
-              [74.2, 0, 10.6],
-              [71.0, 0, 10.6],
-              [71.0, 0, 11.3],
-              [66.6, 0, 11.3],
-              [66.6, 0, 11.2],
-            ],
-            description:
-              "Architectural outline sampled from a real-world earcut-oriented building footprint.",
-            category: "Dataset Cases",
-          },
-        };
-
-        function toVector3Loop(points) {
-          return points.map((point) => new Vector3(point[0], point[1], point[2]));
-        }
-
-        function applyPolygonMaterial(polygon, color, opacity, wireframe, outline) {
-          polygon.outline = outline;
-
-          if (polygon.material && polygon.material.color) {
-            polygon.material.color.set(color);
-          }
-
-          if (polygon.material) {
-            polygon.material.opacity = opacity;
-            polygon.material.transparent = opacity < 1;
-            polygon.material.wireframe = wireframe;
-          }
-        }
-
-        const { scene, camera, renderer, controls } = await createExampleScene(meta, {
-          cameraPosition: [0, 20, 20],
-          target: [0, 0, 0],
-        });
-
-        camera.position.set(0, 20, 20);
-        controls.target.set(0, 0, 0);
-        controls.update();
-
-        const stats = new Stats();
-        statsHost.replaceChildren(stats.dom);
-
-        const renderBase = renderer.render.bind(renderer);
-        renderer.render = (renderScene, renderCamera) => {
-          stats.begin();
-          renderBase(renderScene, renderCamera);
-          stats.end();
-        };
-
-        const params = {
-          polygonType: "Complex_Multi_Hole",
-          showOutline: true,
-          polygonColor: "#4CAF50",
-          opacity: 0.7,
-          wireframe: false,
-          showStats: true,
-          statsMode: 0,
-        };
-
-        let current = null;
-
-        function updatePolygonDescription(polygonName) {
-          const polygonData = polygonDataset[polygonName];
-          if (!polygonData) {
-            return;
-          }
-
-          descriptionName.textContent = polygonName;
-          descriptionCategory.textContent = `Category: ${polygonData.category}`;
-          descriptionHoles.textContent = polygonData.holes && polygonData.holes.length
-            ? `Holes: ${polygonData.holes.length}`
-            : "Holes: 0";
-          descriptionText.textContent = polygonData.description;
-        }
-
-        function createPolygon(polygonName) {
-          const polygonData = polygonDataset[polygonName];
-          if (!polygonData) {
-            return;
-          }
-
-          const polygon = new Polygon({
-            vertices: toVector3Loop(polygonData.vertices),
-            color: 0x4caf50,
-          });
-
-          (polygonData.holes || []).forEach((hole) => {
-            polygon.addHole(toVector3Loop(hole));
-          });
-
-          polygon.position.y = 0.01;
-          applyPolygonMaterial(
-            polygon,
-            params.polygonColor,
-            params.opacity,
-            params.wireframe,
-            params.showOutline
-          );
-
-          current = replaceSceneObject(scene, current, polygon);
-          infoVertices.textContent = String(polygonData.vertices.length);
-          infoHoles.textContent = String(polygonData.holes ? polygonData.holes.length : 0);
-          infoCategory.textContent = polygonData.category;
-          updatePolygonDescription(polygonName);
-        }
-
-        bindSelectControl("polygonType", params.polygonType, (value) => {
-          params.polygonType = value;
-          createPolygon(value);
-        });
-
-        bindBooleanControl("showOutline", params.showOutline, (value) => {
-          params.showOutline = value;
-          if (current) {
-            applyPolygonMaterial(current, params.polygonColor, params.opacity, params.wireframe, value);
-          }
-        });
-
-        bindColorControl(params.polygonColor, (value) => {
-          params.polygonColor = value;
-          if (current) {
-            applyPolygonMaterial(current, value, params.opacity, params.wireframe, params.showOutline);
-          }
-        });
-
-        bindNumberControl("opacity", 0, 1, 0.01, params.opacity, (value) => {
-          params.opacity = value;
-          if (current) {
-            applyPolygonMaterial(current, params.polygonColor, value, params.wireframe, params.showOutline);
-          }
-        });
-
-        bindBooleanControl("wireframe", params.wireframe, (value) => {
-          params.wireframe = value;
-          if (current) {
-            applyPolygonMaterial(current, params.polygonColor, params.opacity, value, params.showOutline);
-          }
-        });
-
-        bindBooleanControl("showStats", params.showStats, (value) => {
-          params.showStats = value;
-          statsHost.style.display = value ? "block" : "none";
-        });
-
-        bindSelectControl("statsMode", params.statsMode, (value) => {
-          params.statsMode = Number(value);
-          stats.showPanel(params.statsMode);
-        });
-
-        statsHost.style.display = params.showStats ? "block" : "none";
-        stats.showPanel(params.statsMode);
-        createPolygon(params.polygonType);
+        setUIControls();
+        updateGeometry();
       }
 
       void main();

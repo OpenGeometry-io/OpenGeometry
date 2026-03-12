@@ -4,35 +4,20 @@
     <title>OpenGeometry Sweep MEP Pipes Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="OpenGeometry Demo" />
+    <meta name="description" content="OpenGeometry sweep MEP pipes example" />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
-  <body>
-    <aside class="og-badge">
-      <div class="og-badge-top">
-        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
-        <p class="og-badge-status">ready</p>
-      </div>
-      <div class="og-badge-meta">
-        <p class="og-badge-kicker">OPEN GEOMETRY • OPERATIONS</p>
-        <strong class="og-badge-title">Sweep MEP Pipes</strong>
-        <span class="og-badge-desc">Adjustable multi-run MEP sweep benchmark using primitive-backed path/profile inputs.</span>
-      </div>
-      <div class="og-badge-chip-row">
-        <span class="og-chip og-chip-accent">Arc + Rectangle</span>
-        <span class="og-chip og-chip-accent">Legend</span>
-        <span class="og-chip og-chip-accent">FPS</span>
-      </div>
-      <div class="og-badge-footer">
-        <a class="og-badge-link" href="../index.html">Back to Examples</a>
-      </div>
-    </aside>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Sweep MEP Pipes</span>
+    </div>
 
     <aside class="og-controls" data-control-panel>
       <h3>MEP Sweep Benchmark Parameters</h3>
       <p class="og-control-summary">
-        Red pipes use arc profiles. Blue pipes use rectangle profiles.
-        Joint strategy is split into miter mains and bevel branches.
+        Red pipes use arc profiles. Blue pipes use rectangle profiles. Counts, samples, and export
+        reports are logged to the console.
       </p>
 
       <label class="og-control-row" data-control-key="runCount" data-control-type="number">
@@ -196,59 +181,10 @@
         </select>
       </label>
 
-      <div class="og-control-row">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Generated Pipes</span>
-          <code data-info-total>0</code>
-        </div>
-        <p class="og-control-summary">
-          Arc Main <strong data-info-arc-main>0</strong> · Arc Branch <strong data-info-arc-branch>0</strong><br />
-          Rect Main <strong data-info-rect-main>0</strong> · Rect Branch <strong data-info-rect-branch>0</strong>
-        </p>
-      </div>
-
-      <pre class="og-control-report" data-report>Generate geometry to see MEP pipe config summary and per-type samples.</pre>
-    </aside>
-
-    <aside
-      class="og-controls"
-      id="pipe-legend"
-      style="top: 176px; right: auto; left: 16px; width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 196px); z-index: 25;"
-    >
-      <h3>Pipe Legend</h3>
-      <p class="og-control-summary">Color, profile, and joint strategy used for each generated pipe category.</p>
-
-      <div class="og-control-row">
-        <div class="og-control-header">
-          <span class="og-control-label-chip" style="background: rgba(231, 76, 87, 0.15); color: #8f2028;">Arc Main</span>
-          <code data-legend-count="arc-main">0</code>
-        </div>
-        <p class="og-control-summary">Red · Arc profile · Hard miter sweep</p>
-      </div>
-
-      <div class="og-control-row">
-        <div class="og-control-header">
-          <span class="og-control-label-chip" style="background: rgba(231, 76, 87, 0.15); color: #8f2028;">Arc Branch</span>
-          <code data-legend-count="arc-branch">0</code>
-        </div>
-        <p class="og-control-summary">Red · Arc profile · Hard miter sweep</p>
-      </div>
-
-      <div class="og-control-row">
-        <div class="og-control-header">
-          <span class="og-control-label-chip" style="background: rgba(70, 112, 245, 0.15); color: #1f3c91;">Rect Main</span>
-          <code data-legend-count="rect-main">0</code>
-        </div>
-        <p class="og-control-summary">Blue · Rectangle profile · Hard miter sweep</p>
-      </div>
-
-      <div class="og-control-row">
-        <div class="og-control-header">
-          <span class="og-control-label-chip" style="background: rgba(70, 112, 245, 0.15); color: #1f3c91;">Rect Branch</span>
-          <code data-legend-count="rect-branch">0</code>
-        </div>
-        <p class="og-control-summary">Blue · Rectangle profile · Hard miter sweep</p>
-      </div>
+      <button type="button" class="og-control-action og-control-action-rose" data-action="export-ifc">
+        Export IFC + Metadata
+      </button>
+      <a data-download-link hidden></a>
     </aside>
 
     <div id="stats" style="left: 16px; bottom: 16px;"></div>
@@ -260,7 +196,7 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Arc, Cuboid, Polyline, Rectangle, Sweep, Vector3 } from "@og-three";
+      import { OGSceneManager, OpenGeometry, Arc, Cuboid, Polyline, Rectangle, Sweep, Vector3 } from "@og-three";
 
       const app = document.getElementById("app");
       if (!app) {
@@ -269,34 +205,9 @@
 
       const panel = document.querySelector("[data-control-panel]");
       const statsHost = document.getElementById("stats");
-      const reportNode = panel?.querySelector("[data-report]");
-      const infoTotal = panel?.querySelector("[data-info-total]");
-      const infoArcMain = panel?.querySelector("[data-info-arc-main]");
-      const infoArcBranch = panel?.querySelector("[data-info-arc-branch]");
-      const infoRectMain = panel?.querySelector("[data-info-rect-main]");
-      const infoRectBranch = panel?.querySelector("[data-info-rect-branch]");
+      const exportIfcButton = panel?.querySelector('[data-action="export-ifc"]');
 
-      const legendCountNodes = {
-        "arc-main": document.querySelector('[data-legend-count="arc-main"]'),
-        "arc-branch": document.querySelector('[data-legend-count="arc-branch"]'),
-        "rect-main": document.querySelector('[data-legend-count="rect-main"]'),
-        "rect-branch": document.querySelector('[data-legend-count="rect-branch"]'),
-      };
-
-      if (
-        !panel ||
-        !statsHost ||
-        !reportNode ||
-        !infoTotal ||
-        !infoArcMain ||
-        !infoArcBranch ||
-        !infoRectMain ||
-        !infoRectBranch ||
-        !legendCountNodes["arc-main"] ||
-        !legendCountNodes["arc-branch"] ||
-        !legendCountNodes["rect-main"] ||
-        !legendCountNodes["rect-branch"]
-      ) {
+      if (!panel || !statsHost || !exportIfcButton) {
         throw new Error("Missing static sweep-mep-pipes UI nodes");
       }
 
@@ -327,6 +238,36 @@
         },
       };
 
+      let config = {
+        runCount: 10,
+        branchCount: 12,
+        laneSpacing: 3.2,
+        runLength: 26,
+        mainElevation: 2.8,
+        branchDrop: 1.1,
+        branchReach: 1.45,
+        profileScale: 1,
+        wallHeight: 3.4,
+        showWalls: true,
+        outline: true,
+        fatOutlines: false,
+        outlineWidth: 4,
+        showStats: true,
+        statsMode: 0,
+      };
+
+      let orbitControls;
+      let stats;
+      let pipeGroup;
+      let structureGroup;
+      let pipeObjects = new Map();
+      let structureObjects = new Map();
+      let latestExportSnapshot = null;
+      let profileSources;
+      let profileByType = null;
+      let profileMetrics = null;
+      let cachedProfileScale = null;
+
       function formatControlNumber(value) {
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
       }
@@ -335,106 +276,18 @@
         return Math.min(max, Math.max(min, value));
       }
 
-      function disposeMaterial(material) {
-        if (!material) {
-          return;
+      function downloadText(text, filename, mime) {
+        const link = panel.querySelector("[data-download-link]");
+        if (!link) {
+          throw new Error("Missing download link node");
         }
 
-        if (Array.isArray(material)) {
-          material.forEach((entry) => entry && entry.dispose && entry.dispose());
-          return;
-        }
-
-        if (material.dispose) {
-          material.dispose();
-        }
-      }
-
-      function disposeObject3D(object) {
-        object.traverse((node) => {
-          if (node.geometry && node.geometry.dispose) {
-            node.geometry.dispose();
-          }
-          disposeMaterial(node.material);
-        });
-      }
-
-      function replaceSceneObject(scene, previous, next) {
-        if (previous) {
-          previous.parent && previous.parent.remove(previous);
-          disposeObject3D(previous);
-        }
-
-        scene.add(next);
-        return next;
-      }
-
-      function bindControls(definitions, onChange) {
-        const state = {};
-        const emitChange = () => {
-          onChange({ ...state });
-        };
-
-        definitions.forEach((definition) => {
-          state[definition.key] = definition.value;
-          const row = panel.querySelector(`[data-control-key="${definition.key}"]`);
-          if (!row) {
-            throw new Error(`Missing control row for ${definition.key}`);
-          }
-
-          if (definition.type === "number") {
-            const valueLabel = row.querySelector("[data-control-value]");
-            const rangeInput = row.querySelector("[data-control-range]");
-            const numberInput = row.querySelector("[data-control-number]");
-            if (!valueLabel || !rangeInput || !numberInput) {
-              throw new Error(`Missing number controls for ${definition.key}`);
-            }
-
-            const updateValue = (raw) => {
-              const next = clamp(raw, definition.min, definition.max);
-              state[definition.key] = next;
-              rangeInput.value = String(next);
-              numberInput.value = String(next);
-              valueLabel.textContent = formatControlNumber(next);
-              emitChange();
-            };
-
-            rangeInput.addEventListener("input", () => updateValue(Number(rangeInput.value)));
-            numberInput.addEventListener("change", () => updateValue(Number(numberInput.value)));
-            valueLabel.textContent = formatControlNumber(definition.value);
-            return;
-          }
-
-          if (definition.type === "boolean") {
-            const toggle = row.querySelector("[data-control-toggle]");
-            const boolLabel = row.querySelector("[data-control-bool-state]");
-            if (!toggle || !boolLabel) {
-              throw new Error(`Missing boolean controls for ${definition.key}`);
-            }
-
-            toggle.checked = Boolean(definition.value);
-            boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-            toggle.addEventListener("change", () => {
-              state[definition.key] = toggle.checked;
-              boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-              emitChange();
-            });
-            return;
-          }
-
-          const select = row.querySelector("[data-control-select]");
-          if (!select) {
-            throw new Error(`Missing select control for ${definition.key}`);
-          }
-
-          select.value = String(definition.value);
-          select.addEventListener("change", () => {
-            state[definition.key] = select.value;
-            emitChange();
-          });
-        });
-
-        emitChange();
+        const blob = new Blob([text], { type: mime });
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
       }
 
       function toVector3List(vertices) {
@@ -494,121 +347,668 @@
         };
       }
 
-      function updateLegendAndInfo(counts) {
-        const total = counts["arc-main"] + counts["arc-branch"] + counts["rect-main"] + counts["rect-branch"];
-
-        legendCountNodes["arc-main"].textContent = String(counts["arc-main"]);
-        legendCountNodes["arc-branch"].textContent = String(counts["arc-branch"]);
-        legendCountNodes["rect-main"].textContent = String(counts["rect-main"]);
-        legendCountNodes["rect-branch"].textContent = String(counts["rect-branch"]);
-
-        infoTotal.textContent = String(total);
-        infoArcMain.textContent = String(counts["arc-main"]);
-        infoArcBranch.textContent = String(counts["arc-branch"]);
-        infoRectMain.textContent = String(counts["rect-main"]);
-        infoRectBranch.textContent = String(counts["rect-branch"]);
-
+      function measurePathLength(points) {
+        let total = 0;
+        for (let index = 1; index < points.length; index += 1) {
+          const start = points[index - 1];
+          const end = points[index];
+          const dx = Number(end.x) - Number(start.x);
+          const dy = Number(end.y) - Number(start.y);
+          const dz = Number(end.z) - Number(start.z);
+          total += Math.sqrt(dx * dx + dy * dy + dz * dz);
+        }
         return total;
       }
 
-      function buildReportText(total, counts, samples, state, wallCount) {
-        return [
-          "Sweep MEP Pipes Config Summary",
-          `Total Pipes: ${total}`,
-          `Run Count: ${Math.round(state.runCount)} | Branches / Run: ${Math.round(state.branchCount)} | Walls/Blocks: ${wallCount}`,
-          `Run Length: ${formatControlNumber(state.runLength)} | Run Spacing: ${formatControlNumber(state.laneSpacing)} | Main Elevation: ${formatControlNumber(state.mainElevation)}`,
-          `Branch Drop: ${formatControlNumber(state.branchDrop)} | Branch Reach: ${formatControlNumber(state.branchReach)} | Profile Scale: ${formatControlNumber(state.profileScale)}`,
-          "",
-          `Arc Main: ${counts["arc-main"]}`,
-          `Arc Branch: ${counts["arc-branch"]}`,
-          `Rect Main: ${counts["rect-main"]}`,
-          `Rect Branch: ${counts["rect-branch"]}`,
-          "",
-          "Sample Configs (one per type):",
-          `Arc Main:\n${JSON.stringify(samples["arc-main"], null, 2)}`,
-          `Arc Branch:\n${JSON.stringify(samples["arc-branch"], null, 2)}`,
-          `Rect Main:\n${JSON.stringify(samples["rect-main"], null, 2)}`,
-          `Rect Branch:\n${JSON.stringify(samples["rect-branch"], null, 2)}`,
-        ].join("\n");
+      function buildIfcSemantics(pipeConfigs, structureConfigs, summary) {
+        const semantics = {};
+
+        pipeConfigs.forEach((pipeConfig) => {
+          const branchLabel =
+            pipeConfig.branchIndex === null ? "Main" : `Branch ${pipeConfig.branchIndex + 1}`;
+          const quantitySet = {
+            PathLength: Number(measurePathLength(pipeConfig.pathPoints).toFixed(4)),
+            PointCount: Number(pipeConfig.pathPoints.length),
+            OutlineWidth: Number(pipeConfig.outlineWidth),
+          };
+
+          if (typeof pipeConfig.profileParams.radius === "number") {
+            quantitySet.ProfileDiameter = Number((pipeConfig.profileParams.radius * 2).toFixed(4));
+          }
+          if (typeof pipeConfig.profileParams.width === "number") {
+            quantitySet.ProfileWidth = Number(pipeConfig.profileParams.width.toFixed(4));
+          }
+          if (typeof pipeConfig.profileParams.depth === "number") {
+            quantitySet.ProfileDepth = Number(pipeConfig.profileParams.depth.toFixed(4));
+          }
+
+          semantics[pipeConfig.id] = {
+            ifc_class: "IFCMEMBER",
+            name: `${pipeConfig.type} ${branchLabel}`,
+            description: `${pipeConfig.type} benchmark sweep generated in the MEP pipe example`,
+            object_type: `MEP Pipe ${pipeConfig.profile}`,
+            tag: pipeConfig.id.toUpperCase(),
+            property_sets: {
+              OG_MepPipeBenchmark: {
+                Category: pipeConfig.type,
+                Profile: pipeConfig.profile,
+                JointMode: pipeConfig.jointMode,
+                BranchRole: pipeConfig.branchIndex === null ? "main" : "branch",
+                LaneIndex: String(pipeConfig.laneIndex),
+                BranchIndex:
+                  pipeConfig.branchIndex === null ? "main" : String(pipeConfig.branchIndex),
+                Color: pipeConfig.color,
+              },
+            },
+            quantity_sets: {
+              OG_MepPipeQuantities: quantitySet,
+            },
+          };
+        });
+
+        structureConfigs.forEach((structureConfig) => {
+          semantics[structureConfig.id] = {
+            ifc_class:
+              structureConfig.role === "wall" ? "IFCWALL" : "IFCBUILDINGELEMENTPROXY",
+            name: structureConfig.name,
+            description: structureConfig.description,
+            object_type: structureConfig.objectType,
+            tag: structureConfig.id.toUpperCase(),
+            property_sets: {
+              OG_MepSupportBenchmark: {
+                Role: structureConfig.role,
+                Side: structureConfig.side ?? "n/a",
+                LaneIndex:
+                  structureConfig.laneIndex === null ? "n/a" : String(structureConfig.laneIndex),
+                Color: structureConfig.colorHex,
+                TotalPipes: String(summary.totalPipes),
+              },
+            },
+            quantity_sets: {
+              OG_MepSupportQuantities: {
+                Width: Number(structureConfig.width.toFixed(4)),
+                Height: Number(structureConfig.height.toFixed(4)),
+                Depth: Number(structureConfig.depth.toFixed(4)),
+              },
+            },
+          };
+        });
+
+        return semantics;
       }
 
-      async function createExampleScene(meta, options) {
-        const settings = options || {};
-        document.body.classList.add("og-example-page");
-        document.title = meta.title + " | OpenGeometry";
+      function vectorKey(point) {
+        return `${point.x.toFixed(4)},${point.y.toFixed(4)},${point.z.toFixed(4)}`;
+      }
 
+      function pointsKey(points) {
+        return points.map(vectorKey).join("|");
+      }
+
+      function cuboidKey(cuboidConfig) {
+        return [
+          vectorKey(cuboidConfig.center),
+          cuboidConfig.width.toFixed(4),
+          cuboidConfig.height.toFixed(4),
+          cuboidConfig.depth.toFixed(4),
+          String(cuboidConfig.color),
+        ].join("|");
+      }
+
+      function updateProfileCache() {
+        if (cachedProfileScale === config.profileScale && profileByType && profileMetrics) {
+          return;
+        }
+
+        const arcMainRadius = 0.18 * config.profileScale;
+        const arcBranchRadius = 0.12 * config.profileScale;
+        const rectMainWidth = 0.34 * config.profileScale;
+        const rectMainDepth = 0.22 * config.profileScale;
+        const rectBranchWidth = 0.25 * config.profileScale;
+        const rectBranchDepth = 0.16 * config.profileScale;
+
+        profileSources["arc-main"].setConfig({
+          center: new Vector3(0, 0, 0),
+          radius: arcMainRadius,
+          startAngle: 0,
+          endAngle: Math.PI * 2,
+          segments: 48,
+          color: PIPE_TYPES["arc-main"].color,
+        });
+        profileSources["arc-branch"].setConfig({
+          center: new Vector3(0, 0, 0),
+          radius: arcBranchRadius,
+          startAngle: 0,
+          endAngle: Math.PI * 2,
+          segments: 36,
+          color: PIPE_TYPES["arc-branch"].color,
+        });
+        profileSources["rect-main"].setConfig({
+          center: new Vector3(0, 0, 0),
+          width: rectMainWidth,
+          breadth: rectMainDepth,
+          color: PIPE_TYPES["rect-main"].color,
+        });
+        profileSources["rect-branch"].setConfig({
+          center: new Vector3(0, 0, 0),
+          width: rectBranchWidth,
+          breadth: rectBranchDepth,
+          color: PIPE_TYPES["rect-branch"].color,
+        });
+
+        profileByType = {
+          "arc-main": readLineGeometryPoints(profileSources["arc-main"]),
+          "arc-branch": readLineGeometryPoints(profileSources["arc-branch"]),
+          "rect-main": toVector3List(profileSources["rect-main"].getBrep().vertices),
+          "rect-branch": toVector3List(profileSources["rect-branch"].getBrep().vertices),
+        };
+
+        profileMetrics = {
+          "arc-main": { radius: Number(arcMainRadius.toFixed(3)) },
+          "arc-branch": { radius: Number(arcBranchRadius.toFixed(3)) },
+          "rect-main": {
+            width: Number(rectMainWidth.toFixed(3)),
+            depth: Number(rectMainDepth.toFixed(3)),
+          },
+          "rect-branch": {
+            width: Number(rectBranchWidth.toFixed(3)),
+            depth: Number(rectBranchDepth.toFixed(3)),
+          },
+        };
+
+        cachedProfileScale = config.profileScale;
+      }
+
+      function syncPipe(pipeConfig) {
+        let sweep = pipeObjects.get(pipeConfig.id);
+
+        if (!sweep) {
+          sweep = new Sweep({
+            path: pipeConfig.path.map((point) => point.clone()),
+            profile: pipeConfig.profile.map((point) => point.clone()),
+            color: pipeConfig.color,
+            capStart: true,
+            capEnd: true,
+            fatOutlines: config.fatOutlines,
+            outlineWidth: config.outlineWidth,
+          });
+          pipeGroup.add(sweep);
+          pipeObjects.set(pipeConfig.id, sweep);
+        }
+
+        const previous = sweep.userData.sync || {};
+        if (previous.pathKey !== pipeConfig.pathKey || previous.profileKey !== pipeConfig.profileKey) {
+          sweep.setConfig({
+            path: pipeConfig.path.map((point) => point.clone()),
+            profile: pipeConfig.profile.map((point) => point.clone()),
+            color: pipeConfig.color,
+            capStart: true,
+            capEnd: true,
+          });
+        }
+
+        if (previous.fatOutlines !== config.fatOutlines) {
+          sweep.fatOutlines = config.fatOutlines;
+        }
+        if (previous.outlineWidth !== config.outlineWidth) {
+          sweep.outlineWidth = config.outlineWidth;
+        }
+        if (previous.outline !== config.outline) {
+          sweep.outline = config.outline;
+        }
+
+        sweep.visible = true;
+        sweep.userData.sync = {
+          pathKey: pipeConfig.pathKey,
+          profileKey: pipeConfig.profileKey,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth,
+          outline: config.outline,
+        };
+      }
+
+      function syncStructure(id, cuboidConfig) {
+        let cuboid = structureObjects.get(id);
+        const geometryKey = cuboidKey(cuboidConfig);
+
+        if (!cuboid) {
+          cuboid = new Cuboid({
+            center: cuboidConfig.center.clone(),
+            width: cuboidConfig.width,
+            height: cuboidConfig.height,
+            depth: cuboidConfig.depth,
+            color: cuboidConfig.color,
+            fatOutlines: config.fatOutlines,
+            outlineWidth: config.outlineWidth,
+          });
+          structureGroup.add(cuboid);
+          structureObjects.set(id, cuboid);
+        }
+
+        const previous = cuboid.userData.sync || {};
+        if (previous.geometryKey !== geometryKey) {
+          cuboid.setConfig({
+            center: cuboidConfig.center.clone(),
+            width: cuboidConfig.width,
+            height: cuboidConfig.height,
+            depth: cuboidConfig.depth,
+            color: cuboidConfig.color,
+          });
+        }
+
+        if (previous.fatOutlines !== config.fatOutlines) {
+          cuboid.fatOutlines = config.fatOutlines;
+        }
+        if (previous.outlineWidth !== config.outlineWidth) {
+          cuboid.outlineWidth = config.outlineWidth;
+        }
+        if (previous.outline !== config.outline) {
+          cuboid.outline = config.outline;
+        }
+
+        cuboid.visible = true;
+        cuboid.userData.sync = {
+          geometryKey,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth,
+          outline: config.outline,
+        };
+      }
+
+      function updateOutlineWidthState() {
+        const outlineWidthRow = panel.querySelector('[data-control-key="outlineWidth"]');
+        if (!outlineWidthRow) {
+          return;
+        }
+
+        const rangeInput = outlineWidthRow.querySelector("[data-control-range]");
+        const numberInput = outlineWidthRow.querySelector("[data-control-number]");
+        const disabled = !config.fatOutlines;
+
+        rangeInput.disabled = disabled;
+        numberInput.disabled = disabled;
+        outlineWidthRow.style.opacity = disabled ? "0.6" : "1";
+      }
+
+      function setUIControls() {
+        const controls = panel.querySelectorAll("[data-control-key]");
+
+        controls.forEach((control) => {
+          const key = control.getAttribute("data-control-key");
+          const type = control.getAttribute("data-control-type");
+
+          if (type === "number") {
+            const rangeInput = control.querySelector("[data-control-range]");
+            const numberInput = control.querySelector("[data-control-number]");
+            const valueDisplay = control.querySelector("[data-control-value]");
+
+            const min = parseFloat(rangeInput.min);
+            const max = parseFloat(rangeInput.max);
+            const integer = rangeInput.step === "1";
+
+            function setNumberValue(value, shouldUpdate = true) {
+              const numericValue = parseFloat(value);
+              if (!Number.isFinite(numericValue)) {
+                return;
+              }
+
+              const clampedValue = integer
+                ? Math.round(clamp(numericValue, min, max))
+                : clamp(numericValue, min, max);
+
+              config[key] = clampedValue;
+              rangeInput.value = String(clampedValue);
+              numberInput.value = String(clampedValue);
+              valueDisplay.textContent = formatControlNumber(clampedValue);
+
+              if (shouldUpdate) {
+                updateGeometry();
+              }
+            }
+
+            setNumberValue(config[key], false);
+            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
+            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
+          }
+
+          if (type === "boolean") {
+            const toggleInput = control.querySelector("[data-control-toggle]");
+            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+
+            function setBooleanValue(checked, shouldUpdate = true) {
+              config[key] = checked;
+              toggleInput.checked = checked;
+              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
+
+              if (shouldUpdate) {
+                updateGeometry();
+              }
+            }
+
+            setBooleanValue(Boolean(config[key]), false);
+            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
+          }
+
+          if (type === "select") {
+            const selectInput = control.querySelector("[data-control-select]");
+
+            function setSelectValue(value, shouldUpdate = true) {
+              config[key] = key === "statsMode" ? Number(value) : value;
+              selectInput.value = String(value);
+
+              if (shouldUpdate) {
+                updateGeometry();
+              }
+            }
+
+            setSelectValue(config[key], false);
+            selectInput.addEventListener("change", () => setSelectValue(selectInput.value));
+          }
+        });
+      }
+
+      function updateGeometry() {
+        if (!pipeGroup || !structureGroup) {
+          return;
+        }
+
+        updateProfileCache();
+        updateOutlineWidthState();
+
+        pipeObjects.forEach((object) => {
+          object.visible = false;
+        });
+        structureObjects.forEach((object) => {
+          object.visible = false;
+        });
+
+        statsHost.style.display = config.showStats ? "block" : "none";
+        stats.showPanel(Number(config.statsMode));
+
+        const runCount = Math.round(config.runCount);
+        const branchCount = Math.round(config.branchCount);
+        const laneHalf = (runCount - 1) * 0.5;
+        const branchStart = config.runLength * 0.1;
+        const branchSpan = config.runLength * 0.8;
+        const branchSpacing = branchCount > 1 ? branchSpan / (branchCount - 1) : 0;
+        const mainOffset = config.laneSpacing * 0.23;
+
+        const counts = {
+          "arc-main": 0,
+          "arc-branch": 0,
+          "rect-main": 0,
+          "rect-branch": 0,
+        };
+
+        const firstSampleByType = {
+          "arc-main": null,
+          "arc-branch": null,
+          "rect-main": null,
+          "rect-branch": null,
+        };
+
+        const summaryRows = [];
+        const pipeConfigs = [];
+        const structureConfigs = [];
+
+        function createSweepPipe(typeKey, laneIndex, branchIndex, rawPathPoints) {
+          const type = PIPE_TYPES[typeKey];
+          const profilePoints = profileByType[typeKey].map((point) => point.clone());
+          const pipePath = rawPathPoints.map((point) => point.clone());
+          const pipeId = `${typeKey}-run${laneIndex}${branchIndex === null ? "" : `-branch${branchIndex}`}`;
+
+          syncPipe({
+            id: pipeId,
+            path: pipePath,
+            profile: profilePoints,
+            pathKey: pointsKey(pipePath),
+            profileKey: pointsKey(profilePoints),
+            color: type.color,
+          });
+
+          counts[typeKey] += 1;
+
+          const record = {
+            id: pipeId,
+            type: type.label,
+            typeKey,
+            profile: type.profile,
+            profileParams: profileMetrics[typeKey],
+            jointMode: "hard-miter",
+            color: type.colorHex,
+            laneIndex,
+            branchIndex,
+            capStart: true,
+            capEnd: true,
+            outline: config.outline,
+            fatOutlines: config.fatOutlines,
+            outlineWidth: Number(config.outlineWidth),
+            pathPoints: pipePath.map(formatPipeVector),
+          };
+
+          pipeConfigs.push(record);
+          if (!firstSampleByType[typeKey]) {
+            firstSampleByType[typeKey] = record;
+          }
+        }
+
+        for (let laneIndex = 0; laneIndex < runCount; laneIndex += 1) {
+          const laneCenter = (laneIndex - laneHalf) * config.laneSpacing;
+          const arcMainX = laneCenter - mainOffset;
+          const rectMainX = laneCenter + mainOffset;
+
+          createSweepPipe(
+            "arc-main",
+            laneIndex,
+            null,
+            buildMainPath(arcMainX, 0, config.runLength, config.mainElevation, 0.22, 1.5)
+          );
+
+          createSweepPipe(
+            "rect-main",
+            laneIndex,
+            null,
+            buildMainPath(rectMainX, 0.2, config.runLength, config.mainElevation - 0.14, -0.2, 1.1)
+          );
+
+          for (let branchIndex = 0; branchIndex < branchCount; branchIndex += 1) {
+            const branchZ = branchStart + branchSpacing * branchIndex;
+
+            createSweepPipe(
+              "arc-branch",
+              laneIndex,
+              branchIndex,
+              buildBranchPath(
+                arcMainX,
+                arcMainX + config.branchReach,
+                branchZ,
+                config.mainElevation,
+                config.branchDrop,
+                branchIndex % 2 === 0 ? 0.08 : -0.08
+              )
+            );
+
+            createSweepPipe(
+              "rect-branch",
+              laneIndex,
+              branchIndex,
+              buildBranchPath(
+                rectMainX,
+                rectMainX - config.branchReach,
+                branchZ + 0.22,
+                config.mainElevation - 0.14,
+                config.branchDrop * 0.88,
+                branchIndex % 2 === 0 ? -0.05 : 0.05
+              )
+            );
+          }
+        }
+
+        let wallCount = 0;
+        if (config.showWalls) {
+          const sideInset = config.laneSpacing * 0.92;
+          const minX = -laneHalf * config.laneSpacing - sideInset;
+          const maxX = laneHalf * config.laneSpacing + sideInset;
+          const wallDepth = config.runLength + 3.6;
+
+          syncStructure("wall-left", {
+            center: new Vector3(minX, config.wallHeight * 0.5, config.runLength * 0.5),
+            width: 0.24,
+            height: config.wallHeight,
+            depth: wallDepth,
+            color: 0x9d4f4f,
+          });
+          structureConfigs.push({
+            id: "wall-left",
+            role: "wall",
+            side: "left",
+            laneIndex: null,
+            name: "Benchmark Left Wall",
+            description: "Left boundary wall for the sweep MEP benchmark",
+            objectType: "Boundary Wall",
+            width: 0.24,
+            height: config.wallHeight,
+            depth: wallDepth,
+            colorHex: "#9d4f4f",
+          });
+          wallCount += 1;
+
+          syncStructure("wall-right", {
+            center: new Vector3(maxX, config.wallHeight * 0.5, config.runLength * 0.5),
+            width: 0.24,
+            height: config.wallHeight,
+            depth: wallDepth,
+            color: 0x9d4f4f,
+          });
+          structureConfigs.push({
+            id: "wall-right",
+            role: "wall",
+            side: "right",
+            laneIndex: null,
+            name: "Benchmark Right Wall",
+            description: "Right boundary wall for the sweep MEP benchmark",
+            objectType: "Boundary Wall",
+            width: 0.24,
+            height: config.wallHeight,
+            depth: wallDepth,
+            colorHex: "#9d4f4f",
+          });
+          wallCount += 1;
+
+          for (let laneIndex = 0; laneIndex < runCount; laneIndex += 1) {
+            const laneCenter = (laneIndex - laneHalf) * config.laneSpacing;
+            const equipmentId = `equipment-${laneIndex}`;
+
+            syncStructure(equipmentId, {
+              center: new Vector3(laneCenter, 0.26, -1.45),
+              width: 1.1,
+              height: 0.52,
+              depth: 0.84,
+              color: 0x666e75,
+            });
+            structureConfigs.push({
+              id: equipmentId,
+              role: "equipment",
+              side: null,
+              laneIndex,
+              name: `Equipment Block ${laneIndex + 1}`,
+              description: "Reference equipment plinth placed below the benchmark pipe runs",
+              objectType: "Equipment Block",
+              width: 1.1,
+              height: 0.52,
+              depth: 0.84,
+              colorHex: "#666e75",
+            });
+            wallCount += 1;
+          }
+        }
+
+        const totalPipes =
+          counts["arc-main"] + counts["arc-branch"] + counts["rect-main"] + counts["rect-branch"];
+
+        summaryRows.push(
+          { type: PIPE_TYPES["arc-main"].label, count: counts["arc-main"], profile: "Arc", joints: "Hard miter" },
+          { type: PIPE_TYPES["arc-branch"].label, count: counts["arc-branch"], profile: "Arc", joints: "Hard miter" },
+          { type: PIPE_TYPES["rect-main"].label, count: counts["rect-main"], profile: "Rectangle", joints: "Hard miter" },
+          { type: PIPE_TYPES["rect-branch"].label, count: counts["rect-branch"], profile: "Rectangle", joints: "Hard miter" }
+        );
+
+        latestExportSnapshot = {
+          pipeConfigs,
+          structureConfigs,
+          counts: { ...counts },
+          wallCount,
+          totalPipes,
+          state: {
+            runCount,
+            branchCount,
+            laneSpacing: config.laneSpacing,
+            runLength: config.runLength,
+            mainElevation: config.mainElevation,
+            branchDrop: config.branchDrop,
+            branchReach: config.branchReach,
+            profileScale: config.profileScale,
+            wallHeight: config.wallHeight,
+            showWalls: config.showWalls,
+            outline: config.outline,
+            fatOutlines: config.fatOutlines,
+            outlineWidth: config.outlineWidth,
+          },
+        };
+
+        console.groupCollapsed(`[sweep-mep-pipes] ${totalPipes} pipes`);
+        console.table(summaryRows);
+        console.log("State", latestExportSnapshot.state);
+        console.log("Counts", counts);
+        console.log("Samples", firstSampleByType);
+        console.log("Wall and equipment count", wallCount);
+        console.groupEnd();
+
+        const focusTarget = new THREE.Vector3(
+          0,
+          Math.max(1.2, config.mainElevation * 0.9),
+          config.runLength * 0.5
+        );
+        orbitControls.target.lerp(focusTarget, 0.32);
+        orbitControls.update();
+      }
+
+      async function main() {
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(settings.background || 0xf6f1eb);
+        scene.background = new THREE.Color(0xf6f1eb);
 
-        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 4000);
-        const cameraPosition = settings.cameraPosition || [24, 17, 28];
-        camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          4000
+        );
+        camera.position.set(23, 15, 30);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
 
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        const target = settings.target || [0, 2.2, 12];
-        controls.target.set(target[0], target[1], target[2]);
-        controls.update();
+        orbitControls = new OrbitControls(camera, renderer.domElement);
+        orbitControls.enableDamping = true;
+        orbitControls.target.set(0, 2.4, 13);
+        orbitControls.update();
 
-        scene.add(
-          new THREE.GridHelper(
-            settings.gridSize || 100,
-            settings.gridDivisions || 100,
-            settings.gridPrimary || 0xd88b63,
-            settings.gridSecondary || 0xe7d4ca
-          )
-        );
-
+        scene.add(new THREE.GridHelper(100, 100, 0xd88b63, 0xe7d4ca));
         scene.add(new THREE.AmbientLight(0xffffff, 0.74));
 
-        const keyLight = new THREE.DirectionalLight(0xffffff, 0.86);
-        keyLight.position.set(12, 18, 8);
-        scene.add(keyLight);
+        const key = new THREE.DirectionalLight(0xffffff, 0.86);
+        key.position.set(12, 18, 8);
+        scene.add(key);
 
-        const fillLight = new THREE.DirectionalLight(0xfff2e0, 0.5);
-        fillLight.position.set(-10, 7, -7);
-        scene.add(fillLight);
-
-        window.addEventListener("resize", () => {
-          camera.aspect = window.innerWidth / window.innerHeight;
-          camera.updateProjectionMatrix();
-          renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        const fill = new THREE.DirectionalLight(0xfff2e0, 0.5);
+        fill.position.set(-10, 7, -7);
+        scene.add(fill);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
 
-        function animate() {
-          requestAnimationFrame(animate);
-          controls.update();
-          renderer.render(scene, camera);
-        }
-
-        animate();
-        return { scene, camera, renderer, controls };
-      }
-
-      async function main() {
-        const meta = {
-          slug: "operations/sweep-mep-pipes",
-          category: "operations",
-          title: "Sweep MEP Pipes",
-          description: "Adjustable multi-run MEP sweep benchmark using primitive-backed path/profile inputs.",
-          statusLabel: "ready",
-          chips: ["Arc + Rectangle", "Legend", "FPS"],
-          footerText: "MEP, Sweep, Performance",
-        };
-
-        const { scene, controls, renderer } = await createExampleScene(meta, {
-          cameraPosition: [23, 15, 30],
-          target: [0, 2.4, 13],
-        });
-
-        const stats = new Stats();
+        stats = new Stats();
         statsHost.replaceChildren(stats.dom);
 
         const renderBase = renderer.render.bind(renderer);
@@ -618,312 +1018,132 @@
           stats.end();
         };
 
-        let current = null;
+        pipeGroup = new THREE.Group();
+        structureGroup = new THREE.Group();
+        scene.add(pipeGroup);
+        scene.add(structureGroup);
 
-        bindControls(
-          [
-            { type: "number", key: "runCount", label: "Run Count", min: 2, max: 20, step: 1, value: 10 },
-            { type: "number", key: "branchCount", label: "Branches / Run", min: 2, max: 28, step: 1, value: 12 },
-            { type: "number", key: "laneSpacing", label: "Run Spacing", min: 2, max: 6, step: 0.1, value: 3.2 },
-            { type: "number", key: "runLength", label: "Run Length", min: 8, max: 42, step: 1, value: 26 },
-            { type: "number", key: "mainElevation", label: "Main Elevation", min: 1, max: 5, step: 0.05, value: 2.8 },
-            { type: "number", key: "branchDrop", label: "Branch Drop", min: 0.3, max: 2.4, step: 0.05, value: 1.1 },
-            { type: "number", key: "branchReach", label: "Branch Reach", min: 0.5, max: 3, step: 0.05, value: 1.45 },
-            { type: "number", key: "profileScale", label: "Profile Scale", min: 0.5, max: 2, step: 0.05, value: 1 },
-            { type: "number", key: "wallHeight", label: "Wall Height", min: 1.5, max: 6, step: 0.1, value: 3.4 },
-            { type: "boolean", key: "showWalls", label: "Show Cuboid Walls", value: true },
-            { type: "boolean", key: "outline", label: "Outline", value: true },
-            { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
-            { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 },
-            { type: "boolean", key: "showStats", label: "Show FPS Stats", value: true },
-            {
-              type: "select",
-              key: "statsMode",
-              label: "Stats Mode",
-              value: 0,
-              options: [
-                { label: "FPS", value: 0 },
-                { label: "MS", value: 1 },
-                { label: "MB", value: 2 },
-              ],
-            },
-          ],
-          (state) => {
-            const runCount = Math.round(state.runCount);
-            const branchCount = Math.round(state.branchCount);
-            const laneHalf = (runCount - 1) * 0.5;
-            const laneSpacing = state.laneSpacing;
-            const runLength = state.runLength;
-            const zStart = 0;
-            const branchStart = runLength * 0.1;
-            const branchSpan = runLength * 0.8;
-            const branchSpacing = branchCount > 1 ? branchSpan / (branchCount - 1) : 0;
-            const mainOffset = laneSpacing * 0.23;
+        profileSources = {
+          "arc-main": new Arc({
+            center: new Vector3(0, 0, 0),
+            radius: 0.18,
+            startAngle: 0,
+            endAngle: Math.PI * 2,
+            segments: 48,
+            color: PIPE_TYPES["arc-main"].color,
+          }),
+          "arc-branch": new Arc({
+            center: new Vector3(0, 0, 0),
+            radius: 0.12,
+            startAngle: 0,
+            endAngle: Math.PI * 2,
+            segments: 36,
+            color: PIPE_TYPES["arc-branch"].color,
+          }),
+          "rect-main": new Rectangle({
+            center: new Vector3(0, 0, 0),
+            width: 0.34,
+            breadth: 0.22,
+            color: PIPE_TYPES["rect-main"].color,
+          }),
+          "rect-branch": new Rectangle({
+            center: new Vector3(0, 0, 0),
+            width: 0.25,
+            breadth: 0.16,
+            color: PIPE_TYPES["rect-branch"].color,
+          }),
+        };
 
-            const arcMainRadius = 0.18 * state.profileScale;
-            const arcBranchRadius = 0.12 * state.profileScale;
-            const rectMainWidth = 0.34 * state.profileScale;
-            const rectMainDepth = 0.22 * state.profileScale;
-            const rectBranchWidth = 0.25 * state.profileScale;
-            const rectBranchDepth = 0.16 * state.profileScale;
+        function onResize() {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
 
-            statsHost.style.display = state.showStats ? "block" : "none";
-            stats.showPanel(Number(state.statsMode));
+        window.addEventListener("resize", onResize);
 
-            const arcMainPrimitive = new Arc({
-              center: new Vector3(0, 0, 0),
-              radius: arcMainRadius,
-              startAngle: 0,
-              endAngle: Math.PI * 2,
-              segments: 48,
-              color: PIPE_TYPES["arc-main"].color,
-            });
-            const arcMainProfile = readLineGeometryPoints(arcMainPrimitive);
-            disposeObject3D(arcMainPrimitive);
+        function animate() {
+          requestAnimationFrame(animate);
+          orbitControls.update();
+          renderer.render(scene, camera);
+        }
 
-            const arcBranchPrimitive = new Arc({
-              center: new Vector3(0, 0, 0),
-              radius: arcBranchRadius,
-              startAngle: 0,
-              endAngle: Math.PI * 2,
-              segments: 36,
-              color: PIPE_TYPES["arc-branch"].color,
-            });
-            const arcBranchProfile = readLineGeometryPoints(arcBranchPrimitive);
-            disposeObject3D(arcBranchPrimitive);
+        animate();
 
-            const rectMainPrimitive = new Rectangle({
-              center: new Vector3(0, 0, 0),
-              width: rectMainWidth,
-              breadth: rectMainDepth,
-              color: PIPE_TYPES["rect-main"].color,
-            });
-            const rectMainProfile = toVector3List(rectMainPrimitive.getBrep().vertices);
-            disposeObject3D(rectMainPrimitive);
+        setUIControls();
+        updateGeometry();
 
-            const rectBranchPrimitive = new Rectangle({
-              center: new Vector3(0, 0, 0),
-              width: rectBranchWidth,
-              breadth: rectBranchDepth,
-              color: PIPE_TYPES["rect-branch"].color,
-            });
-            const rectBranchProfile = toVector3List(rectBranchPrimitive.getBrep().vertices);
-            disposeObject3D(rectBranchPrimitive);
-
-            const profileByType = {
-              "arc-main": arcMainProfile,
-              "arc-branch": arcBranchProfile,
-              "rect-main": rectMainProfile,
-              "rect-branch": rectBranchProfile,
-            };
-
-            const profileMetrics = {
-              "arc-main": { radius: Number(arcMainRadius.toFixed(3)) },
-              "arc-branch": { radius: Number(arcBranchRadius.toFixed(3)) },
-              "rect-main": {
-                width: Number(rectMainWidth.toFixed(3)),
-                depth: Number(rectMainDepth.toFixed(3)),
-              },
-              "rect-branch": {
-                width: Number(rectBranchWidth.toFixed(3)),
-                depth: Number(rectBranchDepth.toFixed(3)),
-              },
-            };
-
-            const counts = {
-              "arc-main": 0,
-              "arc-branch": 0,
-              "rect-main": 0,
-              "rect-branch": 0,
-            };
-
-            const firstSampleByType = {
-              "arc-main": null,
-              "arc-branch": null,
-              "rect-main": null,
-              "rect-branch": null,
-            };
-
-            const summaryRows = [];
-            const pipeConfigs = [];
-            const group = new THREE.Group();
-
-            function createSweepPipe(typeKey, laneIndex, branchIndex, rawPathPoints) {
-              const type = PIPE_TYPES[typeKey];
-              const profilePoints = profileByType[typeKey].map((point) => point.clone());
-
-              const pathPrimitive = new Polyline({
-                points: rawPathPoints.map((point) => point.clone()),
-                color: type.color,
-              });
-
-              const pipePath = pathPrimitive.options.points.map((point) => point.clone());
-              const sweep = new Sweep({
-                path: pipePath,
-                profile: profilePoints,
-                color: type.color,
-                capStart: true,
-                capEnd: true,
-                fatOutlines: state.fatOutlines,
-                outlineWidth: state.outlineWidth,
-              });
-              sweep.outline = state.outline;
-
-              group.add(sweep);
-              disposeObject3D(pathPrimitive);
-
-              counts[typeKey] += 1;
-
-              const configRecord = {
-                id: `${typeKey}-run${laneIndex}${branchIndex === null ? "" : `-branch${branchIndex}`}`,
-                type: type.label,
-                typeKey,
-                profile: type.profile,
-                profileParams: profileMetrics[typeKey],
-                jointMode: "hard-miter",
-                color: type.colorHex,
-                laneIndex,
-                branchIndex,
-                capStart: true,
-                capEnd: true,
-                outline: state.outline,
-                fatOutlines: state.fatOutlines,
-                outlineWidth: Number(state.outlineWidth),
-                pathPoints: pipePath.map(formatPipeVector),
-              };
-
-              pipeConfigs.push(configRecord);
-              if (!firstSampleByType[typeKey]) {
-                firstSampleByType[typeKey] = configRecord;
-              }
-            }
-
-            for (let laneIndex = 0; laneIndex < runCount; laneIndex += 1) {
-              const laneCenter = (laneIndex - laneHalf) * laneSpacing;
-              const arcMainX = laneCenter - mainOffset;
-              const rectMainX = laneCenter + mainOffset;
-
-              createSweepPipe(
-                "arc-main",
-                laneIndex,
-                null,
-                buildMainPath(arcMainX, zStart, runLength, state.mainElevation, 0.22, 1.5)
-              );
-
-              createSweepPipe(
-                "rect-main",
-                laneIndex,
-                null,
-                buildMainPath(rectMainX, zStart + 0.2, runLength, state.mainElevation - 0.14, -0.2, 1.1)
-              );
-
-              for (let branchIndex = 0; branchIndex < branchCount; branchIndex += 1) {
-                const branchZ = branchStart + branchSpacing * branchIndex;
-
-                createSweepPipe(
-                  "arc-branch",
-                  laneIndex,
-                  branchIndex,
-                  buildBranchPath(
-                    arcMainX,
-                    arcMainX + state.branchReach,
-                    branchZ,
-                    state.mainElevation,
-                    state.branchDrop,
-                    branchIndex % 2 === 0 ? 0.08 : -0.08
-                  )
-                );
-
-                createSweepPipe(
-                  "rect-branch",
-                  laneIndex,
-                  branchIndex,
-                  buildBranchPath(
-                    rectMainX,
-                    rectMainX - state.branchReach,
-                    branchZ + 0.22,
-                    state.mainElevation - 0.14,
-                    state.branchDrop * 0.88,
-                    branchIndex % 2 === 0 ? -0.05 : 0.05
-                  )
-                );
-              }
-            }
-
-            let wallCount = 0;
-            if (state.showWalls) {
-              const sideInset = laneSpacing * 0.92;
-              const minX = -laneHalf * laneSpacing - sideInset;
-              const maxX = laneHalf * laneSpacing + sideInset;
-              const wallDepth = runLength + 3.6;
-
-              const leftWall = new Cuboid({
-                center: new Vector3(minX, state.wallHeight * 0.5, runLength * 0.5),
-                width: 0.24,
-                height: state.wallHeight,
-                depth: wallDepth,
-                color: 0x9d4f4f,
-                fatOutlines: state.fatOutlines,
-                outlineWidth: state.outlineWidth,
-              });
-              leftWall.outline = state.outline;
-              group.add(leftWall);
-              wallCount += 1;
-
-              const rightWall = new Cuboid({
-                center: new Vector3(maxX, state.wallHeight * 0.5, runLength * 0.5),
-                width: 0.24,
-                height: state.wallHeight,
-                depth: wallDepth,
-                color: 0x9d4f4f,
-                fatOutlines: state.fatOutlines,
-                outlineWidth: state.outlineWidth,
-              });
-              rightWall.outline = state.outline;
-              group.add(rightWall);
-              wallCount += 1;
-
-              for (let laneIndex = 0; laneIndex < runCount; laneIndex += 1) {
-                const laneCenter = (laneIndex - laneHalf) * laneSpacing;
-                const equipmentBlock = new Cuboid({
-                  center: new Vector3(laneCenter, 0.26, -1.45),
-                  width: 1.1,
-                  height: 0.52,
-                  depth: 0.84,
-                  color: 0x666e75,
-                  fatOutlines: state.fatOutlines,
-                  outlineWidth: state.outlineWidth,
-                });
-                equipmentBlock.outline = state.outline;
-                group.add(equipmentBlock);
-                wallCount += 1;
-              }
-            }
-
-            const totalPipes = updateLegendAndInfo(counts);
-
-            summaryRows.push(
-              { type: PIPE_TYPES["arc-main"].label, count: counts["arc-main"], profile: "Arc", joints: "Hard miter" },
-              { type: PIPE_TYPES["arc-branch"].label, count: counts["arc-branch"], profile: "Arc", joints: "Hard miter" },
-              { type: PIPE_TYPES["rect-main"].label, count: counts["rect-main"], profile: "Rectangle", joints: "Hard miter" },
-              { type: PIPE_TYPES["rect-branch"].label, count: counts["rect-branch"], profile: "Rectangle", joints: "Hard miter" }
-            );
-
-            reportNode.textContent = buildReportText(totalPipes, counts, firstSampleByType, state, wallCount);
-
-            console.groupCollapsed(`[sweep-mep-pipes] Generated ${totalPipes} pipes`);
-            console.table(summaryRows);
-            console.log("Full pipe config array", pipeConfigs);
-            console.log("Wall/cuboid count", wallCount);
-            console.groupEnd();
-
-            current = replaceSceneObject(scene, current, group);
-
-            const focusTarget = new THREE.Vector3(0, Math.max(1.2, state.mainElevation * 0.9), runLength * 0.5);
-            controls.target.lerp(focusTarget, 0.32);
-            controls.update();
+        exportIfcButton.addEventListener("click", () => {
+          if (!latestExportSnapshot) {
+            return;
           }
-        );
+
+          try {
+            const manager = new OGSceneManager();
+            const sceneId = manager.createScene("sweep-mep-pipes-ifc-scene");
+
+            latestExportSnapshot.pipeConfigs.forEach((pipeConfig) => {
+              const sweep = pipeObjects.get(pipeConfig.id);
+              if (!sweep) {
+                return;
+              }
+
+              manager.addBrepEntityToScene(
+                sceneId,
+                pipeConfig.id,
+                "OGSweep",
+                JSON.stringify(sweep.getBrep())
+              );
+            });
+
+            latestExportSnapshot.structureConfigs.forEach((structureConfig) => {
+              const cuboid = structureObjects.get(structureConfig.id);
+              if (!cuboid) {
+                return;
+              }
+
+              manager.addBrepEntityToScene(
+                sceneId,
+                structureConfig.id,
+                "OGCuboid",
+                JSON.stringify(cuboid.getBrepData())
+              );
+            });
+
+            const semantics = buildIfcSemantics(
+              latestExportSnapshot.pipeConfigs,
+              latestExportSnapshot.structureConfigs,
+              latestExportSnapshot
+            );
+            const exportConfig = {
+              schema: "Ifc4Add2",
+              project_name: "OpenGeometry Sweep MEP Pipes",
+              site_name: "Benchmark Site",
+              building_name: "MEP Benchmark Building",
+              storey_name: "Level 01",
+              scale: 1,
+              error_policy: "BestEffort",
+              validate_topology: true,
+              require_closed_shell: true,
+              semantics,
+            };
+
+            const result = manager.exportSceneToIfc(sceneId, JSON.stringify(exportConfig));
+            const report = JSON.parse(result.reportJson);
+            const filename = "opengeometry-sweep-mep-pipes.ifc";
+
+            downloadText(result.text, filename, "model/ifc");
+
+            console.groupCollapsed(`[sweep-mep-pipes] ${filename}`);
+            console.log("Snapshot", latestExportSnapshot);
+            console.log("Report", report);
+            console.log("Bytes", new TextEncoder().encode(result.text).length);
+            console.log("Metadata Entries", Object.keys(semantics).length);
+            console.groupEnd();
+          } catch (error) {
+            console.error("[sweep-mep-pipes] IFC export failed", error);
+          }
+        });
       }
 
       void main();

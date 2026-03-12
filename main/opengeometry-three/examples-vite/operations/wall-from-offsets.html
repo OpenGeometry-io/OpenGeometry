@@ -1,100 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Wall from Offsets Example</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="OpenGeometry Demo" />
-    <meta name="author" content="Vishwajeet Mane" />
-  </head>
-  <body>
-    <aside class="og-badge">
-      <div class="og-badge-top">
-        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
-        <p class="og-badge-status">ready</p>
-      </div>
-      <div class="og-badge-meta">
-        <p class="og-badge-kicker">OPEN GEOMETRY • OPERATIONS</p>
-        <strong class="og-badge-title">Wall from Offsets</strong>
-        <span class="og-badge-desc">Composite wall profile assembled from offset centerlines.</span>
-      </div>
-      <div class="og-badge-chip-row">
-          <span class="og-chip og-chip-accent">Thickness</span>
-      </div>
-      <div class="og-badge-footer">
-        <a class="og-badge-link" href="../index.html">Back to Examples</a>
-      </div>
-    </aside>
+      <title>OpenGeometry Wall from Offsets Example</title>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta name="description" content="OpenGeometry Demo" />
+      <meta name="author" content="Vishwajeet Mane" />
+    </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Wall from Offsets</span>
+    </div>
     <aside class="og-controls" data-control-panel>
-      <h3>Wall Parameters</h3>
-      <label class="og-control-row" data-control-key="thickness" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Wall Thickness</span>
-          <code class="og-control-value" data-control-value>0.45</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="0.1" max="2" step="0.05" value="0.45" />
-          <input data-control-number type="number" min="0.1" max="2" step="0.05" value="0.45" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="acute" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Acute Threshold</span>
-          <code class="og-control-value" data-control-value>90</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="1" max="179" step="1" value="90" />
-          <input data-control-number type="number" min="1" max="179" step="1" value="90" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="curveBias" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Curve Bias</span>
-          <code class="og-control-value" data-control-value>0</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="-0.8" max="0.8" step="0.05" value="0" />
-          <input data-control-number type="number" min="-0.8" max="0.8" step="0.05" value="0" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="bevel" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Bevel</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Bevel" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Outline</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Fat Outlines</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Fat Outlines" />
-          <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Outline Width</span>
-          <code class="og-control-value" data-control-value>4</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="1" max="12" step="0.5" value="4" />
-          <input data-control-number type="number" min="1" max="12" step="0.5" value="4" />
-        </div>
-      </label>
-    </aside>
+          <h3>Wall Parameters</h3>
+          <label class="og-control-row" data-control-key="thickness" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Wall Thickness</span>
+              <code class="og-control-value" data-control-value>0.45</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="0.1" max="2" step="0.05" value="0.45" />
+              <input data-control-number type="number" min="0.1" max="2" step="0.05" value="0.45" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="acute" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Acute Threshold</span>
+              <code class="og-control-value" data-control-value>90</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="1" max="179" step="1" value="90" />
+              <input data-control-number type="number" min="1" max="179" step="1" value="90" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="curveBias" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Curve Bias</span>
+              <code class="og-control-value" data-control-value>0</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="-0.8" max="0.8" step="0.05" value="0" />
+              <input data-control-number type="number" min="-0.8" max="0.8" step="0.05" value="0" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="bevel" data-control-type="boolean">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Bevel</span>
+            </div>
+            <div class="og-control-bool">
+              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Bevel" checked />
+              <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Outline</span>
+            </div>
+            <div class="og-control-bool">
+              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
+              <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Fat Outlines</span>
+            </div>
+            <div class="og-control-bool">
+              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Fat Outlines" />
+              <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Outline Width</span>
+              <code class="og-control-value" data-control-value>4</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="1" max="12" step="0.5" value="4" />
+              <input data-control-number type="number" min="1" max="12" step="0.5" value="4" />
+            </div>
+          </label>
+        </aside>
     <div id="app"></div>
     <script type="module">
       import "../src/styles/theme.css";
@@ -108,127 +95,131 @@
         throw new Error("Missing #app container");
       }
 
+      let centerline;
+      let leftPolyline;
+      let rightPolyline;
+      let polygon;
+      let config = {
+        thickness: 0.45,
+        acute: 90,
+        curveBias: 0.0,
+        bevel: true,
+        outline: true,
+        fatOutlines: false,
+        outlineWidth: 4,
+      };
+
       function formatControlNumber(value) {
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
       }
 
-      function disposeMaterial(material) {
-        if (!material) {
-          return;
-        }
-
-        if (Array.isArray(material)) {
-          material.forEach((entry) => entry && entry.dispose && entry.dispose());
-          return;
-        }
-
-        if (material.dispose) {
-          material.dispose();
-        }
+      function buildCenterline(curveBias) {
+        return [
+          new Vector3(-2.6, 0, -1.9),
+          new Vector3(-1.2, 0, -1.0),
+          new Vector3(-0.2, 0, 0.1),
+          new Vector3(0.7 + curveBias, 0, 0.2),
+          new Vector3(0.1, 0, 1.0),
+          new Vector3(2.6, 0, 2.0),
+        ];
       }
 
-      function disposeObject3D(object) {
-        object.traverse((node) => {
-          if (node.geometry && node.geometry.dispose) {
-            node.geometry.dispose();
+      function buildWallOutline(left, right) {
+        if (!left.length || !right.length) {
+          return [];
+        }
+
+        return left.map((point) => point.clone()).concat(right.map((point) => point.clone()).reverse());
+      }
+
+      function setUIControls() {
+        const controls = document.querySelectorAll("[data-control-key]");
+
+        controls.forEach((control) => {
+          const key = control.getAttribute("data-control-key");
+          const type = control.getAttribute("data-control-type");
+
+          if (type === "number") {
+            const rangeInput = control.querySelector("[data-control-range]");
+            const numberInput = control.querySelector("[data-control-number]");
+            const valueDisplay = control.querySelector("[data-control-value]");
+
+            function setNumberValue(value) {
+              const numericValue = parseFloat(value);
+              if (!Number.isFinite(numericValue)) return;
+
+              config[key] = numericValue;
+              rangeInput.value = String(numericValue);
+              numberInput.value = String(numericValue);
+              valueDisplay.textContent = formatControlNumber(numericValue);
+              updateGeometry();
+            }
+
+            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
+            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
           }
-          disposeMaterial(node.material);
+
+          if (type === "boolean") {
+            const toggleInput = control.querySelector("[data-control-toggle]");
+            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+
+            function setBooleanValue(checked) {
+              config[key] = checked;
+              toggleInput.checked = checked;
+              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
+              updateGeometry();
+            }
+
+            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
+          }
+
+          if (type === "select") {
+            const selectInput = control.querySelector("[data-control-select]");
+
+            function setSelectValue(value) {
+              config[key] = value;
+              selectInput.value = String(value);
+              updateGeometry();
+            }
+
+            selectInput.addEventListener("change", () => setSelectValue(selectInput.value));
+          }
         });
       }
 
-      function replaceSceneObject(scene, previous, next) {
-        if (previous) {
-          previous.parent && previous.parent.remove(previous);
-          disposeObject3D(previous);
-        }
-
-        scene.add(next);
-        return next;
-      }
-
-      function clamp(value, min, max) {
-        return Math.min(max, Math.max(min, value));
-      }
-
-      function bindControls(definitions, onChange) {
-        const panel = document.querySelector("[data-control-panel]");
-        if (!panel) {
-          throw new Error("Missing control panel");
-        }
-
-        const state = {};
-        const emitChange = () => {
-          onChange({ ...state });
-        };
-
-        definitions.forEach((definition) => {
-          state[definition.key] = definition.value;
-          const row = panel.querySelector(`[data-control-key="${definition.key}"]`);
-          if (!row) {
-            throw new Error(`Missing control row for ${definition.key}`);
-          }
-
-          if (definition.type === "number") {
-            const valueLabel = row.querySelector("[data-control-value]");
-            const rangeInput = row.querySelector("[data-control-range]");
-            const numberInput = row.querySelector("[data-control-number]");
-            if (!valueLabel || !rangeInput || !numberInput) {
-              throw new Error(`Missing number controls for ${definition.key}`);
-            }
-
-            const updateValue = (raw) => {
-              const next = clamp(raw, definition.min, definition.max);
-              state[definition.key] = next;
-              rangeInput.value = String(next);
-              numberInput.value = String(next);
-              valueLabel.textContent = formatControlNumber(next);
-              emitChange();
-            };
-
-            rangeInput.addEventListener("input", () => updateValue(Number(rangeInput.value)));
-            numberInput.addEventListener("change", () => updateValue(Number(numberInput.value)));
-            valueLabel.textContent = formatControlNumber(definition.value);
-            return;
-          }
-
-          if (definition.type === "boolean") {
-            const toggle = row.querySelector("[data-control-toggle]");
-            const boolLabel = row.querySelector("[data-control-bool-state]");
-            if (!toggle || !boolLabel) {
-              throw new Error(`Missing boolean controls for ${definition.key}`);
-            }
-
-            toggle.checked = Boolean(definition.value);
-            boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-            toggle.addEventListener("change", () => {
-              state[definition.key] = toggle.checked;
-              boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-              emitChange();
-            });
-            return;
-          }
-
-          const select = row.querySelector("[data-control-select]");
-          if (!select) {
-            throw new Error(`Missing select control for ${definition.key}`);
-          }
-          select.value = String(definition.value);
-          select.addEventListener("change", () => {
-            state[definition.key] = select.value;
-            emitChange();
-          });
+      function updateGeometry() {
+        if (!centerline || !leftPolyline || !rightPolyline || !polygon) return;
+        centerline.setConfig({
+          points: buildCenterline(config.curveBias),
+          color: 0x1f2937,
         });
 
-        emitChange();
+        const half = config.thickness * 0.5;
+        const leftOffset = centerline.getOffset(half, config.acute, config.bevel);
+        const rightOffset = centerline.getOffset(-half, config.acute, config.bevel);
+        const outline = buildWallOutline(leftOffset.points, rightOffset.points);
+
+        leftPolyline.setConfig({ points: leftOffset.points, color: 0x22c55e });
+        rightPolyline.setConfig({ points: rightOffset.points, color: 0xf97316 });
+
+        if (outline.length < 3) {
+          polygon.visible = false;
+          return;
+        }
+
+        polygon.visible = true;
+        polygon.setConfig({
+          vertices: outline,
+          color: 0x3b82f6,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth,
+        });
+        polygon.outline = config.outline;
       }
 
-      async function createExampleScene(meta, options) {
-        const settings = options || {};
-        document.body.classList.add("og-example-page");
-        document.title = meta.title + " | OpenGeometry";
-
+      async function main() {
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(settings.background || 0xf6f1eb);
+        scene.background = new THREE.Color(0xf6f1eb);
 
         const camera = new THREE.PerspectiveCamera(
           55,
@@ -237,8 +228,7 @@
           4000
         );
 
-        const cameraPosition = settings.cameraPosition || [5.5, 4.2, 6.5];
-        camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+        camera.position.set(5.5, 4.2, 6.5);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -247,19 +237,10 @@
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        const target = settings.target || [0, 0.8, 0];
-        controls.target.set(target[0], target[1], target[2]);
+        controls.target.set(0, 0.8, 0);
         controls.update();
 
-        scene.add(
-          new THREE.GridHelper(
-            settings.gridSize || 32,
-            settings.gridDivisions || 32,
-            settings.gridPrimary || 0xd88b63,
-            settings.gridSecondary || 0xe7d4ca
-          )
-        );
-
+        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
         scene.add(new THREE.AmbientLight(0xffffff, 0.72));
 
         const key = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -271,6 +252,33 @@
         scene.add(fill);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        centerline = new Polyline({
+          points: buildCenterline(config.curveBias),
+          color: 0x1f2937,
+        });
+        const initialHalfThickness = config.thickness * 0.5;
+        const initialLeftOffset = centerline.getOffset(initialHalfThickness, config.acute, config.bevel);
+        const initialRightOffset = centerline.getOffset(-initialHalfThickness, config.acute, config.bevel);
+        leftPolyline = new Polyline({ points: initialLeftOffset.points, color: 0x22c55e });
+        rightPolyline = new Polyline({ points: initialRightOffset.points, color: 0xf97316 });
+        polygon = new Polygon({
+          vertices: buildWallOutline(initialLeftOffset.points, initialRightOffset.points),
+          color: 0x3b82f6,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth,
+        });
+        polygon.position.y = 0.01;
+        polygon.outline = config.outline;
+
+        const group = new THREE.Group();
+        group.add(centerline);
+        group.add(leftPolyline);
+        group.add(rightPolyline);
+        group.add(polygon);
+        scene.add(group);
+
+        updateGeometry();
 
         function onResize() {
           camera.aspect = window.innerWidth / window.innerHeight;
@@ -287,87 +295,7 @@
         }
 
         animate();
-        return { scene, camera, renderer, controls };
-      }
-
-      async function main() {
-        const meta = {
-        "slug": "operations/wall-from-offsets",
-        "category": "operations",
-        "title": "Wall from Offsets",
-        "description": "Composite wall profile assembled from offset centerlines.",
-        "statusLabel": "ready",
-        "chips": [
-          "Thickness"
-        ],
-        "footerText": "Thickness"
-      };
-
-        function buildCenterline(curveBias) {
-          return [
-            new Vector3(-2.6, 0, -1.9),
-            new Vector3(-1.2, 0, -1.0),
-            new Vector3(-0.2, 0, 0.1),
-            new Vector3(0.7 + curveBias, 0, 0.2),
-            new Vector3(0.1, 0, 1.0),
-            new Vector3(2.6, 0, 2.0)
-          ];
-        }
-
-        function buildWallOutline(left, right) {
-          if (!left.length || !right.length) {
-            return [];
-          }
-
-          return left.map((point) => point.clone()).concat(right.map((point) => point.clone()).reverse());
-        }
-
-        const { scene } = await createExampleScene(meta);
-        let current = null;
-
-        bindControls([
-          { type: "number", key: "thickness", label: "Wall Thickness", min: 0.1, max: 2, step: 0.05, value: 0.45 },
-          { type: "number", key: "acute", label: "Acute Threshold", min: 1, max: 179, step: 1, value: 90 },
-          { type: "number", key: "curveBias", label: "Curve Bias", min: -0.8, max: 0.8, step: 0.05, value: 0.0 },
-          { type: "boolean", key: "bevel", label: "Bevel", value: true },
-          { type: "boolean", key: "outline", label: "Outline", value: true },
-          { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
-          { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 }
-        ], (state) => {
-          const centerline = new Polyline({
-            points: buildCenterline(state.curveBias),
-            color: 0x1f2937
-          });
-
-          const half = state.thickness * 0.5;
-          const leftOffset = centerline.getOffset(half, state.acute, state.bevel);
-          const rightOffset = centerline.getOffset(-half, state.acute, state.bevel);
-
-          const leftPolyline = new Polyline({ points: leftOffset.points, color: 0x22c55e });
-          const rightPolyline = new Polyline({ points: rightOffset.points, color: 0xf97316 });
-          const outline = buildWallOutline(leftOffset.points, rightOffset.points);
-
-          if (outline.length < 3) {
-            return;
-          }
-
-          const polygon = new Polygon({
-            vertices: outline,
-            color: 0x3b82f6,
-            fatOutlines: state.fatOutlines,
-            outlineWidth: state.outlineWidth
-          });
-          polygon.position.y = 0.01;
-          polygon.outline = state.outline;
-
-          const group = new THREE.Group();
-          group.add(centerline);
-          group.add(leftPolyline);
-          group.add(rightPolyline);
-          group.add(polygon);
-
-          current = replaceSceneObject(scene, current, group);
-        });
+        setUIControls();
       }
 
       void main();

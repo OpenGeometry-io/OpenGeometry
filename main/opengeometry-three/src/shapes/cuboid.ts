@@ -19,6 +19,8 @@ export interface ICuboidOptions {
   outlineWidth?: number;
 }
 
+export type CuboidConfigUpdate = Partial<ICuboidOptions>;
+
 export class Cuboid extends THREE.Mesh {
   ogid: string;
   options: ICuboidOptions = {
@@ -48,7 +50,7 @@ export class Cuboid extends THREE.Mesh {
 
   set color(color: number) {
     this.options.color = color;
-    if (this.material instanceof THREE.LineBasicMaterial) {
+    if (this.material instanceof THREE.MeshStandardMaterial) {
       this.material.color.set(color);
     }
   }
@@ -74,30 +76,44 @@ export class Cuboid extends THREE.Mesh {
     return this.options;
   }
 
-  setConfig(options: ICuboidOptions) {
+  setConfig(options: CuboidConfigUpdate) {
     this.validateOptions();
 
-    this.options = { ...this.options, ...options };
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "center" in options ||
+      "width" in options ||
+      "height" in options ||
+      "depth" in options;
+    const colorChanged = "color" in options;
+    const outlineStyleChanged =
+      "fatOutlines" in options ||
+      "outlineWidth" in options;
 
+    this.options = nextOptions;
     this._fatOutlines = this.options.fatOutlines ?? false;
     this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
     this.options.fatOutlines = this._fatOutlines;
     this.options.outlineWidth = this._outlineWidth;
 
-    const { width, height, depth, center, color } = this.options;
+    if (geometryChanged) {
+      this.cuboid.set_config(
+        this.options.center.clone(),
+        this.options.width,
+        this.options.height,
+        this.options.depth
+      );
+      this.generateGeometry();
+      return;
+    }
 
-    // Material Configs
-    this.options.color = color;
+    if (colorChanged) {
+      this.color = this.options.color;
+    }
 
-    // Kernel Configs
-    this.cuboid.set_config(
-      center.clone(),
-      width,
-      height,
-      depth
-    );
-
-    this.generateGeometry();
+    if (outlineStyleChanged && this._outlineEnabled) {
+      this.outline = true;
+    }
   }
 
   cleanGeometry() {

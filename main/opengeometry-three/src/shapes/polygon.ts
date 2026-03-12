@@ -13,15 +13,19 @@ import {
 export interface IPolygonOptions {
   ogid?: string;
   vertices: Vector3[];
+  holes?: Vector3[][];
   color: number;
   fatOutlines?: boolean;
   outlineWidth?: number;
 }
 
+export type PolygonConfigUpdate = Partial<IPolygonOptions>;
+
 export class Polygon extends THREE.Mesh {
   ogid: string;
   options: IPolygonOptions = {
     vertices: [],
+    holes: [],
     color: 0x00ff00,
     fatOutlines: false,
     outlineWidth: 1,
@@ -86,21 +90,41 @@ export class Polygon extends THREE.Mesh {
     }
   }
 
-  setConfig(options: IPolygonOptions) {
+  setConfig(options: PolygonConfigUpdate) {
     this.validateOptions();
 
-    this.options = { ...this.options, ...options };
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "vertices" in options ||
+      "holes" in options;
+    const colorChanged = "color" in options;
+    const outlineStyleChanged =
+      "fatOutlines" in options ||
+      "outlineWidth" in options;
+
+    this.options = nextOptions;
     this._fatOutlines = this.options.fatOutlines ?? false;
     this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
     this.options.fatOutlines = this._fatOutlines;
     this.options.outlineWidth = this._outlineWidth;
 
-    const { vertices, color } = this.options;
-    this.polygon.set_config(vertices);
+    if (geometryChanged) {
+      this.polygon = new OGPolygon(this.ogid);
+      this.polygon.set_config(this.options.vertices.map((vertex) => vertex.clone()));
+      (this.options.holes ?? []).forEach((hole) => {
+        this.polygon.add_holes(hole.map((vertex) => vertex.clone()));
+      });
+      this.generateGeometry();
+      return;
+    }
 
-    this.options.color = color;
+    if (colorChanged) {
+      this.color = this.options.color;
+    }
 
-    this.generateGeometry();
+    if (outlineStyleChanged && this._outlineEnabled) {
+      this.outline = true;
+    }
   }
 
   // /**
@@ -313,6 +337,7 @@ export class Polygon extends THREE.Mesh {
 
   addHole(holeVertices: Vector3[]) {
     if (!this.polygon) return;
+    this.options.holes = [...(this.options.holes ?? []), holeVertices.map((vertex) => vertex.clone())];
     this.polygon.add_holes(holeVertices);
     
     this.disposeGeometryMaterial();

@@ -8,6 +8,8 @@ export interface ICurveOptions {
   color: number;
 }
 
+export type CurveConfigUpdate = Partial<ICurveOptions>;
+
 export interface ICurveOffsetResult {
   points: Vector3[];
   beveledVertexIndices: number[];
@@ -56,12 +58,24 @@ export class Curve extends THREE.Line {
     this.setConfig(this.options);
   }
 
-  setConfig(options: ICurveOptions) {
-    const { controlPoints } = options;
-    this.curve.set_config(controlPoints.map((point) => point.clone()));
+  setConfig(options: CurveConfigUpdate) {
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged = "controlPoints" in options;
+    const colorChanged = "color" in options;
 
-    this.options = { ...this.options, ...options };
-    this.generateGeometry();
+    this.options = nextOptions;
+
+    if (geometryChanged) {
+      this.curve.set_config(
+        nextOptions.controlPoints.map((point) => point.clone())
+      );
+      this.generateGeometry();
+      return;
+    }
+
+    if (colorChanged && this.material instanceof THREE.LineBasicMaterial) {
+      this.material.color.set(this.options.color);
+    }
   }
 
   private generateGeometry() {

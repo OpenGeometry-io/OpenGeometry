@@ -1,92 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Sphere Example</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="OpenGeometry Demo" />
-    <meta name="author" content="Vishwajeet Mane" />
-  </head>
-  <body>
-    <aside class="og-badge">
-      <div class="og-badge-top">
-        <div class="og-badge-icon-wrap"><strong>OG</strong></div>
-        <p class="og-badge-status">ready</p>
-      </div>
-      <div class="og-badge-meta">
-        <p class="og-badge-kicker">OPEN GEOMETRY • SHAPES</p>
-        <strong class="og-badge-title">Sphere</strong>
-        <span class="og-badge-desc">UV sphere for equipment envelopes and clearance studies.</span>
-      </div>
-      <div class="og-badge-chip-row">
-          <span class="og-chip og-chip-accent">Radius</span>
-          <span class="og-chip og-chip-accent">Segments</span>
-      </div>
-      <div class="og-badge-footer">
-        <a class="og-badge-link" href="../index.html">Back to Examples</a>
-      </div>
-    </aside>
+      <title>OpenGeometry Sphere Example</title>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta name="description" content="OpenGeometry Demo" />
+      <meta name="author" content="Vishwajeet Mane" />
+    </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Sphere</span>
+    </div>
     <aside class="og-controls" data-control-panel>
-      <h3>Sphere Parameters</h3>
-      <label class="og-control-row" data-control-key="radius" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Radius</span>
-          <code class="og-control-value" data-control-value>1</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="0.2" max="3" step="0.05" value="1" />
-          <input data-control-number type="number" min="0.2" max="3" step="0.05" value="1" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="widthSegments" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Width Segments</span>
-          <code class="og-control-value" data-control-value>32</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="3" max="96" step="1" value="32" />
-          <input data-control-number type="number" min="3" max="96" step="1" value="32" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="heightSegments" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Height Segments</span>
-          <code class="og-control-value" data-control-value>20</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="2" max="64" step="1" value="20" />
-          <input data-control-number type="number" min="2" max="64" step="1" value="20" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Outline</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Fat Outlines</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Fat Outlines" />
-          <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Outline Width</span>
-          <code class="og-control-value" data-control-value>4</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="1" max="12" step="0.5" value="4" />
-          <input data-control-number type="number" min="1" max="12" step="0.5" value="4" />
-        </div>
-      </label>
-    </aside>
+          <h3>Sphere Parameters</h3>
+          <label class="og-control-row" data-control-key="radius" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Radius</span>
+              <code class="og-control-value" data-control-value>1</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="0.2" max="3" step="0.05" value="1" />
+              <input data-control-number type="number" min="0.2" max="3" step="0.05" value="1" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="widthSegments" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Width Segments</span>
+              <code class="og-control-value" data-control-value>32</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="3" max="96" step="1" value="32" />
+              <input data-control-number type="number" min="3" max="96" step="1" value="32" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="heightSegments" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Height Segments</span>
+              <code class="og-control-value" data-control-value>20</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="2" max="64" step="1" value="20" />
+              <input data-control-number type="number" min="2" max="64" step="1" value="20" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Outline</span>
+            </div>
+            <div class="og-control-bool">
+              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
+              <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Fat Outlines</span>
+            </div>
+            <div class="og-control-bool">
+              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Fat Outlines" />
+              <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Outline Width</span>
+              <code class="og-control-value" data-control-value>4</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="1" max="12" step="0.5" value="4" />
+              <input data-control-number type="number" min="1" max="12" step="0.5" value="4" />
+            </div>
+          </label>
+        </aside>
     <div id="app"></div>
     <script type="module">
       import "../src/styles/theme.css";
@@ -100,127 +86,81 @@
         throw new Error("Missing #app container");
       }
 
+      let sphere;
+      let config = {
+        radius: 1.0,
+        widthSegments: 32,
+        heightSegments: 20,
+        outline: true,
+        fatOutlines: false,
+        outlineWidth: 4,
+      };
+
       function formatControlNumber(value) {
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
       }
 
-      function disposeMaterial(material) {
-        if (!material) {
-          return;
-        }
+      function setUIControls() {
+        const controls = document.querySelectorAll("[data-control-key]");
 
-        if (Array.isArray(material)) {
-          material.forEach((entry) => entry && entry.dispose && entry.dispose());
-          return;
-        }
+        controls.forEach((control) => {
+          const key = control.getAttribute("data-control-key");
+          const type = control.getAttribute("data-control-type");
 
-        if (material.dispose) {
-          material.dispose();
-        }
-      }
+          if (type === "number") {
+            const rangeInput = control.querySelector("[data-control-range]");
+            const numberInput = control.querySelector("[data-control-number]");
+            const valueDisplay = control.querySelector("[data-control-value]");
 
-      function disposeObject3D(object) {
-        object.traverse((node) => {
-          if (node.geometry && node.geometry.dispose) {
-            node.geometry.dispose();
+            function setNumberValue(value) {
+              const numericValue = parseFloat(value);
+              if (!Number.isFinite(numericValue)) return;
+
+              config[key] = numericValue;
+              rangeInput.value = String(numericValue);
+              numberInput.value = String(numericValue);
+              valueDisplay.textContent = formatControlNumber(numericValue);
+              updateGeometry();
+            }
+
+            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
+            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
           }
-          disposeMaterial(node.material);
+
+          if (type === "boolean") {
+            const toggleInput = control.querySelector("[data-control-toggle]");
+            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+
+            function setBooleanValue(checked) {
+              config[key] = checked;
+              toggleInput.checked = checked;
+              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
+              updateGeometry();
+            }
+
+            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
+          }
         });
       }
 
-      function replaceSceneObject(scene, previous, next) {
-        if (previous) {
-          previous.parent && previous.parent.remove(previous);
-          disposeObject3D(previous);
-        }
-
-        scene.add(next);
-        return next;
-      }
-
-      function clamp(value, min, max) {
-        return Math.min(max, Math.max(min, value));
-      }
-
-      function bindControls(definitions, onChange) {
-        const panel = document.querySelector("[data-control-panel]");
-        if (!panel) {
-          throw new Error("Missing control panel");
-        }
-
-        const state = {};
-        const emitChange = () => {
-          onChange({ ...state });
-        };
-
-        definitions.forEach((definition) => {
-          state[definition.key] = definition.value;
-          const row = panel.querySelector(`[data-control-key="${definition.key}"]`);
-          if (!row) {
-            throw new Error(`Missing control row for ${definition.key}`);
-          }
-
-          if (definition.type === "number") {
-            const valueLabel = row.querySelector("[data-control-value]");
-            const rangeInput = row.querySelector("[data-control-range]");
-            const numberInput = row.querySelector("[data-control-number]");
-            if (!valueLabel || !rangeInput || !numberInput) {
-              throw new Error(`Missing number controls for ${definition.key}`);
-            }
-
-            const updateValue = (raw) => {
-              const next = clamp(raw, definition.min, definition.max);
-              state[definition.key] = next;
-              rangeInput.value = String(next);
-              numberInput.value = String(next);
-              valueLabel.textContent = formatControlNumber(next);
-              emitChange();
-            };
-
-            rangeInput.addEventListener("input", () => updateValue(Number(rangeInput.value)));
-            numberInput.addEventListener("change", () => updateValue(Number(numberInput.value)));
-            valueLabel.textContent = formatControlNumber(definition.value);
-            return;
-          }
-
-          if (definition.type === "boolean") {
-            const toggle = row.querySelector("[data-control-toggle]");
-            const boolLabel = row.querySelector("[data-control-bool-state]");
-            if (!toggle || !boolLabel) {
-              throw new Error(`Missing boolean controls for ${definition.key}`);
-            }
-
-            toggle.checked = Boolean(definition.value);
-            boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-            toggle.addEventListener("change", () => {
-              state[definition.key] = toggle.checked;
-              boolLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
-              emitChange();
-            });
-            return;
-          }
-
-          const select = row.querySelector("[data-control-select]");
-          if (!select) {
-            throw new Error(`Missing select control for ${definition.key}`);
-          }
-          select.value = String(definition.value);
-          select.addEventListener("change", () => {
-            state[definition.key] = select.value;
-            emitChange();
-          });
+      function updateGeometry() {
+        if (!sphere) return;
+        sphere.setConfig({
+          center: new Vector3(0, config.radius, 0),
+          radius: config.radius,
+          widthSegments: Math.floor(config.widthSegments),
+          heightSegments: Math.floor(config.heightSegments),
+          color: 0x0891b2,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth,
         });
 
-        emitChange();
+        sphere.outline = config.outline;
       }
 
-      async function createExampleScene(meta, options) {
-        const settings = options || {};
-        document.body.classList.add("og-example-page");
-        document.title = meta.title + " | OpenGeometry";
-
+      async function main() {
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(settings.background || 0xf6f1eb);
+        scene.background = new THREE.Color(0xf6f1eb);
 
         const camera = new THREE.PerspectiveCamera(
           55,
@@ -229,8 +169,7 @@
           4000
         );
 
-        const cameraPosition = settings.cameraPosition || [5.5, 4.2, 6.5];
-        camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+        camera.position.set(5.5, 4.2, 6.5);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -239,19 +178,10 @@
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        const target = settings.target || [0, 0.8, 0];
-        controls.target.set(target[0], target[1], target[2]);
+        controls.target.set(0, 0.8, 0);
         controls.update();
 
-        scene.add(
-          new THREE.GridHelper(
-            settings.gridSize || 32,
-            settings.gridDivisions || 32,
-            settings.gridPrimary || 0xd88b63,
-            settings.gridSecondary || 0xe7d4ca
-          )
-        );
-
+        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
         scene.add(new THREE.AmbientLight(0xffffff, 0.72));
 
         const key = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -263,6 +193,20 @@
         scene.add(fill);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        sphere = new Sphere({
+          center: new Vector3(0, config.radius, 0),
+          radius: config.radius,
+          widthSegments: Math.floor(config.widthSegments),
+          heightSegments: Math.floor(config.heightSegments),
+          color: 0x0891b2,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth,
+        });
+        sphere.outline = config.outline;
+        scene.add(sphere);
+
+        updateGeometry();
 
         function onResize() {
           camera.aspect = window.innerWidth / window.innerHeight;
@@ -279,47 +223,7 @@
         }
 
         animate();
-        return { scene, camera, renderer, controls };
-      }
-
-      async function main() {
-        const meta = {
-        "slug": "shapes/sphere",
-        "category": "shapes",
-        "title": "Sphere",
-        "description": "UV sphere for equipment envelopes and clearance studies.",
-        "statusLabel": "ready",
-        "chips": [
-          "Radius",
-          "Segments"
-        ],
-        "footerText": "Radius, Segments"
-      };
-
-        const { scene } = await createExampleScene(meta);
-        let current = null;
-
-        bindControls([
-          { type: "number", key: "radius", label: "Radius", min: 0.2, max: 3, step: 0.05, value: 1.0 },
-          { type: "number", key: "widthSegments", label: "Width Segments", min: 3, max: 96, step: 1, value: 32 },
-          { type: "number", key: "heightSegments", label: "Height Segments", min: 2, max: 64, step: 1, value: 20 },
-          { type: "boolean", key: "outline", label: "Outline", value: true },
-          { type: "boolean", key: "fatOutlines", label: "Fat Outlines", value: false },
-          { type: "number", key: "outlineWidth", label: "Outline Width", min: 1, max: 12, step: 0.5, value: 4 }
-        ], (state) => {
-          const sphere = new Sphere({
-            center: new Vector3(0, state.radius, 0),
-            radius: state.radius,
-            widthSegments: Math.floor(state.widthSegments),
-            heightSegments: Math.floor(state.heightSegments),
-            color: 0x0891b2,
-            fatOutlines: state.fatOutlines,
-            outlineWidth: state.outlineWidth
-          });
-          sphere.outline = state.outline;
-
-          current = replaceSceneObject(scene, current, sphere);
-        });
+        setUIControls();
       }
 
       void main();
