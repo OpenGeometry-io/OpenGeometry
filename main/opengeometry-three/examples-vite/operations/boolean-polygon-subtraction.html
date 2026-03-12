@@ -40,6 +40,26 @@
           <input data-control-number type="number" min="1" max="8" step="1" value="3" />
         </div>
       </label>
+      <label class="og-control-row" data-control-key="operandBX" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Operand B X</span>
+          <code class="og-control-value" data-control-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-1.5" max="1.5" step="0.01" value="0" />
+          <input data-control-number type="number" min="-1.5" max="1.5" step="0.01" value="0" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="operandBZ" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Operand B Z</span>
+          <code class="og-control-value" data-control-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-1.5" max="1.5" step="0.01" value="0" />
+          <input data-control-number type="number" min="-1.5" max="1.5" step="0.01" value="0" />
+        </div>
+      </label>
       <label class="og-control-row" data-control-key="showOperandA" data-control-type="boolean">
         <div class="og-control-header"><span class="og-control-label-chip">Operand A</span></div>
         <div class="og-control-bool">
@@ -71,8 +91,9 @@
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, createBooleanExample } from "@og-three";
+      import { OpenGeometry, Vector3, createBooleanExample } from "@og-three";
 
       const operation = "subtraction";
       const app = document.getElementById("app");
@@ -83,11 +104,15 @@
       let camera;
       let renderer;
       let controls;
+      let stats;
       let currentExample = null;
+      let rebuildQueued = false;
       const config = {
         outline: true,
         fatOutlines: true,
         outlineWidth: 3,
+        operandBX: 0,
+        operandBZ: 0,
         showOperandA: true,
         showOperandB: true,
         showResult: true,
@@ -96,6 +121,15 @@
 
       function parseColor(color) {
         return Number.parseInt(color.replace("#", "0x"), 16);
+      }
+
+      function scheduleRebuild() {
+        if (rebuildQueued) return;
+        rebuildQueued = true;
+        requestAnimationFrame(() => {
+          rebuildQueued = false;
+          rebuildExample();
+        });
       }
 
       function rebuildExample() {
@@ -111,6 +145,7 @@
           fatOutlines: config.fatOutlines,
           outlineWidth: config.outlineWidth,
           color: parseColor(config.resultColor),
+          polygonOffset: new Vector3(config.operandBX, 0, config.operandBZ),
         });
 
         currentExample.lhs.visible = config.showOperandA;
@@ -165,7 +200,7 @@
               rangeInput.value = raw;
               numberInput.value = raw;
               valueDisplay.textContent = formatControlNumber(raw);
-              rebuildExample();
+              scheduleRebuild();
             };
 
             rangeInput.addEventListener("input", () => setValue(rangeInput.value));
@@ -186,7 +221,7 @@
                 : (isStyleControl ? "Disabled" : "Hidden");
 
               if (isStyleControl) {
-                rebuildExample();
+                scheduleRebuild();
                 return;
               }
 
@@ -200,7 +235,7 @@
             const colorInput = control.querySelector("[data-control-color]");
             colorInput.addEventListener("input", () => {
               config[key] = colorInput.value;
-              rebuildExample();
+              scheduleRebuild();
             });
           }
         });
@@ -217,6 +252,15 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
+
+        stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "24px";
+        stats.dom.style.bottom = "24px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "30";
+        document.body.appendChild(stats.dom);
 
         controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
@@ -245,6 +289,7 @@
         });
 
         renderer.setAnimationLoop(() => {
+          stats.update();
           controls.update();
           renderer.render(scene, camera);
         });

@@ -113,6 +113,7 @@
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
       import { OpenGeometry, Vector3, createBooleanExample } from "@og-three";
 
@@ -125,6 +126,7 @@
       let camera;
       let renderer;
       let controls;
+      let stats;
       let currentExample = null;
       let rebuildQueued = false;
       const config = {
@@ -274,6 +276,15 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
 
+        stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "24px";
+        stats.dom.style.bottom = "24px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "30";
+        document.body.appendChild(stats.dom);
+
         controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.target.set(0, 0.5, 0);
@@ -301,6 +312,7 @@
         });
 
         renderer.setAnimationLoop(() => {
+          stats.update();
           controls.update();
           renderer.render(scene, camera);
         });

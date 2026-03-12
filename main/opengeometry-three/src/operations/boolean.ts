@@ -283,18 +283,30 @@ function resolveOperandSerialized(operand: BooleanOperand): string {
   }
 
   if (typeof operand.getBrepSerialized === "function") {
-    return operand.getBrepSerialized();
+    return serializeBrepLike(operand.getBrepSerialized());
   }
 
   if (typeof operand.getBrepData === "function") {
-    return JSON.stringify(operand.getBrepData());
+    return serializeBrepLike(operand.getBrepData());
   }
 
   if (typeof operand.getBrep === "function") {
-    return JSON.stringify(operand.getBrep());
+    return serializeBrepLike(operand.getBrep());
   }
 
-  return JSON.stringify(operand);
+  return serializeBrepLike(operand);
+}
+
+/**
+ * Accepts either a parsed BRep object or an already serialized JSON payload
+ * and always returns the canonical serialized form expected by the wasm API.
+ */
+function serializeBrepLike(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return JSON.stringify(value);
 }
 
 /**

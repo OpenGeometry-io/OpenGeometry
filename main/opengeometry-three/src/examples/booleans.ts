@@ -18,6 +18,7 @@ export type BooleanExampleMode = "solid" | "polygon";
 export interface BooleanExampleBuildOptions extends BooleanExecutionOptions {
   mode: BooleanExampleMode;
   sphereCenter?: Vector3;
+  polygonOffset?: Vector3;
 }
 
 export interface BooleanExampleBuildResult {
@@ -107,13 +108,14 @@ function createPolygonPreset(
   options: BooleanExampleBuildOptions
 ) {
   const outlineWidth = options.outlineWidth ?? 3;
+  const polygonOffset = options.polygonOffset ?? new Vector3(0.0, 0.0, 0.0);
   const lhsVertices = [
     new Vector3(-1.8, 0.0, -0.8),
     new Vector3(0.4, 0.0, -0.8),
     new Vector3(0.4, 0.0, 1.0),
     new Vector3(-1.8, 0.0, 1.0),
   ];
-  const rhsVertices =
+  const rhsVertices = translateVertices(
     operation === "subtraction"
       ? [
           new Vector3(-0.55, 0.0, -0.35),
@@ -126,7 +128,9 @@ function createPolygonPreset(
           new Vector3(1.55, 0.0, -1.1),
           new Vector3(1.55, 0.0, 0.7),
           new Vector3(-0.4, 0.0, 0.7),
-        ];
+        ],
+    polygonOffset
+  );
 
   const lhs = new Polygon({
     vertices: lhsVertices,
@@ -173,4 +177,19 @@ function getBooleanExecutor(operation: BooleanExampleOperation) {
  */
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/**
+ * Applies a uniform translation to the polygon operand so examples can move it
+ * interactively without mutating the base preset coordinates.
+ */
+function translateVertices(vertices: Vector3[], offset: Vector3) {
+  return vertices.map(
+    (vertex) =>
+      new Vector3(
+        vertex.x + offset.x,
+        vertex.y + offset.y,
+        vertex.z + offset.z
+      )
+  );
 }
