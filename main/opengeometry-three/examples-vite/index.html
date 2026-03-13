@@ -4,20 +4,22 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenGeometry Three Examples</title>
-<style>
+    <style>
       :root {
         color-scheme: light;
-        --og-bg: #ede7e0;
-        --og-line: rgba(95, 61, 46, 0.1);
-        --og-text: #221a14;
-        --og-muted: #736255;
-        --og-muted-soft: #9f8f83;
-        --og-accent: #ff5400;
-        --og-accent-soft: rgba(255, 84, 0, 0.12);
-        --og-shadow: 0 22px 44px rgba(72, 44, 24, 0.08);
+        --og-bg: #ece4db;
+        --og-panel: rgba(255, 251, 247, 0.9);
+        --og-panel-soft: rgba(255, 255, 255, 0.72);
+        --og-line: rgba(88, 57, 42, 0.12);
+        --og-line-strong: rgba(88, 57, 42, 0.2);
+        --og-text: #241a14;
+        --og-muted: #6f6055;
+        --og-accent: #f05a24;
+        --og-accent-soft: rgba(240, 90, 36, 0.1);
+        --og-shadow: 0 14px 28px rgba(69, 43, 28, 0.08);
         --og-font: "Space Grotesk", "Sora", "Avenir Next", "Segoe UI", sans-serif;
-        --og-mono: "IBM Plex Mono", "JetBrains Mono", "SFMono-Regular", monospace;
-        --og-squircle-radius: 24px;
+        --og-radius: 18px;
+        --og-radius-soft: 14px;
       }
 
       * {
@@ -27,808 +29,548 @@
       html,
       body {
         margin: 0;
-        width: 100%;
         min-height: 100%;
         background:
-          radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0)),
-          linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(116, 84, 63, 0.05)),
+          radial-gradient(circle at top left, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0)),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(116, 84, 63, 0.05)),
           var(--og-bg);
         color: var(--og-text);
-        font: 14px/1.45 var(--og-font);
+        font: 14px/1.5 var(--og-font);
       }
 
       body {
-        overflow-x: hidden;
+        padding: 24px 0 40px;
       }
 
-      code {
-        font-family: var(--og-mono);
-      }
-
-      #app {
-        width: 100%;
-        min-height: 100vh;
-      }
-
-      .og-specs-shell {
-        width: min(1320px, calc(100% - 30px));
+      main {
+        width: min(1120px, calc(100% - 28px));
         margin: 0 auto;
-        padding: 26px 8px 48px;
       }
 
-      .og-specs-head,
-      .og-spec-card,
-      .og-support,
-      .og-spec-open,
-      .og-support-link {
+      .og-hero,
+      .og-section-card,
+      .og-example-card,
+      .og-advanced-card,
+      .og-open {
         corner-shape: squircle;
-        border-radius: var(--og-squircle-radius);
+        border-radius: var(--og-radius);
       }
 
-      .og-specs-head {
-        display: grid;
-        grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
-        gap: 24px;
-        padding: 22px 24px;
+      .og-hero,
+      .og-section-card,
+      .og-advanced-card {
         border: 1px solid var(--og-line);
-        background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(249, 239, 229, 0.9));
+        background: var(--og-panel);
         box-shadow: var(--og-shadow);
+        backdrop-filter: blur(10px);
       }
 
-      .og-specs-title {
-        margin: 6px 0 0;
-        font-weight: 700;
-        letter-spacing: -0.03em;
-        font-size: clamp(42px, 6vw, 74px);
-        line-height: 0.92;
+      .og-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+        gap: 18px;
+        padding: 18px 20px;
       }
 
-      .og-specs-note {
+      .og-kicker,
+      .og-meta,
+      .og-section-count,
+      .og-advanced-label {
         margin: 0;
         color: var(--og-muted);
-        font-size: 12px;
-        line-height: 1.4;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
       }
 
-      .og-specs-head .og-specs-note:last-child {
-        align-self: end;
-        justify-self: end;
-        max-width: 320px;
-        text-align: right;
+      .og-title {
+        margin: 8px 0 10px;
+        font-size: clamp(36px, 6vw, 58px);
+        line-height: 0.96;
+        letter-spacing: -0.04em;
       }
 
-      .og-specs-section {
-        margin-top: 26px;
+      .og-copy,
+      .og-meta-copy,
+      .og-card-desc,
+      .og-advanced-copy {
+        margin: 0;
+        color: var(--og-muted);
       }
 
-      .og-specs-section-head {
+      .og-meta-block {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+        padding: 2px 0;
+      }
+
+      .og-meta-chip-row,
+      .og-tag-row,
+      .og-advanced-tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .og-meta-chip,
+      .og-tag,
+      .og-advanced-tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(88, 57, 42, 0.1);
+        background: var(--og-panel-soft);
+        color: #855941;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .og-section-card {
+        margin-top: 18px;
+        padding: 16px;
+      }
+
+      .og-section-head {
         display: flex;
         align-items: baseline;
         justify-content: space-between;
-        gap: 10px;
+        gap: 12px;
         margin-bottom: 14px;
-        padding: 0 4px;
       }
 
-      .og-specs-section-title {
+      .og-section-title {
         margin: 0;
-        font-size: clamp(28px, 4vw, 42px);
+        font-size: 24px;
         letter-spacing: -0.03em;
-        font-weight: 650;
       }
 
-      .og-specs-count {
-        margin: 0;
-        color: var(--og-muted);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.12em;
-        padding: 8px 12px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.45);
-        border: 1px solid var(--og-line);
-      }
-
-      .og-specs-grid {
+      .og-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
-        gap: 18px;
-      }
-
-      .og-spec-card {
-        display: grid;
-        gap: 16px;
-        min-height: 312px;
-        padding: 18px 18px 16px;
-        border: 1px solid var(--og-line);
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(250, 242, 235, 0.96));
-        box-shadow: var(--og-shadow);
-        transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
-      }
-
-      .og-spec-card:hover {
-        border-color: rgba(255, 84, 0, 0.28);
-        transform: translateY(-3px);
-        box-shadow: 0 28px 52px rgba(72, 44, 24, 0.12);
-      }
-
-      .og-spec-card-head {
-        display: flex;
-        align-items: start;
-        justify-content: space-between;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
         gap: 12px;
       }
 
-      .og-spec-card-brand {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 56px;
-        height: 56px;
-        border-radius: 20px;
-        background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(255, 235, 223, 0.92));
-        border: 1px solid rgba(255, 84, 0, 0.18);
-        color: var(--og-accent);
+      .og-example-card {
+        display: grid;
+        gap: 12px;
+        min-height: 196px;
+        padding: 14px;
+        border: 1px solid rgba(88, 57, 42, 0.09);
+        background: var(--og-panel-soft);
+        transition: border-color 140ms ease, transform 140ms ease;
       }
 
-      .og-spec-card-brand svg {
-        width: 20px;
-        height: 20px;
-        opacity: 0.88;
+      .og-example-card:hover {
+        border-color: rgba(240, 90, 36, 0.24);
+        transform: translateY(-2px);
       }
 
-      .og-spec-card-title {
-        margin: 0;
-        font-weight: 650;
-        font-size: 28px;
-        letter-spacing: -0.02em;
-      }
-
-      .og-spec-badge {
-        margin: 0;
-        color: #4f7259;
-        background: rgba(133, 189, 149, 0.12);
-        border: 1px solid rgba(133, 189, 149, 0.24);
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.03em;
-        text-transform: capitalize;
-        padding: 8px 12px;
-        border-radius: 14px;
-      }
-
-      .og-spec-desc {
-        margin: 6px 0 0;
-        color: var(--og-muted);
-        font-size: 14px;
-        min-height: 44px;
-      }
-
-      .og-spec-chip-row {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-start;
-        gap: 6px;
-      }
-
-      .og-chip {
-        display: inline-flex;
-        flex: 0 0 auto;
-        align-items: center;
-        justify-content: center;
-        height: 28px;
-        padding: 0 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(214, 132, 83, 0.14);
-        background: rgba(246, 234, 226, 0.92);
-        white-space: nowrap;
-      }
-
-      .og-chip span {
-        display: inline-block;
-        font-size: 11px;
-        line-height: 1;
-        color: #9f6b4e;
-        font-weight: 550;
-        letter-spacing: 0.02em;
-      }
-
-      .og-spec-card-footer {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 14px;
-        margin-top: auto;
-        padding-top: 14px;
-        border-top: 1px solid rgba(95, 61, 46, 0.08);
-      }
-
-      .og-spec-open {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 42px;
-        padding: 0 16px;
-        border: 1px solid rgba(96, 87, 78, 0.14);
-        background: #64584f;
-        color: #fbf7f3;
-        font-weight: 600;
-        text-decoration: none;
-        box-shadow: 0 10px 18px rgba(76, 63, 54, 0.16);
-      }
-
-      .og-support {
+      .og-card-top {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 18px;
-        margin-top: 28px;
-        padding: 20px 22px;
-        border: 1px solid rgba(255, 84, 0, 0.18);
-        background: linear-gradient(145deg, rgba(255, 248, 242, 0.96), rgba(250, 239, 230, 0.92));
-        box-shadow: var(--og-shadow);
+        gap: 10px;
       }
 
-      .og-support-copy {
-        display: grid;
-        gap: 6px;
-      }
-
-      .og-support-kicker {
-        margin: 0;
-        color: var(--og-accent);
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-      }
-
-      .og-support-title {
-        margin: 0;
-        font-size: 22px;
-        font-weight: 650;
-        letter-spacing: -0.02em;
-      }
-
-      .og-support-text {
-        margin: 0;
-        color: var(--og-muted);
-        font-size: 14px;
-      }
-
-      .og-support-link {
+      .og-card-badge {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 10px;
-        min-height: 46px;
-        padding: 0 18px;
-        border: 1px solid rgba(255, 84, 0, 0.18);
-        background: var(--og-accent);
-        color: #fff7f2;
+        min-height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: var(--og-accent-soft);
+        color: #9b5535;
+        font-size: 10px;
         font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .og-card-title {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+
+      .og-card-desc {
+        font-size: 13px;
+      }
+
+      .og-open {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--og-line-strong);
+        background: #5f554e;
+        color: #faf6f2;
+        font-size: 12px;
+        font-weight: 600;
         text-decoration: none;
-        white-space: nowrap;
-        box-shadow: 0 12px 24px rgba(255, 84, 0, 0.18);
+        width: fit-content;
       }
 
-      .og-support-link svg {
-        width: 18px;
-        height: 18px;
-        flex: 0 0 auto;
+      .og-advanced-card {
+        display: grid;
+        gap: 12px;
+        margin-top: 18px;
+        padding: 16px;
       }
 
-      @media (max-width: 900px) {
-        .og-specs-head {
+      .og-advanced-group {
+        display: grid;
+        gap: 8px;
+      }
+
+      .og-advanced-title {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+
+      @media (max-width: 840px) {
+        .og-hero {
           grid-template-columns: 1fr;
-        }
-
-        .og-specs-head .og-specs-note:last-child {
-          justify-self: start;
-          text-align: left;
         }
       }
 
       @media (max-width: 640px) {
-        .og-specs-shell {
-          width: min(100%, calc(100% - 20px));
-          padding-top: 18px;
+        body {
+          padding-top: 14px;
         }
 
-        .og-spec-card {
-          min-height: 286px;
+        main {
+          width: min(100%, calc(100% - 16px));
         }
 
-        .og-spec-card-title {
-          font-size: 24px;
+        .og-hero,
+        .og-section-card,
+        .og-advanced-card {
+          padding: 14px;
         }
 
-        .og-spec-card-footer,
-        .og-support {
-          flex-direction: column;
-          align-items: stretch;
+        .og-grid {
+          grid-template-columns: 1fr;
         }
       }
     </style>
   </head>
   <body>
-    <main class="og-specs-shell">
-      <section class="og-specs-head">
+    <main>
+      <section class="og-hero">
         <div>
-          <p class="og-specs-note">OpenGeometry Three Example Catalog</p>
-          <h1 class="og-specs-title">Examples</h1>
-        </div>
-        <p class="og-specs-note">
-          Standalone Vite-served pages for primitives, shapes, and operation workflows. Read any example in one
-          file and open it directly from this catalog.
-        </p>
-      </section>
-<section class="og-specs-section">
-  <div class="og-specs-section-head">
-    <h2 class="og-specs-section-title">Primitives</h2>
-    <p class="og-specs-count">5 items</p>
-  </div>
-  <div class="og-specs-grid"><article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Arc</h3>
-    <p class="og-spec-desc">Circular arc with angle span and segmentation control.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Radius</span></span><span class="og-chip"><span>Span</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./primitives/arc.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Curve</h3>
-    <p class="og-spec-desc">Control-point curve for route and profile sketching.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Sag</span></span><span class="og-chip"><span>Lift</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./primitives/curve.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Line</h3>
-    <p class="og-spec-desc">Two-point line primitive with direct endpoint control.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Length</span></span><span class="og-chip"><span>Angle</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./primitives/line.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Polyline</h3>
-    <p class="og-spec-desc">Open and closed path definitions for profile work.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Closure</span></span><span class="og-chip"><span>Span</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./primitives/polyline.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Rectangle</h3>
-    <p class="og-spec-desc">Parametric rectangular primitive for base profiles.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Width</span></span><span class="og-chip"><span>Breadth</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./primitives/rectangle.html">Open example</a>
-  </div>
-</article></div>
-</section>
-<section class="og-specs-section">
-  <div class="og-specs-section-head">
-    <h2 class="og-specs-section-title">Shapes</h2>
-    <p class="og-specs-count">8 items</p>
-  </div>
-  <div class="og-specs-grid"><article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Cuboid</h3>
-    <p class="og-spec-desc">Rectangular solid for rooms, equipment blocks and massing.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Width</span></span><span class="og-chip"><span>Height</span></span><span class="og-chip"><span>Depth</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./shapes/cuboid.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Cylinder</h3>
-    <p class="og-spec-desc">Cylindrical volume for ducts, pipes and mechanical shafts.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Radius</span></span><span class="og-chip"><span>Height</span></span><span class="og-chip"><span>Segments</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./shapes/cylinder.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Opening</h3>
-    <p class="og-spec-desc">Opening helper volume for void and penetration previews.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Width</span></span><span class="og-chip"><span>Height</span></span><span class="og-chip"><span>Depth</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./shapes/opening.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Polygon</h3>
-    <p class="og-spec-desc">Planar polygon triangulation for surfaces and slabs.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Sides</span></span><span class="og-chip"><span>Radius</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./shapes/polygon.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Polygon Suite</h3>
-    <p class="og-spec-desc">Dataset-backed polygon validation with concave, performance, and multi-hole cases.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Holes</span></span><span class="og-chip"><span>Concavity</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./shapes/polygon-suite.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Sphere</h3>
-    <p class="og-spec-desc">UV sphere for equipment envelopes and clearance studies.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Radius</span></span><span class="og-chip"><span>Segments</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./shapes/sphere.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Sweep</h3>
-    <p class="og-spec-desc">Profile along path sweep for framing and custom sections.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Path</span></span><span class="og-chip"><span>Caps</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./shapes/sweep.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Wedge</h3>
-    <p class="og-spec-desc">Tapered solid for ramps and sloped technical elements.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Width</span></span><span class="og-chip"><span>Height</span></span><span class="og-chip"><span>Depth</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./shapes/wedge.html">Open example</a>
-  </div>
-</article></div>
-</section>
-<section class="og-specs-section">
-  <div class="og-specs-section-head">
-    <h2 class="og-specs-section-title">Operations</h2>
-    <p class="og-specs-count">18 items</p>
-  </div>
-  <div class="og-specs-grid"><article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">new</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Boolean Union</h3>
-    <p class="og-spec-desc">Solid union demo with live sphere-position sliders, outlines, and direct operand/result comparison.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Union</span></span><span class="og-chip"><span>Solid</span></span><span class="og-chip"><span>Realtime</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/boolean-union.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">new</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Boolean Intersection</h3>
-    <p class="og-spec-desc">Solid intersection workflow with live sphere-position control and direct operand/result comparison.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Intersection</span></span><span class="og-chip"><span>Solid</span></span><span class="og-chip"><span>Realtime</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/boolean-intersection.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">new</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Boolean Subtraction</h3>
-    <p class="og-spec-desc">Solid subtraction workflow with live sphere-position control and direct operand/result comparison.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Subtraction</span></span><span class="og-chip"><span>Solid</span></span><span class="og-chip"><span>Realtime</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/boolean-subtraction.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">new</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Wall Union IFC</h3>
-    <p class="og-spec-desc">Move two adjoining cuboid walls with plan sliders, union them into one wall body, and export the joined result as IFC.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Boolean</span></span><span class="og-chip"><span>Walls</span></span><span class="og-chip"><span>IFC</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/wall-union-ifc.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">new</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Opening Subtraction</h3>
-    <p class="og-spec-desc">Select a host solid, move an opening volume through it, and preview door or window style cutouts in realtime.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Opening</span></span><span class="og-chip"><span>Walls</span></span><span class="og-chip"><span>Realtime</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/opening-subtraction.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">new</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Polygon Boolean Union</h3>
-    <p class="og-spec-desc">Dedicated coplanar polygon union page with operand/result overlays and outline controls.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Union</span></span><span class="og-chip"><span>Polygon</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/boolean-polygon-union.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">new</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Polygon Boolean Intersection</h3>
-    <p class="og-spec-desc">Dedicated coplanar polygon intersection page with operand/result overlays and outline controls.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Intersection</span></span><span class="og-chip"><span>Polygon</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/boolean-polygon-intersection.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">new</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Polygon Boolean Subtraction</h3>
-    <p class="og-spec-desc">Dedicated coplanar polygon subtraction page with operand/result overlays and outline controls.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Subtraction</span></span><span class="og-chip"><span>Polygon</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/boolean-polygon-subtraction.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Door Export</h3>
-    <p class="og-spec-desc">Door panel as Cuboid plus frame from swept profile, exported through STL, STEP and IFC.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Door Panel</span></span><span class="og-chip"><span>Frame Profile</span></span><span class="og-chip"><span>IFC</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/door-export.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">IFC Export</h3>
-    <p class="og-spec-desc">IFC4 export with user-side semantics sidecar and console-based reporting.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Semantics JSON</span></span><span class="og-chip"><span>IFC4</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/ifc-export.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Offset</h3>
-    <p class="og-spec-desc">Offset generation with acute-corner and bevel parameters.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Offset</span></span><span class="og-chip"><span>Bevel</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/offset.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">STEP Export</h3>
-    <p class="og-spec-desc">STEP Part-21 export workflow with console-based reporting and download.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>STEP</span></span><span class="og-chip"><span>Shape</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/step-export.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">STL Export</h3>
-    <p class="og-spec-desc">Binary STL export workflow with console-based reporting and download.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Binary STL</span></span><span class="og-chip"><span>Shape</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/stl-export.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">LEGO-Style Brick Export</h3>
-    <p class="og-spec-desc">3x2 brick built from a simple Cuboid body plus Cylinder studs, with live updates and STL export.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>3x2 Brick</span></span><span class="og-chip"><span>Cuboid Body</span></span><span class="og-chip"><span>Binary STL</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/lego-brick-export.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Sweep Hilbert Profiles</h3>
-    <p class="og-spec-desc">Locked Hilbert3D path with switchable kernel and custom section profiles.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Hilbert Path</span></span><span class="og-chip"><span>Profiles</span></span><span class="og-chip"><span>Sweep</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/sweep-hilbert-profiles.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Sweep Path + Profile</h3>
-    <p class="og-spec-desc">Operation-level sweep from path primitive plus profile primitive.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Path</span></span><span class="og-chip"><span>Caps</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/sweep-path-profile.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Sweep MEP Pipes</h3>
-    <p class="og-spec-desc">Adjustable multi-run MEP sweep benchmark with arc/rectangle profiles and FPS stats.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>MEP Rack</span></span><span class="og-chip"><span>Profiles</span></span><span class="og-chip"><span>FPS</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/sweep-mep-pipes.html">Open example</a>
-  </div>
-</article>
-<article class="og-spec-card">
-  <div class="og-spec-card-head">
-    <div class="og-spec-card-brand" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 4v16M4 17h16M17 4v16"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></div>
-    <p class="og-spec-badge">ready</p>
-  </div>
-  <div>
-    <h3 class="og-spec-card-title">Wall from Offsets</h3>
-    <p class="og-spec-desc">Composite wall profile assembled from offset centerlines.</p>
-  </div>
-  <div class="og-spec-chip-row"><span class="og-chip"><span>Offsets</span></span><span class="og-chip"><span>Thickness</span></span></div>
-  <div class="og-spec-card-footer">
-    <a class="og-spec-open" href="./operations/wall-from-offsets.html">Open example</a>
-  </div>
-</article></div>
-</section>
-      <section class="og-support">
-        <div class="og-support-copy">
-          <p class="og-support-kicker">Need Help</p>
-          <h2 class="og-support-title">Talk to the OpenGeometry team</h2>
-          <p class="og-support-text">
-            Use Discord for example issues, geometry questions, and requests for new standalone demos.
+          <p class="og-kicker">OpenGeometry Three</p>
+          <h1 class="og-title">Core examples</h1>
+          <p class="og-copy">
+            The public catalog stays focused on small, readable demos that explain the kernel
+            without dragging in profiling or domain-heavy setup.
           </p>
         </div>
-        <a class="og-support-link" href="https://discord.gg/BUBcPU8w" target="_blank" rel="noreferrer">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none"><path d="M19.54 5.17a16.7 16.7 0 0 0-4.13-1.3l-.2.4a14.6 14.6 0 0 1 3.95 1.36 13.9 13.9 0 0 0-3.99-1.23 16.1 16.1 0 0 0-6.34 0A13.9 13.9 0 0 0 4.84 5.63a14.6 14.6 0 0 1 3.95-1.36l-.2-.4a16.7 16.7 0 0 0-4.13 1.3C1.84 9.1 1.15 12.93 1.5 16.72a16.8 16.8 0 0 0 5.07 2.57l1.09-1.76a10.7 10.7 0 0 1-1.72-.83l.42-.3c3.32 1.57 6.92 1.57 10.19 0l.42.3c-.54.33-1.12.61-1.72.83l1.09 1.76a16.8 16.8 0 0 0 5.07-2.57c.41-4.39-.7-8.18-2.87-11.55ZM8.68 14.4c-.99 0-1.8-.92-1.8-2.04 0-1.13.8-2.04 1.8-2.04.99 0 1.8.92 1.8 2.04 0 1.12-.81 2.04-1.8 2.04Zm6.64 0c-.99 0-1.8-.92-1.8-2.04 0-1.13.8-2.04 1.8-2.04.99 0 1.8.92 1.8 2.04 0 1.12-.81 2.04-1.8 2.04Z" fill="currentColor"/></svg>
-          <span>Join Discord</span>
-        </a>
+        <div class="og-meta-block">
+          <p class="og-meta">Source of truth</p>
+          <p class="og-meta-copy">
+            Every page here is a checked-in standalone HTML file under
+            <code>examples-vite/</code>, built with Vite and opened directly from this catalog.
+          </p>
+          <div class="og-meta-chip-row">
+            <span class="og-meta-chip">19 curated pages</span>
+            <span class="og-meta-chip">Static HTML controls</span>
+            <span class="og-meta-chip">Inline module scripts</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="og-section-card">
+        <div class="og-section-head">
+          <h2 class="og-section-title">Primitives</h2>
+          <p class="og-section-count">5 core demos</p>
+        </div>
+        <div class="og-grid">
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Arc</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Circular arc with span and segment controls.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Radius</span>
+              <span class="og-tag">Span</span>
+            </div>
+            <a class="og-open" href="./primitives/arc.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Curve</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Control-point curve for route and profile sketching.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Sag</span>
+              <span class="og-tag">Lift</span>
+            </div>
+            <a class="og-open" href="./primitives/curve.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Line</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Two-point line primitive with direct endpoint control.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Length</span>
+              <span class="og-tag">Angle</span>
+            </div>
+            <a class="og-open" href="./primitives/line.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Polyline</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Open and closed path definitions for profile work.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Closure</span>
+              <span class="og-tag">Span</span>
+            </div>
+            <a class="og-open" href="./primitives/polyline.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Rectangle</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Parametric rectangular primitive for base profiles.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Width</span>
+              <span class="og-tag">Breadth</span>
+            </div>
+            <a class="og-open" href="./primitives/rectangle.html">Open example</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="og-section-card">
+        <div class="og-section-head">
+          <h2 class="og-section-title">Shapes</h2>
+          <p class="og-section-count">7 core demos</p>
+        </div>
+        <div class="og-grid">
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Cuboid</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Rectangular solid for massing, rooms, and equipment blocks.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Width</span>
+              <span class="og-tag">Depth</span>
+            </div>
+            <a class="og-open" href="./shapes/cuboid.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Cylinder</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Cylindrical volume for ducts, pipes, and shafts.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Radius</span>
+              <span class="og-tag">Segments</span>
+            </div>
+            <a class="og-open" href="./shapes/cylinder.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Opening</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Opening helper volume for void and penetration previews.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Width</span>
+              <span class="og-tag">Height</span>
+            </div>
+            <a class="og-open" href="./shapes/opening.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Polygon</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Planar polygon triangulation for surfaces and slabs.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Sides</span>
+              <span class="og-tag">Radius</span>
+            </div>
+            <a class="og-open" href="./shapes/polygon.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Sphere</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">UV sphere for equipment envelopes and clearance studies.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Radius</span>
+              <span class="og-tag">Segments</span>
+            </div>
+            <a class="og-open" href="./shapes/sphere.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Sweep</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Profile along path sweep for framing and custom sections.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Path</span>
+              <span class="og-tag">Caps</span>
+            </div>
+            <a class="og-open" href="./shapes/sweep.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Wedge</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Tapered solid for ramps and sloped technical elements.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Height</span>
+              <span class="og-tag">Depth</span>
+            </div>
+            <a class="og-open" href="./shapes/wedge.html">Open example</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="og-section-card">
+        <div class="og-section-head">
+          <h2 class="og-section-title">Operations</h2>
+          <p class="og-section-count">7 core demos</p>
+        </div>
+        <div class="og-grid">
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Boolean Union</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Solid union with operand visibility and outline controls.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Solid</span>
+              <span class="og-tag">Union</span>
+            </div>
+            <a class="og-open" href="./operations/boolean-union.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Polygon Boolean Union</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Coplanar polygon union with operand and result overlays.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Polygon</span>
+              <span class="og-tag">Union</span>
+            </div>
+            <a class="og-open" href="./operations/boolean-polygon-union.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Offset</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Offset generation with acute-corner and bevel parameters.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Polyline</span>
+              <span class="og-tag">Offset</span>
+            </div>
+            <a class="og-open" href="./operations/offset.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">STEP Export</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">STEP Part-21 export with compact controls and download.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">STEP</span>
+              <span class="og-tag">Export</span>
+            </div>
+            <a class="og-open" href="./operations/step-export.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">STL Export</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Binary STL export workflow with direct download.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">STL</span>
+              <span class="og-tag">Export</span>
+            </div>
+            <a class="og-open" href="./operations/stl-export.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Sweep Path + Profile</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Operation-level sweep assembled from primitive inputs.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Path</span>
+              <span class="og-tag">Profile</span>
+            </div>
+            <a class="og-open" href="./operations/sweep-path-profile.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Wall from Offsets</h3>
+              <span class="og-card-badge">Core</span>
+            </div>
+            <p class="og-card-desc">Composite wall profile assembled from offset centerlines.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Wall</span>
+              <span class="og-tag">Offsets</span>
+            </div>
+            <a class="og-open" href="./operations/wall-from-offsets.html">Open example</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="og-advanced-card">
+        <p class="og-advanced-label">Companion repo</p>
+        <h2 class="og-advanced-title">Advanced examples moved to `OpenGeometry-Examples-Advanced`</h2>
+        <p class="og-advanced-copy">
+          Heavy validation, BIM export, profiling, and large-scene workflows no longer ship in the
+          public core catalog here. Publishing for the companion repository is still being wired up,
+          so this note stays non-clickable until the external repo URL is ready.
+        </p>
+        <div class="og-advanced-group">
+          <p class="og-meta">Moved shape demo</p>
+          <div class="og-advanced-tag-row">
+            <span class="og-advanced-tag">Polygon Suite</span>
+          </div>
+        </div>
+        <div class="og-advanced-group">
+          <p class="og-meta">Moved operation demos</p>
+          <div class="og-advanced-tag-row">
+            <span class="og-advanced-tag">Boolean Intersection</span>
+            <span class="og-advanced-tag">Boolean Subtraction</span>
+            <span class="og-advanced-tag">Polygon Boolean Intersection</span>
+            <span class="og-advanced-tag">Polygon Boolean Subtraction</span>
+            <span class="og-advanced-tag">IFC Export</span>
+            <span class="og-advanced-tag">Door Export</span>
+            <span class="og-advanced-tag">Opening Subtraction</span>
+            <span class="og-advanced-tag">Wall Union IFC</span>
+            <span class="og-advanced-tag">Sweep Hilbert Profiles</span>
+            <span class="og-advanced-tag">Sweep MEP Pipes</span>
+          </div>
+        </div>
       </section>
     </main>
   </body>

@@ -1,6 +1,6 @@
 {
   "name": "@opengeometry/kernel-three",
-  "version": "1.0.0",
+  "version": "1.0.9",
   "description": "OpenGeometry Kernel for Three.js",
   "main": "index.js",
   "scripts": {

@@ -34,6 +34,32 @@ function toPosixPath(path) {
   return path.replace(/\\/g, "/");
 }
 
+function createManualChunk(id) {
+  const normalized = toPosixPath(id);
+
+  if (normalized.includes("/node_modules/three/examples/jsm/libs/stats.module")) {
+    return "vendor-stats";
+  }
+
+  if (normalized.includes("/node_modules/three/examples/jsm/")) {
+    return "vendor-three-extras";
+  }
+
+  if (normalized.includes("/node_modules/three/")) {
+    return "vendor-three";
+  }
+
+  if (
+    normalized.includes("/main/opengeometry-three/index.ts")
+    || normalized.includes("/main/opengeometry-three/src/")
+    || normalized.includes("/main/opengeometry/pkg/")
+  ) {
+    return "vendor-opengeometry";
+  }
+
+  return undefined;
+}
+
 function collectHtmlInputs() {
   const htmlFiles = collectFiles(examplesRoot, ".html");
   const inputs = {};
@@ -54,7 +80,12 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, "examples-dist"),
     emptyOutDir: true,
-    rollupOptions: { input },
+    rollupOptions: {
+      input,
+      output: {
+        manualChunks: createManualChunk,
+      },
+    },
   },
   resolve: {
     alias: {
