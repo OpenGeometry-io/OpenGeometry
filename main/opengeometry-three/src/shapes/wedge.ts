@@ -1,6 +1,18 @@
 import { OGWedge, Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
+import {
+  createShapeOutlineMesh,
+  disposeShapeOutlineMesh,
+  sanitizeOutlineWidth,
+  ShapeOutlineMesh,
+} from "./outline-utils";
+import { subtractShapeOperand } from "./boolean-subtract";
+import type {
+  ShapeSubtractOperand,
+  ShapeSubtractOptions,
+  ShapeSubtractResult,
+} from "./boolean-subtract";
 
 export interface IWedgeOptions {
   ogid?: string;
@@ -9,7 +21,11 @@ export interface IWedgeOptions {
   height: number;
   depth: number;
   color: number;
+  fatOutlines?: boolean;
+  outlineWidth?: number;
 }
+
+export type WedgeConfigUpdate = Partial<IWedgeOptions>;
 
 export class Wedge extends THREE.Mesh {
   ogid: string;
@@ -19,10 +35,15 @@ export class Wedge extends THREE.Mesh {
     height: 1,
     depth: 1,
     color: 0x00ff00,
+    fatOutlines: false,
+    outlineWidth: 1,
   };
 
   private wedge: OGWedge;
-  #outlineMesh: THREE.Line | null = null;
+  #outlineMesh: ShapeOutlineMesh | null = null;
+  private _outlineEnabled = false;
+  private _fatOutlines = false;
+  private _outlineWidth = 1;
 
   set color(color: number) {
     this.options.color = color;
@@ -48,14 +69,40 @@ export class Wedge extends THREE.Mesh {
     }
   }
 
-  setConfig(options: IWedgeOptions) {
+  setConfig(options: WedgeConfigUpdate) {
     this.validateOptions();
 
-    const { width, height, depth, center, color } = options;
-    this.wedge.set_config(center.clone(), width, height, depth);
-    this.options.color = color;
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "center" in options ||
+      "width" in options ||
+      "height" in options ||
+      "depth" in options;
+    const colorChanged = "color" in options;
+    const outlineStyleChanged =
+      "fatOutlines" in options ||
+      "outlineWidth" in options;
 
-    this.generateGeometry();
+    this.options = nextOptions;
+    this._fatOutlines = this.options.fatOutlines ?? false;
+    this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
+    this.options.fatOutlines = this._fatOutlines;
+    this.options.outlineWidth = this._outlineWidth;
+
+    if (geometryChanged) {
+      const { width, height, depth, center } = this.options;
+      this.wedge.set_config(center.clone(), width, height, depth);
+      this.generateGeometry();
+      return;
+    }
+
+    if (colorChanged) {
+      this.color = this.options.color;
+    }
+
+    if (outlineStyleChanged && this._outlineEnabled) {
+      this.outline = true;
+    }
   }
 
   cleanGeometry() {
@@ -91,7 +138,7 @@ export class Wedge extends THREE.Mesh {
     this.geometry = geometry;
     this.material = material;
 
-    if (this.#outlineMesh) {
+    if (this._outlineEnabled) {
       this.outline = true;
     }
   }
@@ -104,31 +151,71 @@ export class Wedge extends THREE.Mesh {
     return JSON.parse(brepData);
   }
 
-  set outline(enable: boolean) {
-    if (this.#outlineMesh) {
-      this.remove(this.#outlineMesh);
-      this.#outlineMesh.geometry.dispose();
-      this.#outlineMesh = null;
-    }
+  /**
+   * Subtracts another boolean operand, such as an Opening, from this wedge.
+   */
+  subtract(
+    operand: ShapeSubtractOperand,
+    options?: ShapeSubtractOptions
+  ): ShapeSubtractResult {
+    return subtractShapeOperand(this, operand, options);
+  }
 
+  set outline(enable: boolean) {
+    this._outlineEnabled = enable;
+    this.clearOutlineMesh();
     if (enable) {
       const outlineBuffer = this.wedge.get_outline_geometry_serialized();
-      const outlineData = JSON.parse(outlineBuffer);
-
-      const outlineGeometry = new THREE.BufferGeometry();
-      outlineGeometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(outlineData, 3)
-      );
-
-      const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-      this.#outlineMesh = new THREE.LineSegments(outlineGeometry, outlineMaterial);
+      const outlineData = JSON.parse(outlineBuffer) as number[];
+      this.#outlineMesh = createShapeOutlineMesh({
+        positions: outlineData,
+        color: 0x000000,
+        fatOutlines: this._fatOutlines,
+        outlineWidth: this._outlineWidth,
+      });
       this.add(this.#outlineMesh);
     }
   }
 
+  get outline() {
+    return this._outlineEnabled;
+  }
+
+  set fatOutlines(value: boolean) {
+    this._fatOutlines = value;
+    this.options.fatOutlines = value;
+    if (this._outlineEnabled) {
+      this.outline = true;
+    }
+  }
+
+  get fatOutlines() {
+    return this._fatOutlines;
+  }
+
+  set outlineWidth(value: number) {
+    this._outlineWidth = sanitizeOutlineWidth(value);
+    this.options.outlineWidth = this._outlineWidth;
+    if (this._outlineEnabled) {
+      this.outline = true;
+    }
+  }
+
+  get outlineWidth() {
+    return this._outlineWidth;
+  }
+
   get outlineMesh() {
     return this.#outlineMesh;
+  }
+
+  private clearOutlineMesh() {
+    if (!this.#outlineMesh) {
+      return;
+    }
+    this.remove(this.#outlineMesh);
+    disposeShapeOutlineMesh(this.#outlineMesh);
+    this.#outlineMesh = null;
   }
 
   discardGeometry() {

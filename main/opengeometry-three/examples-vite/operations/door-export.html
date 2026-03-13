@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Door Export Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OpenGeometry door export example" />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Door Export</span>
+    </div>
+
+    <aside class="og-controls" data-control-panel>
+      <h3>Door Export</h3>
+      <p class="og-control-summary">
+        Frame is a custom profile sweep. Door panel is a Cuboid. Four doors are placed and export
+        reports are logged to the console.
+      </p>
+
+      <label class="og-control-row" data-control-key="doorWidth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Door Width</span>
+          <code class="og-control-value" data-control-value>0.95</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.6" max="2" step="0.01" value="0.95" />
+          <input data-control-number type="number" min="0.6" max="2" step="0.01" value="0.95" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="doorHeight" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Door Height</span>
+          <code class="og-control-value" data-control-value>2.1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="1.8" max="3" step="0.01" value="2.1" />
+          <input data-control-number type="number" min="1.8" max="3" step="0.01" value="2.1" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="panelThickness" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Panel Thickness</span>
+          <code class="og-control-value" data-control-value>0.04</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.02" max="0.12" step="0.005" value="0.04" />
+          <input data-control-number type="number" min="0.02" max="0.12" step="0.005" value="0.04" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="frameDepth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Frame Depth</span>
+          <code class="og-control-value" data-control-value>0.12</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.06" max="0.3" step="0.005" value="0.12" />
+          <input data-control-number type="number" min="0.06" max="0.3" step="0.005" value="0.12" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="frameFace" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Frame Face</span>
+          <code class="og-control-value" data-control-value>0.05</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.02" max="0.15" step="0.005" value="0.05" />
+          <input data-control-number type="number" min="0.02" max="0.15" step="0.005" value="0.05" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="frameRebate" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Frame Rebate</span>
+          <code class="og-control-value" data-control-value>0.025</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.01" max="0.12" step="0.005" value="0.025" />
+          <input data-control-number type="number" min="0.01" max="0.12" step="0.005" value="0.025" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="frameClearance" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Panel Clearance</span>
+          <code class="og-control-value" data-control-value>0.012</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.002" max="0.04" step="0.001" value="0.012" />
+          <input data-control-number type="number" min="0.002" max="0.04" step="0.001" value="0.012" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showFrame" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Show Frame</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Show Frame" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showPanel" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Show Panel</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Show Panel" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outline</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <button type="button" class="og-control-action og-control-action-cyan" data-action="export-stl">
+        Export Binary STL
+      </button>
+      <button type="button" class="og-control-action og-control-action-amber" data-action="export-step">
+        Export STEP
+      </button>
+      <button type="button" class="og-control-action og-control-action-rose" data-action="export-ifc">
+        Export IFC Door
+      </button>
+      <a data-download-link hidden></a>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import {
+        Cuboid,
+        OGSceneManager,
+        OpenGeometry,
+        Polyline,
+        Sweep,
+        Vector3,
+      } from "@og-three";
+
+      const app = document.getElementById("app");
+      if (!app) {
+        throw new Error("Missing #app container");
+      }
+
+      const panel = document.querySelector("[data-control-panel]");
+      const stlButton = panel?.querySelector('[data-action="export-stl"]');
+      const stepButton = panel?.querySelector('[data-action="export-step"]');
+      const ifcButton = panel?.querySelector('[data-action="export-ifc"]');
+
+      if (!panel || !stlButton || !stepButton || !ifcButton) {
+        throw new Error("Missing static door export UI nodes");
+      }
+
+      const PANEL_ENTITY_ID = "ifc-door-panel";
+      const FRAME_ENTITY_ID = "ifc-door-frame";
+      const DOOR_POSITIONS = [
+        { id: "A", x: -2.2, z: -1.8 },
+        { id: "B", x: 2.2, z: -1.8 },
+        { id: "C", x: -2.2, z: 1.8 },
+        { id: "D", x: 2.2, z: 1.8 },
+      ];
+      const EXPECTED_ENTITY_COUNT = DOOR_POSITIONS.length * 2;
+
+      let profileGuide;
+      let doorObjects = [];
+      let latestExportState = null;
+      let config = {
+        doorWidth: 0.95,
+        doorHeight: 2.1,
+        panelThickness: 0.04,
+        frameDepth: 0.12,
+        frameFace: 0.05,
+        frameRebate: 0.025,
+        frameClearance: 0.012,
+        showFrame: true,
+        showPanel: true,
+        outline: true,
+      };
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function formatControlNumber(value) {
+        return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      }
+
+      function clonePoints(points) {
+        return points.map((point) => point.clone());
+      }
+
+      function closeLoop(points) {
+        if (points.length === 0) {
+          return [];
+        }
+
+        return [...points, points[0].clone()];
+      }
+
+      function buildFramePath(doorWidth, doorHeight, frameClearance) {
+        const xLeft = -doorWidth * 0.5 - frameClearance;
+        const xRight = doorWidth * 0.5 + frameClearance;
+
+        return [
+          new Vector3(xLeft, 0, 0),
+          new Vector3(xLeft, doorHeight, 0),
+          new Vector3(xRight, doorHeight, 0),
+          new Vector3(xRight, 0, 0),
+        ];
+      }
+
+      function buildFrameProfile(frameDepth, frameFace, frameRebate) {
+        const depth = Math.max(frameDepth, frameFace + 0.004, frameRebate + 0.004);
+        const face = clamp(frameFace, 0.002, depth - 0.002);
+        const rebate = clamp(frameRebate, 0.002, depth - 0.002);
+
+        const raw = [
+          new Vector3(depth, 0, depth),
+          new Vector3(rebate, 0, depth),
+          new Vector3(rebate, 0, face),
+          new Vector3(0, 0, face),
+          new Vector3(0, 0, 0),
+          new Vector3(depth, 0, 0),
+        ];
+
+        const averageDepth = raw.reduce((sum, point) => sum + point.z, 0) / raw.length;
+        return [new Vector3(depth, 0, averageDepth), ...raw];
+      }
+
+      function buildProfileGuide(profilePoints, doorWidth) {
+        const xOffset = -doorWidth * 0.95;
+        const yOffset = 0.2;
+        const zOffset = 0.18;
+
+        return closeLoop(profilePoints).map(
+          (point) => new Vector3(xOffset + point.x, yOffset + point.z, zOffset)
+        );
+      }
+
+      function buildIfcSemantics(doorWidth, doorHeight, panelWidth, panelHeight) {
+        const semantics = {};
+
+        DOOR_POSITIONS.forEach((door, index) => {
+          const suffix = String(index + 1).padStart(2, "0");
+          const panelId = `${PANEL_ENTITY_ID}-${door.id}`;
+          const frameId = `${FRAME_ENTITY_ID}-${door.id}`;
+
+          semantics[panelId] = {
+            ifc_class: "IFCDOOR",
+            name: `Door ${suffix} Panel`,
+            object_type: "DoorLeaf",
+            tag: `D-${suffix}-PANEL`,
+            property_sets: {
+              Pset_DoorCommon: {
+                FireRating: "30min",
+                IsExternal: "false",
+              },
+            },
+            quantity_sets: {
+              Qto_DoorBaseQuantities: {
+                Width: Number(panelWidth.toFixed(4)),
+                Height: Number(panelHeight.toFixed(4)),
+              },
+            },
+          };
+
+          semantics[frameId] = {
+            ifc_class: "IFCDOOR",
+            name: `Door ${suffix} Frame`,
+            object_type: "DoorFrame",
+            tag: `D-${suffix}-FRAME`,
+            property_sets: {
+              Pset_DoorCommon: {
+                FireRating: "30min",
+                IsExternal: "false",
+              },
+            },
+            quantity_sets: {
+              Qto_DoorBaseQuantities: {
+                Width: Number(doorWidth.toFixed(4)),
+                Height: Number(doorHeight.toFixed(4)),
+              },
+            },
+          };
+        });
+
+        return semantics;
+      }
+
+      function setUIControls() {
+        const controls = panel.querySelectorAll("[data-control-key]");
+
+        controls.forEach((control) => {
+          const key = control.getAttribute("data-control-key");
+          const type = control.getAttribute("data-control-type");
+
+          if (type === "number") {
+            const rangeInput = control.querySelector("[data-control-range]");
+            const numberInput = control.querySelector("[data-control-number]");
+            const valueDisplay = control.querySelector("[data-control-value]");
+
+            const min = parseFloat(rangeInput.min);
+            const max = parseFloat(rangeInput.max);
+
+            function setNumberValue(value, shouldUpdate = true) {
+              const numericValue = parseFloat(value);
+              if (!Number.isFinite(numericValue)) {
+                return;
+              }
+
+              const clampedValue = clamp(numericValue, min, max);
+              config[key] = clampedValue;
+              rangeInput.value = String(clampedValue);
+              numberInput.value = String(clampedValue);
+              valueDisplay.textContent = formatControlNumber(clampedValue);
+
+              if (shouldUpdate) {
+                updateGeometry();
+              }
+            }
+
+            setNumberValue(config[key], false);
+            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
+            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
+          }
+
+          if (type === "boolean") {
+            const toggleInput = control.querySelector("[data-control-toggle]");
+            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+
+            function setBooleanValue(checked, shouldUpdate = true) {
+              config[key] = checked;
+              toggleInput.checked = checked;
+              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
+
+              if (shouldUpdate) {
+                updateGeometry();
+              }
+            }
+
+            setBooleanValue(Boolean(config[key]), false);
+            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
+          }
+        });
+      }
+
+      function updateGeometry() {
+        if (!profileGuide || doorObjects.length === 0) {
+          return;
+        }
+
+        const frameDepth = Math.max(
+          config.frameDepth,
+          config.frameFace + 0.004,
+          config.frameRebate + 0.004
+        );
+        const frameFace = clamp(config.frameFace, 0.002, frameDepth - 0.002);
+        const frameRebate = clamp(config.frameRebate, 0.002, frameDepth - 0.002);
+        const framePath = buildFramePath(config.doorWidth, config.doorHeight, config.frameClearance);
+        const frameProfile = buildFrameProfile(frameDepth, frameFace, frameRebate);
+        const panelWidth = Math.max(0.1, config.doorWidth - config.frameClearance * 2);
+        const panelHeight = Math.max(0.2, config.doorHeight - config.frameClearance * 2);
+        const panelCenterY = panelHeight * 0.5 + config.frameClearance;
+
+        profileGuide.setConfig({
+          points: buildProfileGuide(frameProfile, config.doorWidth),
+          color: 0xf97316,
+        });
+        profileGuide.visible = config.showFrame;
+
+        doorObjects.forEach(({ door, frame, panel, framePathGuide }) => {
+          const framePathAtDoor = framePath.map(
+            (point) => new Vector3(point.x + door.x, point.y, point.z + door.z)
+          );
+
+          frame.setConfig({
+            path: clonePoints(framePathAtDoor),
+            profile: clonePoints(frameProfile),
+            color: 0x64748b,
+            capStart: true,
+            capEnd: true,
+          });
+          frame.outline = config.outline;
+          frame.visible = config.showFrame;
+
+          panel.setConfig({
+            center: new Vector3(door.x, panelCenterY, door.z),
+            width: panelWidth,
+            height: panelHeight,
+            depth: config.panelThickness,
+            color: 0x2563eb,
+          });
+          panel.outline = config.outline;
+          panel.visible = config.showPanel;
+
+          framePathGuide.setConfig({
+            points: clonePoints(framePathAtDoor),
+            color: 0x1f2937,
+          });
+          framePathGuide.position.z = frameDepth * 0.6;
+          framePathGuide.visible = config.showFrame;
+        });
+
+        latestExportState = {
+          doorWidth: config.doorWidth,
+          doorHeight: config.doorHeight,
+          panelWidth,
+          panelHeight,
+          panelThickness: config.panelThickness,
+          frameDepth,
+          frameFace,
+          frameRebate,
+          frameClearance: config.frameClearance,
+          showFrame: config.showFrame,
+          showPanel: config.showPanel,
+          outline: config.outline,
+        };
+
+        console.groupCollapsed(`[door-export] ${DOOR_POSITIONS.length} door assemblies ready`);
+        console.log(latestExportState);
+        console.groupEnd();
+      }
+
+      function downloadText(text, filename, mime) {
+        const link = panel.querySelector("[data-download-link]");
+        if (!link) {
+          throw new Error("Missing download link node");
+        }
+
+        const blob = new Blob([text], { type: mime });
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function downloadBytes(bytes, filename, mime) {
+        const link = panel.querySelector("[data-download-link]");
+        if (!link) {
+          throw new Error("Missing download link node");
+        }
+
+        const blob = new Blob([bytes], { type: mime });
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function buildExportManager() {
+        const manager = new OGSceneManager();
+        const sceneId = manager.createScene("door-export-scene");
+
+        doorObjects.forEach(({ door, frame, panel }) => {
+          manager.addBrepEntityToScene(
+            sceneId,
+            `${FRAME_ENTITY_ID}-${door.id}`,
+            "OGSweep",
+            JSON.stringify(frame.getBrep())
+          );
+          manager.addBrepEntityToScene(
+            sceneId,
+            `${PANEL_ENTITY_ID}-${door.id}`,
+            "OGCuboid",
+            JSON.stringify(panel.getBrepData())
+          );
+        });
+
+        return { manager, sceneId };
+      }
+
+      async function main() {
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf6f1eb);
+
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          4000
+        );
+        camera.position.set(8.5, 5.8, 9.2);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 1.2, 0);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(36, 36, 0xd88b63, 0xe7d4ca));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+
+        const key = new THREE.DirectionalLight(0xffffff, 0.92);
+        key.position.set(8, 9, 6);
+        scene.add(key);
+
+        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
+        fill.position.set(-6, 4, -7);
+        scene.add(fill);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        const assemblyGroup = new THREE.Group();
+        scene.add(assemblyGroup);
+
+        const initialFramePath = buildFramePath(
+          config.doorWidth,
+          config.doorHeight,
+          config.frameClearance
+        );
+        const initialFrameProfile = buildFrameProfile(
+          config.frameDepth,
+          config.frameFace,
+          config.frameRebate
+        );
+        const initialPanelWidth = Math.max(0.1, config.doorWidth - config.frameClearance * 2);
+        const initialPanelHeight = Math.max(0.2, config.doorHeight - config.frameClearance * 2);
+        const initialPanelCenterY = initialPanelHeight * 0.5 + config.frameClearance;
+
+        profileGuide = new Polyline({
+          points: buildProfileGuide(initialFrameProfile, config.doorWidth),
+          color: 0xf97316,
+        });
+        assemblyGroup.add(profileGuide);
+
+        doorObjects = DOOR_POSITIONS.map((door) => {
+          const framePathAtDoor = initialFramePath.map(
+            (point) => new Vector3(point.x + door.x, point.y, point.z + door.z)
+          );
+
+          const frame = new Sweep({
+            path: clonePoints(framePathAtDoor),
+            profile: clonePoints(initialFrameProfile),
+            color: 0x64748b,
+            capStart: true,
+            capEnd: true,
+          });
+
+          const panel = new Cuboid({
+            center: new Vector3(door.x, initialPanelCenterY, door.z),
+            width: initialPanelWidth,
+            height: initialPanelHeight,
+            depth: config.panelThickness,
+            color: 0x2563eb,
+          });
+
+          const framePathGuide = new Polyline({
+            points: clonePoints(framePathAtDoor),
+            color: 0x1f2937,
+          });
+
+          assemblyGroup.add(frame);
+          assemblyGroup.add(panel);
+          assemblyGroup.add(framePathGuide);
+
+          return { door, frame, panel, framePathGuide };
+        });
+
+        function onResize() {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener("resize", onResize);
+
+        function animate() {
+          requestAnimationFrame(animate);
+          controls.update();
+          renderer.render(scene, camera);
+        }
+
+        animate();
+
+        setUIControls();
+        updateGeometry();
+
+        stlButton.addEventListener("click", () => {
+          try {
+            const { manager, sceneId } = buildExportManager();
+            const exportConfig = {
+              header: "OpenGeometry Door Assembly STL Export",
+              scale: 1,
+              error_policy: "BestEffort",
+              validate_topology: true,
+            };
+
+            const result = manager.exportSceneToStl(sceneId, JSON.stringify(exportConfig));
+            const report = JSON.parse(result.reportJson);
+            const filename = "opengeometry-door-assembly.stl";
+
+            downloadBytes(result.bytes, filename, "model/stl");
+
+            console.groupCollapsed(`[door-export] ${filename}`);
+            console.log("Assembly", latestExportState);
+            console.log("Report", report);
+            console.log("Bytes", result.bytes.length);
+            console.groupEnd();
+          } catch (error) {
+            console.error("[door-export] STL export failed", error);
+          }
+        });
+
+        stepButton.addEventListener("click", () => {
+          try {
+            const { manager, sceneId } = buildExportManager();
+            const exportConfig = {
+              schema: "AutomotiveDesign",
+              product_name: "OpenGeometry Door Assembly STEP Export",
+              scale: 1,
+              error_policy: "BestEffort",
+              validate_topology: true,
+              require_closed_shell: true,
+            };
+
+            const result = manager.exportSceneToStep(sceneId, JSON.stringify(exportConfig));
+            const report = JSON.parse(result.reportJson);
+            const filename = "opengeometry-door-assembly.step";
+
+            downloadText(result.text, filename, "application/step");
+
+            console.groupCollapsed(`[door-export] ${filename}`);
+            console.log("Assembly", latestExportState);
+            console.log("Report", report);
+            console.log("Bytes", new TextEncoder().encode(result.text).length);
+            console.groupEnd();
+          } catch (error) {
+            console.error("[door-export] STEP export failed", error);
+          }
+        });
+
+        ifcButton.addEventListener("click", () => {
+          try {
+            const { manager, sceneId } = buildExportManager();
+            const semantics = buildIfcSemantics(
+              latestExportState.doorWidth,
+              latestExportState.doorHeight,
+              latestExportState.panelWidth,
+              latestExportState.panelHeight
+            );
+            const exportConfig = {
+              schema: "Ifc4Add2",
+              project_name: "OpenGeometry Door Export",
+              site_name: "Main Site",
+              building_name: "Main Building",
+              storey_name: "Level 01",
+              scale: 1,
+              error_policy: "BestEffort",
+              validate_topology: true,
+              require_closed_shell: true,
+              semantics,
+            };
+
+            const result = manager.exportSceneToIfc(sceneId, JSON.stringify(exportConfig));
+            const report = JSON.parse(result.reportJson);
+            const filename = "opengeometry-door-assembly.ifc";
+            const ifcDoorMentions = (result.text.match(/IFCDOOR\(/g) || []).length;
+            const isPass =
+              report.exported_elements >= EXPECTED_ENTITY_COUNT &&
+              report.semantics_applied >= EXPECTED_ENTITY_COUNT &&
+              report.proxy_fallbacks === 0 &&
+              ifcDoorMentions >= EXPECTED_ENTITY_COUNT;
+
+            downloadText(result.text, filename, "model/ifc");
+
+            console.groupCollapsed(`[door-export] ${filename}`);
+            console.log("Assembly", latestExportState);
+            console.log("Report", report);
+            console.log("Bytes", new TextEncoder().encode(result.text).length);
+            console.log("IFCDOOR Mentions", ifcDoorMentions);
+            console.log("Expected IFCDOOR Entities", EXPECTED_ENTITY_COUNT);
+            console.log("IFC Criteria", isPass ? "PASS" : "FAIL");
+            console.groupEnd();
+          } catch (error) {
+            console.error("[door-export] IFC export failed", error);
+          }
+        });
+      }
+
+      void main();
+    </script>
+  </body>
+</html>

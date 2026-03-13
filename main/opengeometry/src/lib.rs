@@ -13,7 +13,6 @@ pub mod operations {
 
 pub mod utility {
     pub mod bgeometry;
-    pub mod geometry;
 }
 
 pub mod primitives {
@@ -30,15 +29,7 @@ pub mod primitives {
     pub mod wedge;
 }
 
+pub mod booleans;
 pub mod brep;
 pub mod export;
 pub mod scenegraph;
-
-// v0.3.0
-// mod brep_ds {
-//   mod vertex;
-//   // mod halfedge;
-//   mod edge;
-//   mod face;
-//   pub mod brep;
-// }

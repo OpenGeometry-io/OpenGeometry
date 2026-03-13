@@ -43,7 +43,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut cuboid = OGCuboid::new("perspective-cuboid".to_string());
-    cuboid.set_config(Vector3::new(0.0, 0.0, 0.0), 2.2, 1.4, 1.8);
+    cuboid
+        .set_config(Vector3::new(0.0, 0.0, 0.0), 2.2, 1.4, 1.8)
+        .unwrap();
 
     let mut config = PdfExportConfig::a4_landscape();
     config.title = Some("Perspective Camera Projection".to_string());

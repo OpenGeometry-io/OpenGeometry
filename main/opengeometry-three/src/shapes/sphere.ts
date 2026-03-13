@@ -2,6 +2,18 @@ import * as OGKernel from "../../../opengeometry/pkg/opengeometry";
 import { Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
+import {
+  createShapeOutlineMesh,
+  disposeShapeOutlineMesh,
+  sanitizeOutlineWidth,
+  ShapeOutlineMesh,
+} from "./outline-utils";
+import { subtractShapeOperand } from "./boolean-subtract";
+import type {
+  ShapeSubtractOperand,
+  ShapeSubtractOptions,
+  ShapeSubtractResult,
+} from "./boolean-subtract";
 
 export interface ISphereOptions {
   ogid?: string;
@@ -10,7 +22,11 @@ export interface ISphereOptions {
   widthSegments: number;
   heightSegments: number;
   color: number;
+  fatOutlines?: boolean;
+  outlineWidth?: number;
 }
+
+export type SphereConfigUpdate = Partial<ISphereOptions>;
 
 /* eslint-disable no-unused-vars */
 interface ISphereKernelInstance {
@@ -19,6 +35,7 @@ interface ISphereKernelInstance {
   ) => void;
   get_geometry_serialized(): string;
   get_brep_serialized(): string;
+  get_outline_geometry_serialized(): string;
 }
 
 type SphereKernelConstructor = new (..._args: [string]) => ISphereKernelInstance;
@@ -32,10 +49,15 @@ export class Sphere extends THREE.Mesh {
     widthSegments: 24,
     heightSegments: 16,
     color: 0x00ff00,
+    fatOutlines: false,
+    outlineWidth: 1,
   };
 
   private sphere: ISphereKernelInstance;
-  #outlineMesh: THREE.LineSegments | null = null;
+  #outlineMesh: ShapeOutlineMesh | null = null;
+  private _outlineEnabled = false;
+  private _fatOutlines = false;
+  private _outlineWidth = 1;
 
   set radius(value: number) {
     this.options.radius = value;
@@ -75,18 +97,45 @@ export class Sphere extends THREE.Mesh {
     }
   }
 
-  setConfig(options: ISphereOptions) {
+  setConfig(options: SphereConfigUpdate) {
     this.validateOptions();
 
-    this.options = { ...this.options, ...options };
-    this.sphere.set_config(
-      this.options.center.clone(),
-      this.options.radius,
-      this.options.widthSegments,
-      this.options.heightSegments
-    );
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "center" in options ||
+      "radius" in options ||
+      "widthSegments" in options ||
+      "heightSegments" in options;
+    const colorChanged = "color" in options;
+    const outlineStyleChanged =
+      "fatOutlines" in options ||
+      "outlineWidth" in options;
 
-    this.generateGeometry();
+    this.options = nextOptions;
+    this._fatOutlines = this.options.fatOutlines ?? false;
+    this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
+    this.options.fatOutlines = this._fatOutlines;
+    this.options.outlineWidth = this._outlineWidth;
+
+    if (geometryChanged) {
+      this.sphere.set_config(
+        this.options.center.clone(),
+        this.options.radius,
+        this.options.widthSegments,
+        this.options.heightSegments
+      );
+
+      this.generateGeometry();
+      return;
+    }
+
+    if (colorChanged) {
+      this.color = this.options.color;
+    }
+
+    if (outlineStyleChanged && this._outlineEnabled) {
+      this.outline = true;
+    }
   }
 
   cleanGeometry() {
@@ -122,7 +171,7 @@ export class Sphere extends THREE.Mesh {
     this.geometry = geometry;
     this.material = material;
 
-    if (this.#outlineMesh) {
+    if (this._outlineEnabled) {
       this.outline = true;
     }
   }
@@ -135,49 +184,71 @@ export class Sphere extends THREE.Mesh {
     return JSON.parse(brepData);
   }
 
+  /**
+   * Subtracts another boolean operand, such as an Opening, from this sphere.
+   */
+  subtract(
+    operand: ShapeSubtractOperand,
+    options?: ShapeSubtractOptions
+  ): ShapeSubtractResult {
+    return subtractShapeOperand(this, operand, options);
+  }
+
   set outline(enable: boolean) {
-    if (this.#outlineMesh) {
-      this.remove(this.#outlineMesh);
-      this.#outlineMesh.geometry.dispose();
-      if (Array.isArray(this.#outlineMesh.material)) {
-        this.#outlineMesh.material.forEach((material) => material.dispose());
-      } else {
-        this.#outlineMesh.material.dispose();
-      }
-      this.#outlineMesh = null;
-    }
-
+    this._outlineEnabled = enable;
+    this.clearOutlineMesh();
     if (enable) {
-      const brep = this.getBrep();
-      const lineBuffer: number[] = [];
-
-      for (const edge of brep.edges ?? []) {
-        const start = brep.vertices?.[edge.v1]?.position;
-        const end = brep.vertices?.[edge.v2]?.position;
-        if (!start || !end) {
-          continue;
-        }
-
-        lineBuffer.push(
-          start.x, start.y, start.z,
-          end.x, end.y, end.z
-        );
-      }
-
-      const outlineGeometry = new THREE.BufferGeometry();
-      outlineGeometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(lineBuffer, 3)
-      );
-
-      const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-      this.#outlineMesh = new THREE.LineSegments(outlineGeometry, outlineMaterial);
+      const outlineBuffer = this.sphere.get_outline_geometry_serialized();
+      const lineBuffer = JSON.parse(outlineBuffer) as number[];
+      this.#outlineMesh = createShapeOutlineMesh({
+        positions: lineBuffer,
+        color: 0x000000,
+        fatOutlines: this._fatOutlines,
+        outlineWidth: this._outlineWidth,
+      });
       this.add(this.#outlineMesh);
     }
   }
 
+  get outline() {
+    return this._outlineEnabled;
+  }
+
+  set fatOutlines(value: boolean) {
+    this._fatOutlines = value;
+    this.options.fatOutlines = value;
+    if (this._outlineEnabled) {
+      this.outline = true;
+    }
+  }
+
+  get fatOutlines() {
+    return this._fatOutlines;
+  }
+
+  set outlineWidth(value: number) {
+    this._outlineWidth = sanitizeOutlineWidth(value);
+    this.options.outlineWidth = this._outlineWidth;
+    if (this._outlineEnabled) {
+      this.outline = true;
+    }
+  }
+
+  get outlineWidth() {
+    return this._outlineWidth;
+  }
+
   get outlineMesh() {
     return this.#outlineMesh;
+  }
+
+  private clearOutlineMesh() {
+    if (!this.#outlineMesh) {
+      return;
+    }
+    this.remove(this.#outlineMesh);
+    disposeShapeOutlineMesh(this.#outlineMesh);
+    this.#outlineMesh = null;
   }
 
   discardGeometry() {

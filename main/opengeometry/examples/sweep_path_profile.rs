@@ -21,11 +21,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Vector3::new(0.2, 1.2, 0.9),
         Vector3::new(1.2, 1.8, 0.2),
         Vector3::new(2.0, 2.2, -0.8),
-    ]);
+    ])
+    .unwrap();
 
     let mut rectangle_profile = OGRectangle::new("sweep-profile".to_string());
-    rectangle_profile.set_config(Vector3::new(0.0, 0.0, 0.0), 0.7, 0.4);
-    rectangle_profile.generate_geometry();
+    rectangle_profile
+        .set_config(Vector3::new(0.0, 0.0, 0.0), 0.7, 0.4)
+        .unwrap();
+    rectangle_profile.generate_geometry().unwrap();
 
     let profile_points: Vec<Vector3> = rectangle_profile
         .brep()
@@ -35,7 +38,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect();
 
     let mut sweep = OGSweep::new("sweep".to_string());
-    sweep.set_config_with_caps(path.get_raw_points(), profile_points, true, true);
+    sweep
+        .set_config_with_caps(path.get_raw_points(), profile_points, true, true)
+        .unwrap();
 
     println!("Sweep vertices: {}", sweep.brep().vertices.len());
     println!("Sweep edges: {}", sweep.brep().edges.len());

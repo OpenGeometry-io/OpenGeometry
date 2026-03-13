@@ -9,16 +9,20 @@ const __dirname = dirname(__filename);
 
 const examplesRoot = resolve(__dirname, "examples-vite");
 
-function collectHtmlFiles(dir, files = []) {
+function collectFiles(dir, extension, files = []) {
   for (const entry of readdirSync(dir)) {
-    const fullPath = join(dir, entry);
-    const stats = statSync(fullPath);
-    if (stats.isDirectory()) {
-      collectHtmlFiles(fullPath, files);
+    if (entry.startsWith(".")) {
       continue;
     }
 
-    if (extname(fullPath) === ".html") {
+    const fullPath = join(dir, entry);
+    const stats = statSync(fullPath);
+    if (stats.isDirectory()) {
+      collectFiles(fullPath, extension, files);
+      continue;
+    }
+
+    if (extname(fullPath) === extension) {
       files.push(fullPath);
     }
   }
@@ -26,15 +30,23 @@ function collectHtmlFiles(dir, files = []) {
   return files;
 }
 
-const htmlInputs = collectHtmlFiles(examplesRoot);
-const input = Object.fromEntries(
-  htmlInputs.map((filePath) => {
-    const id = relative(examplesRoot, filePath)
-      .replace(/\\/g, "/")
-      .replace(/\.html$/, "");
-    return [id, filePath];
-  })
-);
+function toPosixPath(path) {
+  return path.replace(/\\/g, "/");
+}
+
+function collectHtmlInputs() {
+  const htmlFiles = collectFiles(examplesRoot, ".html");
+  const inputs = {};
+
+  for (const htmlPath of htmlFiles) {
+    const key = toPosixPath(relative(examplesRoot, htmlPath)).replace(/\.html$/, "");
+    inputs[key] = htmlPath;
+  }
+
+  return inputs;
+}
+
+const input = collectHtmlInputs();
 
 export default defineConfig({
   root: examplesRoot,

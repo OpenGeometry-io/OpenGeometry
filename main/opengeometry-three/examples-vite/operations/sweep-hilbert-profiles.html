@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+      <title>OpenGeometry Sweep Hilbert Profiles Example</title>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta name="description" content="OpenGeometry Demo" />
+      <meta name="author" content="Vishwajeet Mane" />
+    </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Sweep Hilbert Profiles</span>
+    </div>
+    <aside class="og-controls" data-control-panel>
+          <h3>Hilbert Sweep Parameters</h3>
+          <label class="og-control-row" data-control-key="profileType" data-control-type="select">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Profile Type</span>
+            </div>
+            <select class="og-control-select" data-control-select aria-label="Profile Type">
+              <option value="arc-pipe" selected>Arc Pipe</option>
+              <option value="rectangle">Rectangle</option>
+              <option value="architectural-molding">Architectural Molding</option>
+              <option value="trapezoid">Trapezoid</option>
+              <option value="diamond">Diamond</option>
+              <option value="hexagon">Hexagon</option>
+            </select>
+          </label>
+          <label class="og-control-row" data-control-key="profileWidth" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Profile Width</span>
+              <code class="og-control-value" data-control-value>0.6</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="0.15" max="1.5" step="0.05" value="0.6" />
+              <input data-control-number type="number" min="0.15" max="1.5" step="0.05" value="0.6" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="profileDepth" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Profile Depth</span>
+              <code class="og-control-value" data-control-value>0.45</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="0.15" max="1.5" step="0.05" value="0.45" />
+              <input data-control-number type="number" min="0.15" max="1.5" step="0.05" value="0.45" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="capStart" data-control-type="boolean">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Cap Start</span>
+            </div>
+            <div class="og-control-bool">
+              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Cap Start" checked />
+              <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="capEnd" data-control-type="boolean">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Cap End</span>
+            </div>
+            <div class="og-control-bool">
+              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Cap End" checked />
+              <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Outline</span>
+            </div>
+            <div class="og-control-bool">
+              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" />
+              <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Fat Outlines</span>
+            </div>
+            <div class="og-control-bool">
+              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Fat Outlines" />
+              <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Outline Width</span>
+              <code class="og-control-value" data-control-value>4</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="1" max="12" step="0.5" value="4" />
+              <input data-control-number type="number" min="1" max="12" step="0.5" value="4" />
+            </div>
+          </label>
+        </aside>
+    <div id="app"></div>
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import { hilbert3D } from "three/examples/jsm/utils/GeometryUtils.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { OpenGeometry, Arc, Polyline, Rectangle, Sweep, Vector3 } from "@og-three";
+
+      const app = document.getElementById("app");
+      if (!app) {
+        throw new Error("Missing #app container");
+      }
+
+      let previewObject;
+      let sweep;
+      let cachedProfileKey = "";
+      let cachedProfilePoints = [];
+      let profileArc;
+      let profileRectangle;
+      let config = {
+        profileType: "arc-pipe",
+        profileWidth: 0.6,
+        profileDepth: 0.45,
+        capStart: true,
+        capEnd: true,
+        outline: false,
+        fatOutlines: false,
+        outlineWidth: 4,
+      };
+
+      function formatControlNumber(value) {
+        return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      }
+
+      const LOCKED_HILBERT_SIZE = 8;
+      const LOCKED_HILBERT_ITERATIONS = 1;
+
+      function toVector3List(vertices) {
+        return vertices.map((vertex) => new Vector3(vertex.position.x, vertex.position.y, vertex.position.z));
+      }
+
+      function readLineGeometryPoints(object) {
+        const positions = object.geometry && object.geometry.getAttribute("position");
+        if (!positions || positions.itemSize !== 3) {
+          throw new Error("Profile preview geometry is missing line positions.");
+        }
+
+        const points = [];
+        for (let index = 0; index < positions.count; index += 1) {
+          points.push(new Vector3(positions.getX(index), positions.getY(index), positions.getZ(index)));
+        }
+
+        if (points.length >= 3) {
+          const first = points[0];
+          const last = points[points.length - 1];
+          const dx = first.x - last.x;
+          const dy = first.y - last.y;
+          const dz = first.z - last.z;
+          if (dx * dx + dy * dy + dz * dz <= 1.0e-12) {
+            points.pop();
+          }
+        }
+
+        return points;
+      }
+
+      function scaleProfileShape(points, width, depth) {
+        return points.map(([x, z]) => new Vector3(x * width, 0, z * depth));
+      }
+
+      function buildHilbertPath(size, iterations) {
+        const rawPoints = hilbert3D(new THREE.Vector3(0, 0, 0), size, iterations);
+        const minY = rawPoints.reduce((lowest, point) => Math.min(lowest, point.y), Number.POSITIVE_INFINITY);
+        const lift = Number.isFinite(minY) ? Math.max(0.25 - minY, 0) : 0;
+        return rawPoints.map((point) => new Vector3(point.x, point.y + lift, point.z));
+      }
+
+      function createPreviewLoop(points, color) {
+        const positions = [];
+        points.forEach((point) => {
+          positions.push(point.x, point.y, point.z);
+        });
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+        return new THREE.LineLoop(geometry, new THREE.LineBasicMaterial({ color }));
+      }
+
+      function updatePreviewLoop(loop, points) {
+        const positions = [];
+        points.forEach((point) => {
+          positions.push(point.x, point.y, point.z);
+        });
+
+        loop.geometry.dispose();
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+        loop.geometry = geometry;
+      }
+
+      function buildCustomProfile(profileType, width, depth) {
+        const normalizedPointsByType = {
+          "architectural-molding": [
+            [-0.5, -0.5],
+            [0.5, -0.5],
+            [0.5, -0.16],
+            [0.18, -0.16],
+            [0.28, 0.04],
+            [0.12, 0.26],
+            [-0.08, 0.4],
+            [-0.28, 0.5],
+            [-0.5, 0.5],
+          ],
+          trapezoid: [
+            [-0.5, -0.5],
+            [0.5, -0.5],
+            [0.24, 0.5],
+            [-0.24, 0.5],
+          ],
+          diamond: [
+            [0, -0.5],
+            [0.5, 0],
+            [0, 0.5],
+            [-0.5, 0],
+          ],
+          hexagon: [
+            [-0.25, -0.5],
+            [0.25, -0.5],
+            [0.5, 0],
+            [0.25, 0.5],
+            [-0.25, 0.5],
+            [-0.5, 0],
+          ],
+        };
+
+        return scaleProfileShape(normalizedPointsByType[profileType], width, depth);
+      }
+
+      function getProfilePoints(profileType, width, depth) {
+        const nextKey = profileType + ":" + width + ":" + depth;
+        if (nextKey !== cachedProfileKey) {
+          cachedProfileKey = nextKey;
+          if (profileType === "arc-pipe") {
+            profileArc.setConfig({
+              center: new Vector3(0, 0, 0),
+              radius: Math.min(width, depth) * 0.5,
+              startAngle: 0,
+              endAngle: Math.PI * 2,
+              segments: 48,
+              color: 0xc2410c,
+            });
+            cachedProfilePoints = readLineGeometryPoints(profileArc);
+          } else if (profileType === "rectangle") {
+            profileRectangle.setConfig({
+              center: new Vector3(0, 0, 0),
+              width,
+              breadth: depth,
+              color: 0xc2410c,
+            });
+            cachedProfilePoints = toVector3List(profileRectangle.getBrep().vertices);
+          } else {
+            cachedProfilePoints = buildCustomProfile(profileType, width, depth);
+          }
+        }
+
+        return cachedProfilePoints.map((point) => point.clone());
+      }
+
+      function setUIControls() {
+        const controls = document.querySelectorAll("[data-control-key]");
+
+        controls.forEach((control) => {
+          const key = control.getAttribute("data-control-key");
+          const type = control.getAttribute("data-control-type");
+
+          if (type === "number") {
+            const rangeInput = control.querySelector("[data-control-range]");
+            const numberInput = control.querySelector("[data-control-number]");
+            const valueDisplay = control.querySelector("[data-control-value]");
+
+            function setNumberValue(value) {
+              const numericValue = parseFloat(value);
+              if (!Number.isFinite(numericValue)) return;
+
+              config[key] = numericValue;
+              rangeInput.value = String(numericValue);
+              numberInput.value = String(numericValue);
+              valueDisplay.textContent = formatControlNumber(numericValue);
+              updateGeometry();
+            }
+
+            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
+            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
+          }
+
+          if (type === "boolean") {
+            const toggleInput = control.querySelector("[data-control-toggle]");
+            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+
+            function setBooleanValue(checked) {
+              config[key] = checked;
+              toggleInput.checked = checked;
+              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
+              updateGeometry();
+            }
+
+            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
+          }
+
+          if (type === "select") {
+            const selectInput = control.querySelector("[data-control-select]");
+
+            function setSelectValue(value) {
+              config[key] = value;
+              selectInput.value = String(value);
+              updateGeometry();
+            }
+
+            selectInput.addEventListener("change", () => setSelectValue(selectInput.value));
+          }
+        });
+      }
+
+      function updateGeometry() {
+        if (!previewObject || !sweep) return;
+        const profilePoints = getProfilePoints(config.profileType, config.profileWidth, config.profileDepth);
+        updatePreviewLoop(previewObject, profilePoints);
+        sweep.setConfig({
+          profile: profilePoints.map((point) => point.clone()),
+          color: 0x0f766e,
+          capStart: config.capStart,
+          capEnd: config.capEnd,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth,
+        });
+
+        sweep.outline = config.outline;
+      }
+
+      async function main() {
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf6f1eb);
+
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          4000
+        );
+
+        camera.position.set(5.5, 4.2, 6.5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 0.8, 0);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+
+        const key = new THREE.DirectionalLight(0xffffff, 0.9);
+        key.position.set(6, 8, 4);
+        scene.add(key);
+
+        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
+        fill.position.set(-5, 3, -6);
+        scene.add(fill);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        const lockedPathPoints = buildHilbertPath(LOCKED_HILBERT_SIZE, LOCKED_HILBERT_ITERATIONS);
+        profileArc = new Arc({
+          center: new Vector3(0, 0, 0),
+          radius: Math.min(config.profileWidth, config.profileDepth) * 0.5,
+          startAngle: 0,
+          endAngle: Math.PI * 2,
+          segments: 48,
+          color: 0xc2410c,
+        });
+        profileRectangle = new Rectangle({
+          center: new Vector3(0, 0, 0),
+          width: config.profileWidth,
+          breadth: config.profileDepth,
+          color: 0xc2410c,
+        });
+
+        const pathPrimitive = new Polyline({
+          points: lockedPathPoints.map((point) => point.clone()),
+          color: 0x4b5563,
+        });
+        const initialProfilePoints = getProfilePoints(config.profileType, config.profileWidth, config.profileDepth);
+        previewObject = createPreviewLoop(initialProfilePoints, 0xc2410c);
+        sweep = new Sweep({
+          path: lockedPathPoints.map((point) => point.clone()),
+          profile: initialProfilePoints.map((point) => point.clone()),
+          color: 0x0f766e,
+          capStart: config.capStart,
+          capEnd: config.capEnd,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth,
+        });
+        sweep.outline = config.outline;
+
+        const previewOffset = LOCKED_HILBERT_SIZE * 0.95;
+        pathPrimitive.position.y += 0.01;
+        previewObject.position.set(-previewOffset, 0.02, -previewOffset);
+
+        const group = new THREE.Group();
+        group.add(pathPrimitive);
+        group.add(previewObject);
+        group.add(sweep);
+        scene.add(group);
+
+        updateGeometry();
+
+        function onResize() {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener("resize", onResize);
+
+        function animate() {
+          requestAnimationFrame(animate);
+          controls.update();
+          renderer.render(scene, camera);
+        }
+
+        animate();
+        setUIControls();
+      }
+
+      void main();
+    </script>
+  </body>
+</html>

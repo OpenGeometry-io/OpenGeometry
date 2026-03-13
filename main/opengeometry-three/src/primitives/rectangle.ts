@@ -1,6 +1,9 @@
 import { OGRectangle, Vector3 } from "./../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 
 export interface IRectangleOptions {
   ogid?: string;
@@ -8,7 +11,11 @@ export interface IRectangleOptions {
   width: number;
   breadth: number;
   color: number;
+  fatLines?: boolean;
+  lineWidth?: number;
 }
+
+export type RectangleConfigUpdate = Partial<IRectangleOptions>;
 
 export interface IRectangleOffsetResult {
   points: Vector3[];
@@ -40,6 +47,7 @@ export class Rectangle extends THREE.Line {
   };
 
   private polyLineRectangle: OGRectangle;
+  private fatLine: Line2 | null = null;
 
   // set width(width: number) {
   //   this.options.width = width;
@@ -64,7 +72,17 @@ export class Rectangle extends THREE.Line {
     if (this.material instanceof THREE.LineBasicMaterial) {
       this.material.color.set(color);
     }
+    if (this.fatLine && this.fatLine.material instanceof LineMaterial) {
+      this.fatLine.material.color.set(color);
+    }
   }
+
+  // set lineWidth(lineWidth: number) {
+  //   this.options.lineWidth = lineWidth;
+  //   if (this.material instanceof THREE.LineBasicMaterial) {
+  //     (this.material as THREE.LineBasicMaterial).linewidth = lineWidth;
+  //   }
+  // }
 
   // FINAL: This flow should be used for other primitives
   constructor(options?: IRectangleOptions) {
@@ -84,21 +102,90 @@ export class Rectangle extends THREE.Line {
     }
   }
 
-  setConfig(options: IRectangleOptions) {
+  setConfig(options: RectangleConfigUpdate) {
     this.validateOptions();
 
-    const { width, breadth, center } = options;
-    this.polyLineRectangle.set_config(
-      center.clone(),
-      width,
-      breadth,
-    );
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "center" in options ||
+      "width" in options ||
+      "breadth" in options;
+    const renderChanged =
+      "color" in options ||
+      "fatLines" in options ||
+      "lineWidth" in options;
 
-    this.generateGeometry();
+    this.options = nextOptions;
+
+    if (geometryChanged) {
+      this.polyLineRectangle.set_config(
+        nextOptions.center.clone(),
+        nextOptions.width,
+        nextOptions.breadth,
+      );
+      this.generateGeometry();
+      return;
+    }
+
+    if (renderChanged) {
+      this.updateRenderStyle();
+    }
   }
 
   getConfig() {
     return this.options;
+  }
+
+  private getCurrentPositions() {
+    const attribute = this.geometry.getAttribute("position");
+    if (!attribute || attribute.itemSize !== 3) {
+      return [];
+    }
+
+    const positions = [];
+    for (let index = 0; index < attribute.count; index += 1) {
+      positions.push(
+        attribute.getX(index),
+        attribute.getY(index),
+        attribute.getZ(index)
+      );
+    }
+
+    return positions;
+  }
+
+  private updateRenderStyle(bufferData?: number[]) {
+    const positions = bufferData ?? this.getCurrentPositions();
+
+    if (this.options.fatLines) {
+      if (!this.fatLine) {
+        this.fatLine = new Line2(
+          new LineGeometry(),
+          new LineMaterial({
+            color: this.options.color,
+            linewidth: this.options.lineWidth,
+            resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+          })
+        );
+        this.add(this.fatLine);
+      }
+
+      this.fatLine.geometry.setPositions(positions);
+      (this.fatLine.material as LineMaterial).color.set(this.options.color);
+      (this.fatLine.material as LineMaterial).linewidth = this.options.lineWidth ?? 1;
+      (this.fatLine.material as LineMaterial).resolution.set(
+        window.innerWidth,
+        window.innerHeight
+      );
+      this.fatLine.visible = true;
+    } else if (this.fatLine) {
+      this.fatLine.visible = false;
+    }
+
+    if (this.material instanceof THREE.LineBasicMaterial) {
+      this.material.color.set(this.options.color);
+      this.material.visible = !this.options.fatLines;
+    }
   }
 
   private generateGeometry() {
@@ -116,6 +203,7 @@ export class Rectangle extends THREE.Line {
 
     this.geometry = geometry;
     this.material = new THREE.LineBasicMaterial({ color: this.options.color });
+    this.updateRenderStyle(bufferData);
   }
 
   getBrep() {

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Boolean Union Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OpenGeometry boolean union solid example" />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Boolean Union</span>
+    </div>
+    <aside class="og-controls" data-control-panel>
+      <h3>Union Controls</h3>
+      <p class="og-control-summary" data-summary>Loading solid boolean example...</p>
+      <p class="og-control-summary" data-metrics>Preparing result metrics...</p>
+      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outlines</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Fat Outlines</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outline Width</span>
+          <code class="og-control-value" data-control-value>3</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="1" max="8" step="1" value="3" />
+          <input data-control-number type="number" min="1" max="8" step="1" value="3" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="sphereX" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Sphere X</span>
+          <code class="og-control-value" data-control-value>0.45</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-1.25" max="1.25" step="0.01" value="0.45" />
+          <input data-control-number type="number" min="-1.25" max="1.25" step="0.01" value="0.45" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="sphereY" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Sphere Y</span>
+          <code class="og-control-value" data-control-value>0.12</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-1.25" max="1.25" step="0.01" value="0.12" />
+          <input data-control-number type="number" min="-1.25" max="1.25" step="0.01" value="0.12" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="sphereZ" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Sphere Z</span>
+          <code class="og-control-value" data-control-value>0.18</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-1.25" max="1.25" step="0.01" value="0.18" />
+          <input data-control-number type="number" min="-1.25" max="1.25" step="0.01" value="0.18" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="showOperandA" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Operand A</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="showOperandB" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Operand B</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="showResult" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Result</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="resultColor" data-control-type="color">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Result Color</span>
+        </div>
+        <input data-control-color type="color" class="og-control-color" value="#14b8a6" />
+      </label>
+    </aside>
+    <div id="app"></div>
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { OpenGeometry, Vector3, createBooleanExample } from "@og-three";
+
+      const operation = "union";
+      const app = document.getElementById("app");
+      const summary = document.querySelector("[data-summary]");
+      const metrics = document.querySelector("[data-metrics]");
+
+      let scene;
+      let camera;
+      let renderer;
+      let controls;
+      let stats;
+      let currentExample = null;
+      let rebuildQueued = false;
+      const config = {
+        outline: true,
+        fatOutlines: true,
+        outlineWidth: 3,
+        sphereX: 0.45,
+        sphereY: 0.12,
+        sphereZ: 0.18,
+        showOperandA: true,
+        showOperandB: true,
+        showResult: true,
+        resultColor: "#14b8a6",
+      };
+
+      function parseColor(color) {
+        return Number.parseInt(color.replace("#", "0x"), 16);
+      }
+
+      function scheduleRebuild() {
+        if (rebuildQueued) return;
+        rebuildQueued = true;
+        requestAnimationFrame(() => {
+          rebuildQueued = false;
+          rebuildExample();
+        });
+      }
+
+      function rebuildExample() {
+        if (!scene) return;
+        if (currentExample?.group) {
+          scene.remove(currentExample.group);
+          disposeObject(currentExample.group);
+        }
+
+        currentExample = createBooleanExample(operation, {
+          mode: "solid",
+          outline: config.outline,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth,
+          color: parseColor(config.resultColor),
+          sphereCenter: new Vector3(config.sphereX, config.sphereY, config.sphereZ),
+        });
+
+        currentExample.lhs.visible = config.showOperandA;
+        currentExample.rhs.visible = config.showOperandB;
+        currentExample.result.visible = config.showResult;
+        summary.textContent = `${currentExample.title}. ${currentExample.description}`;
+
+        const report = currentExample.result.report;
+        metrics.textContent = report
+          ? `Faces ${report.output_face_count}, shells ${report.output_shell_count}, empty ${report.empty ? "yes" : "no"}`
+          : "Result metrics unavailable.";
+
+        scene.add(currentExample.group);
+      }
+
+      function disposeObject(object) {
+        object.traverse((child) => {
+          if (child.geometry) {
+            child.geometry.dispose();
+          }
+          if (Array.isArray(child.material)) {
+            child.material.forEach((material) => material.dispose());
+          } else if (child.material) {
+            child.material.dispose();
+          }
+        });
+      }
+
+      function updateVisibility() {
+        if (!currentExample) return;
+        currentExample.lhs.visible = config.showOperandA;
+        currentExample.rhs.visible = config.showOperandB;
+        currentExample.result.visible = config.showResult;
+      }
+
+      function formatControlNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
+      }
+
+      function setUIControls() {
+        document.querySelectorAll("[data-control-key]").forEach((control) => {
+          const key = control.getAttribute("data-control-key");
+          const type = control.getAttribute("data-control-type");
+
+          if (type === "number") {
+            const rangeInput = control.querySelector("[data-control-range]");
+            const numberInput = control.querySelector("[data-control-number]");
+            const valueDisplay = control.querySelector("[data-control-value]");
+
+            const setValue = (raw) => {
+              config[key] = Number(raw);
+              rangeInput.value = raw;
+              numberInput.value = raw;
+              valueDisplay.textContent = formatControlNumber(raw);
+              scheduleRebuild();
+            };
+
+            rangeInput.addEventListener("input", () => setValue(rangeInput.value));
+            numberInput.addEventListener("input", () => setValue(numberInput.value));
+          }
+
+          if (type === "boolean") {
+            const toggleInput = control.querySelector("[data-control-toggle]");
+            const state = control.querySelector("[data-control-bool-state]");
+
+            const setValue = (checked) => {
+              config[key] = checked;
+              toggleInput.checked = checked;
+
+              const isStyleControl = key === "outline" || key === "fatOutlines";
+              state.textContent = checked
+                ? (isStyleControl ? "Enabled" : "Visible")
+                : (isStyleControl ? "Disabled" : "Hidden");
+
+              if (isStyleControl) {
+                scheduleRebuild();
+                return;
+              }
+
+              updateVisibility();
+            };
+
+            toggleInput.addEventListener("change", () => setValue(toggleInput.checked));
+          }
+
+          if (type === "color") {
+            const colorInput = control.querySelector("[data-control-color]");
+            colorInput.addEventListener("input", () => {
+              config[key] = colorInput.value;
+              scheduleRebuild();
+            });
+          }
+        });
+      }
+
+      async function main() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf6f1eb);
+
+        camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 4000);
+        camera.position.set(5.6, 4.4, 6.4);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "24px";
+        stats.dom.style.bottom = "24px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "30";
+        document.body.appendChild(stats.dom);
+
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 0.5, 0);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.74));
+
+        const key = new THREE.DirectionalLight(0xffffff, 0.94);
+        key.position.set(6, 9, 5);
+        scene.add(key);
+
+        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
+        fill.position.set(-6, 4, -6);
+        scene.add(fill);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+        rebuildExample();
+        setUIControls();
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+      }
+
+      main().catch((error) => {
+        console.error(error);
+        summary.textContent = error instanceof Error ? error.message : String(error);
+      });
+    </script>
+  </body>
+</html>

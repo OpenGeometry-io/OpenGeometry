@@ -1,6 +1,18 @@
 import { OGCuboid, Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { getUUID } from "../utils/randomizer";
+import {
+  createShapeOutlineMesh,
+  disposeShapeOutlineMesh,
+  sanitizeOutlineWidth,
+  ShapeOutlineMesh,
+} from "./outline-utils";
+import { subtractShapeOperand } from "./boolean-subtract";
+import type {
+  ShapeSubtractOperand,
+  ShapeSubtractOptions,
+  ShapeSubtractResult,
+} from "./boolean-subtract";
 
 export interface ICuboidOptions {
   ogid?: string;
@@ -9,7 +21,11 @@ export interface ICuboidOptions {
   height: number;
   depth: number;
   color: number;
+  fatOutlines?: boolean;
+  outlineWidth?: number;
 }
+
+export type CuboidConfigUpdate = Partial<ICuboidOptions>;
 
 export class Cuboid extends THREE.Mesh {
   ogid: string;
@@ -19,10 +35,15 @@ export class Cuboid extends THREE.Mesh {
     height: 1,
     depth: 1,
     color: 0x00ff00,
+    fatOutlines: false,
+    outlineWidth: 1,
   };
 
   private cuboid: OGCuboid;
-  #outlineMesh: THREE.Line | null = null;
+  #outlineMesh: ShapeOutlineMesh | null = null;
+  private _outlineEnabled = false;
+  private _fatOutlines = false;
+  private _outlineWidth = 1;
 
   // Store local center offset to align outlines
   // TODO: Can this be moved to Engine? It can increase performance | Needs to be used in other shapes too
@@ -35,7 +56,7 @@ export class Cuboid extends THREE.Mesh {
 
   set color(color: number) {
     this.options.color = color;
-    if (this.material instanceof THREE.LineBasicMaterial) {
+    if (this.material instanceof THREE.MeshStandardMaterial) {
       this.material.color.set(color);
     }
   }
@@ -57,20 +78,48 @@ export class Cuboid extends THREE.Mesh {
     }
   }
 
-  setConfig(options: ICuboidOptions) {
+  getConfig() {
+    return this.options;
+  }
+
+  setConfig(options: CuboidConfigUpdate) {
     this.validateOptions();
 
-    const { width, height, depth, center, color } = options;
-    this.cuboid.set_config(
-      center.clone(),
-      width,
-      height,
-      depth
-    );
+    const nextOptions = { ...this.options, ...options };
+    const geometryChanged =
+      "center" in options ||
+      "width" in options ||
+      "height" in options ||
+      "depth" in options;
+    const colorChanged = "color" in options;
+    const outlineStyleChanged =
+      "fatOutlines" in options ||
+      "outlineWidth" in options;
 
-    this.options.color = color;
+    this.options = nextOptions;
+    this._fatOutlines = this.options.fatOutlines ?? false;
+    this._outlineWidth = sanitizeOutlineWidth(this.options.outlineWidth);
+    this.options.fatOutlines = this._fatOutlines;
+    this.options.outlineWidth = this._outlineWidth;
 
-    this.generateGeometry();
+    if (geometryChanged) {
+      this.cuboid.set_config(
+        this.options.center.clone(),
+        this.options.width,
+        this.options.height,
+        this.options.depth
+      );
+      this.generateGeometry();
+      return;
+    }
+
+    if (colorChanged) {
+      this.color = this.options.color;
+    }
+
+    if (outlineStyleChanged && this._outlineEnabled) {
+      this.outline = true;
+    }
   }
 
   cleanGeometry() {
@@ -86,8 +135,7 @@ export class Cuboid extends THREE.Mesh {
     this.cleanGeometry();
 
     // Kernel Geometry
-    // Since geometry is already generated in set_config, we don't need to call it again
-    // this.cuboid.generate_geometry();
+    // Since Kernel Generates Geometry if we do set_config, we don't need to generate Geometry separately. We can directly get the geometry data and create Three.js geometry.
     const geometryData = this.cuboid.get_geometry_serialized();
     const bufferData = JSON.parse(geometryData);
     
@@ -110,7 +158,7 @@ export class Cuboid extends THREE.Mesh {
     this.material = material;
 
     // outline
-    if (this.#outlineMesh) {
+    if (this._outlineEnabled) {
       this.outline = true;
     }
   }
@@ -124,41 +172,72 @@ export class Cuboid extends THREE.Mesh {
     return JSON.parse(brepData);
   }
 
-  set outline(enable: boolean) {
-    if (this.#outlineMesh) {
-      this.remove(this.#outlineMesh);
-      this.#outlineMesh.geometry.dispose();
-      this.#outlineMesh = null;
-    }
+  /**
+   * Subtracts another boolean operand, such as an Opening, from this cuboid.
+   */
+  subtract(
+    operand: ShapeSubtractOperand,
+    options?: ShapeSubtractOptions
+  ): ShapeSubtractResult {
+    return subtractShapeOperand(this, operand, options);
+  }
 
+  set outline(enable: boolean) {
+    this._outlineEnabled = enable;
+    this.clearOutlineMesh();
     if (enable) {
       const outline_buff = this.cuboid.get_outline_geometry_serialized();
-      const outline_buf = JSON.parse(outline_buff);
-
-      const outlineGeometry = new THREE.BufferGeometry();
-      outlineGeometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(outline_buf, 3)
-      );
-
-      const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-      this.#outlineMesh = new THREE.LineSegments(
-        outlineGeometry,
-        outlineMaterial
-      );
+      const outline_buf = JSON.parse(outline_buff) as number[];
+      this.#outlineMesh = createShapeOutlineMesh({
+        positions: outline_buf,
+        color: 0x000000,
+        fatOutlines: this._fatOutlines,
+        outlineWidth: this._outlineWidth,
+      });
 
       this.add(this.#outlineMesh);
     }
+  }
 
-    if (!enable && this.#outlineMesh) {
-      this.remove(this.#outlineMesh);
-      this.#outlineMesh.geometry.dispose();
-      this.#outlineMesh = null;
+  get outline() {
+    return this._outlineEnabled;
+  }
+
+  set fatOutlines(value: boolean) {
+    this._fatOutlines = value;
+    this.options.fatOutlines = value;
+    if (this._outlineEnabled) {
+      this.outline = true;
     }
+  }
+
+  get fatOutlines() {
+    return this._fatOutlines;
+  }
+
+  set outlineWidth(value: number) {
+    this._outlineWidth = sanitizeOutlineWidth(value);
+    this.options.outlineWidth = this._outlineWidth;
+    if (this._outlineEnabled) {
+      this.outline = true;
+    }
+  }
+
+  get outlineWidth() {
+    return this._outlineWidth;
   }
 
   get outlineMesh() {
     return this.#outlineMesh;
+  }
+
+  private clearOutlineMesh() {
+    if (!this.#outlineMesh) {
+      return;
+    }
+    this.remove(this.#outlineMesh);
+    disposeShapeOutlineMesh(this.#outlineMesh);
+    this.#outlineMesh = null;
   }
 
   discardGeometry() {

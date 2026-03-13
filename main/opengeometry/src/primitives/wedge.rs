@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-use crate::brep::{Brep, Edge, Face, Vertex};
+use crate::brep::{Brep, BrepBuilder};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
 use crate::operations::triangulate::triangulate_polygon_with_holes;
 use openmaths::Vector3;
@@ -45,18 +45,23 @@ impl OGWedge {
     }
 
     #[wasm_bindgen]
-    pub fn set_config(&mut self, center: Vector3, width: f64, height: f64, depth: f64) {
+    pub fn set_config(
+        &mut self,
+        center: Vector3,
+        width: f64,
+        height: f64,
+        depth: f64,
+    ) -> Result<(), JsValue> {
         self.center = center;
         self.width = width;
         self.height = height;
         self.depth = depth;
-
-        self.generate_brep();
+        self.generate_brep()
     }
 
-    pub fn generate_brep(&mut self) {
+    pub fn generate_brep(&mut self) -> Result<(), JsValue> {
         self.clean_geometry();
-        self.generate_geometry();
+        self.generate_geometry()
     }
 
     pub fn clean_geometry(&mut self) {
@@ -64,7 +69,7 @@ impl OGWedge {
     }
 
     #[wasm_bindgen]
-    pub fn generate_geometry(&mut self) {
+    pub fn generate_geometry(&mut self) -> Result<(), JsValue> {
         let half_width = self.width / 2.0;
         let half_height = self.height / 2.0;
         let half_depth = self.depth / 2.0;
@@ -76,40 +81,41 @@ impl OGWedge {
         let z_min = self.center.z - half_depth;
         let z_max = self.center.z + half_depth;
 
-        self.brep
-            .vertices
-            .push(Vertex::new(0, Vector3::new(x_min, y_min, z_min)));
-        self.brep
-            .vertices
-            .push(Vertex::new(1, Vector3::new(x_max, y_min, z_min)));
-        self.brep
-            .vertices
-            .push(Vertex::new(2, Vector3::new(x_min, y_max, z_min)));
-        self.brep
-            .vertices
-            .push(Vertex::new(3, Vector3::new(x_min, y_min, z_max)));
-        self.brep
-            .vertices
-            .push(Vertex::new(4, Vector3::new(x_max, y_min, z_max)));
-        self.brep
-            .vertices
-            .push(Vertex::new(5, Vector3::new(x_min, y_max, z_max)));
+        let vertices = vec![
+            Vector3::new(x_min, y_min, z_min),
+            Vector3::new(x_max, y_min, z_min),
+            Vector3::new(x_min, y_max, z_min),
+            Vector3::new(x_min, y_min, z_max),
+            Vector3::new(x_max, y_min, z_max),
+            Vector3::new(x_min, y_max, z_max),
+        ];
 
-        self.brep.edges.push(Edge::new(0, 0, 1));
-        self.brep.edges.push(Edge::new(1, 1, 4));
-        self.brep.edges.push(Edge::new(2, 4, 3));
-        self.brep.edges.push(Edge::new(3, 3, 0));
-        self.brep.edges.push(Edge::new(4, 0, 2));
-        self.brep.edges.push(Edge::new(5, 2, 5));
-        self.brep.edges.push(Edge::new(6, 5, 3));
-        self.brep.edges.push(Edge::new(7, 1, 2));
-        self.brep.edges.push(Edge::new(8, 4, 5));
+        let faces = vec![
+            vec![0, 1, 4, 3],
+            vec![0, 2, 1],
+            vec![3, 4, 5],
+            vec![0, 3, 5, 2],
+            vec![1, 2, 5, 4],
+        ];
 
-        self.brep.faces.push(Face::new(0, vec![0, 1, 4, 3]));
-        self.brep.faces.push(Face::new(1, vec![0, 2, 1]));
-        self.brep.faces.push(Face::new(2, vec![3, 4, 5]));
-        self.brep.faces.push(Face::new(3, vec![0, 3, 5, 2]));
-        self.brep.faces.push(Face::new(4, vec![1, 2, 5, 4]));
+        let mut builder = BrepBuilder::new(self.brep.id);
+        builder.add_vertices(&vertices);
+
+        for face in &faces {
+            builder.add_face(face, &[]).map_err(|err| {
+                JsValue::from_str(&format!("Failed to build wedge face: {}", err))
+            })?;
+        }
+
+        builder
+            .add_shell_from_all_faces(true)
+            .map_err(|err| JsValue::from_str(&format!("Failed to build wedge shell: {}", err)))?;
+
+        self.brep = builder
+            .build()
+            .map_err(|err| JsValue::from_str(&format!("Failed to finalize wedge BREP: {}", err)))?;
+
+        Ok(())
     }
 
     #[wasm_bindgen]
@@ -120,12 +126,10 @@ impl OGWedge {
     #[wasm_bindgen]
     pub fn get_geometry_serialized(&self) -> String {
         let mut vertex_buffer: Vec<f64> = Vec::new();
-        let faces = self.brep.faces.clone();
 
-        for face in &faces {
+        for face in &self.brep.faces {
             let (face_vertices, holes_vertices) =
                 self.brep.get_vertices_and_holes_by_face_id(face.id);
-
             if face_vertices.len() < 3 {
                 continue;
             }
@@ -153,9 +157,13 @@ impl OGWedge {
     pub fn get_outline_geometry_serialized(&self) -> String {
         let mut vertex_buffer: Vec<f64> = Vec::new();
 
-        for edge in self.brep.edges.clone() {
-            let start_vertex = self.brep.vertices[edge.v1 as usize].clone();
-            let end_vertex = self.brep.vertices[edge.v2 as usize].clone();
+        for (start_id, end_id) in self.brep.collect_outline_segments() {
+            let Some(start_vertex) = self.brep.vertices.get(start_id as usize) else {
+                continue;
+            };
+            let Some(end_vertex) = self.brep.vertices.get(end_id as usize) else {
+                continue;
+            };
 
             vertex_buffer.push(start_vertex.position.x);
             vertex_buffer.push(start_vertex.position.y);
