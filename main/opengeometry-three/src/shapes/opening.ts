@@ -7,6 +7,12 @@ import {
   sanitizeOutlineWidth,
   ShapeOutlineMesh,
 } from "./outline-utils";
+import { subtractShapeOperand } from "./boolean-subtract";
+import type {
+  ShapeSubtractOperand,
+  ShapeSubtractOptions,
+  ShapeSubtractResult,
+} from "./boolean-subtract";
 
 export interface IOpeningOptions {
   ogid?: string;
@@ -176,6 +182,26 @@ export class Opening extends THREE.Mesh {
       throw new Error("Brep data is not available for this opening.");
     }
     return JSON.parse(brepData);
+  }
+
+  /**
+   * Subtracts another boolean operand from this opening volume.
+   */
+  subtract(
+    operand: ShapeSubtractOperand,
+    options?: ShapeSubtractOptions
+  ): ShapeSubtractResult {
+    return subtractShapeOperand(this, operand, options);
+  }
+
+  /**
+   * Uses this opening volume to cut a host shape.
+   */
+  subtractFrom(
+    host: ShapeSubtractOperand,
+    options?: ShapeSubtractOptions
+  ): ShapeSubtractResult {
+    return subtractShapeOperand(host, this, options);
   }
 
   set outline(enable: boolean) {

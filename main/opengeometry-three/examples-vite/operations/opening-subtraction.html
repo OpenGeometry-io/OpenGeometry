@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Opening Subtraction Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OpenGeometry opening subtraction example" />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Opening Subtraction</span>
+    </div>
+
+    <aside class="og-controls" data-control-panel>
+      <h3>Opening Controls</h3>
+      <p class="og-control-summary" data-summary>
+        Choose a host solid, move the opening volume in space, and preview the cut result for
+        window and door style workflows.
+      </p>
+      <p class="og-control-summary" data-metrics>Preparing opening subtraction example...</p>
+
+      <label class="og-control-row" data-control-key="shape" data-control-type="select">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Host Shape</span>
+        </div>
+        <select class="og-control-select" data-control-select>
+          <option value="wall" selected>Wall</option>
+          <option value="cuboid">Cuboid</option>
+          <option value="cylinder">Cylinder</option>
+          <option value="sphere">Sphere</option>
+          <option value="wedge">Wedge</option>
+          <option value="sweep">Sweep</option>
+        </select>
+      </label>
+
+      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outlines</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Fat Outlines</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" />
+          <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outline Width</span>
+          <code class="og-control-value" data-control-value>4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="1" max="8" step="1" value="4" />
+          <input data-control-number type="number" min="1" max="8" step="1" value="4" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="openingWidth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Opening Width</span>
+          <code class="og-control-value" data-control-value>1.2</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.2" max="4.5" step="0.05" value="1.2" />
+          <input data-control-number type="number" min="0.2" max="4.5" step="0.05" value="1.2" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="openingHeight" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Opening Height</span>
+          <code class="og-control-value" data-control-value>1.8</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.2" max="4.5" step="0.05" value="1.8" />
+          <input data-control-number type="number" min="0.2" max="4.5" step="0.05" value="1.8" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="openingDepth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Opening Depth</span>
+          <code class="og-control-value" data-control-value>0.45</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.1" max="4.5" step="0.05" value="0.45" />
+          <input data-control-number type="number" min="0.1" max="4.5" step="0.05" value="0.45" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="openingX" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Opening X</span>
+          <code class="og-control-value" data-control-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-3" max="3" step="0.05" value="0" />
+          <input data-control-number type="number" min="-3" max="3" step="0.05" value="0" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="openingY" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Opening Y</span>
+          <code class="og-control-value" data-control-value>1.05</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0" max="3.5" step="0.05" value="1.05" />
+          <input data-control-number type="number" min="0" max="3.5" step="0.05" value="1.05" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="openingZ" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Opening Z</span>
+          <code class="og-control-value" data-control-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-3" max="3" step="0.05" value="0" />
+          <input data-control-number type="number" min="-3" max="3" step="0.05" value="0" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showHost" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Host Shape</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showOpening" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Opening</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showResult" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Result</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="resultColor" data-control-type="color">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Result Color</span>
+        </div>
+        <input data-control-color type="color" class="og-control-color" value="#14b8a6" />
+      </label>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { Cuboid, Cylinder, Opening, OpenGeometry, Sphere, Sweep, Vector3, Wedge } from "@og-three";
+
+      const app = document.getElementById("app");
+      const panel = document.querySelector("[data-control-panel]");
+      const summary = document.querySelector("[data-summary]");
+      const metrics = document.querySelector("[data-metrics]");
+
+      if (!app || !panel || !summary || !metrics) {
+        throw new Error("Missing static opening subtraction example UI nodes");
+      }
+
+      const HOST_PRESETS = {
+        wall: {
+          label: "Wall",
+          description: "Wall preset sized for window and door openings.",
+          hostColor: 0x93c5fd,
+          opening: {
+            width: 1.2,
+            height: 1.8,
+            depth: 0.45,
+            x: 0,
+            y: 1.05,
+            z: 0,
+          },
+          create() {
+            return new Cuboid({
+              center: new Vector3(0, 1.5, 0),
+              width: 6,
+              height: 3,
+              depth: 0.3,
+              color: 0x93c5fd,
+            });
+          },
+        },
+        cuboid: {
+          label: "Cuboid",
+          description: "Generic rectangular solid cut with the opening volume.",
+          hostColor: 0x10b981,
+          opening: {
+            width: 1.2,
+            height: 1.8,
+            depth: 2.4,
+            x: 0,
+            y: 1.5,
+            z: 0,
+          },
+          create() {
+            return new Cuboid({
+              center: new Vector3(0, 1.5, 0),
+              width: 3.4,
+              height: 3,
+              depth: 2.2,
+              color: 0x10b981,
+            });
+          },
+        },
+        cylinder: {
+          label: "Cylinder",
+          description: "Round host volume demonstrating the same subtraction API.",
+          hostColor: 0xf97316,
+          opening: {
+            width: 1.1,
+            height: 1.8,
+            depth: 2.8,
+            x: 0,
+            y: 1.6,
+            z: 0,
+          },
+          create() {
+            return new Cylinder({
+              center: new Vector3(0, 1.6, 0),
+              radius: 1.3,
+              height: 3.2,
+              segments: 40,
+              angle: Math.PI * 2,
+              color: 0xf97316,
+            });
+          },
+        },
+        sphere: {
+          label: "Sphere",
+          description: "Spherical host showing the opening volume as a generic cutting solid.",
+          hostColor: 0x0ea5e9,
+          opening: {
+            width: 1.1,
+            height: 2.1,
+            depth: 3.4,
+            x: 0,
+            y: 1.6,
+            z: 0,
+          },
+          create() {
+            return new Sphere({
+              center: new Vector3(0, 1.6, 0),
+              radius: 1.6,
+              widthSegments: 36,
+              heightSegments: 24,
+              color: 0x0ea5e9,
+            });
+          },
+        },
+        wedge: {
+          label: "Wedge",
+          description: "Sloped host body cut by the same opening volume workflow.",
+          hostColor: 0x7c3aed,
+          opening: {
+            width: 1.1,
+            height: 2.1,
+            depth: 2.4,
+            x: 0,
+            y: 1.4,
+            z: 0,
+          },
+          create() {
+            return new Wedge({
+              center: new Vector3(0, 1.5, 0),
+              width: 3.2,
+              height: 3,
+              depth: 2.2,
+              color: 0x7c3aed,
+            });
+          },
+        },
+        sweep: {
+          label: "Sweep",
+          description: "Sweep host for testing openings against custom solid profiles.",
+          hostColor: 0x14b8a6,
+          opening: {
+            width: 0.9,
+            height: 1.2,
+            depth: 1.1,
+            x: 0,
+            y: 1.4,
+            z: 0,
+          },
+          create() {
+            return new Sweep({
+              path: [
+                new Vector3(-1.4, 0, 0),
+                new Vector3(-0.8, 0.8, 0),
+                new Vector3(0, 1.6, 0),
+                new Vector3(0.8, 2.2, 0),
+                new Vector3(1.4, 2.8, 0),
+              ],
+              profile: [
+                new Vector3(-0.75, 0, -0.5),
+                new Vector3(0.75, 0, -0.5),
+                new Vector3(0.75, 0, 0.5),
+                new Vector3(-0.75, 0, 0.5),
+              ],
+              color: 0x14b8a6,
+              capStart: true,
+              capEnd: true,
+            });
+          },
+        },
+      };
+
+      const config = {
+        shape: "wall",
+        outline: true,
+        fatOutlines: false,
+        outlineWidth: 4,
+        openingWidth: HOST_PRESETS.wall.opening.width,
+        openingHeight: HOST_PRESETS.wall.opening.height,
+        openingDepth: HOST_PRESETS.wall.opening.depth,
+        openingX: HOST_PRESETS.wall.opening.x,
+        openingY: HOST_PRESETS.wall.opening.y,
+        openingZ: HOST_PRESETS.wall.opening.z,
+        showHost: true,
+        showOpening: true,
+        showResult: true,
+        resultColor: "#14b8a6",
+      };
+
+      let scene;
+      let camera;
+      let renderer;
+      let controls;
+      let stats;
+      let hostShape = null;
+      let opening = null;
+      let result = null;
+      let rebuildQueued = false;
+      let currentHostKey = null;
+
+      function parseColor(color) {
+        return Number.parseInt(color.replace("#", "0x"), 16);
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function formatControlNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
+      }
+
+      function disposeObject(object) {
+        object.traverse((child) => {
+          if (child.geometry) {
+            child.geometry.dispose();
+          }
+          if (Array.isArray(child.material)) {
+            child.material.forEach((material) => material.dispose());
+          } else if (child.material) {
+            child.material.dispose();
+          }
+        });
+      }
+
+      /**
+       * Updates the opening sliders to the current host preset defaults.
+       */
+      function applyOpeningPreset(shapeKey) {
+        const preset = HOST_PRESETS[shapeKey];
+        config.openingWidth = preset.opening.width;
+        config.openingHeight = preset.opening.height;
+        config.openingDepth = preset.opening.depth;
+        config.openingX = preset.opening.x;
+        config.openingY = preset.opening.y;
+        config.openingZ = preset.opening.z;
+      }
+
+      function syncNumberControl(key) {
+        const control = panel.querySelector(`[data-control-key="${key}"]`);
+        if (!control) return;
+
+        const rangeInput = control.querySelector("[data-control-range]");
+        const numberInput = control.querySelector("[data-control-number]");
+        const valueDisplay = control.querySelector("[data-control-value]");
+
+        if (rangeInput) rangeInput.value = String(config[key]);
+        if (numberInput) numberInput.value = String(config[key]);
+        if (valueDisplay) valueDisplay.textContent = formatControlNumber(config[key]);
+      }
+
+      function syncBooleanControl(key) {
+        const control = panel.querySelector(`[data-control-key="${key}"]`);
+        if (!control) return;
+
+        const toggleInput = control.querySelector("[data-control-toggle]");
+        const stateDisplay = control.querySelector("[data-control-bool-state]");
+        const enabledState = key === "outline" || key === "fatOutlines";
+
+        if (toggleInput) {
+          toggleInput.checked = Boolean(config[key]);
+        }
+        if (stateDisplay) {
+          stateDisplay.textContent = Boolean(config[key])
+            ? (enabledState ? "Enabled" : "Visible")
+            : (enabledState ? "Disabled" : "Hidden");
+        }
+      }
+
+      function syncSelectControl(key) {
+        const control = panel.querySelector(`[data-control-key="${key}"]`);
+        const selectInput = control?.querySelector("[data-control-select]");
+        if (selectInput) {
+          selectInput.value = String(config[key]);
+        }
+      }
+
+      function syncColorControl(key) {
+        const control = panel.querySelector(`[data-control-key="${key}"]`);
+        const colorInput = control?.querySelector("[data-control-color]");
+        if (colorInput) {
+          colorInput.value = String(config[key]);
+        }
+      }
+
+      function syncControls() {
+        syncSelectControl("shape");
+        [
+          "outlineWidth",
+          "openingWidth",
+          "openingHeight",
+          "openingDepth",
+          "openingX",
+          "openingY",
+          "openingZ",
+        ].forEach(syncNumberControl);
+        ["outline", "fatOutlines", "showHost", "showOpening", "showResult"].forEach(syncBooleanControl);
+        syncColorControl("resultColor");
+      }
+
+      /**
+       * Reuses the current host mesh when possible and recreates it only when the selected shape changes.
+       */
+      function ensureHostShape() {
+        if (currentHostKey === config.shape && hostShape) {
+          return;
+        }
+
+        if (hostShape) {
+          scene.remove(hostShape);
+          disposeObject(hostShape);
+        }
+
+        currentHostKey = config.shape;
+        hostShape = HOST_PRESETS[config.shape].create();
+        scene.add(hostShape);
+      }
+
+      function ensureOpening() {
+        if (opening) {
+          return;
+        }
+
+        opening = new Opening({
+          center: new Vector3(0, 1, 0),
+          width: 1,
+          height: 1,
+          depth: 1,
+          color: 0x94a3b8,
+          fatOutlines: config.fatOutlines,
+          outlineWidth: config.outlineWidth,
+        });
+        scene.add(opening);
+      }
+
+      /**
+       * Applies the current visibility and outline style toggles to the live scene objects.
+       */
+      function applyDisplayState() {
+        if (hostShape) {
+          hostShape.fatOutlines = config.fatOutlines;
+          hostShape.outlineWidth = config.outlineWidth;
+          hostShape.outline = config.outline;
+          hostShape.visible = config.showHost;
+        }
+
+        if (opening) {
+          opening.fatOutlines = config.fatOutlines;
+          opening.outlineWidth = config.outlineWidth;
+          opening.outline = config.outline;
+          opening.visible = config.showOpening;
+        }
+
+        if (result) {
+          result.fatOutlines = config.fatOutlines;
+          result.outlineWidth = config.outlineWidth;
+          result.outline = config.outline;
+          result.visible = config.showResult;
+          if (!Array.isArray(result.material) && result.material?.color) {
+            result.material.color.set(parseColor(config.resultColor));
+          }
+        }
+      }
+
+      function clearResult() {
+        if (!result) {
+          return;
+        }
+
+        scene.remove(result);
+        disposeObject(result);
+        result = null;
+      }
+
+      /**
+       * Recomputes the subtraction result using the current host preset and opening position.
+       */
+      function rebuildResult() {
+        if (!scene) {
+          return;
+        }
+
+        try {
+          ensureHostShape();
+          ensureOpening();
+
+          opening.setConfig({
+            center: new Vector3(config.openingX, config.openingY, config.openingZ),
+            width: config.openingWidth,
+            height: config.openingHeight,
+            depth: config.openingDepth,
+            color: 0x94a3b8,
+            fatOutlines: config.fatOutlines,
+            outlineWidth: config.outlineWidth,
+          });
+
+          clearResult();
+          result = hostShape.subtract(opening, {
+            color: parseColor(config.resultColor),
+            outline: config.outline,
+            fatOutlines: config.fatOutlines,
+            outlineWidth: config.outlineWidth,
+          });
+
+          scene.add(result);
+          applyDisplayState();
+
+          const preset = HOST_PRESETS[config.shape];
+          summary.textContent = `${preset.label}. ${preset.description}`;
+          metrics.textContent = result.report
+            ? `Faces ${result.report.output_face_count}, shells ${result.report.output_shell_count}, empty ${result.report.empty ? "yes" : "no"}`
+            : "Result metrics unavailable.";
+        } catch (error) {
+          clearResult();
+          summary.textContent = error instanceof Error ? error.message : String(error);
+          metrics.textContent = "Opening subtraction failed.";
+          console.error("[opening-subtraction] rebuild failed", error);
+        }
+      }
+
+      function scheduleRebuild() {
+        if (rebuildQueued) {
+          return;
+        }
+
+        rebuildQueued = true;
+        requestAnimationFrame(() => {
+          rebuildQueued = false;
+          rebuildResult();
+        });
+      }
+
+      function setUIControls() {
+        panel.querySelectorAll("[data-control-key]").forEach((control) => {
+          const key = control.getAttribute("data-control-key");
+          const type = control.getAttribute("data-control-type");
+
+          if (type === "number") {
+            const rangeInput = control.querySelector("[data-control-range]");
+            const numberInput = control.querySelector("[data-control-number]");
+            const min = Number.parseFloat(rangeInput.min);
+            const max = Number.parseFloat(rangeInput.max);
+
+            const setValue = (raw) => {
+              const numericValue = Number.parseFloat(raw);
+              if (!Number.isFinite(numericValue)) {
+                return;
+              }
+
+              config[key] = clamp(numericValue, min, max);
+              syncNumberControl(key);
+              scheduleRebuild();
+            };
+
+            rangeInput.addEventListener("input", () => setValue(rangeInput.value));
+            numberInput.addEventListener("input", () => setValue(numberInput.value));
+          }
+
+          if (type === "boolean") {
+            const toggleInput = control.querySelector("[data-control-toggle]");
+            toggleInput.addEventListener("change", () => {
+              config[key] = toggleInput.checked;
+              syncBooleanControl(key);
+              applyDisplayState();
+            });
+          }
+
+          if (type === "select") {
+            const selectInput = control.querySelector("[data-control-select]");
+            selectInput.addEventListener("change", () => {
+              config[key] = selectInput.value;
+              applyOpeningPreset(config.shape);
+              currentHostKey = null;
+              syncControls();
+              scheduleRebuild();
+            });
+          }
+
+          if (type === "color") {
+            const colorInput = control.querySelector("[data-control-color]");
+            colorInput.addEventListener("input", () => {
+              config[key] = colorInput.value;
+              syncColorControl(key);
+              applyDisplayState();
+            });
+          }
+        });
+
+        syncControls();
+      }
+
+      async function main() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf6f1eb);
+
+        camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 4000);
+        camera.position.set(7.4, 5.2, 7.8);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "24px";
+        stats.dom.style.bottom = "24px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "30";
+        document.body.appendChild(stats.dom);
+
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 1.3, 0);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.74));
+
+        const key = new THREE.DirectionalLight(0xffffff, 0.94);
+        key.position.set(8, 10, 5);
+        scene.add(key);
+
+        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
+        fill.position.set(-6, 4, -6);
+        scene.add(fill);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        setUIControls();
+        rebuildResult();
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+      }
+
+      main().catch((error) => {
+        console.error(error);
+        summary.textContent = error instanceof Error ? error.message : String(error);
+      });
+    </script>
+  </body>
+</html>

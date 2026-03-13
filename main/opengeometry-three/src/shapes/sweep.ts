@@ -8,6 +8,12 @@ import {
   sanitizeOutlineWidth,
   ShapeOutlineMesh,
 } from "./outline-utils";
+import { subtractShapeOperand } from "./boolean-subtract";
+import type {
+  ShapeSubtractOperand,
+  ShapeSubtractOptions,
+  ShapeSubtractResult,
+} from "./boolean-subtract";
 
 export interface ISweepOptions {
   ogid?: string;
@@ -185,6 +191,16 @@ export class Sweep extends THREE.Mesh {
       throw new Error("Brep data is not available for Sweep.");
     }
     return JSON.parse(brepData);
+  }
+
+  /**
+   * Subtracts another boolean operand, such as an Opening, from this sweep.
+   */
+  subtract(
+    operand: ShapeSubtractOperand,
+    options?: ShapeSubtractOptions
+  ): ShapeSubtractResult {
+    return subtractShapeOperand(this, operand, options);
   }
 
   set outline(enable: boolean) {

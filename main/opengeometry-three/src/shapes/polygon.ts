@@ -9,6 +9,12 @@ import {
   setShapeOutlineColor,
   ShapeOutlineMesh,
 } from "./outline-utils";
+import { subtractShapeOperand } from "./boolean-subtract";
+import type {
+  ShapeSubtractOperand,
+  ShapeSubtractOptions,
+  ShapeSubtractResult,
+} from "./boolean-subtract";
 
 export interface IPolygonOptions {
   ogid?: string;
@@ -375,6 +381,16 @@ export class Polygon extends THREE.Mesh {
     if (!this.polygon) return null;
     const brepData = this.polygon.get_brep_serialized();
     return brepData;
+  }
+
+  /**
+   * Subtracts another boolean operand from this polygon.
+   */
+  subtract(
+    operand: ShapeSubtractOperand,
+    options?: ShapeSubtractOptions
+  ): ShapeSubtractResult {
+    return subtractShapeOperand(this, operand, options);
   }
 
   set outlineColor(color: number) {
