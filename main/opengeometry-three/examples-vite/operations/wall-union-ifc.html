@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Wall Union IFC Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OpenGeometry wall union IFC export example" />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Wall Union IFC</span>
+    </div>
+
+    <aside class="og-controls" data-control-panel>
+      <h3>Wall Union IFC</h3>
+      <p class="og-control-summary" data-summary>
+        Move the two cuboid walls in plan with the X and Z sliders, then union and export the
+        joined wall body as IFC.
+      </p>
+      <p class="og-control-summary" data-metrics>Preparing wall boolean example...</p>
+
+      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outlines</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Fat Outlines</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outline Width</span>
+          <code class="og-control-value" data-control-value>3</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="1" max="8" step="1" value="3" />
+          <input data-control-number type="number" min="1" max="8" step="1" value="3" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="wallAX" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Wall A X</span>
+          <code class="og-control-value" data-control-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-3" max="3" step="0.01" value="0" />
+          <input data-control-number type="number" min="-3" max="3" step="0.01" value="0" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="wallAZ" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Wall A Z</span>
+          <code class="og-control-value" data-control-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-3" max="3" step="0.01" value="0" />
+          <input data-control-number type="number" min="-3" max="3" step="0.01" value="0" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="wallBX" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Wall B X</span>
+          <code class="og-control-value" data-control-value>1.86</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-3" max="3.5" step="0.01" value="1.86" />
+          <input data-control-number type="number" min="-3" max="3.5" step="0.01" value="1.86" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="wallBZ" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Wall B Z</span>
+          <code class="og-control-value" data-control-value>1.46</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-3" max="3.5" step="0.01" value="1.46" />
+          <input data-control-number type="number" min="-3" max="3.5" step="0.01" value="1.46" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showWallA" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Wall A</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showWallB" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Wall B</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" checked />
+          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="showUnion" data-control-type="boolean">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Union</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-control-toggle type="checkbox" class="og-toggle" />
+          <span class="og-control-bool-state" data-control-bool-state>Unavailable</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control-key="resultColor" data-control-type="color">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Union Color</span>
+        </div>
+        <input data-control-color type="color" class="og-control-color" value="#14b8a6" />
+      </label>
+
+      <button type="button" class="og-control-action og-control-action-amber" data-action="union-walls">
+        Union Walls
+      </button>
+      <button type="button" class="og-control-action" data-action="reset-walls">Reset Walls</button>
+      <button type="button" class="og-control-action og-control-action-rose" data-action="export-ifc" disabled>
+        Export Union IFC
+      </button>
+      <a data-download-link hidden></a>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { booleanUnion, Cuboid, OGSceneManager, OpenGeometry, Vector3 } from "@og-three";
+
+      const ENTITY_ID = "joined-wall";
+      const app = document.getElementById("app");
+      const panel = document.querySelector("[data-control-panel]");
+      const summary = document.querySelector("[data-summary]");
+      const metrics = document.querySelector("[data-metrics]");
+
+      if (!app || !panel || !summary || !metrics) {
+        throw new Error("Missing static wall union example UI nodes");
+      }
+
+      const actionButtons = {
+        union: panel.querySelector('[data-action="union-walls"]'),
+        reset: panel.querySelector('[data-action="reset-walls"]'),
+        exportIfc: panel.querySelector('[data-action="export-ifc"]'),
+      };
+
+      const downloadLink = panel.querySelector("[data-download-link]");
+      if (!actionButtons.union || !actionButtons.reset || !actionButtons.exportIfc || !downloadLink) {
+        throw new Error("Missing wall union example action nodes");
+      }
+
+      const DEFAULT_CONFIG = {
+        outline: true,
+        fatOutlines: true,
+        outlineWidth: 3,
+        wallAX: 0,
+        wallAZ: 0,
+        wallBX: 1.86,
+        wallBZ: 1.46,
+        showWallA: true,
+        showWallB: true,
+        showUnion: false,
+        resultColor: "#14b8a6",
+      };
+
+      const WALL_SPECS = {
+        wallA: {
+          label: "Wall A",
+          width: 4,
+          height: 3,
+          depth: 0.28,
+          color: 0x93c5fd,
+          xKey: "wallAX",
+          zKey: "wallAZ",
+        },
+        wallB: {
+          label: "Wall B",
+          width: 0.28,
+          height: 3,
+          depth: 3.2,
+          color: 0xf59e0b,
+          xKey: "wallBX",
+          zKey: "wallBZ",
+        },
+      };
+
+      const config = { ...DEFAULT_CONFIG };
+      const wallEntries = {};
+
+      let scene;
+      let camera;
+      let renderer;
+      let controls;
+      let stats;
+      let unionResult = null;
+
+      function parseColor(color) {
+        return Number.parseInt(color.replace("#", "0x"), 16);
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function formatControlNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
+      }
+
+      function setActionDisabled(button, disabled) {
+        button.disabled = disabled;
+        button.style.opacity = disabled ? "0.58" : "1";
+        button.style.cursor = disabled ? "not-allowed" : "pointer";
+      }
+
+      function getWallCenter(key) {
+        const spec = WALL_SPECS[key];
+        return new Vector3(config[spec.xKey], spec.height * 0.5, config[spec.zKey]);
+      }
+
+      function getControlNode(key) {
+        return panel.querySelector(`[data-control-key="${key}"]`);
+      }
+
+      function booleanStateLabel(key) {
+        const checked = Boolean(config[key]);
+        if (key === "outline" || key === "fatOutlines") {
+          return checked ? "Enabled" : "Disabled";
+        }
+
+        if (key === "showUnion" && !unionResult) {
+          return "Unavailable";
+        }
+
+        return checked ? "Visible" : "Hidden";
+      }
+
+      function syncNumberControl(key) {
+        const control = getControlNode(key);
+        if (!control) return;
+
+        const rangeInput = control.querySelector("[data-control-range]");
+        const numberInput = control.querySelector("[data-control-number]");
+        const valueDisplay = control.querySelector("[data-control-value]");
+        const value = String(config[key]);
+
+        if (rangeInput) rangeInput.value = value;
+        if (numberInput) numberInput.value = value;
+        if (valueDisplay) valueDisplay.textContent = formatControlNumber(value);
+      }
+
+      function syncBooleanControl(key) {
+        const control = getControlNode(key);
+        if (!control) return;
+
+        const toggleInput = control.querySelector("[data-control-toggle]");
+        const stateDisplay = control.querySelector("[data-control-bool-state]");
+
+        if (toggleInput) {
+          toggleInput.checked = Boolean(config[key]);
+          if (key === "showUnion") {
+            toggleInput.disabled = !unionResult;
+          }
+        }
+
+        if (stateDisplay) {
+          stateDisplay.textContent = booleanStateLabel(key);
+        }
+      }
+
+      function syncColorControl(key) {
+        const control = getControlNode(key);
+        if (!control) return;
+
+        const colorInput = control.querySelector("[data-control-color]");
+        if (colorInput) {
+          colorInput.value = String(config[key]);
+        }
+      }
+
+      function syncControls() {
+        [
+          "outlineWidth",
+          "wallAX",
+          "wallAZ",
+          "wallBX",
+          "wallBZ",
+        ].forEach(syncNumberControl);
+        [
+          "outline",
+          "fatOutlines",
+          "showWallA",
+          "showWallB",
+          "showUnion",
+        ].forEach(syncBooleanControl);
+        syncColorControl("resultColor");
+      }
+
+      function updateActionState() {
+        setActionDisabled(actionButtons.exportIfc, !unionResult);
+      }
+
+      function updateIdleMetrics() {
+        metrics.textContent =
+          `Wall A (${formatControlNumber(config.wallAX)}, ${formatControlNumber(config.wallAZ)}) | ` +
+          `Wall B (${formatControlNumber(config.wallBX)}, ${formatControlNumber(config.wallBZ)})`;
+      }
+
+      function updateUnionMetrics() {
+        const report = unionResult?.report;
+        if (!report) {
+          metrics.textContent = "Union result ready.";
+          return;
+        }
+
+        metrics.textContent =
+          `Faces ${report.output_face_count}, shells ${report.output_shell_count}, ` +
+          `empty ${report.empty ? "yes" : "no"}`;
+      }
+
+      /**
+       * Applies the shared outline style settings to the source wall meshes.
+       */
+      function applyWallStyles() {
+        Object.values(wallEntries).forEach((entry) => {
+          entry.mesh.fatOutlines = config.fatOutlines;
+          entry.mesh.outlineWidth = config.outlineWidth;
+          entry.mesh.outline = config.outline;
+        });
+      }
+
+      function applySourceVisibility() {
+        if (wallEntries.wallA) {
+          wallEntries.wallA.mesh.visible = config.showWallA;
+        }
+        if (wallEntries.wallB) {
+          wallEntries.wallB.mesh.visible = config.showWallB;
+        }
+      }
+
+      /**
+       * Keeps the boolean result appearance in sync with the current UI controls.
+       */
+      function applyUnionStyles() {
+        if (!unionResult) {
+          return;
+        }
+
+        unionResult.fatOutlines = config.fatOutlines;
+        unionResult.outlineWidth = config.outlineWidth;
+        unionResult.outline = config.outline;
+        unionResult.visible = config.showUnion;
+
+        if (!Array.isArray(unionResult.material) && unionResult.material?.color) {
+          unionResult.material.color.set(parseColor(config.resultColor));
+        }
+      }
+
+      function disposeUnionResult() {
+        if (!scene || !unionResult) {
+          return;
+        }
+
+        scene.remove(unionResult);
+        unionResult.disposeGeometry();
+        unionResult = null;
+        updateActionState();
+      }
+
+      /**
+       * Drops the stale union body when wall placement changes and restores the source walls.
+       */
+      function invalidateUnion(reason) {
+        if (!unionResult) {
+          updateIdleMetrics();
+          return;
+        }
+
+        disposeUnionResult();
+        config.showWallA = true;
+        config.showWallB = true;
+        config.showUnion = false;
+        applySourceVisibility();
+        syncBooleanControl("showWallA");
+        syncBooleanControl("showWallB");
+        syncBooleanControl("showUnion");
+        summary.textContent = reason;
+        updateIdleMetrics();
+      }
+
+      /**
+       * Repositions the two source walls from the current X/Z slider state.
+       */
+      function updateWallGeometry(reason = "Wall positions changed. Click Union Walls to rebuild the joined wall.") {
+        Object.keys(WALL_SPECS).forEach((key) => {
+          const entry = wallEntries[key];
+          if (!entry) return;
+
+          entry.mesh.setConfig({ center: getWallCenter(key) });
+        });
+
+        applyWallStyles();
+        applySourceVisibility();
+
+        if (unionResult) {
+          invalidateUnion(reason);
+          return;
+        }
+
+        updateIdleMetrics();
+      }
+
+      function buildIfcSemantics() {
+        return {
+          [ENTITY_ID]: {
+            ifc_class: "IFCWALL",
+            name: "Joined Cuboid Wall",
+            description: "Boolean union of two adjoining cuboid wall solids",
+            object_type: "Joined Wall",
+            tag: "WALL-UNION-01",
+            property_sets: {
+              Pset_WallCommon: {
+                IsExternal: "false",
+                LoadBearing: "false",
+                FireRating: "2h",
+              },
+            },
+          },
+        };
+      }
+
+      function downloadText(text, filename, mime) {
+        const blob = new Blob([text], { type: mime });
+        const url = URL.createObjectURL(blob);
+        downloadLink.href = url;
+        downloadLink.download = filename;
+        downloadLink.click();
+        URL.revokeObjectURL(url);
+      }
+
+      /**
+       * Runs the wall boolean, hides the source walls, and presents the joined solid.
+       */
+      function handleUnion() {
+        try {
+          disposeUnionResult();
+
+          unionResult = booleanUnion(wallEntries.wallA.mesh, wallEntries.wallB.mesh, {
+            color: parseColor(config.resultColor),
+            outline: config.outline,
+            fatOutlines: config.fatOutlines,
+            outlineWidth: config.outlineWidth,
+          });
+
+          scene.add(unionResult);
+          config.showWallA = false;
+          config.showWallB = false;
+          config.showUnion = true;
+          applySourceVisibility();
+          applyUnionStyles();
+          syncBooleanControl("showWallA");
+          syncBooleanControl("showWallB");
+          syncBooleanControl("showUnion");
+          updateActionState();
+
+          summary.textContent =
+            "Union complete. The source walls are hidden and the joined wall body is ready for review or IFC export.";
+          updateUnionMetrics();
+
+          console.groupCollapsed("[wall-union-ifc] union");
+          console.log("Wall A", wallEntries.wallA.mesh.getConfig());
+          console.log("Wall B", wallEntries.wallB.mesh.getConfig());
+          console.log("Report", unionResult.report);
+          console.groupEnd();
+        } catch (error) {
+          disposeUnionResult();
+          config.showWallA = true;
+          config.showWallB = true;
+          config.showUnion = false;
+          applySourceVisibility();
+          syncBooleanControl("showWallA");
+          syncBooleanControl("showWallB");
+          syncBooleanControl("showUnion");
+          summary.textContent = error instanceof Error ? error.message : String(error);
+          updateIdleMetrics();
+          console.error("[wall-union-ifc] union failed", error);
+        }
+      }
+
+      /**
+       * Exports the current joined wall body as IFC with wall semantics attached.
+       */
+      function handleIfcExport() {
+        if (!unionResult) {
+          return;
+        }
+
+        try {
+          const manager = new OGSceneManager();
+          const sceneId = manager.createScene("wall-union-ifc-scene");
+          manager.addBrepEntityToScene(
+            sceneId,
+            ENTITY_ID,
+            "OGBooleanResult",
+            unionResult.getBrepSerialized()
+          );
+
+          const semantics = buildIfcSemantics();
+          const exportConfig = {
+            schema: "Ifc4Add2",
+            project_name: "OpenGeometry Wall Union IFC",
+            site_name: "Main Site",
+            building_name: "Boolean Demo Building",
+            storey_name: "Level 01",
+            scale: 1,
+            error_policy: "BestEffort",
+            validate_topology: true,
+            require_closed_shell: true,
+            semantics,
+          };
+
+          const result = manager.exportSceneToIfc(sceneId, JSON.stringify(exportConfig));
+          const report = JSON.parse(result.reportJson);
+          const bytes = new TextEncoder().encode(result.text).length;
+
+          downloadText(result.text, "opengeometry-joined-wall.ifc", "model/ifc");
+
+          summary.textContent = "IFC export completed from the current union result.";
+          metrics.textContent =
+            `${unionResult.report ? `Faces ${unionResult.report.output_face_count}, shells ${unionResult.report.output_shell_count} | ` : ""}` +
+            `IFC ${bytes} bytes`;
+
+          console.groupCollapsed("[wall-union-ifc] export");
+          console.log("Semantics", semantics);
+          console.log("Report", report);
+          console.log("Bytes", bytes);
+          console.groupEnd();
+        } catch (error) {
+          summary.textContent = error instanceof Error ? error.message : String(error);
+          console.error("[wall-union-ifc] export failed", error);
+        }
+      }
+
+      /**
+       * Resets wall placement and visibility while preserving the current display style settings.
+       */
+      function resetWalls() {
+        config.wallAX = DEFAULT_CONFIG.wallAX;
+        config.wallAZ = DEFAULT_CONFIG.wallAZ;
+        config.wallBX = DEFAULT_CONFIG.wallBX;
+        config.wallBZ = DEFAULT_CONFIG.wallBZ;
+        config.showWallA = true;
+        config.showWallB = true;
+        config.showUnion = false;
+
+        disposeUnionResult();
+        updateWallGeometry("Walls reset. Move them with the X/Z sliders, then click Union Walls.");
+        syncControls();
+
+        summary.textContent =
+          "Walls reset. Move them with the X/Z sliders, then click Union Walls to build the joined wall body.";
+      }
+
+      function setUIControls() {
+        panel.querySelectorAll("[data-control-key]").forEach((control) => {
+          const key = control.getAttribute("data-control-key");
+          const type = control.getAttribute("data-control-type");
+
+          if (type === "number") {
+            const rangeInput = control.querySelector("[data-control-range]");
+            const numberInput = control.querySelector("[data-control-number]");
+            const min = Number.parseFloat(rangeInput.min);
+            const max = Number.parseFloat(rangeInput.max);
+
+            const setValue = (raw) => {
+              const numericValue = Number.parseFloat(raw);
+              if (!Number.isFinite(numericValue)) {
+                return;
+              }
+
+              config[key] = clamp(numericValue, min, max);
+              syncNumberControl(key);
+              updateWallGeometry();
+            };
+
+            rangeInput.addEventListener("input", () => setValue(rangeInput.value));
+            numberInput.addEventListener("input", () => setValue(numberInput.value));
+          }
+
+          if (type === "boolean") {
+            const toggleInput = control.querySelector("[data-control-toggle]");
+            toggleInput.addEventListener("change", () => {
+              if (key === "showUnion" && !unionResult) {
+                config.showUnion = false;
+                syncBooleanControl(key);
+                return;
+              }
+
+              config[key] = toggleInput.checked;
+              syncBooleanControl(key);
+
+              if (key === "outline" || key === "fatOutlines") {
+                applyWallStyles();
+                applyUnionStyles();
+                return;
+              }
+
+              if (key === "showWallA" || key === "showWallB") {
+                applySourceVisibility();
+                return;
+              }
+
+              if (key === "showUnion") {
+                applyUnionStyles();
+              }
+            });
+          }
+
+          if (type === "color") {
+            const colorInput = control.querySelector("[data-control-color]");
+            colorInput.addEventListener("input", () => {
+              config[key] = colorInput.value;
+              syncColorControl(key);
+              applyUnionStyles();
+            });
+          }
+        });
+
+        actionButtons.union.addEventListener("click", handleUnion);
+        actionButtons.reset.addEventListener("click", resetWalls);
+        actionButtons.exportIfc.addEventListener("click", handleIfcExport);
+        syncControls();
+        updateActionState();
+      }
+
+      async function main() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf6f1eb);
+
+        camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 4000);
+        camera.position.set(7.2, 5.4, 8.2);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "24px";
+        stats.dom.style.bottom = "24px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "30";
+        document.body.appendChild(stats.dom);
+
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0.9, 1.3, 0.8);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.74));
+
+        const key = new THREE.DirectionalLight(0xffffff, 0.94);
+        key.position.set(8, 10, 5);
+        scene.add(key);
+
+        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
+        fill.position.set(-6, 4, -6);
+        scene.add(fill);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        Object.keys(WALL_SPECS).forEach((keyName) => {
+          const spec = WALL_SPECS[keyName];
+          const mesh = new Cuboid({
+            center: getWallCenter(keyName),
+            width: spec.width,
+            height: spec.height,
+            depth: spec.depth,
+            color: spec.color,
+            fatOutlines: config.fatOutlines,
+            outlineWidth: config.outlineWidth,
+          });
+
+          wallEntries[keyName] = { ...spec, mesh };
+          scene.add(mesh);
+        });
+
+        applyWallStyles();
+        applySourceVisibility();
+        setUIControls();
+        updateIdleMetrics();
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+      }
+
+      main().catch((error) => {
+        console.error(error);
+        summary.textContent = error instanceof Error ? error.message : String(error);
+      });
+    </script>
+  </body>
+</html>
