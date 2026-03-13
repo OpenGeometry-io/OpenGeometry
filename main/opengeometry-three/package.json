@@ -1,30 +1,28 @@
 {
   "name": "@opengeometry/kernel-three",
+  "author": "Vishwajeet Vinayak Mane",
+  "license": "MPL-2.0",
   "version": "1.0.9",
   "description": "OpenGeometry Kernel for Three.js",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"No package-level test command configured\"",
     "dev-example-three": "vite --config ./vite.examples.config.mjs",
     "build-example-three": "vite build --config ./vite.examples.config.mjs && node ./scripts/copy-wasm-assets.mjs",
     "preview-example-three": "vite preview --config ./vite.examples.config.mjs",
     "docs:api": "typedoc --options ./typedoc.json",
-    "docs:api:watch": "typedoc --options ./typedoc.json --watch",
-    "docs:jsdoc": "npm run docs:api"
+    "docs:api:watch": "typedoc --options ./typedoc.json --watch"
   },
   "keywords": [
     "opengeometry",
     "three",
     "geometry"
   ],
-  "author": "Vishwajeet Mane",
-  "license": "MIT",
   "dependencies": {
-    "@fortawesome/fontawesome-svg-core": "^6.7.2",
-    "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@opengeometry/openmaths": "^0.2.3"
   },
   "devDependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "typedoc": "^0.28.14"
   }
 }

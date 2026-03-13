@@ -1,30 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Polygon Boolean Union Example</title>
+    <title>OpenGeometry Boolean Operations Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="OpenGeometry polygon boolean union example" />
+    <meta name="description" content="OpenGeometry solid boolean operations example" />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
   <body class="og-example-page">
     <div class="og-badge-title-card">
       <a href="../index.html" class="og-badge-title-link">Back</a>
-      <span class="og-badge-title">Polygon Boolean Union</span>
+      <span class="og-badge-title">Boolean Operations</span>
     </div>
     <aside class="og-controls" data-control-panel>
-      <h3>Polygon Union Controls</h3>
-      <p class="og-control-summary" data-summary>Loading coplanar polygon boolean example...</p>
+      <h3>Boolean Operation Controls</h3>
+      <p class="og-control-summary" data-summary>Loading solid boolean example...</p>
       <p class="og-control-summary" data-metrics>Preparing result metrics...</p>
+      <label class="og-control-row" data-control-key="operation" data-control-type="select">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Operation</span>
+        </div>
+        <select class="og-control-select" data-control-select aria-label="Operation">
+          <option value="union" selected>Union</option>
+          <option value="intersection">Intersection</option>
+          <option value="subtraction">Subtraction</option>
+        </select>
+      </label>
       <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
-        <div class="og-control-header"><span class="og-control-label-chip">Outlines</span></div>
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outlines</span>
+        </div>
         <div class="og-control-bool">
           <input data-control-toggle type="checkbox" class="og-toggle" checked />
           <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
         </div>
       </label>
       <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
-        <div class="og-control-header"><span class="og-control-label-chip">Fat Outlines</span></div>
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Fat Outlines</span>
+        </div>
         <div class="og-control-bool">
           <input data-control-toggle type="checkbox" class="og-toggle" checked />
           <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
@@ -40,49 +54,67 @@
           <input data-control-number type="number" min="1" max="8" step="1" value="3" />
         </div>
       </label>
-      <label class="og-control-row" data-control-key="operandBX" data-control-type="number">
+      <label class="og-control-row" data-control-key="sphereX" data-control-type="number">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Operand B X</span>
-          <code class="og-control-value" data-control-value>0</code>
+          <span class="og-control-label-chip">Sphere X</span>
+          <code class="og-control-value" data-control-value>0.45</code>
         </div>
         <div class="og-control-range">
-          <input data-control-range type="range" min="-1.5" max="1.5" step="0.01" value="0" />
-          <input data-control-number type="number" min="-1.5" max="1.5" step="0.01" value="0" />
+          <input data-control-range type="range" min="-1.25" max="1.25" step="0.01" value="0.45" />
+          <input data-control-number type="number" min="-1.25" max="1.25" step="0.01" value="0.45" />
         </div>
       </label>
-      <label class="og-control-row" data-control-key="operandBZ" data-control-type="number">
+      <label class="og-control-row" data-control-key="sphereY" data-control-type="number">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Operand B Z</span>
-          <code class="og-control-value" data-control-value>0</code>
+          <span class="og-control-label-chip">Sphere Y</span>
+          <code class="og-control-value" data-control-value>0.12</code>
         </div>
         <div class="og-control-range">
-          <input data-control-range type="range" min="-1.5" max="1.5" step="0.01" value="0" />
-          <input data-control-number type="number" min="-1.5" max="1.5" step="0.01" value="0" />
+          <input data-control-range type="range" min="-1.25" max="1.25" step="0.01" value="0.12" />
+          <input data-control-number type="number" min="-1.25" max="1.25" step="0.01" value="0.12" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="sphereZ" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Sphere Z</span>
+          <code class="og-control-value" data-control-value>0.18</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-1.25" max="1.25" step="0.01" value="0.18" />
+          <input data-control-number type="number" min="-1.25" max="1.25" step="0.01" value="0.18" />
         </div>
       </label>
       <label class="og-control-row" data-control-key="showOperandA" data-control-type="boolean">
-        <div class="og-control-header"><span class="og-control-label-chip">Operand A</span></div>
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Operand A</span>
+        </div>
         <div class="og-control-bool">
           <input data-control-toggle type="checkbox" class="og-toggle" checked />
           <span class="og-control-bool-state" data-control-bool-state>Visible</span>
         </div>
       </label>
       <label class="og-control-row" data-control-key="showOperandB" data-control-type="boolean">
-        <div class="og-control-header"><span class="og-control-label-chip">Operand B</span></div>
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Operand B</span>
+        </div>
         <div class="og-control-bool">
           <input data-control-toggle type="checkbox" class="og-toggle" checked />
           <span class="og-control-bool-state" data-control-bool-state>Visible</span>
         </div>
       </label>
       <label class="og-control-row" data-control-key="showResult" data-control-type="boolean">
-        <div class="og-control-header"><span class="og-control-label-chip">Result</span></div>
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Result</span>
+        </div>
         <div class="og-control-bool">
           <input data-control-toggle type="checkbox" class="og-toggle" checked />
           <span class="og-control-bool-state" data-control-bool-state>Visible</span>
         </div>
       </label>
       <label class="og-control-row" data-control-key="resultColor" data-control-type="color">
-        <div class="og-control-header"><span class="og-control-label-chip">Result Color</span></div>
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Result Color</span>
+        </div>
         <input data-control-color type="color" class="og-control-color" value="#14b8a6" />
       </label>
     </aside>
@@ -94,7 +126,6 @@
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
       import { OpenGeometry, Vector3, createBooleanExample } from "@og-three";
 
-      const operation = "union";
       const app = document.getElementById("app");
       const summary = document.querySelector("[data-summary]");
       const metrics = document.querySelector("[data-metrics]");
@@ -106,11 +137,13 @@
       let currentExample = null;
       let rebuildQueued = false;
       const config = {
+        operation: "union",
         outline: true,
         fatOutlines: true,
         outlineWidth: 3,
-        operandBX: 0,
-        operandBZ: 0,
+        sphereX: 0.45,
+        sphereY: 0.12,
+        sphereZ: 0.18,
         showOperandA: true,
         showOperandB: true,
         showResult: true,
@@ -137,13 +170,13 @@
           disposeObject(currentExample.group);
         }
 
-        currentExample = createBooleanExample(operation, {
-          mode: "polygon",
+        currentExample = createBooleanExample(config.operation, {
+          mode: "solid",
           outline: config.outline,
           fatOutlines: config.fatOutlines,
           outlineWidth: config.outlineWidth,
           color: parseColor(config.resultColor),
-          polygonOffset: new Vector3(config.operandBX, 0, config.operandBZ),
+          sphereCenter: new Vector3(config.sphereX, config.sphereY, config.sphereZ),
         });
 
         currentExample.lhs.visible = config.showOperandA;
@@ -187,6 +220,19 @@
         document.querySelectorAll("[data-control-key]").forEach((control) => {
           const key = control.getAttribute("data-control-key");
           const type = control.getAttribute("data-control-type");
+
+          if (type === "select") {
+            const selectInput = control.querySelector("[data-control-select]");
+
+            const setValue = (value) => {
+              config[key] = value;
+              selectInput.value = value;
+              scheduleRebuild();
+            };
+
+            selectInput.value = config[key];
+            selectInput.addEventListener("change", () => setValue(selectInput.value));
+          }
 
           if (type === "number") {
             const rangeInput = control.querySelector("[data-control-range]");
@@ -241,10 +287,10 @@
 
       async function main() {
         scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xf6f1eb);
+        scene.background = new THREE.Color(0xeef2ff);
 
         camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 4000);
-        camera.position.set(5.1, 4.0, 5.9);
+        camera.position.set(5.6, 4.4, 6.4);
 
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -253,17 +299,17 @@
 
         controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(0, 0.25, 0);
+        controls.target.set(0, 0.5, 0);
         controls.update();
 
-        scene.add(new THREE.GridHelper(20, 20, 0xd88b63, 0xe7d4ca));
-        scene.add(new THREE.AmbientLight(0xffffff, 0.76));
+        scene.add(new THREE.GridHelper(32, 32, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.74));
 
         const key = new THREE.DirectionalLight(0xffffff, 0.94);
         key.position.set(6, 9, 5);
         scene.add(key);
 
-        const fill = new THREE.DirectionalLight(0xffffff, 0.38);
+        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
         fill.position.set(-6, 4, -6);
         scene.add(fill);
 

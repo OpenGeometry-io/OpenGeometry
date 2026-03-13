@@ -1,15 +1,17 @@
 :root {
   color-scheme: light;
-  --og-bg: #ece4db;
-  --og-panel: rgba(255, 251, 247, 0.92);
-  --og-panel-soft: rgba(255, 255, 255, 0.74);
-  --og-line: rgba(88, 57, 42, 0.12);
-  --og-line-strong: rgba(88, 57, 42, 0.2);
-  --og-text: #241a14;
-  --og-muted: #6f6055;
-  --og-accent: #f05a24;
-  --og-accent-soft: rgba(240, 90, 36, 0.12);
-  --og-shadow: 0 14px 28px rgba(69, 43, 28, 0.08);
+  --og-bg: #eef2ff;
+  --og-panel: rgba(255, 255, 255, 0.92);
+  --og-panel-soft: rgba(244, 247, 255, 0.9);
+  --og-line: rgba(68, 96, 255, 0.12);
+  --og-line-strong: rgba(68, 96, 255, 0.24);
+  --og-text: #18203d;
+  --og-muted: #5f6c9d;
+  --og-accent: #4460ff;
+  --og-accent-strong: #2f49df;
+  --og-accent-soft: rgba(68, 96, 255, 0.12);
+  --og-secondary: #aab8ff;
+  --og-shadow: 0 18px 38px rgba(68, 96, 255, 0.11);
   --og-font: "Space Grotesk", "Sora", "Avenir Next", "Segoe UI", sans-serif;
   --og-mono: "IBM Plex Mono", "JetBrains Mono", "SFMono-Regular", monospace;
   --og-radius: 18px;
@@ -26,8 +28,9 @@ body {
   width: 100%;
   min-height: 100%;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(116, 84, 63, 0.05)),
+    radial-gradient(circle at top left, rgba(68, 96, 255, 0.16), rgba(255, 255, 255, 0)),
+    radial-gradient(circle at top right, rgba(117, 133, 255, 0.18), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(213, 221, 255, 0.55)),
     var(--og-bg);
   color: var(--og-text);
   font: 14px/1.45 var(--og-font);
@@ -79,14 +82,19 @@ code {
   justify-content: center;
   min-height: 34px;
   padding: 0 11px;
-  border: 1px solid rgba(240, 90, 36, 0.18);
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  color: var(--og-accent);
+  background: var(--og-accent);
+  color: #ffffff;
   text-decoration: none;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.01em;
+  box-shadow: 0 10px 24px rgba(68, 96, 255, 0.22);
+}
+
+.og-badge-title-link:hover {
+  background: var(--og-accent-strong);
 }
 
 .og-badge-title {
@@ -130,7 +138,7 @@ code {
   gap: 8px;
   margin: 0 0 8px;
   padding: 10px;
-  border: 1px solid rgba(88, 57, 42, 0.08);
+  border: 1px solid var(--og-line);
   border-radius: var(--og-radius-soft);
   background: var(--og-panel-soft);
 }
@@ -149,7 +157,7 @@ code {
   padding: 4px 9px;
   border-radius: 999px;
   background: var(--og-accent-soft);
-  color: #9b5535;
+  color: var(--og-accent-strong);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -176,7 +184,7 @@ code {
   padding: 7px 8px;
   border: 1px solid var(--og-line);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.92);
   color: var(--og-text);
   font: inherit;
 }
@@ -186,7 +194,7 @@ code {
   padding: 8px 10px;
   border: 1px solid var(--og-line);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
   color: var(--og-text);
   font: inherit;
 }
@@ -214,7 +222,7 @@ code {
   width: 100%;
   border: 1px solid var(--og-line);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
   color: var(--og-text);
   font: inherit;
 }
@@ -240,24 +248,38 @@ code {
   margin-top: 0.25rem;
   min-height: 36px;
   padding: 0 14px;
-  border: 1px solid var(--og-line-strong);
+  border: 1px solid transparent;
   border-radius: 999px;
   cursor: pointer;
-  color: #171717;
+  color: #ffffff;
   font: 600 12px/1.2 var(--og-font);
-  box-shadow: none;
+  background: var(--og-accent);
+  box-shadow: 0 10px 22px rgba(68, 96, 255, 0.2);
 }
 
 .og-control-action-cyan {
-  background: #7dd3fc;
+  background: var(--og-accent);
 }
 
 .og-control-action-amber {
-  background: #f8bf65;
+  background: #6f86ff;
 }
 
 .og-control-action-rose {
-  background: #fda4af;
+  background: var(--og-secondary);
+  color: #18203d;
+}
+
+.og-control-action:hover {
+  background: var(--og-accent-strong);
+}
+
+.og-control-action-amber:hover {
+  background: #5d74f3;
+}
+
+.og-control-action-rose:hover {
+  background: #90a3ff;
 }
 
 #stats {

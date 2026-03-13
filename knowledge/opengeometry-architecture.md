@@ -14,7 +14,7 @@ OpenGeometry/
 │   │   │   ├── operations/          # triangulate, extrude, winding utilities
 │   │   │   ├── export/              # 2D projection + optional PDF export
 │   │   │   └── scenegraph.rs        # OGSceneManager orchestration layer
-│   │   └── examples/                # Projection/PDF usage samples
+│   │   └── tests/                   # Rust validation for projection/export/runtime behavior
 │   ├── opengeometry-three/          # TS/Three.js wrapper around WASM classes
 │   │   ├── src/primitives/          # Three wrappers for line/arc/polyline/rectangle
 │   │   └── src/shapes/              # Three wrappers for polygon/cuboid/cylinder/opening
@@ -106,4 +106,4 @@ flowchart LR
 - `main/opengeometry` is the actual engine.
 - `main/opengeometry-three` is the runtime adapter for Three.js.
 - `main/opengeometry-webgl` and `main/opengeometry-babylon` are currently scaffolds (package metadata only).
-- Projection + PDF examples in `main/opengeometry/examples/` are the fastest way to inspect real engine behavior.
+- Projection, export, and scenegraph behavior are validated inside `main/opengeometry` tests; downstream apps should call the public APIs directly for interactive inspection.

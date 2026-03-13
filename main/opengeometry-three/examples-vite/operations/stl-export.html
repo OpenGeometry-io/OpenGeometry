@@ -489,7 +489,7 @@
 
       async function main() {
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xf6f1eb);
+        scene.background = new THREE.Color(0xeef2ff);
 
         const camera = new THREE.PerspectiveCamera(
           55,
@@ -509,7 +509,7 @@
         controls.target.set(0, 0.9, 0);
         controls.update();
 
-        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
+        scene.add(new THREE.GridHelper(32, 32, 0x4460ff, 0xd5ddff));
         scene.add(new THREE.AmbientLight(0xffffff, 0.72));
 
         const key = new THREE.DirectionalLight(0xffffff, 0.9);

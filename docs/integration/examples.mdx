@@ -22,7 +22,7 @@ The public catalog keeps a curated core set:
 
 - Primitives: `line`, `arc`, `curve`, `polyline`, `rectangle`
 - Shapes: `cuboid`, `cylinder`, `opening`, `polygon`, `sphere`, `sweep`, `wedge`
-- Operations: `boolean-union`, `boolean-polygon-union`, `offset`, `step-export`, `stl-export`, `sweep-path-profile`, `wall-from-offsets`
+- Operations: `boolean-operations`, `polygon-boolean-operations`, `offset`, `stl-export`, `sweep-path-profile`, `wall-from-offsets`
 
 ## Example structure
 
@@ -131,27 +131,10 @@ That stylesheet is used by the public example pages for:
 
 The goal is utility UI, not showcase UI. Control panels should feel like production tooling.
 
-## Advanced examples
+## Extra requests
 
-The heavier demos are no longer part of the public core catalog in this repo. They move into the
-companion `OpenGeometry-Examples-Advanced` repository.
-
-Advanced demos include:
-
-- `shapes/polygon-suite.html`
-- `operations/boolean-intersection.html`
-- `operations/boolean-subtraction.html`
-- `operations/boolean-polygon-intersection.html`
-- `operations/boolean-polygon-subtraction.html`
-- `operations/ifc-export.html`
-- `operations/door-export.html`
-- `operations/opening-subtraction.html`
-- `operations/wall-union-ifc.html`
-- `operations/sweep-hilbert-profiles.html`
-- `operations/sweep-mep-pipes.html`
-
-This split keeps the public catalog readable while preserving larger validation, BIM, export, and
-performance workflows in a separate place.
+The public catalog stays intentionally small. If you want to see additional example coverage,
+surface the request through GitHub or Discord and keep the request tied to a concrete workflow.
 
 ## Run the core examples locally
 

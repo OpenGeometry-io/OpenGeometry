@@ -154,7 +154,7 @@
       async function main() {
         // Simple Three.js Scene Setup
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xf6f1eb);
+        scene.background = new THREE.Color(0xeef2ff);
 
         const camera = new THREE.PerspectiveCamera(
           55,
@@ -176,7 +176,7 @@
         controls.update();
 
         // Grid Helper
-        scene.add(new THREE.GridHelper(32, 32, 0xd88b63, 0xe7d4ca));
+        scene.add(new THREE.GridHelper(32, 32, 0x4460ff, 0xd5ddff));
 
         // Lights Setup
         scene.add(new THREE.AmbientLight(0xffffff, 0.72));

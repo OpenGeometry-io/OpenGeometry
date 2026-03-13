@@ -1190,6 +1190,37 @@ mod tests {
     }
 
     #[test]
+    fn test_scene_projection_lines_json_payload() {
+        let mut manager = OGSceneManager::new();
+        let scene_id = manager.create_scene_internal("test-scene");
+
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[Vector3::new(-1.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0)]);
+        builder.add_wire(&[0, 1], false).unwrap();
+        let brep: Brep = builder.build().unwrap();
+
+        manager
+            .add_brep_entity_to_scene_internal(&scene_id, "edge-1", "Edge", &brep)
+            .unwrap();
+
+        let payload = manager
+            .project_scene_to_2d_lines_json(
+                &scene_id,
+                &CameraParameters::default(),
+                &HlrOptions::default(),
+            )
+            .unwrap();
+        let projected: Scene2DLines = serde_json::from_str(&payload).unwrap();
+
+        assert_eq!(projected.name.as_deref(), Some("test-scene"));
+        assert_eq!(projected.lines.len(), 1);
+        assert!(projected.lines[0].start.x.is_finite());
+        assert!(projected.lines[0].start.y.is_finite());
+        assert!(projected.lines[0].end.x.is_finite());
+        assert!(projected.lines[0].end.y.is_finite());
+    }
+
+    #[test]
     fn test_scene_stl_export_binary_payload() {
         let mut manager = OGSceneManager::new();
         let scene_id = manager.create_scene_internal("stl-scene");

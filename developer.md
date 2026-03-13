@@ -18,13 +18,12 @@ Primitives and Shapes are created using Rust and exposed to JavaScript via WebAs
 
 #### Building Three.js Package
 The Three.js package depends on the core WebAssembly package. Therefore, ensure to build the core package first.
-1. Run `npm run build-local` to build the project and copy the output to the local OpenPlans repository.
-2. Make sure to have the OpenPlans repository cloned locally for this to work.
+1. Run `npm run build` to produce the root distribution bundle in `dist/`.
+2. Run `npm run build-example-three` to build the standalone example catalog in `main/opengeometry-three/examples-dist/`.
 
 #### Testing Examples
-1. After building the project, run `npm run make-examples` to copy the built files to the OpenGeometry-Examples repository.
-2. Open the examples in a web server (e.g., using Live Server in VSCode) to test the changes.
-- Note that `OpenGeometry-Examples` should be cloned locally for this to work and the folder structure should match.
+1. After building the examples, open `main/opengeometry-three/examples-dist/index.html` through a static file server or use the Vite preview command from `main/opengeometry-three`.
+2. Use the catalog pages directly for validation instead of copying artifacts into sibling local repositories.
 
 **Project Structure**
 
@@ -34,12 +33,7 @@ OpenGeometry/
 ├── main/
 │   ├── opengeometry/
 │   └── opengeometry-three/
-├── OpenGeometry-Examples/
-│   ├── core/
-│   └── src/
-└── OpenPlans/
-    ├── src/
-    └── kernel/
+└── main/opengeometry-three/examples-dist/
 ```
 
 ### Release Process

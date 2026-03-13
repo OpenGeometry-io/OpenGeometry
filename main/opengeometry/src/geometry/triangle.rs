@@ -23,9 +23,6 @@ impl Triangle {
     }
 
     pub fn is_point_in_triangle(&self, p: Vector3) -> bool {
-        let v1 = Vector3::new(1.0, 0.0, 0.0);
-        let crso = v1.cross(&self.a);
-
         let ab = self.b.clone().subtract(&self.a);
         let bc = self.c.clone().subtract(&self.b);
         let ca = self.a.clone().subtract(&self.c);
@@ -38,11 +35,7 @@ impl Triangle {
         let cross_bcp = bc.clone().cross(&bp);
         let cross_cap = ca.clone().cross(&cp);
 
-        if (cross_abp.y > 0.0 && cross_bcp.y > 0.0 && cross_cap.y > 0.0)
+        (cross_abp.y > 0.0 && cross_bcp.y > 0.0 && cross_cap.y > 0.0)
             || (cross_abp.y < 0.0 && cross_bcp.y < 0.0 && cross_cap.y < 0.0)
-        {
-            return true;
-        }
-        false
     }
 }
