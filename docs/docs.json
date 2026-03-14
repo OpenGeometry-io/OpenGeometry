@@ -31,7 +31,7 @@
             },
             {
               "anchor": "Discord",
-              "href": "https://discord.gg/mintlify",
+              "href": "https://discord.gg/9wJpbfgGGA",
               "icon": "discord"
             },
             {
@@ -54,8 +54,11 @@
             "group": "Core Concepts",
             "pages": [
               "concepts/architecture",
+              "concepts/primitives-and-shapes",
+              "concepts/operations",
               "concepts/brep",
-              "concepts/scene-graph"
+              "concepts/booleans",
+              "concepts/exports"
             ]
           },
           {
@@ -70,6 +73,12 @@
       {
         "tab": "API Reference",
         "groups": [
+          {
+            "group": "Core",
+            "pages": [
+              "api/core/opengeometry"
+            ]
+          },
           {
             "group": "2D Primitives",
             "pages": [
@@ -98,15 +107,17 @@
               "api/operations/extrude",
               "api/operations/offset",
               "api/operations/sweep",
-              "api/operations/triangulate"
+              "api/operations/triangulate",
+              "api/operations/boolean-operations"
             ]
           },
           {
-            "group": "Scene & Export",
+            "group": "Export (Experimental)",
             "pages": [
-              "api/scene/scene-management",
-              "api/export/projection",
-              "api/export/pdf"
+              "api/export/stl",
+              "api/export/ifc",
+              "api/export/pdf",
+              "api/export/step"
             ]
           }
         ]

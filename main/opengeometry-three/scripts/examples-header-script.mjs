@@ -19,6 +19,7 @@ function createMixpanelSnippet(pagePath) {
 
   mixpanel.init('${MIXPANEL_TOKEN}', {
     autocapture: true,
+    track_pageview: true,
     record_sessions_percent: 100,
     api_host: '${MIXPANEL_HOST}',
   });
@@ -27,16 +28,45 @@ function createMixpanelSnippet(pagePath) {
     var pagePath = ${JSON.stringify(pagePath)};
     var pageName = pagePath.split("/").pop().replace(/\\.html$/, "") || "index";
     var pageSection = pagePath.split("/").length > 2 ? pagePath.split("/")[1] : "catalog";
+    var distinctId = null;
+    var pageProperties = {
+      example_name: pageName,
+      example_path: pagePath,
+      example_section: pageSection,
+      page_title: document.title,
+    };
 
-    function safeTrack(eventName, payload) {
-      if (typeof mixpanel === "undefined" || typeof mixpanel.track !== "function") {
-        return;
-      }
-
-      mixpanel.track(eventName, payload);
+    if (typeof mixpanel !== "undefined" && typeof mixpanel.get_distinct_id === "function") {
+      distinctId = mixpanel.get_distinct_id();
     }
 
-    function normalizeText(value) {
+    if (distinctId && typeof mixpanel !== "undefined" && typeof mixpanel.identify === "function") {
+      mixpanel.identify(distinctId);
+    }
+
+    if (typeof mixpanel !== "undefined" && typeof mixpanel.register === "function") {
+      mixpanel.register(pageProperties);
+    }
+
+    if (
+      distinctId
+      && typeof mixpanel !== "undefined"
+      && typeof mixpanel.people === "object"
+      && typeof mixpanel.people.set_once === "function"
+    ) {
+      mixpanel.people.set_once({
+        first_example_name: pageName,
+        first_example_path: pagePath,
+        first_example_section: pageSection,
+        first_seen_page_title: document.title,
+      });
+    }
+
+    if (typeof mixpanel !== "undefined" && typeof mixpanel.track === "function") {
+      mixpanel.track("Example Loaded", pageProperties);
+    }
+
+    function normalizeLabel(value) {
       if (!value) {
         return null;
       }
@@ -49,79 +79,25 @@ function createMixpanelSnippet(pagePath) {
       return normalized.length > 80 ? normalized.slice(0, 80) + "..." : normalized;
     }
 
-    function getTargetDetails(element) {
-      if (!element) {
-        return null;
-      }
-
-      var tagName = (element.tagName || "").toLowerCase();
-      var action = element.getAttribute("data-action");
-      var controlKey = element.getAttribute("data-control-key");
-      var role = element.getAttribute("role");
-      var label = normalizeText(
-        element.getAttribute("aria-label")
-          || element.getAttribute("title")
-          || element.getAttribute("data-control-label")
-          || element.textContent
-      );
-
-      return {
-        tag_name: tagName || null,
-        element_id: element.id || null,
-        element_name: element.getAttribute("name") || null,
-        element_type: element.getAttribute("type") || null,
-        role: role || null,
-        href: tagName === "a" ? element.getAttribute("href") || null : null,
-        control_key: controlKey || null,
-        action: action || null,
-        label: label,
-      };
-    }
-
-    safeTrack("example_viewed", {
-      page_name: pageName,
-      page_path: pagePath,
-      page_section: pageSection,
-      page_title: document.title,
-    });
-
     document.addEventListener("click", function (event) {
-      var target = event.target instanceof Element ? event.target.closest("a,button,[data-action]") : null;
+      if (typeof mixpanel === "undefined" || typeof mixpanel.track !== "function") {
+        return;
+      }
+
+      var target = event.target instanceof Element ? event.target.closest("button, a") : null;
       if (!target) {
         return;
       }
 
-      safeTrack("example_click", Object.assign({
-        page_name: pageName,
-        page_path: pagePath,
-        page_section: pageSection,
-      }, getTargetDetails(target)));
-    }, true);
-
-    document.addEventListener("change", function (event) {
-      var target = event.target instanceof Element ? event.target.closest("input,select,textarea") : null;
-      if (!target) {
-        return;
-      }
-
-      safeTrack("example_change", Object.assign({
-        page_name: pageName,
-        page_path: pagePath,
-        page_section: pageSection,
-      }, getTargetDetails(target)));
-    }, true);
-
-    document.addEventListener("submit", function (event) {
-      var target = event.target instanceof Element ? event.target.closest("form") : null;
-      if (!target) {
-        return;
-      }
-
-      safeTrack("example_submit", Object.assign({
-        page_name: pageName,
-        page_path: pagePath,
-        page_section: pageSection,
-      }, getTargetDetails(target)));
+      mixpanel.track("Example Button Clicked", {
+        example_name: pageName,
+        example_path: pagePath,
+        example_section: pageSection,
+        button_label: normalizeLabel(target.textContent),
+        button_id: target.id || null,
+        button_href: target.tagName === "A" ? target.getAttribute("href") || null : null,
+        button_role: target.getAttribute("role") || null,
+      });
     }, true);
   })();
 </script>`;

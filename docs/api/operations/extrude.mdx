@@ -54,11 +54,11 @@ The `extrude_polygon_by_buffer_geometry` function returns a `Geometry` object wi
 
 ### Brep Structure
 
-The `extrude_brep_face` function returns a `Brep` object with:
+The `extrude_brep_face` function returns a `Brep` using OpenGeometry's current half-edge topology
+schema (see [BRep](/concepts/brep)).
 
-- **vertices**: Vector of `Vertex` objects with unique IDs and positions
-- **edges**: Vector of `Edge` objects connecting vertices
-- **faces**: Vector of `Face` objects containing vertex indices
+At a high level, the result contains the base face, the top face, and side faces, and it is marked
+as a closed shell.
 
 ## How It Works
 
@@ -119,13 +119,22 @@ let prism = extrude_polygon_by_buffer_geometry(base_geom, 1.5);
 
 ```rust
 use opengeometry::{
-    brep::Brep,
+    brep::BrepBuilder,
     operations::extrude::extrude_brep_face,
 };
+use openmaths::Vector3;
 use uuid::Uuid;
 
-// Assuming you have a BREP face
-let brep_face = create_polygon_brep(); // Your BREP creation logic
+// Build a single face B-Rep (a surface) with BrepBuilder.
+let mut builder = BrepBuilder::new(Uuid::new_v4());
+builder.add_vertices(&[
+    Vector3::new(0.0, 0.0, 0.0),
+    Vector3::new(1.0, 0.0, 0.0),
+    Vector3::new(1.0, 0.0, 1.0),
+    Vector3::new(0.0, 0.0, 1.0),
+]);
+builder.add_face(&[0, 1, 2, 3], &[]).unwrap();
+let brep_face = builder.build().unwrap();
 
 // Extrude to create a 3D BREP with topological data
 let extruded_brep = extrude_brep_face(brep_face, 3.0);
@@ -154,7 +163,7 @@ Input Polygon (Top View):          Extruded Result (3D):
 
 ### Source Location
 
-`~/workspace/source/main/opengeometry/src/operations/extrude.rs:9`
+`main/opengeometry/src/operations/extrude.rs`
 
 ### Edge Cases
 
@@ -167,3 +176,8 @@ Input Polygon (Top View):          Extruded Result (3D):
 - [Sweep](/api/operations/sweep) - Extrude a profile along an arbitrary path
 - [Offset](/api/operations/offset) - Create parallel offset curves
 - [Triangulate](/api/operations/triangulate) - Convert polygons to triangle meshes
+
+## Live demo
+
+There is no dedicated extrude demo page yet. Start from the demo index:
+[OpenGeometry demos](https://demo.opengeometry.io/).

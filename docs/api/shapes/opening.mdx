@@ -41,6 +41,14 @@ new Opening(options?: IOpeningOptions)
     <ParamField path="color" type="number" required>
       Color value (primarily used for outlines, since opening is transparent)
     </ParamField>
+
+    <ParamField path="fatOutlines" type="boolean" optional>
+      Use wide outlines backed by Three.js `LineSegments2` (instead of thin `LineSegments`).
+    </ParamField>
+
+    <ParamField path="outlineWidth" type="number" optional>
+      Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
+    </ParamField>
   </Expandable>
 </ParamField>
 
@@ -74,7 +82,15 @@ new Opening(options?: IOpeningOptions)
   Enable or disable the outline rendering (settable property)
 </ResponseField>
 
-<ResponseField name="outlineMesh" type="THREE.Line | null">
+<ResponseField name="fatOutlines" type="boolean">
+  When enabled, outlines are rendered using a wide-line implementation (instead of thin lines).
+</ResponseField>
+
+<ResponseField name="outlineWidth" type="number">
+  Outline width used for fat outlines.
+</ResponseField>
+
+<ResponseField name="outlineMesh" type="THREE.LineSegments | object | null">
   Access the outline mesh if enabled
 </ResponseField>
 
@@ -118,13 +134,32 @@ Dispose of the Three.js geometry to free memory.
 discardGeometry(): void
 ```
 
+### subtract()
+
+Subtracts another boolean operand from this opening volume and returns a renderable result mesh.
+
+```typescript
+subtract(operand, options?): BooleanResult
+```
+
+### subtractFrom()
+
+Uses this opening volume to cut a host shape and returns a renderable result mesh.
+
+```typescript
+subtractFrom(host, options?): BooleanResult
+```
+
+<Tip>
+For architectural workflows (doors/windows cutting walls), `subtractFrom(...)` is usually the clearest API.
+</Tip>
+
 ## Example Usage
 
 ### Basic Window Opening
 
 ```typescript
-import { Opening } from '@opengeometry/kernel-three';
-import { Vector3 } from 'opengeometry';
+import { Opening, Vector3 } from "opengeometry";
 import * as THREE from 'three';
 
 // Create a window opening
@@ -238,6 +273,11 @@ Opening geometry uses `depthWrite: false` which means it won't write to the dept
 
 ## Related
 
+- [Boolean operations](/api/operations/boolean-operations) - Union, intersection, and subtraction
 - [Cuboid](/api/shapes/cuboid) - Solid rectangular boxes
 - [Polygon](/api/shapes/polygon) - For 2D shapes that can be extruded
 - [Scene Management](/api/scene/scene-management) - Organizing multiple openings in a scene
+
+## Live demo
+
+Try it in the browser: [Opening demo](https://demo.opengeometry.io/shapes/opening.html).

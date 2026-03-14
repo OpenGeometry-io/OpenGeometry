@@ -67,39 +67,46 @@ OpenGeometry includes built-in TypeScript definitions, so no additional types ar
 
 ## WebAssembly Setup
 
-OpenGeometry uses WebAssembly for high-performance geometric computations. The WASM file needs to be initialized before you can use the library.
+OpenGeometry uses WebAssembly for high-performance geometry. You need to do two things:
 
-### Development Setup
+1. Serve the `.wasm` file so your app can fetch it.
+2. Call `await OpenGeometry.create({ wasmURL })` once before you create primitives or shapes.
 
-During development, the WASM file will be loaded from your `node_modules` directory. No additional configuration is needed.
+### Where the WASM file lives
 
-### Production Setup
+When installed from npm, the WASM binary is located at:
 
-For production builds, you'll need to ensure the WASM file is accessible. Most modern bundlers (Vite, webpack, etc.) handle this automatically.
+`node_modules/opengeometry/opengeometry_bg.wasm`
 
-#### Vite Configuration
+### Vite (recommended)
 
-Vite automatically handles WASM files. No additional configuration is required.
+Copy the WASM file into your app `public/` folder so it is served at `/opengeometry_bg.wasm`:
 
-#### Webpack Configuration
-
-If using webpack 5+, add the following to your `webpack.config.js`:
-
-```javascript
-module.exports = {
-  experiments: {
-    asyncWebAssembly: true,
-  },
-};
+```bash
+cp node_modules/opengeometry/opengeometry_bg.wasm public/opengeometry_bg.wasm
 ```
+
+Then initialize OpenGeometry like this:
+
+```ts
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+```
+
+### Other setups
+
+As long as the WASM file is served and you pass the correct `wasmURL`, OpenGeometry works. If your
+build fingerprints assets, pass the fingerprinted URL.
 
 ## Verify Installation
 
 Create a simple test file to verify your installation:
 
 ```typescript
-import { Cuboid, Vector3 } from 'opengeometry';
+import { OpenGeometry, Cuboid, Vector3 } from 'opengeometry';
 import * as THREE from 'three';
+
+// Initialize the WASM module once before creating shapes
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' });
 
 // Create a simple test cuboid
 const cuboid = new Cuboid({
@@ -115,7 +122,7 @@ console.log('OGID:', cuboid.ogid);
 ```
 
 <Note>
-  OpenGeometry uses WebAssembly which loads automatically. The shapes are ready to use immediately after import.
+  Call `await OpenGeometry.create(...)` once before constructing kernel-backed primitives and shapes.
 </Note>
 
 ## Next Steps

@@ -60,6 +60,14 @@ const sphere = new Sphere(options?: ISphereOptions);
   ```
 </ParamField>
 
+<ParamField path="fatOutlines" type="boolean" default="false">
+  Use wide outlines backed by Three.js `LineSegments2` (instead of thin `LineSegments`).
+</ParamField>
+
+<ParamField path="outlineWidth" type="number" default="1">
+  Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
+</ParamField>
+
 ## Methods
 
 ### setConfig()
@@ -95,6 +103,14 @@ const brepData = sphere.getBrep();
 console.log('Vertices:', brepData.vertices.length);
 console.log('Edges:', brepData.edges.length);
 console.log('Faces:', brepData.faces.length);
+```
+
+### subtract()
+
+Subtracts another boolean operand (such as an `Opening`) from this sphere and returns a renderable result mesh.
+
+```typescript
+const result = sphere.subtract(operand, options?);
 ```
 
 ### generateGeometry()
@@ -153,7 +169,15 @@ sphere.discardGeometry(): void
   ```
 </ResponseField>
 
-<ResponseField name="outlineMesh" type="THREE.LineSegments | null">
+<ResponseField name="fatOutlines" type="boolean">
+  When enabled, outlines are rendered using a wide-line implementation (instead of thin lines).
+</ResponseField>
+
+<ResponseField name="outlineWidth" type="number">
+  Outline width used for fat outlines.
+</ResponseField>
+
+<ResponseField name="outlineMesh" type="THREE.LineSegments | object | null">
   Reference to the outline mesh if outline is enabled.
 </ResponseField>
 
@@ -162,7 +186,7 @@ sphere.discardGeometry(): void
 ### Basic Sphere
 
 ```typescript
-import { Sphere, Vector3 } from 'opengeometry-three';
+import { Sphere, Vector3 } from "opengeometry";
 
 const sphere = new Sphere({
   center: new Vector3(0, 0, 0),
@@ -179,7 +203,7 @@ scene.add(sphere);
 ### High-Resolution Sphere
 
 ```typescript
-import { Sphere, Vector3 } from 'opengeometry-three';
+import { Sphere, Vector3 } from "opengeometry";
 
 // Smooth sphere for close-up viewing
 const smoothSphere = new Sphere({
@@ -196,7 +220,7 @@ smoothSphere.outline = true;
 ### Low-Poly Sphere
 
 ```typescript
-import { Sphere, Vector3 } from 'opengeometry-three';
+import { Sphere, Vector3 } from "opengeometry";
 
 // Faceted appearance for stylized visuals
 const lowPolySphere = new Sphere({
@@ -211,7 +235,7 @@ const lowPolySphere = new Sphere({
 ### Animated Sphere
 
 ```typescript
-import { Sphere, Vector3 } from 'opengeometry-three';
+import { Sphere, Vector3 } from "opengeometry";
 
 const sphere = new Sphere({
   center: new Vector3(0, 0, 0),
@@ -233,7 +257,7 @@ animate();
 ### Planet with Outline
 
 ```typescript
-import { Sphere, Vector3 } from 'opengeometry-three';
+import { Sphere, Vector3 } from "opengeometry";
 
 const planet = new Sphere({
   center: new Vector3(0, 0, 0),
@@ -278,8 +302,6 @@ for iy in 0..=height {
 
 Spheres use MeshStandardMaterial with transparency:
 
-**Source:** `/workspace/source/main/opengeometry-three/src/shapes/sphere.ts:113-117`
-
 ```typescript
 const material = new THREE.MeshStandardMaterial({
   color: this.options.color,
@@ -291,8 +313,6 @@ const material = new THREE.MeshStandardMaterial({
 ### Outline from B-Rep Edges
 
 Unlike other shapes, sphere outlines are generated from the B-Rep edge data to properly represent the geometry:
-
-**Source:** `/workspace/source/main/opengeometry-three/src/shapes/sphere.ts:150-176`
 
 ```typescript
 const brep = this.getBrep();
@@ -346,6 +366,11 @@ Approximate number of triangular faces: `widthSegments × heightSegments × 2`
 
 ## See Also
 
+- [Boolean operations](/api/operations/boolean-operations) - Union, intersection, and subtraction
 - [Cylinder](/api/shapes/cylinder) - For cylindrical shapes
 - [Cuboid](/api/shapes/cuboid) - For rectangular boxes
 - [Sweep](/api/shapes/sweep) - For custom revolution shapes
+
+## Live demo
+
+Try it in the browser: [Sphere demo](https://demo.opengeometry.io/shapes/sphere.html).

@@ -47,7 +47,7 @@ Create a `main.ts` file and set up a basic Three.js scene:
 ```typescript
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Cuboid, Vector3 } from 'opengeometry';
+import { OpenGeometry, Cuboid, Vector3 } from 'opengeometry';
 
 // Get the app container
 const app = document.getElementById('app');
@@ -89,6 +89,22 @@ const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
 directionalLight.position.set(5, 8, 3);
 scene.add(directionalLight);
 ```
+
+</Step>
+
+<Step title="Initialize OpenGeometry">
+
+Initialize the OpenGeometry WASM module once before creating shapes:
+
+```typescript
+// Initialize OpenGeometry
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+```
+
+<Note>
+  With Vite, copy `node_modules/opengeometry/opengeometry_bg.wasm` to `public/opengeometry_bg.wasm`
+  so it is served at `/opengeometry_bg.wasm`.
+</Note>
 
 </Step>
 
@@ -188,7 +204,7 @@ directionalLight.position.set(5, 8, 3);
 scene.add(directionalLight);
 
 // Initialize OpenGeometry
-await OpenGeometry.create({});
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 
 // Create a cuboid
 const cuboid = new Cuboid({
@@ -299,14 +315,14 @@ scene.add(polyline);
   <Card
     title="API Reference"
     icon="book"
-    href="/api-reference"
+    href="/api/primitives/line"
   >
     Explore the complete API documentation for all shapes and operations
   </Card>
   <Card
     title="Live Examples"
     icon="sparkles"
-    href="https://demos.opengeometry.io/src/kernel/index.html"
+    href="https://demos.opengeometry.io/"
   >
     See interactive examples showcasing all features
   </Card>

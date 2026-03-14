@@ -67,19 +67,30 @@ The Rust core is organized into focused modules as defined in `src/lib.rs`:
 - `triangulate` - Convert faces to triangular meshes
 - `windingsort` - Polygon winding order utilities
 
+**booleans**
+- Kernel-backed boolean operations (union, intersection, subtraction)
+
 **brep**
 Boundary representation data structures:
 - `vertex` - Point in 3D space
-- `edge` - Connection between two vertices
-- `face` - Planar or curved surface
-- `halfedge` - Half-edge data structure (planned)
+- `halfedge` - Directed half-edge topology (twin/next/prev)
+- `edge` - Undirected edge with primary/twin half-edge references
+- `loop` - Face boundary loops (outer and inner holes)
+- `face` - Face normal and loop references
+- `wire` - Polyline topology (open or closed)
+- `shell` - Face groups (open or closed)
+- `builder` - Safe B-Rep construction helper that validates topology
+- `error` - B-Rep error types used during building and validation
 
 **scenegraph**
 Scene management system for organizing multiple geometric entities.
 
 **export**
-- `projection` - 2D projection with hidden line removal
-- `pdf` - PDF export (native only, not WASM)
+- `projection` - 2D projection with hidden line removal (experimental)
+- `pdf` - PDF export (native only, experimental)
+- `stl` - STL export (bytes, experimental)
+- `step` - STEP export (text, experimental)
+- `ifc` - IFC export (text, experimental)
 
 **geometry**
 Base geometry utilities and triangle operations.

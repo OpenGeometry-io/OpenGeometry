@@ -1,11 +1,17 @@
 ---
-title: Projection & Hidden Line Removal
+title: Projection & hidden line removal (experimental)
 description: Project 3D geometry to 2D with hidden line removal
 ---
 
 ## Overview
 
 The projection system converts 3D boundary representations (BReps) to 2D vector drawings with optional hidden line removal. It supports both orthographic and perspective projections with configurable camera parameters.
+
+<Warning>
+Projection and hidden line removal are experimental. Output and option shapes may change. If you hit
+an exporter limitation or confusing output, reach out on
+[Discord](https://discord.gg/9wJpbfgGGA).
+</Warning>
 
 ## Key Concepts
 
@@ -28,6 +34,8 @@ The HLR algorithm determines edge visibility by:
 2. Building edge-to-face adjacency maps
 3. Analyzing edge creases and silhouettes
 4. Filtering based on visibility criteria
+
+OpenGeometry derives edge adjacency from the B-Rep half-edge topology.
 
 ## CameraParameters
 
@@ -249,12 +257,13 @@ Projects a 3D BRep to a 2D scene.
 **Example:**
 
 ```javascript
-import { OGCuboid, OGSceneManager } from 'opengeometry';
+import { OGCuboid, OGSceneManager, Vector3 } from "opengeometry";
 
 const manager = new OGSceneManager();
 const sceneId = manager.createScene("Projection Test");
 
-const cuboid = OGCuboid.new("origin", 5.0, 3.0, 2.0);
+const cuboid = new OGCuboid("origin");
+cuboid.set_config(new Vector3(0, 0, 0), 5.0, 3.0, 2.0);
 manager.addCuboidToScene(sceneId, "box", cuboid);
 
 const camera = {
@@ -415,3 +424,8 @@ Edges between faces with normals differing by more than ~2° (cos θ < 0.9995) a
 - [Scene Management](/api/scene/scene-management) - Organizing multiple entities
 - [PDF Export](/api/export/pdf) - Exporting projections to PDF
 - [BRep](/concepts/brep) - Boundary representation structure
+
+## Live demo
+
+There is no dedicated projection demo page yet. Start from the demo index:
+[OpenGeometry demos](https://demo.opengeometry.io/).

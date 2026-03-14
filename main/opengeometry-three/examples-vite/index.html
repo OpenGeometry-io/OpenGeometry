@@ -289,6 +289,20 @@
           width: 100%;
         }
       }
+
+      .og-anchor {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .og-anchor:hover {
+        text-decoration: underline;
+        text-underline-offset: 4px;
+      }
+
+      .og-section-card {
+        scroll-margin-top: 24px;
+      }
     </style>
   </head>
   <body>
@@ -335,9 +349,9 @@
         </div>
       </section>
 
-      <section class="og-section-card">
+      <section id="primitives" class="og-section-card">
         <div class="og-section-head">
-          <h2 class="og-section-title">Primitives</h2>
+          <h2 class="og-section-title"><a href="#primitives" class="og-anchor">Primitives</a></h2>
           <p class="og-section-count">5 core demos</p>
         </div>
         <div class="og-grid">
@@ -399,9 +413,9 @@
         </div>
       </section>
 
-      <section class="og-section-card">
+      <section id="shapes" class="og-section-card">
         <div class="og-section-head">
-          <h2 class="og-section-title">Shapes</h2>
+          <h2 class="og-section-title"><a href="#shapes" class="og-anchor">Shapes</a></h2>
           <p class="og-section-count">7 core demos</p>
         </div>
         <div class="og-grid">
@@ -485,9 +499,9 @@
         </div>
       </section>
 
-      <section class="og-section-card">
+      <section id="operations" class="og-section-card">
         <div class="og-section-head">
-          <h2 class="og-section-title">Operations</h2>
+          <h2 class="og-section-title"><a href="#operations" class="og-anchor">Operations</a></h2>
           <p class="og-section-count">6 core demos</p>
         </div>
         <div class="og-grid">
@@ -587,5 +601,14 @@
         </div>
       </section>
     </main>
+    <script>
+      // Handle hash navigation on page load
+      if (window.location.hash) {
+        const target = document.querySelector(window.location.hash);
+        if (target) {
+          setTimeout(() => target.scrollIntoView({ behavior: 'smooth' }), 100);
+        }
+      }
+    </script>
   </body>
 </html>

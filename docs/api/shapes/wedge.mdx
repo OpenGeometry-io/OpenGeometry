@@ -60,6 +60,14 @@ const wedge = new Wedge(options?: IWedgeOptions);
   ```
 </ParamField>
 
+<ParamField path="fatOutlines" type="boolean" default="false">
+  Use wide outlines backed by Three.js `LineSegments2` (instead of thin `LineSegments`).
+</ParamField>
+
+<ParamField path="outlineWidth" type="number" default="1">
+  Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
+</ParamField>
+
 ## Methods
 
 ### setConfig()
@@ -95,6 +103,14 @@ const brepData = wedge.getBrepData();
 console.log('Vertices:', brepData.vertices);
 console.log('Edges:', brepData.edges);
 console.log('Faces:', brepData.faces);
+```
+
+### subtract()
+
+Subtracts another boolean operand (such as an `Opening`) from this wedge and returns a renderable result mesh.
+
+```typescript
+const result = wedge.subtract(operand, options?);
 ```
 
 ### generateGeometry()
@@ -146,7 +162,15 @@ wedge.discardGeometry(): void
   ```
 </ResponseField>
 
-<ResponseField name="outlineMesh" type="THREE.Line | null">
+<ResponseField name="fatOutlines" type="boolean">
+  When enabled, outlines are rendered using a wide-line implementation (instead of thin lines).
+</ResponseField>
+
+<ResponseField name="outlineWidth" type="number">
+  Outline width used for fat outlines.
+</ResponseField>
+
+<ResponseField name="outlineMesh" type="THREE.LineSegments | object | null">
   Reference to the outline mesh if outline is enabled.
 </ResponseField>
 
@@ -155,7 +179,7 @@ wedge.discardGeometry(): void
 ### Basic Wedge
 
 ```typescript
-import { Wedge, Vector3 } from 'opengeometry-three';
+import { Wedge, Vector3 } from "opengeometry";
 
 const wedge = new Wedge({
   center: new Vector3(0, 0, 0),
@@ -172,7 +196,7 @@ scene.add(wedge);
 ### Ramp or Slope
 
 ```typescript
-import { Wedge, Vector3 } from 'opengeometry-three';
+import { Wedge, Vector3 } from "opengeometry";
 
 // Create a ramp
 const ramp = new Wedge({
@@ -189,7 +213,7 @@ ramp.outline = true;
 ### Wedge with Outline
 
 ```typescript
-import { Wedge, Vector3 } from 'opengeometry-three';
+import { Wedge, Vector3 } from "opengeometry";
 
 const wedge = new Wedge({
   center: new Vector3(0, 0, 0),
@@ -206,7 +230,7 @@ wedge.outline = true;
 ### Roof Section
 
 ```typescript
-import { Wedge, Vector3 } from 'opengeometry-three';
+import { Wedge, Vector3 } from "opengeometry";
 
 // Triangular roof element
 const roofSection = new Wedge({
@@ -221,7 +245,7 @@ const roofSection = new Wedge({
 ### Array of Wedges
 
 ```typescript
-import { Wedge, Vector3 } from 'opengeometry-three';
+import { Wedge, Vector3 } from "opengeometry";
 
 // Create a stepped pattern
 for (let i = 0; i < 5; i++) {
@@ -287,8 +311,6 @@ self.brep.faces.push(Face::new(4, vec![1, 2, 5, 4]));  // Right sloped side (qua
 
 Wedges use MeshStandardMaterial with transparency:
 
-**Source:** `/workspace/source/main/opengeometry-three/src/shapes/wedge.ts:82-86`
-
 ```typescript
 const material = new THREE.MeshStandardMaterial({
   color: this.options.color,
@@ -336,6 +358,11 @@ V = (width × height × depth) / 2
 
 ## See Also
 
+- [Boolean operations](/api/operations/boolean-operations) - Union, intersection, and subtraction
 - [Cuboid](/api/shapes/cuboid) - For rectangular boxes
 - [Polygon](/api/shapes/polygon) - For 2D triangular shapes
 - [Sweep](/api/shapes/sweep) - For custom extrusions
+
+## Live demo
+
+Try it in the browser: [Wedge demo](https://demo.opengeometry.io/shapes/wedge.html).

@@ -70,6 +70,14 @@ const cylinder = new Cylinder(options?: ICylinderOptions);
   ```
 </ParamField>
 
+<ParamField path="fatOutlines" type="boolean" default="false">
+  Use wide outlines backed by Three.js `LineSegments2` (instead of thin `LineSegments`).
+</ParamField>
+
+<ParamField path="outlineWidth" type="number" default="1">
+  Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
+</ParamField>
+
 ## Methods
 
 ### setConfig()
@@ -107,6 +115,14 @@ if (brepData) {
   console.log('Vertices:', brepData.vertices.length);
   console.log('Faces:', brepData.faces.length);
 }
+```
+
+### subtract()
+
+Subtracts another boolean operand (such as an `Opening`) from this cylinder and returns a renderable result mesh.
+
+```typescript
+const result = cylinder.subtract(operand, options?);
 ```
 
 ### generateGeometry()
@@ -165,12 +181,20 @@ cylinder.discardGeometry(): void
   ```
 </ResponseField>
 
+<ResponseField name="fatOutlines" type="boolean">
+  When enabled, outlines are rendered using a wide-line implementation (instead of thin lines).
+</ResponseField>
+
+<ResponseField name="outlineWidth" type="number">
+  Outline width used for fat outlines.
+</ResponseField>
+
 ## Usage Examples
 
 ### Basic Cylinder
 
 ```typescript
-import { Cylinder, Vector3 } from 'opengeometry-three';
+import { Cylinder, Vector3 } from "opengeometry";
 
 const cylinder = new Cylinder({
   center: new Vector3(0, 0, 0),
@@ -188,7 +212,7 @@ scene.add(cylinder);
 ### Half Cylinder (Partial Angle)
 
 ```typescript
-import { Cylinder, Vector3 } from 'opengeometry-three';
+import { Cylinder, Vector3 } from "opengeometry";
 
 const halfCylinder = new Cylinder({
   center: new Vector3(0, 0, 0),
@@ -205,7 +229,7 @@ halfCylinder.outline = true;
 ### High-Resolution Cylinder
 
 ```typescript
-import { Cylinder, Vector3 } from 'opengeometry-three';
+import { Cylinder, Vector3 } from "opengeometry";
 
 // Smooth cylinder with many segments
 const smoothCylinder = new Cylinder({
@@ -221,7 +245,7 @@ const smoothCylinder = new Cylinder({
 ### Updating Cylinder Dynamically
 
 ```typescript
-import { Cylinder, Vector3 } from 'opengeometry-three';
+import { Cylinder, Vector3 } from "opengeometry";
 
 const cylinder = new Cylinder({
   center: new Vector3(0, 0, 0),
@@ -266,8 +290,6 @@ for _ in 0..segment_count {
 
 Cylinders use MeshStandardMaterial with transparency for better visual integration:
 
-**Source:** `/workspace/source/main/opengeometry-three/src/shapes/cylinder.ts:98-102`
-
 ```typescript
 const material = new THREE.MeshStandardMaterial({
   color: this.options.color,
@@ -298,6 +320,11 @@ When `angle < 2π`, an additional center vertex is added to the base circle to p
 
 ## See Also
 
+- [Boolean operations](/api/operations/boolean-operations) - Union, intersection, and subtraction
 - [Sphere](/api/shapes/sphere) - For spherical shapes
 - [Cuboid](/api/shapes/cuboid) - For rectangular boxes
 - [Sweep](/api/shapes/sweep) - For custom profile extrusions
+
+## Live demo
+
+Try it in the browser: [Cylinder demo](https://demo.opengeometry.io/shapes/cylinder.html).

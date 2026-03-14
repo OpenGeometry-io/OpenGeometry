@@ -70,6 +70,14 @@ const sweep = new Sweep(options?: ISweepOptions);
   ```
 </ParamField>
 
+<ParamField path="fatOutlines" type="boolean" default="false">
+  Use wide outlines backed by Three.js `LineSegments2` (instead of thin `LineSegments`).
+</ParamField>
+
+<ParamField path="outlineWidth" type="number" default="1">
+  Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
+</ParamField>
+
 ## Methods
 
 ### setConfig()
@@ -110,6 +118,14 @@ sweep.getBrep(): object
 const brepData = sweep.getBrep();
 console.log('Vertices:', brepData.vertices.length);
 console.log('Faces:', brepData.faces.length);
+```
+
+### subtract()
+
+Subtracts another boolean operand (such as an `Opening`) from this sweep and returns a renderable result mesh.
+
+```typescript
+const result = sweep.subtract(operand, options?);
 ```
 
 ### generateGeometry()
@@ -160,12 +176,20 @@ sweep.discardGeometry(): void
   ```
 </ResponseField>
 
+<ResponseField name="fatOutlines" type="boolean">
+  When enabled, outlines are rendered using a wide-line implementation (instead of thin lines).
+</ResponseField>
+
+<ResponseField name="outlineWidth" type="number">
+  Outline width used for fat outlines.
+</ResponseField>
+
 ## Usage Examples
 
 ### Simple Pipe
 
 ```typescript
-import { Sweep, Vector3 } from 'opengeometry-three';
+import { Sweep, Vector3 } from "opengeometry";
 
 // Straight vertical pipe with square cross-section
 const pipe = new Sweep({
@@ -190,7 +214,7 @@ scene.add(pipe);
 ### Curved Tube
 
 ```typescript
-import { Sweep, Vector3 } from 'opengeometry-three';
+import { Sweep, Vector3 } from "opengeometry";
 
 // Create a curved path
 const curvedPath = [];
@@ -229,7 +253,7 @@ tube.outline = true;
 ### Handrail
 
 ```typescript
-import { Sweep, Vector3 } from 'opengeometry-three';
+import { Sweep, Vector3 } from "opengeometry";
 
 // Staircase handrail path
 const handrailPath = [
@@ -263,7 +287,7 @@ const handrail = new Sweep({
 ### Open-Ended Sweep
 
 ```typescript
-import { Sweep, Vector3 } from 'opengeometry-three';
+import { Sweep, Vector3 } from "opengeometry";
 
 // Sweep without end caps (open tube)
 const openTube = new Sweep({
@@ -287,7 +311,7 @@ const openTube = new Sweep({
 ### Architectural Molding
 
 ```typescript
-import { Sweep, Vector3 } from 'opengeometry-three';
+import { Sweep, Vector3 } from "opengeometry";
 
 // Complex profile for decorative molding
 const moldingProfile = [
@@ -336,8 +360,6 @@ self.brep = sweep_profile_along_path(&self.path_points, &self.profile_points, op
 
 Sweeps use MeshStandardMaterial with transparency:
 
-**Source:** `/workspace/source/main/opengeometry-three/src/shapes/sweep.ts:123-127`
-
 ```typescript
 const material = new THREE.MeshStandardMaterial({
   color: this.options.color,
@@ -349,8 +371,6 @@ const material = new THREE.MeshStandardMaterial({
 ### Validation
 
 The sweep validates path and profile requirements:
-
-**Source:** `/workspace/source/main/opengeometry-three/src/shapes/sweep.ts:75-87`
 
 ```typescript
 validateOptions() {
@@ -371,8 +391,6 @@ validateOptions() {
 ### Cap Generation
 
 When `capStart` or `capEnd` is true, the sweep operation adds triangulated faces at the ends:
-
-**Source:** `/workspace/source/main/opengeometry-three/src/shapes/sweep.ts:95-96`
 
 ## Best Practices
 
@@ -409,6 +427,11 @@ Total faces ≈ `(path_points - 1) × profile_points × 2 + cap_faces`
 
 ## See Also
 
+- [Boolean operations](/api/operations/boolean-operations) - Union, intersection, and subtraction
 - [Cylinder](/api/shapes/cylinder) - For simple straight extrusions
 - [Polygon](/api/shapes/polygon) - For creating custom 2D profiles
 - [Cuboid](/api/shapes/cuboid) - For rectangular extrusions
+
+## Live demo
+
+Try it in the browser: [Sweep demo](https://demo.opengeometry.io/shapes/sweep.html).

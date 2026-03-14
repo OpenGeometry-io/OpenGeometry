@@ -1,0 +1,65 @@
+---
+title: Operations
+description: How you transform and combine geometry in OpenGeometry
+---
+
+Operations are how you *modify* or *derive* geometry from other geometry.
+
+In OpenGeometry you will typically use:
+
+- **Offset** to create parallel paths and profiles
+- **Extrude** to turn a planar profile into a solid
+- **Sweep** to move a profile along a path
+- **Booleans** to union, intersect, or subtract solids
+
+This page gives you the mental model and points you to the API reference.
+
+## Offset
+
+Use offset operations when you need wall thickness, toolpaths, clearances, or parallel curves.
+
+In TypeScript, offset is exposed as methods on primitives like `Line`, `Polyline`, `Rectangle`, and
+`Curve` (for example `line.getOffset(...)`).
+
+Go to the API pages:
+
+- [Offset operation](/api/operations/offset)
+- [Line](/api/primitives/line)
+- [Polyline](/api/primitives/polyline)
+- [Rectangle](/api/primitives/rectangle)
+- [Curve](/api/primitives/curve)
+
+## Extrude
+
+Extrusion turns a planar profile into a 3D result by pushing it along a direction (currently the Y
+axis in the kernel operation).
+
+Go to the API page:
+
+- [Extrude](/api/operations/extrude)
+
+## Sweep
+
+Sweeps generate 3D geometry by moving a profile along a path. This is useful for rails, pipes,
+moldings, and architectural trims.
+
+Go to the API pages:
+
+- [Sweep operation](/api/operations/sweep)
+- [Sweep shape (Three.js wrapper)](/api/shapes/sweep)
+
+## Booleans
+
+Booleans combine solids or cut one solid by another.
+
+Go to the API and concept pages:
+
+- [Boolean operations API](/api/operations/boolean-operations)
+- [Booleans concept](/concepts/booleans)
+
+## Next steps
+
+- If you are exporting results, start with [Exports](/concepts/exports).
+- If you want to understand kernel topology, read [BRep](/concepts/brep).
+- Browse the hosted demos at [demo.opengeometry.io](https://demo.opengeometry.io/).
+

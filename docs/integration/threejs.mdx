@@ -7,11 +7,10 @@ OpenGeometry provides a comprehensive Three.js wrapper that extends `THREE.Mesh`
 
 ## Installation
 
-All shape classes are exported from the main `@opengeometry/kernel-three` package:
+All shape classes are exported from the `opengeometry` package:
 
 ```typescript
-import { OpenGeometry, Polygon, Cuboid, Cylinder, Sphere, Sweep } from '@opengeometry/kernel-three';
-import { Vector3 } from '@opengeometry/kernel-three';
+import { OpenGeometry, Polygon, Cuboid, Cylinder, Sphere, Sweep, Vector3 } from "opengeometry";
 ```
 
 ## Initialization
@@ -70,7 +69,7 @@ interface ICuboidOptions {
 2D polygons with automatic triangulation:
 
 ```typescript
-import { Polygon, Vector3 } from '@opengeometry/kernel-three';
+import { Polygon, Vector3 } from "opengeometry";
 
 const polygon = new Polygon({
   vertices: [
@@ -84,8 +83,6 @@ const polygon = new Polygon({
 
 scene.add(polygon);
 ```
-
-**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:11
 
 #### Adding Holes
 
@@ -103,7 +100,7 @@ polygon.addHole([
 3D box with center, dimensions, and outline support:
 
 ```typescript
-import { Cuboid, Vector3 } from '@opengeometry/kernel-three';
+import { Cuboid, Vector3 } from "opengeometry";
 
 const cuboid = new Cuboid({
   center: new Vector3(0, 0.5, 0),
@@ -117,14 +114,12 @@ cuboid.outline = true;
 scene.add(cuboid);
 ```
 
-**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/cuboid.ts:14
-
 ### Cylinder
 
 Parametric cylinder with radius, height, and segment control:
 
 ```typescript
-import { Cylinder, Vector3 } from '@opengeometry/kernel-three';
+import { Cylinder, Vector3 } from "opengeometry";
 
 const cylinder = new Cylinder({
   center: new Vector3(0, 1, 0),
@@ -138,14 +133,12 @@ const cylinder = new Cylinder({
 scene.add(cylinder);
 ```
 
-**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/cylinder.ts:15
-
 ### Sphere
 
 Parametric sphere with tessellation control:
 
 ```typescript
-import { Sphere, Vector3 } from '@opengeometry/kernel-three';
+import { Sphere, Vector3 } from "opengeometry";
 
 const sphere = new Sphere({
   center: new Vector3(0, 1, 0),
@@ -158,14 +151,12 @@ const sphere = new Sphere({
 scene.add(sphere);
 ```
 
-**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/sphere.ts:27
-
 ### Sweep
 
 Sweep a 2D profile along a 3D path:
 
 ```typescript
-import { Sweep, Vector3 } from '@opengeometry/kernel-three';
+import { Sweep, Vector3 } from "opengeometry";
 
 const sweep = new Sweep({
   path: [
@@ -188,8 +179,6 @@ const sweep = new Sweep({
 
 scene.add(sweep);
 ```
-
-**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/sweep.ts:28
 
 ## Common Patterns
 
@@ -216,8 +205,6 @@ cuboid.setConfig({
 });
 ```
 
-**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/cuboid.ts:60
-
 ### Color Management
 
 All shapes support dynamic color changes:
@@ -225,8 +212,6 @@ All shapes support dynamic color changes:
 ```typescript
 polygon.color = 0xff0000;  // Change to red
 ```
-
-**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:19
 
 ### Outline Rendering
 
@@ -238,18 +223,11 @@ polygon.outline = false; // Disable outline
 polygon.outlineColor = 0x000000; // Set outline color
 ```
 
-**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:345
-
 ### BREP Data Access
 
 Access the underlying boundary representation:
 
-```typescript
-const brepData = cuboid.getBrepData();
-console.log(brepData); // { vertices: [...], edges: [...], faces: [...] }
-```
-
-**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/cuboid.ts:118
+Wrapper shapes expose one of `getBrep()`, `getBrepData()`, or `getBrepSerialized()` depending on the type.
 
 ### Geometry Management
 
@@ -258,12 +236,7 @@ All shapes handle geometry cleanup automatically:
 ```typescript
 // Geometry is regenerated when calling setConfig
 polygon.setConfig(newOptions);
-
-// Manual cleanup if needed
-polygon.discardGeometry();
 ```
-
-**Source:** ~/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:139
 
 ## Complete Example
 
@@ -271,7 +244,7 @@ Here's a complete scene with multiple shapes:
 
 ```typescript
 import * as THREE from 'three';
-import { OpenGeometry, Polygon, Cuboid, Cylinder, Vector3 } from '@opengeometry/kernel-three';
+import { OpenGeometry, Polygon, Cuboid, Cylinder, Vector3 } from "opengeometry";
 
 // Initialize scene
 const scene = new THREE.Scene();
@@ -344,8 +317,6 @@ When enabled:
 - Geometry renders with semi-transparent materials
 - Faces have random colors for triangle visualization
 - Normals are rendered for debugging
-
-**Source:** ~/workspace/source/main/opengeometry-three/index.ts:34
 
 ## Next Steps
 

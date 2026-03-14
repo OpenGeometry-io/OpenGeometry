@@ -41,6 +41,14 @@ const polygon = new Polygon(options?: IPolygonOptions);
   ```
 </ParamField>
 
+<ParamField path="fatOutlines" type="boolean" default="false">
+  Use wide outlines backed by Three.js `LineSegments2` (instead of thin `LineSegments`).
+</ParamField>
+
+<ParamField path="outlineWidth" type="number" default="1">
+  Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
+</ParamField>
+
 ## Methods
 
 ### setConfig()
@@ -109,6 +117,14 @@ Returns the B-Rep (Boundary Representation) data as a JSON string.
 polygon.getBrepData(): string | null
 ```
 
+### subtract()
+
+Subtracts another boolean operand (such as an `Opening`) from this polygon and returns a renderable result mesh.
+
+```typescript
+const result = polygon.subtract(operand, options?);
+```
+
 ### generateGeometry()
 
 Regenerates the THREE.js geometry from the current polygon configuration. Automatically called after configuration changes.
@@ -157,6 +173,14 @@ polygon.dispose(): void
   ```
 </ResponseField>
 
+<ResponseField name="fatOutlines" type="boolean">
+  When enabled, outlines are rendered using a wide-line implementation (instead of thin lines).
+</ResponseField>
+
+<ResponseField name="outlineWidth" type="number">
+  Outline width used for fat outlines.
+</ResponseField>
+
 <ResponseField name="outlineColor" type="number">
   Get or set the outline color (default: 0x000000 - black).
   
@@ -170,7 +194,7 @@ polygon.dispose(): void
 ### Basic Rectangle
 
 ```typescript
-import { Polygon, Vector3 } from 'opengeometry-three';
+import { Polygon, Vector3 } from "opengeometry";
 
 const rectangle = new Polygon({
   vertices: [
@@ -190,7 +214,7 @@ rectangle.outlineColor = 0x000000;
 ### Polygon with Hole
 
 ```typescript
-import { Polygon, Vector3 } from 'opengeometry-three';
+import { Polygon, Vector3 } from "opengeometry";
 
 // Create outer polygon
 const polygon = new Polygon({
@@ -215,7 +239,7 @@ polygon.addHole([
 ### Complex Shape
 
 ```typescript
-import { Polygon, Vector3 } from 'opengeometry-three';
+import { Polygon, Vector3 } from "opengeometry";
 
 // L-shaped polygon
 const lShape = new Polygon({
@@ -239,8 +263,6 @@ lShape.outline = true;
 
 The polygon is automatically triangulated using the `triangulate_polygon_with_holes` function from the Rust kernel. This ensures proper rendering of complex shapes with holes.
 
-**Source:** `/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:155`
-
 ### Geometry Generation
 
 Geometry is stored as a THREE.BufferGeometry with double-sided material to ensure visibility from both sides:
@@ -252,13 +274,9 @@ const material = new THREE.MeshBasicMaterial({
 });
 ```
 
-**Source:** `/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:176-182`
-
 ### Outline Rendering
 
 Outlines are rendered as THREE.LineSegments, positioned as a child of the polygon mesh to maintain transformation hierarchy.
-
-**Source:** `/workspace/source/main/opengeometry-three/src/shapes/polygon.ts:345-379`
 
 ## Best Practices
 
@@ -276,6 +294,11 @@ Outlines are rendered as THREE.LineSegments, positioned as a child of the polygo
 
 ## See Also
 
+- [Boolean operations](/api/operations/boolean-operations) - Union, intersection, and subtraction
 - [Cuboid](/api/shapes/cuboid) - For rectangular 3D boxes
 - [Cylinder](/api/shapes/cylinder) - For circular extrusions
 - [Sweep](/api/shapes/sweep) - For extruding profiles along paths
+
+## Live demo
+
+Try it in the browser: [Polygon demo](https://demo.opengeometry.io/shapes/polygon.html).

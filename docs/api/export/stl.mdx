@@ -1,0 +1,182 @@
+---
+title: STL export (experimental)
+description: Export B-Reps and scenes to binary STL
+---
+
+## Overview
+
+OpenGeometry can export B-Reps to **binary STL**. You can export a single B-Rep payload or export a
+whole scene through `OGSceneManager`.
+
+<Warning>
+STL export is experimental. Output, config fields, and file-writing helpers may change. If you hit
+an exporter limitation or confusing output, reach out on
+[Discord](https://discord.gg/9wJpbfgGGA).
+</Warning>
+
+<Note>
+The WebAssembly build returns STL as bytes (`Uint8Array`). You are responsible for downloading or
+persisting those bytes. Some file-writing convenience methods exist only in native builds.
+</Note>
+
+## Initialization
+
+Initialize the WASM module once before using `OGSceneManager`:
+
+```ts
+import { OpenGeometry } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+```
+
+## Export APIs
+
+### exportBrepToStl
+
+Export a single serialized B-Rep JSON string to STL bytes.
+
+```ts
+import { OGSceneManager } from "opengeometry";
+
+const manager = new OGSceneManager();
+const result = manager.exportBrepToStl(brepSerialized);
+```
+
+### exportSceneToStl / exportCurrentSceneToStl
+
+Export a stored scene (or the current scene) to STL bytes.
+
+```ts
+import { OGSceneManager } from "opengeometry";
+
+const manager = new OGSceneManager();
+const sceneId = manager.createScene("stl export");
+
+// Add entities to the scene, then:
+const result = manager.exportSceneToStl(sceneId);
+// or:
+const result2 = manager.exportCurrentSceneToStl();
+```
+
+## Result type
+
+`export*ToStl(...)` returns an `OGStlExportResult`:
+
+<ResponseField name="bytes" type="Uint8Array">
+  The binary STL bytes.
+</ResponseField>
+
+<ResponseField name="reportJson" type="string">
+  A JSON string containing export statistics (triangle counts, skipped faces, topology errors).
+</ResponseField>
+
+## Config JSON
+
+All STL exports accept an optional `config_json` string. If it is `null`, `undefined`, or an empty
+string, OpenGeometry uses defaults. If you provide `config_json`, it must deserialize into the full
+`StlExportConfig` shape.
+
+Default configuration (Rust):
+
+```rust
+StlExportConfig {
+  header: Some("OpenGeometry STL Export".to_string()),
+  scale: 1.0,
+  error_policy: StlErrorPolicy::BestEffort,
+  validate_topology: true,
+}
+```
+
+Example JSON payload:
+
+```json
+{
+  "header": "My STL export",
+  "scale": 1.0,
+  "error_policy": "BestEffort",
+  "validate_topology": true
+}
+```
+
+## Examples
+
+### Export a wrapper shape to STL
+
+`OGSceneManager` expects a serialized B-Rep string. Wrapper shapes expose one of `getBrep()`,
+`getBrepData()`, or `getBrepSerialized()` depending on the type.
+
+```ts
+import { Cuboid, OGSceneManager, Vector3 } from "opengeometry";
+
+function toBrepSerialized(source: unknown) {
+  const value =
+    source && typeof (source as any).getBrepSerialized === "function"
+      ? (source as any).getBrepSerialized()
+      : source && typeof (source as any).getBrepData === "function"
+        ? (source as any).getBrepData()
+        : source && typeof (source as any).getBrep === "function"
+          ? (source as any).getBrep()
+          : source;
+
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+const manager = new OGSceneManager();
+const sceneId = manager.createScene("export");
+
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0.5, 0),
+  width: 2,
+  height: 1,
+  depth: 1,
+  color: 0x10b981,
+});
+
+manager.addBrepEntityToScene(
+  sceneId,
+  "box-1",
+  "Cuboid",
+  toBrepSerialized(cuboid)
+);
+
+const result = manager.exportSceneToStl(sceneId);
+console.log(JSON.parse(result.reportJson));
+```
+
+### Download STL in the browser
+
+```ts
+const blob = new Blob([result.bytes], { type: "application/octet-stream" });
+const url = URL.createObjectURL(blob);
+
+const link = document.createElement("a");
+link.href = url;
+link.download = "model.stl";
+link.click();
+
+URL.revokeObjectURL(url);
+```
+
+### Write STL in Node.js
+
+```ts
+import { writeFileSync } from "node:fs";
+
+writeFileSync("model.stl", Buffer.from(result.bytes));
+```
+
+### Native-only file export
+
+<Note>
+Native-only builds also expose `exportSceneToStlFile(...)` (not available in browser/WASM builds).
+</Note>
+
+## Related
+
+- [Exports](/concepts/exports) for an overview of available exporters and runtime constraints
+- [STEP export](/api/export/step) (experimental)
+- [IFC export](/api/export/ifc) (experimental)
+
+## Live demo
+
+Try it in the browser: [STL export demo](https://demo.opengeometry.io/operations/stl-export.html).

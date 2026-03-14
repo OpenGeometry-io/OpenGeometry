@@ -62,11 +62,12 @@ SweepOptions {
 
 ## Return Type
 
-Returns a `Brep` (Boundary Representation) object containing:
+Returns a `Brep` (Boundary Representation) using OpenGeometry's current half-edge topology schema
+(see [BRep](/concepts/brep)). At a high level, the result contains:
 
-- **vertices**: All 3D vertex positions (profile vertices × path sections)
-- **edges**: Connectivity information for the mesh
-- **faces**: Quadrilateral side faces and optional triangular/polygonal end caps
+- Vertices for each profile section placed along the path
+- Side faces connecting successive sections
+- Optional end caps (for open paths) when enabled
 
 ## How It Works
 
@@ -256,7 +257,7 @@ The sweep operation uses a parallel transport method to compute frames that:
 
 ### Source Location
 
-`~/workspace/source/main/opengeometry/src/operations/sweep.rs:98`
+`main/opengeometry/src/operations/sweep.rs`
 
 ### Precision
 
@@ -291,3 +292,7 @@ The sweep operation uses a parallel transport method to compute frames that:
 
 - [Extrude](/api/operations/extrude) - Special case of sweep along a straight vertical path
 - [Offset](/api/operations/offset) - Create parallel offset curves in 2D
+
+## Live demo
+
+Try it in the browser: [Sweep path/profile demo](https://demo.opengeometry.io/operations/sweep-path-profile.html).

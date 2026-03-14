@@ -19,7 +19,7 @@ The Arc primitive represents a segment of a circle in 3D space. It is defined by
 <Tabs>
   <Tab title="Rust">
     ```rust
-    let arc = OGArc::new(id: String);
+    let arc = OGArc::new("arc-1".to_string());
     ```
   </Tab>
   <Tab title="TypeScript">
@@ -233,7 +233,7 @@ Returns the complete BREP representation including vertices, edges, and faces.
   </Tab>
   <Tab title="TypeScript">
     ```typescript
-    import { Arc, Vector3 } from 'opengeometry-three';
+    import { Arc, Vector3 } from "opengeometry";
 
     const semicircle = new Arc({
       center: new Vector3(0, 0, 0),
@@ -334,3 +334,7 @@ Returns the complete BREP representation including vertices, edges, and faces.
     ```
   </Tab>
 </Tabs>
+
+## Live demo
+
+Try it in the browser: [Arc demo](https://demo.opengeometry.io/primitives/arc.html).

@@ -1,11 +1,16 @@
 ---
-title: PDF Export
+title: PDF export (experimental)
 description: Export 2D projections to vector PDF documents
 ---
 
 ## Overview
 
 The PDF export system converts projected 2D scenes to vector PDF documents. All output is true vector graphics with no rasterization, suitable for technical drawings, CAD exports, and high-quality prints.
+
+<Warning>
+PDF export is experimental. Output and APIs may change. If you hit an exporter limitation or
+confusing output, reach out on [Discord](https://discord.gg/9wJpbfgGGA).
+</Warning>
 
 <Note>
 PDF export is **only available in native (non-WASM) builds**. The `printpdf` crate used for PDF generation does not support WebAssembly targets.
@@ -221,12 +226,13 @@ The OGSceneManager provides a convenience method that projects and exports in on
 **Example (Node.js):**
 
 ```javascript
-const { OGSceneManager, OGCuboid } = require('opengeometry');
+const { OGSceneManager, OGCuboid, Vector3 } = require("opengeometry");
 
 const manager = new OGSceneManager();
 const sceneId = manager.createScene("My Model");
 
-const cuboid = OGCuboid.new("origin", 10.0, 8.0, 6.0);
+const cuboid = new OGCuboid("origin");
+cuboid.set_config(new Vector3(0, 0, 0), 10.0, 8.0, 6.0);
 manager.addCuboidToScene(sceneId, "box", cuboid);
 
 const camera = {
@@ -359,10 +365,10 @@ use opengeometry::{
 use openmaths::Vector3;
 
 // Create geometry
-let cuboid = OGCuboid::new(
-    Vector3::new(0.0, 0.0, 0.0),
-    5.0, 3.0, 2.0
-);
+let mut cuboid = OGCuboid::new("cuboid-1".to_string());
+cuboid
+    .set_config(Vector3::new(0.0, 0.0, 0.0), 5.0, 3.0, 2.0)
+    .unwrap();
 
 // Setup projection
 let camera = CameraParameters {
@@ -393,7 +399,7 @@ let config = PdfExportConfig {
 // Export
 export_scene_to_pdf_with_config(&scene, "cuboid.pdf", &config)?;
 
-println!("✓ PDF exported successfully");
+println!("PDF exported successfully");
 ```
 
 ## Multi-View Technical Drawing (Rust)
@@ -533,3 +539,8 @@ lineData.lines.forEach(line => {
 - [Projection](/api/export/projection) - Creating 2D scenes from 3D geometry
 - [Scene Management](/api/scene/scene-management) - Organizing geometry entities
 - [BRep](/concepts/brep) - Boundary representation structure
+
+## Live demo
+
+PDF export is native-only, so there is no browser demo for it. Start from the demo index for other
+examples: [OpenGeometry demos](https://demo.opengeometry.io/).

@@ -145,8 +145,13 @@ manager.add_brep_entity_to_scene_internal(
 
 ```rust
 use opengeometry::primitives::cuboid::OGCuboid;
+use openmaths::Vector3;
 
-let cuboid = OGCuboid::new(1.0, 2.0, 3.0);
+let mut cuboid = OGCuboid::new("box-1".to_string());
+cuboid
+    .set_config(Vector3::new(0.0, 0.0, 0.0), 1.0, 2.0, 3.0)
+    .unwrap();
+
 manager.add_cuboid_to_scene_internal(&scene_id, "box-1", &cuboid)?;
 ```
 
@@ -174,10 +179,10 @@ Every entity in a scene contains a complete BREP representation:
 OGScene
   └─ SceneEntity ("wall-1")
        ├─ kind: "OGCuboid"
-       └─ brep: Brep { vertices, edges, faces }
+       └─ brep: Brep { vertices, halfedges, edges, loops, faces, wires, shells }
   └─ SceneEntity ("window-1")
        ├─ kind: "OGRectangle" 
-       └─ brep: Brep { vertices, edges, faces }
+       └─ brep: Brep { vertices, halfedges, edges, loops, faces, wires, shells }
 ```
 
 This design means:
@@ -189,6 +194,10 @@ This design means:
 ## 2D Projection
 
 Scenes can be projected to 2D with hidden line removal:
+
+<Warning>
+2D projection and hidden line removal are experimental. Output and options may change.
+</Warning>
 
 ```rust
 use opengeometry::export::{CameraParameters, HlrOptions};
@@ -285,22 +294,38 @@ Serialized format includes:
 use opengeometry::scenegraph::OGSceneManager;
 use opengeometry::primitives::cuboid::OGCuboid;
 use opengeometry::primitives::cylinder::OGCylinder;
+use openmaths::Vector3;
 
 let mut manager = OGSceneManager::new();
 let scene_id = manager.create_scene_internal("Building");
 
 // Add foundation
-let foundation = OGCuboid::new(10.0, 10.0, 0.5);
+let mut foundation = OGCuboid::new("foundation".to_string());
+foundation
+    .set_config(Vector3::new(0.0, 0.25, 0.0), 10.0, 0.5, 10.0)
+    .unwrap();
 manager.add_cuboid_to_scene_internal(&scene_id, "foundation", &foundation)?;
 
 // Add columns
 for i in 0..4 {
-    let column = OGCylinder::new(0.3, 3.0, 32);
+    let mut column = OGCylinder::new(format!("column-{}", i));
+    let x = if i % 2 == 0 { -4.0 } else { 4.0 };
+    let z = if i < 2 { -4.0 } else { 4.0 };
+    column
+        .set_config(
+            Vector3::new(x, 1.5, z),
+            0.3,
+            3.0,
+            std::f64::consts::PI * 2.0,
+            32,
+        )
+        .unwrap();
+
     let id = format!("column-{}", i);
     manager.add_cylinder_to_scene_internal(&scene_id, &id, &column)?;
 }
 
-println!("Scene has {} entities", manager.scenes[&scene_id].entities.len());
+println!("{}", manager.get_scene_serialized(scene_id.clone()).unwrap());
 ```
 
 ## Performance Considerations
@@ -316,7 +341,7 @@ println!("Scene has {} entities", manager.scenes[&scene_id].entities.len());
   <Card title="BREP Structure" icon="cube" href="/concepts/brep">
     Learn about the entity data structure
   </Card>
-  <Card title="Projection" icon="film-simple" href="/api-reference/export/projection">
+  <Card title="Projection" icon="film-simple" href="/api/export/projection">
     Understand 2D projection and hidden line removal
   </Card>
 </CardGroup>

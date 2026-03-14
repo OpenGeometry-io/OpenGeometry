@@ -10,8 +10,8 @@ Boundary Representation (BREP) is the core data structure used in OpenGeometry t
 BREP is a method of representing shapes by explicitly defining their boundaries. Instead of storing a solid as a filled volume, BREP stores:
 
 - **Vertices** - Points in 3D space
-- **Edges** - Connections between vertices
-- **Faces** - Surfaces bounded by edges
+- **Edges** - Connectivity between vertices
+- **Faces** - Surfaces bounded by edges (with explicit boundary loops)
 
 This representation is:
 - **Exact** - Preserves geometric precision
@@ -39,29 +39,38 @@ OpenGeometry can represent different types of geometric bodies:
 
 ## Data Structure
 
-The BREP structure is defined in `src/brep/mod.rs`:
+The BREP structure is defined in the Rust core (`main/opengeometry/src/brep/mod.rs` in this repo):
 
 ```rust
 pub struct Brep {
     pub id: Uuid,
     pub vertices: Vec<Vertex>,
+    pub halfedges: Vec<HalfEdge>,
     pub edges: Vec<Edge>,
+    pub loops: Vec<Loop>,
     pub faces: Vec<Face>,
-    pub holes: Vec<u32>,
-    pub hole_edges: Vec<Edge>,
+    pub wires: Vec<Wire>,
+    pub shells: Vec<Shell>,
 }
 ```
+
+<Note>
+IDs (`u32`) in the BREP are array indices. For example, `brep.vertices[vertex_id as usize]` is the
+vertex with id `vertex_id`.
+</Note>
 
 ### Core Components
 
 #### Vertex
 
-Defined in `src/brep/vertex.rs`, a vertex represents a point in 3D space:
+Defined in `main/opengeometry/src/brep/vertex.rs`, a vertex represents a point in 3D space and may
+reference an outgoing half-edge for topology traversal:
 
 ```rust
 pub struct Vertex {
     pub id: u32,
     pub position: Vector3,
+    pub outgoing_halfedge: Option<u32>,
 }
 ```
 
@@ -70,80 +79,138 @@ pub struct Vertex {
 let v = Vertex::new(0, Vector3::new(1.0, 2.0, 3.0));
 ```
 
+#### HalfEdge
+
+Defined in `main/opengeometry/src/brep/halfedge.rs`, a half-edge is the directed topology primitive.
+Half-edges are the basis for efficient adjacency queries, loop traversal, and hidden line removal.
+
+```rust
+pub struct HalfEdge {
+    pub id: u32,
+    pub from: u32,
+    pub to: u32,
+    pub twin: Option<u32>,
+    pub next: Option<u32>,
+    pub prev: Option<u32>,
+    pub edge: u32,
+    pub face: Option<u32>,
+    pub loop_ref: Option<u32>,
+    pub wire_ref: Option<u32>,
+}
+```
+
+Key links:
+- `twin` points to the opposite half-edge (when the underlying edge is shared).
+- `next` and `prev` walk the boundary of a face loop (or a closed wire).
+
 #### Edge
 
-Defined in `src/brep/edge.rs`, an edge connects two vertices:
+Defined in `main/opengeometry/src/brep/edge.rs`, an edge is an undirected edge that points at one
+or two half-edges:
 
 ```rust
 pub struct Edge {
     pub id: u32,
-    pub v1: u32,  // ID of first vertex
-    pub v2: u32,  // ID of second vertex
+    pub halfedge: u32,
+    pub twin_halfedge: Option<u32>,
 }
 ```
 
-**Example:**
-```rust
-let edge = Edge::new(0, 0, 1);  // Edge from vertex 0 to vertex 1
-```
+The endpoints of an edge come from its referenced half-edge(s).
 
 #### Face
 
-Defined in `src/brep/face.rs`, a face is a surface bounded by vertices:
+Defined in `main/opengeometry/src/brep/face.rs`, a face is bounded by an outer loop and zero or
+more inner loops (holes):
 
 ```rust
 pub struct Face {
     pub id: u32,
     pub normal: Vector3,
-    pub face_indices: Vec<u32>,  // Vertex IDs in winding order
+    pub outer_loop: u32,
+    pub inner_loops: Vec<u32>,
+    pub shell_ref: Option<u32>,
 }
 ```
 
 **Example:**
 ```rust
-let face = Face::new(0, vec![0, 1, 2, 3]);  // Quad face
-face.set_normal(Vector3::new(0.0, 0.0, 1.0));
+let face = Face::new(0, Vector3::new(0.0, 0.0, 1.0), 0, Vec::new(), None);
 ```
 
-### Half-Edge Structure (Planned)
+#### Loop
 
-Defined in `src/brep/halfedge.rs`, the half-edge data structure is planned for future implementation:
+Defined in `main/opengeometry/src/brep/loop.rs`, a loop is a face boundary (outer boundary or an
+inner hole) represented by a half-edge cycle:
 
 ```rust
-pub struct HalfEdge {
+pub struct Loop {
     pub id: u32,
-    pub twin_ref: u32,    // ID of twin halfedge
-    pub next_ref: u32,    // ID of next halfedge in loop
-    pub edge_ref: u32,    // ID of parent edge
-    pub vertex_ref: u32,  // ID of vertex this points to
-    pub face_ref: u32,    // ID of adjacent face
+    pub halfedge: u32,
+    pub face: u32,
+    pub is_hole: bool,
 }
 ```
 
-Half-edges enable efficient traversal of mesh topology and are commonly used in mesh editing operations.
+#### Wire
+
+Defined in `main/opengeometry/src/brep/wire.rs`, a wire is an (optionally closed) polyline stored as
+a list of half-edges:
+
+```rust
+pub struct Wire {
+    pub id: u32,
+    pub halfedges: Vec<u32>,
+    pub is_closed: bool,
+}
+```
+
+#### Shell
+
+Defined in `main/opengeometry/src/brep/shell.rs`, a shell groups faces and can be marked as open or
+closed:
+
+```rust
+pub struct Shell {
+    pub id: u32,
+    pub faces: Vec<u32>,
+    pub is_closed: bool,
+}
+```
 
 ## BREP Operations
 
-The `Brep` struct provides several utility methods:
+The `Brep` struct provides several utility methods. Most callers should construct BReps through
+`BrepBuilder` (see below) and treat the resulting BRep as an immutable kernel output.
 
 ### Querying Geometry
 
 ```rust
 // Get count of elements
 let vertex_count = brep.get_vertex_count();
+let halfedge_count = brep.get_halfedge_count();
 let edge_count = brep.get_edge_count();
+let loop_count = brep.get_loop_count();
 let face_count = brep.get_face_count();
+let wire_count = brep.get_wire_count();
+let shell_count = brep.get_shell_count();
 
 // Get vertices for a specific face
 let vertices: Vec<Vector3> = brep.get_vertices_by_face_id(0);
 
 // Get all vertices as flat array
 let all_vertices: Vec<Vector3> = brep.get_flattened_vertices();
+
+// Get a flat triangle buffer (x, y, z triples)
+let triangle_buffer: Vec<f64> = brep.get_triangle_vertex_buffer();
+
+// Get a flat outline buffer (line segments)
+let outline_buffer: Vec<f64> = brep.get_outline_vertex_buffer();
 ```
 
 ### Handling Holes
 
-Faces can contain holes (e.g., a plate with circular cutouts):
+Faces can contain holes (inner loops):
 
 ```rust
 // Get face with holes
@@ -152,41 +219,32 @@ let (face_vertices, hole_vertices) = brep.get_vertices_and_holes_by_face_id(0);
 // hole_vertices: Vec of hole boundaries
 ```
 
-### Modifying Topology
+If you need to build or modify topology, use `BrepBuilder` (below). You can also clear all geometry
+with `brep.clear()`.
+
+## Example: building a BREP with `BrepBuilder`
+
+`BrepBuilder` creates consistent half-edge/edge/loop links and validates topology on `build()`:
 
 ```rust
-// Add vertex to face
-brep.insert_vertex_at_face_by_id(face_id, vertex_id);
-
-// Clear all geometry
-brep.clear();
-```
-
-## Example: Building a BREP
-
-Here's how a simple triangle is represented:
-
-```rust
-use uuid::Uuid;
 use openmaths::Vector3;
-use opengeometry::brep::{Brep, Vertex, Edge, Face};
+use opengeometry::brep::BrepBuilder;
+use uuid::Uuid;
 
-let mut brep = Brep::new(Uuid::new_v4());
+let mut builder = BrepBuilder::new(Uuid::new_v4());
 
 // Add vertices
-brep.vertices.push(Vertex::new(0, Vector3::new(0.0, 0.0, 0.0)));
-brep.vertices.push(Vertex::new(1, Vector3::new(1.0, 0.0, 0.0)));
-brep.vertices.push(Vertex::new(2, Vector3::new(0.5, 1.0, 0.0)));
+builder.add_vertices(&[
+    Vector3::new(0.0, 0.0, 0.0),
+    Vector3::new(1.0, 0.0, 0.0),
+    Vector3::new(1.0, 0.0, 1.0),
+    Vector3::new(0.0, 0.0, 1.0),
+]);
 
-// Add edges
-brep.edges.push(Edge::new(0, 0, 1));
-brep.edges.push(Edge::new(1, 1, 2));
-brep.edges.push(Edge::new(2, 2, 0));
+// Add a quad face using vertex indices (the builder creates loops, half-edges, and edges).
+builder.add_face(&[0, 1, 2, 3], &[])?;
 
-// Add face
-let mut face = Face::new(0, vec![0, 1, 2]);
-face.set_normal(Vector3::new(0.0, 0.0, 1.0));
-brep.faces.push(face);
+let brep = builder.build()?;
 ```
 
 ## Serialization
@@ -205,11 +263,14 @@ This enables passing BREP data between Rust and JavaScript via WASM.
 
 ## Topology Validation
 
-While OpenGeometry doesn't enforce strict manifold constraints, valid BREP structures should maintain:
+`BrepBuilder::build()` calls `brep.validate_topology()` before returning. Exporters can also validate
+topology (depending on the export config).
 
-- **Vertex references** - All edge vertex IDs exist in vertex list
-- **Face winding** - Consistent counter-clockwise ordering (right-hand rule)
-- **Edge connectivity** - Edges properly connect vertices without gaps
+Valid BREP structures should maintain:
+
+- **Vertex references** - All referenced vertex IDs exist in vertex list
+- **Half-edge symmetry** - `twin`, `next`, and `prev` links are consistent
+- **Manifold edges** - An edge has at most two incident faces
 
 ## References
 

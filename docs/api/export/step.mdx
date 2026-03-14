@@ -1,0 +1,131 @@
+---
+title: STEP export (experimental)
+description: Export B-Reps and scenes to STEP (Part 21) text
+---
+
+<Warning>
+STEP export is experimental and may change. If you hit an exporter limitation or confusing output,
+reach out on [Discord](https://discord.gg/9wJpbfgGGA).
+</Warning>
+
+## Overview
+
+OpenGeometry can export B-Reps to **STEP Part 21** text. You can export a single B-Rep payload or
+export a whole scene through `OGSceneManager`.
+
+## Initialization
+
+Initialize the WASM module once before using `OGSceneManager`:
+
+```ts
+import { OpenGeometry } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+```
+
+## Export APIs
+
+### exportBrepToStep
+
+```ts
+import { OGSceneManager } from "opengeometry";
+
+const manager = new OGSceneManager();
+const result = manager.exportBrepToStep(brepSerialized);
+```
+
+### exportSceneToStep / exportCurrentSceneToStep
+
+```ts
+import { OGSceneManager } from "opengeometry";
+
+const manager = new OGSceneManager();
+const sceneId = manager.createScene("step export");
+
+const result = manager.exportSceneToStep(sceneId);
+// or:
+const result2 = manager.exportCurrentSceneToStep();
+```
+
+## Result type
+
+`export*ToStep(...)` returns an `OGStepExportResult`:
+
+<ResponseField name="text" type="string">
+  STEP Part 21 text output.
+</ResponseField>
+
+<ResponseField name="reportJson" type="string">
+  A JSON string containing export statistics (skipped entities, triangle counts, topology errors).
+</ResponseField>
+
+## Config JSON
+
+All STEP exports accept an optional `config_json` string. If it is `null`, `undefined`, or an empty
+string, OpenGeometry uses defaults. If you provide `config_json`, it must deserialize into the full
+`StepExportConfig` shape (required fields must be present).
+
+Default configuration (Rust):
+
+```rust
+StepExportConfig {
+  schema: StepSchema::AutomotiveDesign,
+  product_name: Some("OpenGeometry STEP Export".to_string()),
+  scale: 1.0,
+  error_policy: StepErrorPolicy::BestEffort,
+  validate_topology: true,
+  require_closed_shell: true,
+}
+```
+
+Example JSON payload:
+
+```json
+{
+  "schema": "AutomotiveDesign",
+  "product_name": "OpenGeometry STEP Export",
+  "scale": 1.0,
+  "error_policy": "BestEffort",
+  "validate_topology": true,
+  "require_closed_shell": true
+}
+```
+
+## Key constraints
+
+- When `require_closed_shell` is `true`, non-solid inputs are skipped in best-effort mode.
+- When `validate_topology` is `true`, invalid B-Reps are skipped (or fail in strict mode).
+
+## Examples
+
+### Export and download STEP in the browser
+
+```ts
+const result = manager.exportCurrentSceneToStep();
+
+const blob = new Blob([result.text], { type: "text/plain" });
+const url = URL.createObjectURL(blob);
+
+const link = document.createElement("a");
+link.href = url;
+link.download = "model.step";
+link.click();
+
+URL.revokeObjectURL(url);
+```
+
+### Native-only file export
+
+<Note>
+Native-only builds also expose `exportSceneToStepFile(...)` (not available in browser/WASM builds).
+</Note>
+
+## Related
+
+- [Exports](/concepts/exports) for an overview of available exporters and runtime constraints
+- [STL export](/api/export/stl)
+- [IFC export](/api/export/ifc) (experimental)
+
+## Live demo
+
+Try it in the browser: [STEP export demo](https://demo.opengeometry.io/operations/step-export.html).

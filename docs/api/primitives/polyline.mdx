@@ -20,7 +20,7 @@ The Polyline primitive represents a connected sequence of line segments in 3D sp
 <Tabs>
   <Tab title="Rust">
     ```rust
-    let polyline = OGPolyline::new(id: String);
+    let polyline = OGPolyline::new("poly-1".to_string());
     ```
   </Tab>
   <Tab title="TypeScript">
@@ -29,6 +29,10 @@ The Polyline primitive represents a connected sequence of line segments in 3D sp
     ```
   </Tab>
 </Tabs>
+
+## Live demo
+
+Try it in the browser: [Polyline demo](https://demo.opengeometry.io/primitives/polyline.html).
 
 ### Rust Constructor Parameters
 
@@ -274,7 +278,7 @@ Returns the complete BREP representation.
   </Tab>
   <Tab title="TypeScript">
     ```typescript
-    import { Polyline, Vector3 } from 'opengeometry-three';
+    import { Polyline, Vector3 } from "opengeometry";
 
     const polyline = new Polyline({
       points: [

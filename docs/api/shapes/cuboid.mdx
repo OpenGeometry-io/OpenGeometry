@@ -60,6 +60,14 @@ const cuboid = new Cuboid(options?: ICuboidOptions);
   ```
 </ParamField>
 
+<ParamField path="fatOutlines" type="boolean" default="false">
+  Use wide outlines backed by Three.js `LineSegments2` (instead of thin `LineSegments`).
+</ParamField>
+
+<ParamField path="outlineWidth" type="number" default="1">
+  Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
+</ParamField>
+
 ## Methods
 
 ### setConfig()
@@ -97,6 +105,39 @@ if (brepData) {
   console.log('Edges:', brepData.edges);
   console.log('Faces:', brepData.faces);
 }
+```
+
+### subtract()
+
+Subtracts another boolean operand (such as an `Opening`) from this cuboid and returns a renderable result mesh.
+
+```typescript
+const result = cuboid.subtract(operand, options?);
+```
+
+**Example:**
+
+```typescript
+import { Cuboid, Opening, Vector3 } from "opengeometry";
+
+const wall = new Cuboid({
+  center: new Vector3(0, 1.5, 0),
+  width: 6,
+  height: 3,
+  depth: 0.3,
+  color: 0x9ca3af,
+});
+
+const opening = new Opening({
+  center: new Vector3(0, 1.2, 0),
+  width: 1.2,
+  height: 1.4,
+  depth: 0.4,
+  color: 0xffffff,
+});
+
+const cut = wall.subtract(opening, { outline: true, fatOutlines: true, outlineWidth: 2 });
+scene.add(cut);
 ```
 
 ### generateGeometry()
@@ -156,7 +197,15 @@ cuboid.discardGeometry(): void
   ```
 </ResponseField>
 
-<ResponseField name="outlineMesh" type="THREE.Line | null">
+<ResponseField name="fatOutlines" type="boolean">
+  When enabled, outlines are rendered using a wide-line implementation (instead of thin lines).
+</ResponseField>
+
+<ResponseField name="outlineWidth" type="number">
+  Outline width used for fat outlines.
+</ResponseField>
+
+<ResponseField name="outlineMesh" type="THREE.LineSegments | object | null">
   Reference to the outline mesh if outline is enabled.
 </ResponseField>
 
@@ -165,7 +214,7 @@ cuboid.discardGeometry(): void
 ### Basic Cuboid
 
 ```typescript
-import { Cuboid, Vector3 } from 'opengeometry-three';
+import { Cuboid, Vector3 } from "opengeometry";
 
 const box = new Cuboid({
   center: new Vector3(0, 0, 0),
@@ -182,7 +231,7 @@ scene.add(box);
 ### Cuboid with Outline
 
 ```typescript
-import { Cuboid, Vector3 } from 'opengeometry-three';
+import { Cuboid, Vector3 } from "opengeometry";
 
 const cuboid = new Cuboid({
   center: new Vector3(0, 2.5, 0),
@@ -199,7 +248,7 @@ cuboid.outline = true;
 ### Cube (Equal Dimensions)
 
 ```typescript
-import { Cuboid, Vector3 } from 'opengeometry-three';
+import { Cuboid, Vector3 } from "opengeometry";
 
 const cube = new Cuboid({
   center: new Vector3(0, 0, 0),
@@ -213,7 +262,7 @@ const cube = new Cuboid({
 ### Dynamic Cuboid Scaling
 
 ```typescript
-import { Cuboid, Vector3 } from 'opengeometry-three';
+import { Cuboid, Vector3 } from "opengeometry";
 
 const cuboid = new Cuboid({
   center: new Vector3(0, 0, 0),
@@ -244,7 +293,7 @@ animate();
 ### Building Block
 
 ```typescript
-import { Cuboid, Vector3 } from 'opengeometry-three';
+import { Cuboid, Vector3 } from "opengeometry";
 
 // Create a wall segment
 const wallSegment = new Cuboid({
@@ -290,8 +339,6 @@ let extruded_brep = extrude_brep_face(bottom_face_brep, self.height);
 
 Cuboids use MeshStandardMaterial with transparency:
 
-**Source:** `/workspace/source/main/opengeometry-three/src/shapes/cuboid.ts:100-104`
-
 ```typescript
 const material = new THREE.MeshStandardMaterial({
   color: this.options.color,
@@ -325,6 +372,11 @@ Cuboids have a well-defined B-Rep structure:
 
 ## See Also
 
+- [Boolean operations](/api/operations/boolean-operations) - Union, intersection, and subtraction
 - [Wedge](/api/shapes/wedge) - For triangular prism shapes
 - [Cylinder](/api/shapes/cylinder) - For cylindrical shapes
 - [Polygon](/api/shapes/polygon) - For 2D base shapes
+
+## Live demo
+
+Try it in the browser: [Cuboid demo](https://demo.opengeometry.io/shapes/cuboid.html).

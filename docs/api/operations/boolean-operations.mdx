@@ -1,0 +1,214 @@
+---
+title: Boolean operations
+description: Combine or cut solids using kernel-backed boolean operations
+icon: "shapes"
+---
+
+## Overview
+
+OpenGeometry exposes kernel-backed boolean operations that work on B-Rep payloads. The helpers accept
+multiple operand formats (wrapper objects, raw B-Rep objects, or serialized JSON) and return a
+renderable `THREE.Mesh` result with access to the output B-Rep and a structured report.
+
+To learn how booleans work and what to expect from them, read [Booleans](/concepts/booleans).
+
+## Initialization
+
+Initialize the WASM module once before calling any boolean helpers:
+
+```ts
+import { OpenGeometry } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+```
+
+## API
+
+### booleanUnion
+
+```ts
+import { booleanUnion } from "opengeometry";
+
+const result = booleanUnion(lhs, rhs, options);
+```
+
+### booleanIntersection
+
+```ts
+import { booleanIntersection } from "opengeometry";
+
+const result = booleanIntersection(lhs, rhs, options);
+```
+
+### booleanSubtraction
+
+```ts
+import { booleanSubtraction } from "opengeometry";
+
+const result = booleanSubtraction(lhs, rhs, options);
+```
+
+### BooleanOperand
+
+Each boolean helper accepts a `BooleanOperand` in any of these forms:
+
+- A serialized B-Rep JSON string
+- A parsed B-Rep object (the helper will `JSON.stringify(...)` it)
+- A wrapper object that exposes one of these methods:
+  - `getBrepSerialized(): string`
+  - `getBrepData(): unknown`
+  - `getBrep(): unknown`
+
+This means you can pass OpenGeometry shape wrappers (like `Cuboid` and `Opening`) directly.
+
+### BooleanExecutionOptions
+
+Boolean options let you tune both kernel behavior and rendering.
+
+**Kernel options**
+
+<ParamField path="kernel.tolerance" type="number" optional>
+  Numeric tolerance used by the kernel for boolean decisions.
+</ParamField>
+
+<ParamField path="kernel.mergeCoplanarFaces" type="boolean" optional>
+  When enabled, the kernel attempts to merge coplanar faces in the output.
+</ParamField>
+
+**Render options**
+
+<ParamField path="color" type="number" optional>
+  Output mesh color (hex).
+</ParamField>
+
+<ParamField path="outline" type="boolean" optional>
+  Enable outline rendering for the result. The helpers default to `true` when omitted.
+</ParamField>
+
+<ParamField path="fatOutlines" type="boolean" optional>
+  Use wide outlines backed by Three.js `LineSegments2` (instead of thin `LineSegments`).
+</ParamField>
+
+<ParamField path="outlineWidth" type="number" optional>
+  Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
+</ParamField>
+
+## Return type: BooleanResult
+
+All boolean helpers return a `BooleanResult`, which extends `THREE.Mesh`.
+
+### Common fields and methods
+
+<ResponseField name="report" type="BooleanReport | null">
+  Parsed report emitted by the kernel (operation name, input/output counts, empty flag, and more).
+</ResponseField>
+
+<ResponseField name="getBrepData" type="() => object | null">
+  Returns the parsed output B-Rep object.
+</ResponseField>
+
+<ResponseField name="getBrepSerialized" type="() => string">
+  Returns the output B-Rep JSON string (useful for export and persistence).
+</ResponseField>
+
+<ResponseField name="outline" type="boolean">
+  Enables or disables outline rendering for the result mesh.
+</ResponseField>
+
+<ResponseField name="fatOutlines" type="boolean">
+  Toggles wide outline rendering.
+</ResponseField>
+
+<ResponseField name="outlineWidth" type="number">
+  Sets the outline width used for fat outlines.
+</ResponseField>
+
+<ResponseField name="disposeGeometry" type="() => void">
+  Disposes the result mesh geometry and materials (call this when you remove the mesh from your scene).
+</ResponseField>
+
+## Examples
+
+### Cut a cuboid with an opening
+
+Use `Opening.subtractFrom(...)` when you want the opening to be the cutting operand:
+
+```ts
+import * as THREE from "three";
+import { OpenGeometry, Cuboid, Opening, Vector3 } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+
+const scene = new THREE.Scene();
+
+const wall = new Cuboid({
+  center: new Vector3(0, 1.5, 0),
+  width: 6,
+  height: 3,
+  depth: 0.3,
+  color: 0x9ca3af,
+});
+
+const opening = new Opening({
+  center: new Vector3(0, 1.2, 0),
+  width: 1.2,
+  height: 1.4,
+  depth: 0.4,
+  color: 0xffffff,
+});
+
+const cutWall = opening.subtractFrom(wall, {
+  color: 0x10b981,
+  outline: true,
+  fatOutlines: true,
+  outlineWidth: 2,
+  kernel: { tolerance: 1e-6, mergeCoplanarFaces: true },
+});
+
+scene.add(cutWall);
+```
+
+### Union and intersection
+
+```ts
+import * as THREE from "three";
+import { OpenGeometry, Cuboid, Vector3, booleanUnion, booleanIntersection } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+
+const scene = new THREE.Scene();
+
+const a = new Cuboid({
+  center: new Vector3(-0.2, 0.6, 0),
+  width: 1.4,
+  height: 1.2,
+  depth: 1.0,
+  color: 0x2563eb,
+});
+
+const b = new Cuboid({
+  center: new Vector3(0.4, 0.6, 0),
+  width: 1.4,
+  height: 1.2,
+  depth: 1.0,
+  color: 0xf97316,
+});
+
+const union = booleanUnion(a, b, { color: 0x0ea5e9 });
+const intersection = booleanIntersection(a, b, { color: 0x8b5cf6, outline: false });
+
+union.position.x = -2;
+intersection.position.x = 2;
+
+scene.add(union, intersection);
+```
+
+## Related
+
+- [Booleans](/concepts/booleans) for behavior, limitations, and tips
+- [Exports](/concepts/exports) for exporting boolean results to STL/STEP/IFC
+
+## Live demo
+
+- [Boolean operations demo](https://demo.opengeometry.io/operations/boolean-operations.html)
+- [Polygon boolean operations demo](https://demo.opengeometry.io/operations/polygon-boolean-operations.html)

@@ -1,0 +1,53 @@
+---
+title: Exports
+description: Export OpenGeometry results to 2D drawings and 3D interchange formats
+---
+
+## Overview
+
+OpenGeometry supports both 2D and 3D export workflows:
+
+- **2D drawings**: project a 3D B-Rep to 2D lines (optionally with hidden line removal), then export
+  as PDF in native builds
+- **3D interchange**: export B-Reps or scenes to STL, STEP, or IFC
+
+## Runtime differences
+
+### Browser/WASM
+
+In the WebAssembly build, export APIs return data in-memory:
+
+- STL: `Uint8Array` bytes
+- STEP: text
+- IFC: text
+
+You download the data (Blob) or send it to your backend for persistence.
+
+### Native builds
+
+Some convenience functions (PDF export and file-writing helpers for STL/STEP/IFC) are only available
+in native builds and are not available in browser/WASM environments.
+
+## Export config JSON
+
+Scene exports accept an optional `config_json` string:
+
+- If `config_json` is omitted, `null`, `undefined`, or an empty string, OpenGeometry uses defaults.
+- If you provide `config_json`, the payload must deserialize into the full config struct. Missing
+  required fields cause an error. If you want defaults, omit the config entirely.
+
+## Experimental status
+
+<Warning>
+Projection/hidden line removal, PDF export, STL export, STEP export, and IFC export are
+experimental. Output and config schemas may change. If you hit an exporter limitation or confusing
+output, reach out on [Discord](https://discord.gg/9wJpbfgGGA).
+</Warning>
+
+## Related
+
+- [Projection & hidden line removal](/api/export/projection) (experimental)
+- [PDF export](/api/export/pdf) (experimental)
+- [STL export](/api/export/stl) (experimental)
+- [STEP export](/api/export/step) (experimental)
+- [IFC export](/api/export/ifc) (experimental)

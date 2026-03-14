@@ -1,0 +1,74 @@
+---
+title: Booleans
+description: How kernel-backed boolean operations work in OpenGeometry
+---
+
+## What booleans do
+
+Boolean operations combine or modify solids:
+
+- **Union** merges two solids into one
+- **Intersection** keeps only the overlapping volume
+- **Subtraction** cuts one solid by another
+
+In OpenGeometry, boolean helpers operate on **B-Rep payloads** and return a renderable mesh result
+along with the output B-Rep and a report you can use for debugging.
+
+## How you run booleans
+
+You can use either:
+
+- The standalone helpers: `booleanUnion`, `booleanIntersection`, `booleanSubtraction`
+- Shape convenience methods: `shape.subtract(...)`
+- The opening-centric workflow: `opening.subtractFrom(host)`
+
+All of these call the same kernel entry points under the hood.
+
+## Initialization requirement
+
+Booleans require the WASM module to be initialized:
+
+```ts
+import { OpenGeometry } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+```
+
+## Input expectations
+
+Booleans work best when both operands represent **closed, valid solids**.
+
+Common failure modes include:
+
+- Non-closed shells (missing faces)
+- Self-intersections or degenerate faces
+- Very small features relative to the kernel tolerance
+
+When a boolean returns an empty result, inspect `BooleanResult.report` to see what the kernel
+processed and produced.
+
+## Tolerance and coplanar faces
+
+You can tune kernel behavior:
+
+- `kernel.tolerance` controls how aggressively the kernel treats edges/faces as coincident.
+- `kernel.mergeCoplanarFaces` attempts to merge coplanar faces in the output.
+
+If you see tiny sliver faces or noisy results, increase tolerance slightly and enable coplanar face
+merging. If you see missing details, lower tolerance.
+
+## Debugging tips
+
+- Read `result.report` to get counts and an `empty` flag.
+- Start with simple operands (two cuboids), then move to complex geometry.
+- Turn on outlines (default for the helpers) so you can see output edges clearly.
+
+## Status and limitations
+
+Booleans are under active refinement. Some inputs may produce unexpected results or require
+additional tuning. If you get stuck, reach out on [Discord](https://discord.gg/9wJpbfgGGA).
+
+## Related
+
+- [Boolean operations API](/api/operations/boolean-operations)
+- [Exports](/concepts/exports) for exporting boolean results to STL/STEP/IFC

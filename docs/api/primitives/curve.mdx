@@ -20,7 +20,7 @@ The Curve primitive represents a curve in 3D space defined by a series of contro
 <Tabs>
   <Tab title="Rust">
     ```rust
-    let curve = OGCurve::new(id: String);
+    let curve = OGCurve::new("curve-1".to_string());
     ```
   </Tab>
   <Tab title="TypeScript">
@@ -29,6 +29,10 @@ The Curve primitive represents a curve in 3D space defined by a series of contro
     ```
   </Tab>
 </Tabs>
+
+## Live demo
+
+Try it in the browser: [Curve demo](https://demo.opengeometry.io/primitives/curve.html).
 
 ### Rust Constructor Parameters
 
@@ -212,7 +216,7 @@ Returns the complete BREP representation including vertices and edges.
   </Tab>
   <Tab title="TypeScript">
     ```typescript
-    import { Curve, Vector3 } from 'opengeometry-three';
+    import { Curve, Vector3 } from "opengeometry";
 
     const curve = new Curve({
       controlPoints: [

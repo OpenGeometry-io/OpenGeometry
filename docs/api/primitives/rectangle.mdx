@@ -19,7 +19,7 @@ The Rectangle primitive represents a closed rectangular path in 3D space. It is 
 <Tabs>
   <Tab title="Rust">
     ```rust
-    let rectangle = OGRectangle::new(id: String);
+    let rectangle = OGRectangle::new("rect-1".to_string());
     ```
   </Tab>
   <Tab title="TypeScript">
@@ -28,6 +28,10 @@ The Rectangle primitive represents a closed rectangular path in 3D space. It is 
     ```
   </Tab>
 </Tabs>
+
+## Live demo
+
+Try it in the browser: [Rectangle demo](https://demo.opengeometry.io/primitives/rectangle.html).
 
 ### Rust Constructor Parameters
 
@@ -241,7 +245,7 @@ Returns the complete BREP representation including vertices, edges, and face.
   </Tab>
   <Tab title="TypeScript">
     ```typescript
-    import { Rectangle, Vector3 } from 'opengeometry-three';
+    import { Rectangle, Vector3 } from "opengeometry";
 
     const rect = new Rectangle({
       center: new Vector3(0, 0, 0),

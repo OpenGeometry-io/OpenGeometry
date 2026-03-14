@@ -1,0 +1,45 @@
+---
+title: OpenGeometry runtime
+description: Initialize the OpenGeometry WASM module and control runtime behavior
+---
+
+## Overview
+
+Before you construct kernel-backed primitives and shapes, initialize OpenGeometry once:
+
+```ts
+import { OpenGeometry } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+```
+
+`OpenGeometry.create(...)` is idempotent. It caches a singleton instance and returns it on
+subsequent calls.
+
+## create
+
+```ts
+await OpenGeometry.create(options);
+```
+
+### Options
+
+`OpenGeometryOptions`:
+
+<ParamField path="wasmURL" type="string">
+  URL to `opengeometry_bg.wasm`. This must be reachable from the browser or runtime.
+</ParamField>
+
+## Debug mode
+
+You can toggle debug mode after initialization:
+
+```ts
+const og = await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+og.enableDebug = true;
+```
+
+## Live demo
+
+Start from the hosted demo index (all demos initialize OpenGeometry): [OpenGeometry demos](https://demo.opengeometry.io/).
+

@@ -3,26 +3,30 @@ title: Examples
 description: Core example architecture and the curated OpenGeometry example catalog
 ---
 
-OpenGeometry ships a compact public example set for `@opengeometry/kernel-three`.
+OpenGeometry ships a compact public example set for `opengeometry`.
 
 The goal is simple: each core demo should be easy to open, easy to read, and small enough to use
 as a reference when you are wiring the kernel into your own scene.
 
 ## Core catalog
 
-The in-repo source of truth for public Three.js examples is:
-
-- `main/opengeometry-three/examples-vite/index.html`
-- `main/opengeometry-three/examples-vite/primitives/*.html`
-- `main/opengeometry-three/examples-vite/shapes/*.html`
-- `main/opengeometry-three/examples-vite/operations/*.html`
-- `main/opengeometry-three/examples-vite/src/styles/theme.css`
+The in-repo source of truth for public Three.js examples lives in the Three.js adapter package under
+`main/` (look for the `examples-vite/` folder).
 
 The public catalog keeps a curated core set:
 
 - Primitives: `line`, `arc`, `curve`, `polyline`, `rectangle`
 - Shapes: `cuboid`, `cylinder`, `opening`, `polygon`, `sphere`, `sweep`, `wedge`
 - Operations: `boolean-operations`, `polygon-boolean-operations`, `offset`, `stl-export`, `sweep-path-profile`, `wall-from-offsets`
+
+## Hosted demos
+
+You can browse the hosted demo index at [demo.opengeometry.io](https://demo.opengeometry.io/).
+
+The URL paths mirror the `examples-vite/` folder. For example:
+
+- `examples-vite/primitives/line.html` -> `https://demo.opengeometry.io/primitives/line.html`
+- `examples-vite/operations/stl-export.html` -> `https://demo.opengeometry.io/operations/stl-export.html`
 
 ## Example structure
 
@@ -60,7 +64,7 @@ object, and update geometry through `setConfig(...)`.
     import "../src/styles/theme.css";
     import * as THREE from "three";
     import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-    import { OpenGeometry, Cuboid, Vector3 } from "@opengeometry/kernel-three";
+    import { OpenGeometry, Cuboid, Vector3 } from "opengeometry";
 
     const app = document.getElementById("app");
     let cuboid;
@@ -115,13 +119,12 @@ object, and update geometry through `setConfig(...)`.
 
 In this repository, local example authoring uses the `@og-three` alias inside the Vite config. When
 you copy the pattern into an application or a separate example repo, import from the published
-package name `@opengeometry/kernel-three`.
+package name `opengeometry`.
 
 ## Shared styling
 
-The shared example UI skin lives in:
-
-- `main/opengeometry-three/examples-vite/src/styles/theme.css`
+The shared example UI skin lives in the example catalog stylesheet (`theme.css`) inside the
+`examples-vite/` folder.
 
 That stylesheet is used by the public example pages for:
 
@@ -147,15 +150,17 @@ npm install
 2. Start the Three.js example dev server.
 
 ```bash
-npm --prefix main/opengeometry-three run dev-example-three
+npm run dev-example-three
 ```
+
+Run the command from the Three.js adapter package directory (the one that contains `vite.examples.config.mjs`).
 
 3. Open the served catalog or a direct page such as `/primitives/line.html` or `/operations/stl-export.html`.
 
 4. Build the catalog for production review when you change examples.
 
 ```bash
-npm --prefix main/opengeometry-three run build-example-three
+npm run build-example-three
 ```
 
 ## Related reading
