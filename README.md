@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://opengeometry.io">
-    <img src="https://img.shields.io/badge/OpenGeometry-4460FF?style=for-the-badge&logo=data:image/svg+xml;base64,&logoColor=white" alt="OpenGeometry" />
+    <img src="https://raw.githubusercontent.com/OpenGeometry-io/.github/main/profile/opengeometryTextLogo.png" alt="OpenGeometry" />
   </a>
 </p>
 
