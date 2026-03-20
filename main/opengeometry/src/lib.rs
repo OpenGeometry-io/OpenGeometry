@@ -1,5 +1,5 @@
 pub mod geometry {
-    pub mod basegeometry;
+    pub mod geometrybuffer;
     pub mod triangle;
 }
 
@@ -27,6 +27,10 @@ pub mod primitives {
     pub mod sphere;
     pub mod sweep;
     pub mod wedge;
+}
+
+pub mod spatial {
+    pub mod placement;
 }
 
 pub mod booleans;

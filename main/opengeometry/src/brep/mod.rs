@@ -10,11 +10,11 @@ pub mod wire;
 
 use std::collections::{HashMap, HashSet};
 
-use openmaths::Vector3;
+use openmaths::{Matrix4, Vector3};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::operations::triangulate::triangulate_polygon_with_holes;
+use crate::{operations::triangulate::triangulate_polygon_with_holes, spatial::placement::Placement3D};
 
 pub use builder::BrepBuilder;
 pub use edge::Edge;
@@ -94,6 +94,49 @@ impl Brep {
 
     pub fn get_flattened_vertices(&self) -> Vec<Vector3> {
         self.vertices.iter().map(|vertex| vertex.position).collect()
+    }
+
+    /**
+    * Applies the given placement's world transformation to the BREP. This function transforms all vertices in the BREP from their local space to world space using the transformation defined by the placement. The transformation includes translation, rotation, and scaling as specified in the placement's world matrix. After applying this function, the vertices in the BREP will be updated to reflect their new positions in world space, which can then be used for rendering or further processing.
+    */
+    pub fn apply_transform(&mut self, placement: &Placement3D) {
+        let placement_matrix = placement.world_matrix();
+        // TODO: Apply the placement_matrix to all vertices in self.vertices, figure out if we also need to transform halfedges, edges, loops, faces, wires, shells or if transforming vertices is sufficient to achieve the desired effect on the entire BREP which will save us from recomputing all the other elements after transformation.
+    }
+
+    pub fn bounds_center(&self) -> Option<Vector3> {
+        let first_vertex = self.vertices.first()?;
+        let mut min_x = first_vertex.position.x;
+        let mut min_y = first_vertex.position.y;
+        let mut min_z = first_vertex.position.z;
+        let mut max_x = first_vertex.position.x;
+        let mut max_y = first_vertex.position.y;
+        let mut max_z = first_vertex.position.z;
+
+        for vertex in &self.vertices[1..] {
+            min_x = min_x.min(vertex.position.x);
+            min_y = min_y.min(vertex.position.y);
+            min_z = min_z.min(vertex.position.z);
+            max_x = max_x.max(vertex.position.x);
+            max_y = max_y.max(vertex.position.y);
+            max_z = max_z.max(vertex.position.z);
+        }
+
+        Some(Vector3::new(
+            (min_x + max_x) * 0.5,
+            (min_y + max_y) * 0.5,
+            (min_z + max_z) * 0.5,
+        ))
+    }
+
+    pub fn recompute_face_normals(&mut self) {
+        for face_index in 0..self.faces.len() {
+            let outer_loop = self.faces[face_index].outer_loop;
+            let loop_indices = self.get_loop_vertex_indices(outer_loop);
+            if let Some(normal) = compute_loop_normal(self, &loop_indices) {
+                self.faces[face_index].set_normal(normal);
+            }
+        }
     }
 
     pub fn get_edge_endpoints(&self, edge_id: u32) -> Option<(u32, u32)> {
@@ -253,6 +296,32 @@ impl Brep {
         }
 
         vertices
+    }
+
+    pub fn get_wire_vertex_buffer(&self, wire_id: u32, repeat_first_when_closed: bool) -> Vec<f64> {
+        let Some(wire) = self.wires.get(wire_id as usize) else {
+            return Vec::new();
+        };
+
+        let mut vertex_ids = self.get_wire_vertex_indices(wire_id);
+        if repeat_first_when_closed && wire.is_closed {
+            if let Some(first_vertex_id) = vertex_ids.first().copied() {
+                vertex_ids.push(first_vertex_id);
+            }
+        }
+
+        let mut vertex_buffer = Vec::with_capacity(vertex_ids.len() * 3);
+        for vertex_id in vertex_ids {
+            let Some(vertex) = self.vertices.get(vertex_id as usize) else {
+                continue;
+            };
+
+            vertex_buffer.push(vertex.position.x);
+            vertex_buffer.push(vertex.position.y);
+            vertex_buffer.push(vertex.position.z);
+        }
+
+        vertex_buffer
     }
 
     pub fn get_vertices_by_face_id(&self, face_id: u32) -> Vec<Vector3> {
@@ -882,4 +951,36 @@ impl Brep {
 
         Ok(())
     }
+}
+
+fn compute_loop_normal(brep: &Brep, loop_indices: &[u32]) -> Option<Vector3> {
+    if loop_indices.len() < 3 {
+        return None;
+    }
+
+    let p0 = brep.vertices.get(loop_indices[0] as usize)?.position;
+    for index in 1..(loop_indices.len() - 1) {
+        let p1 = brep.vertices.get(loop_indices[index] as usize)?.position;
+        let p2 = brep
+            .vertices
+            .get(loop_indices[index + 1] as usize)?
+            .position;
+
+        let v1 = [p1.x - p0.x, p1.y - p0.y, p1.z - p0.z];
+        let v2 = [p2.x - p0.x, p2.y - p0.y, p2.z - p0.z];
+
+        let cross = [
+            v1[1] * v2[2] - v1[2] * v2[1],
+            v1[2] * v2[0] - v1[0] * v2[2],
+            v1[0] * v2[1] - v1[1] * v2[0],
+        ];
+        let length_sq = cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2];
+
+        if length_sq > 1.0e-18 {
+            let inv = length_sq.sqrt().recip();
+            return Some(Vector3::new(cross[0] * inv, cross[1] * inv, cross[2] * inv));
+        }
+    }
+
+    None
 }
