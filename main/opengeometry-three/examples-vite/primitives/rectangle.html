@@ -34,24 +34,44 @@
               <input data-control-number type="number" min="0.2" max="5" step="0.05" value="1.1" />
             </div>
           </label>
-          <label class="og-control-row" data-control-key="centerX" data-control-type="number">
+          <label class="og-control-row" data-control-key="translateX" data-control-type="number">
             <div class="og-control-header">
-              <span class="og-control-label-chip">Center X</span>
+              <span class="og-control-label-chip">Translate X</span>
               <code class="og-control-value" data-control-value>0</code>
             </div>
             <div class="og-control-range">
-              <input data-control-range type="range" min="-3" max="3" step="0.1" value="0" />
-              <input data-control-number type="number" min="-3" max="3" step="0.1" value="0" />
+              <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
+              <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
             </div>
           </label>
-          <label class="og-control-row" data-control-key="centerZ" data-control-type="number">
+          <label class="og-control-row" data-control-key="translateZ" data-control-type="number">
             <div class="og-control-header">
-              <span class="og-control-label-chip">Center Z</span>
+              <span class="og-control-label-chip">Translate Z</span>
               <code class="og-control-value" data-control-value>0</code>
             </div>
             <div class="og-control-range">
-              <input data-control-range type="range" min="-3" max="3" step="0.1" value="0" />
-              <input data-control-number type="number" min="-3" max="3" step="0.1" value="0" />
+              <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
+              <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="rotateYDeg" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Rotate Y (deg)</span>
+              <code class="og-control-value" data-control-value>0</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="-180" max="180" step="1" value="0" />
+              <input data-control-number type="number" min="-180" max="180" step="1" value="0" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="scale" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Scale</span>
+              <code class="og-control-value" data-control-value>1</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="0.5" max="2" step="0.05" value="1" />
+              <input data-control-number type="number" min="0.5" max="2" step="0.05" value="1" />
             </div>
           </label>
         </aside>
@@ -72,12 +92,22 @@
       let config = {
         width: 1.8,
         breadth: 1.1,
-        centerX: 0,
-        centerZ: 0,
+        translateX: 0,
+        translateZ: 0,
+        rotateYDeg: 0,
+        scale: 1,
       };
 
       function formatControlNumber(value) {
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      }
+
+      function applyTransform(target) {
+        target.setPlacement({
+          translation: new Vector3(config.translateX, 0, config.translateZ),
+          rotation: new Vector3(0, (config.rotateYDeg * Math.PI) / 180, 0),
+          scale: new Vector3(config.scale, config.scale, config.scale),
+        });
       }
 
       function setUIControls() {
@@ -126,11 +156,13 @@
       function updateGeometry() {
         if (!rectangle) return;
         rectangle.setConfig({
-          center: new Vector3(config.centerX, 0, config.centerZ),
+          center: new Vector3(0, 0, 0),
           width: config.width,
           breadth: config.breadth,
           color: 0x1f2937,
         });
+
+        applyTransform(rectangle);
       }
 
       async function main() {
@@ -170,7 +202,7 @@
         await OpenGeometry.create({ wasmURL: wasmUrl });
 
         rectangle = new Rectangle({
-          center: new Vector3(config.centerX, 0, config.centerZ),
+          center: new Vector3(0, 0, 0),
           width: config.width,
           breadth: config.breadth,
           color: 0x1f2937,

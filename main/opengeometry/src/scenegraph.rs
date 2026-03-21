@@ -300,7 +300,8 @@ impl OGSceneManager {
         entity_id: impl Into<String>,
         line: &OGLine,
     ) -> Result<(), String> {
-        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGLine", line.brep())
+        let world_brep = line.world_brep();
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGLine", &world_brep)
     }
 
     pub fn add_polyline_to_scene_internal(
@@ -309,7 +310,8 @@ impl OGSceneManager {
         entity_id: impl Into<String>,
         polyline: &OGPolyline,
     ) -> Result<(), String> {
-        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGPolyline", polyline.brep())
+        let world_brep = polyline.world_brep();
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGPolyline", &world_brep)
     }
 
     pub fn add_arc_to_scene_internal(
@@ -318,7 +320,8 @@ impl OGSceneManager {
         entity_id: impl Into<String>,
         arc: &OGArc,
     ) -> Result<(), String> {
-        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGArc", arc.brep())
+        let world_brep = arc.world_brep();
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGArc", &world_brep)
     }
 
     pub fn add_rectangle_to_scene_internal(
@@ -327,7 +330,8 @@ impl OGSceneManager {
         entity_id: impl Into<String>,
         rectangle: &OGRectangle,
     ) -> Result<(), String> {
-        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGRectangle", rectangle.brep())
+        let world_brep = rectangle.world_brep();
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGRectangle", &world_brep)
     }
 
     pub fn add_polygon_to_scene_internal(
@@ -336,7 +340,8 @@ impl OGSceneManager {
         entity_id: impl Into<String>,
         polygon: &OGPolygon,
     ) -> Result<(), String> {
-        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGPolygon", polygon.brep())
+        let world_brep = polygon.world_brep();
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGPolygon", &world_brep)
     }
 
     pub fn add_cuboid_to_scene_internal(
@@ -345,7 +350,8 @@ impl OGSceneManager {
         entity_id: impl Into<String>,
         cuboid: &OGCuboid,
     ) -> Result<(), String> {
-        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGCuboid", cuboid.brep())
+        let world_brep = cuboid.world_brep();
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGCuboid", &world_brep)
     }
 
     pub fn add_cylinder_to_scene_internal(
@@ -354,7 +360,8 @@ impl OGSceneManager {
         entity_id: impl Into<String>,
         cylinder: &OGCylinder,
     ) -> Result<(), String> {
-        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGCylinder", cylinder.brep())
+        let world_brep = cylinder.world_brep();
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGCylinder", &world_brep)
     }
 
     pub fn add_sphere_to_scene_internal(
@@ -363,7 +370,8 @@ impl OGSceneManager {
         entity_id: impl Into<String>,
         sphere: &OGSphere,
     ) -> Result<(), String> {
-        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGSphere", sphere.brep())
+        let world_brep = sphere.world_brep();
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGSphere", &world_brep)
     }
 
     pub fn add_wedge_to_scene_internal(
@@ -372,7 +380,8 @@ impl OGSceneManager {
         entity_id: impl Into<String>,
         wedge: &OGWedge,
     ) -> Result<(), String> {
-        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGWedge", wedge.brep())
+        let world_brep = wedge.world_brep();
+        self.add_brep_entity_to_scene_internal(scene_id, entity_id, "OGWedge", &world_brep)
     }
 
     pub fn project_scene_to_2d(
@@ -668,6 +677,48 @@ impl OGSceneManager {
             .scene_id_or_current(None)
             .map_err(|err| JsValue::from_str(&err))?;
         self.add_brep_entity_to_scene(scene_id, entity_id, kind, brep_serialized)
+    }
+
+    #[wasm_bindgen(js_name = replaceBrepEntityInScene)]
+    pub fn replace_brep_entity_in_scene(
+        &mut self,
+        scene_id: String,
+        entity_id: String,
+        kind: String,
+        brep_serialized: String,
+    ) -> Result<(), JsValue> {
+        self.add_brep_entity_to_scene(scene_id, entity_id, kind, brep_serialized)
+    }
+
+    #[wasm_bindgen(js_name = replaceBrepEntityInCurrentScene)]
+    pub fn replace_brep_entity_in_current_scene(
+        &mut self,
+        entity_id: String,
+        kind: String,
+        brep_serialized: String,
+    ) -> Result<(), JsValue> {
+        self.add_brep_entity_to_current_scene(entity_id, kind, brep_serialized)
+    }
+
+    #[wasm_bindgen(js_name = refreshBrepEntityInScene)]
+    pub fn refresh_brep_entity_in_scene(
+        &mut self,
+        scene_id: String,
+        entity_id: String,
+        kind: String,
+        brep_serialized: String,
+    ) -> Result<(), JsValue> {
+        self.replace_brep_entity_in_scene(scene_id, entity_id, kind, brep_serialized)
+    }
+
+    #[wasm_bindgen(js_name = refreshBrepEntityInCurrentScene)]
+    pub fn refresh_brep_entity_in_current_scene(
+        &mut self,
+        entity_id: String,
+        kind: String,
+        brep_serialized: String,
+    ) -> Result<(), JsValue> {
+        self.replace_brep_entity_in_current_scene(entity_id, kind, brep_serialized)
     }
 
     #[wasm_bindgen(js_name = addLineToScene)]
@@ -1161,8 +1212,23 @@ impl OGSceneManager {
 mod tests {
     use super::*;
     use crate::brep::{Brep, BrepBuilder};
+    use crate::primitives::cuboid::OGCuboid;
     use openmaths::Vector3;
     use uuid::Uuid;
+
+    fn assert_close(actual: f64, expected: f64) {
+        let delta = (actual - expected).abs();
+        assert!(
+            delta <= 1.0e-9,
+            "expected {expected}, got {actual}, delta {delta}"
+        );
+    }
+
+    fn assert_vec_close(actual: Vector3, expected: Vector3) {
+        assert_close(actual.x, expected.x);
+        assert_close(actual.y, expected.y);
+        assert_close(actual.z, expected.z);
+    }
 
     #[test]
     fn test_scene_projection_from_edge_entity() {
@@ -1246,6 +1312,123 @@ mod tests {
         let triangle_count = u32::from_le_bytes([bytes[80], bytes[81], bytes[82], bytes[83]]);
         assert_eq!(triangle_count as usize, report.exported_triangles);
         assert_eq!(report.exported_triangles, 1);
+    }
+
+    #[test]
+    fn adding_placed_cuboid_to_scene_snapshots_world_space_brep() {
+        let mut manager = OGSceneManager::new();
+        let scene_id = manager.create_scene_internal("placed-scene");
+
+        let mut cuboid = OGCuboid::new("placed-cuboid".to_string());
+        cuboid
+            .set_config(Vector3::new(0.0, 0.0, 0.0), 2.0, 2.0, 2.0)
+            .expect("cuboid config");
+        cuboid
+            .set_transform(
+                Vector3::new(5.0, 1.0, -2.0),
+                Vector3::new(0.0, 0.4, 0.0),
+                Vector3::new(1.25, 1.25, 1.25),
+            )
+            .expect("placement transform");
+        let expected_brep = cuboid.world_brep();
+
+        manager
+            .add_cuboid_to_scene_internal(&scene_id, "placed-cuboid", &cuboid)
+            .expect("scene insert");
+
+        let scene = manager.get_scene(&scene_id).expect("scene");
+        let entity = scene
+            .entities
+            .iter()
+            .find(|item| item.id == "placed-cuboid")
+            .expect("entity");
+
+        assert_eq!(entity.kind, "OGCuboid");
+        assert_eq!(entity.brep.vertices.len(), expected_brep.vertices.len());
+        for (actual, expected) in entity
+            .brep
+            .vertices
+            .iter()
+            .zip(expected_brep.vertices.iter())
+        {
+            assert_vec_close(actual.position, expected.position);
+        }
+
+        let scene_center = entity.brep.bounds_center().expect("scene bounds");
+        let world_center = expected_brep.bounds_center().expect("world bounds");
+        assert_vec_close(scene_center, world_center);
+
+        let projected = manager
+            .project_scene_to_2d(
+                &scene_id,
+                &CameraParameters::default(),
+                &HlrOptions::default(),
+            )
+            .expect("projection");
+        assert!(!projected.is_empty());
+    }
+
+    #[test]
+    fn scene_snapshot_stays_stale_until_explicit_replace_refresh() {
+        let mut manager = OGSceneManager::new();
+        let scene_id = manager.create_scene_internal("refresh-scene");
+
+        let mut cuboid = OGCuboid::new("refresh-cuboid".to_string());
+        cuboid
+            .set_config(Vector3::new(0.0, 0.0, 0.0), 2.0, 2.0, 2.0)
+            .expect("cuboid config");
+        cuboid
+            .set_transform(
+                Vector3::new(1.0, 0.0, 0.0),
+                Vector3::new(0.0, 0.0, 0.0),
+                Vector3::new(1.0, 1.0, 1.0),
+            )
+            .expect("initial placement");
+
+        manager
+            .add_cuboid_to_scene_internal(&scene_id, "refresh-cuboid", &cuboid)
+            .expect("scene insert");
+
+        cuboid
+            .set_transform(
+                Vector3::new(6.0, 0.0, 0.0),
+                Vector3::new(0.0, 0.0, 0.0),
+                Vector3::new(1.0, 1.0, 1.0),
+            )
+            .expect("updated placement");
+
+        let scene_before_refresh = manager.get_scene(&scene_id).expect("scene");
+        let entity_before_refresh = scene_before_refresh
+            .entities
+            .iter()
+            .find(|item| item.id == "refresh-cuboid")
+            .expect("entity");
+        let center_before_refresh = entity_before_refresh
+            .brep
+            .bounds_center()
+            .expect("bounds before refresh");
+        assert_close(center_before_refresh.x, 1.0);
+
+        manager
+            .replace_brep_entity_in_scene(
+                scene_id.clone(),
+                "refresh-cuboid".to_string(),
+                "OGCuboid".to_string(),
+                serde_json::to_string(&cuboid.world_brep()).expect("serialize world brep"),
+            )
+            .expect("replace scene entity");
+
+        let scene_after_refresh = manager.get_scene(&scene_id).expect("scene");
+        let entity_after_refresh = scene_after_refresh
+            .entities
+            .iter()
+            .find(|item| item.id == "refresh-cuboid")
+            .expect("entity");
+        let center_after_refresh = entity_after_refresh
+            .brep
+            .bounds_center()
+            .expect("bounds after refresh");
+        assert_close(center_after_refresh.x, 6.0);
     }
 
     #[test]

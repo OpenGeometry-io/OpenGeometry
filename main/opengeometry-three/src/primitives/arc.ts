@@ -16,9 +16,21 @@ export interface IArcOptions {
   color: number;
   fatLines?: boolean;
   width?: number;
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
 }
 
-export type ArcConfigUpdate = Partial<IArcOptions>;
+export interface ArcPlacementOptions {
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
+}
+
+export type ArcConfigUpdate = Partial<
+  Omit<IArcOptions, "translation" | "rotation" | "scale">
+>;
+export type ArcPlacementUpdate = ArcPlacementOptions;
 
 export class Arc extends THREE.Line {
   ogid: string;
@@ -30,7 +42,10 @@ export class Arc extends THREE.Line {
     segments: 32,
     color: 0x00ff00,
     fatLines: false,
-    width: 20
+    width: 20,
+    translation: new Vector3(0, 0, 0),
+    rotation: new Vector3(0, 0, 0),
+    scale: new Vector3(1, 1, 1),
   };
 
   private arc: OGArc;
@@ -55,7 +70,21 @@ export class Arc extends THREE.Line {
     this.options = { ...this.options, ...options };
     this.options.ogid = this.ogid;
 
-    this.setConfig(this.options);
+    this.setConfig({
+      center: this.options.center.clone(),
+      radius: this.options.radius,
+      startAngle: this.options.startAngle,
+      endAngle: this.options.endAngle,
+      segments: this.options.segments,
+      color: this.options.color,
+      fatLines: this.options.fatLines,
+      width: this.options.width,
+    });
+    this.setPlacement({
+      translation: this.options.translation?.clone(),
+      rotation: this.options.rotation?.clone(),
+      scale: this.options.scale?.clone(),
+    });
   }
 
   validateOptions() {
@@ -97,6 +126,44 @@ export class Arc extends THREE.Line {
     if (renderChanged) {
       this.updateRenderStyle();
     }
+  }
+
+  getAnchor() {
+    const anchor = this.arc.get_anchor();
+    return new Vector3(anchor.x, anchor.y, anchor.z);
+  }
+
+  setPlacement(placement: ArcPlacementUpdate) {
+    this.options.translation = placement.translation?.clone() ?? this.options.translation;
+    this.options.rotation = placement.rotation?.clone() ?? this.options.rotation;
+    this.options.scale = placement.scale?.clone() ?? this.options.scale;
+
+    this.arc.set_transform(
+      this.options.translation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.rotation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.scale?.clone() ?? new Vector3(1, 1, 1)
+    );
+    this.generateGeometry();
+  }
+
+  setTransform(translation: Vector3, rotation: Vector3, scale: Vector3) {
+    this.setPlacement({
+      translation,
+      rotation,
+      scale,
+    });
+  }
+
+  setTranslation(translation: Vector3) {
+    this.setPlacement({ translation });
+  }
+
+  setRotation(rotation: Vector3) {
+    this.setPlacement({ rotation });
+  }
+
+  setScale(scale: Vector3) {
+    this.setPlacement({ scale });
   }
 
   getConfig() {
@@ -157,22 +224,24 @@ export class Arc extends THREE.Line {
   }
 
   private generateGeometry() {
-    if (this.geometry) {
-      this.geometry.dispose();
+    const bufferData = Array.from(this.arc.get_geometry_buffer());
+
+    this.writePositionsToGeometry(this.geometry, bufferData);
+    this.geometry.computeBoundingBox();
+    this.geometry.computeBoundingSphere();
+
+    if (this.material instanceof THREE.LineBasicMaterial) {
+      this.material.color.set(this.options.color);
+    } else {
+      if (Array.isArray(this.material)) {
+        this.material.forEach((material) => material.dispose());
+      } else {
+        this.material.dispose();
+      }
+
+      this.material = new THREE.LineBasicMaterial({ color: this.options.color });
     }
 
-    this.arc.generate_geometry();
-    const geometryData = this.arc.get_geometry_serialized();
-    const bufferData = JSON.parse(geometryData);
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(bufferData, 3)
-    );
-
-    this.geometry = geometry;
-    this.material = new THREE.LineBasicMaterial({ color: this.options.color });
     this.updateRenderStyle(bufferData);
   }
 
@@ -186,5 +255,27 @@ export class Arc extends THREE.Line {
 
   discardGeometry() {
     this.geometry.dispose();
+  }
+
+  private writePositionsToGeometry(
+    geometry: THREE.BufferGeometry,
+    positions: number[]
+  ) {
+    const existing = geometry.getAttribute("position");
+    if (
+      !(existing instanceof THREE.BufferAttribute) ||
+      existing.itemSize !== 3 ||
+      existing.count !== positions.length / 3
+    ) {
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      return;
+    }
+
+    const array = existing.array as Float32Array;
+    array.set(positions);
+    existing.needsUpdate = true;
   }
 }

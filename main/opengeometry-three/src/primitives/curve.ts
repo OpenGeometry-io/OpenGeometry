@@ -6,9 +6,21 @@ export interface ICurveOptions {
   ogid?: string;
   controlPoints: Vector3[];
   color: number;
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
 }
 
-export type CurveConfigUpdate = Partial<ICurveOptions>;
+export interface CurvePlacementOptions {
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
+}
+
+export type CurveConfigUpdate = Partial<
+  Omit<ICurveOptions, "translation" | "rotation" | "scale">
+>;
+export type CurvePlacementUpdate = CurvePlacementOptions;
 
 export interface ICurveOffsetResult {
   points: Vector3[];
@@ -35,6 +47,9 @@ export class Curve extends THREE.Line {
   options: ICurveOptions = {
     controlPoints: [],
     color: 0x00aa55,
+    translation: new Vector3(0, 0, 0),
+    rotation: new Vector3(0, 0, 0),
+    scale: new Vector3(1, 1, 1),
   };
 
   private curve: OGCurve;
@@ -55,7 +70,15 @@ export class Curve extends THREE.Line {
     this.options = { ...this.options, ...options };
     this.options.ogid = this.ogid;
 
-    this.setConfig(this.options);
+    this.setConfig({
+      controlPoints: this.options.controlPoints.map((point) => point.clone()),
+      color: this.options.color,
+    });
+    this.setPlacement({
+      translation: this.options.translation?.clone(),
+      rotation: this.options.rotation?.clone(),
+      scale: this.options.scale?.clone(),
+    });
   }
 
   setConfig(options: CurveConfigUpdate) {
@@ -78,20 +101,72 @@ export class Curve extends THREE.Line {
     }
   }
 
-  private generateGeometry() {
-    this.geometry.dispose();
+  getAnchor() {
+    const anchor = this.curve.get_anchor();
+    return new Vector3(anchor.x, anchor.y, anchor.z);
+  }
 
-    const geometryData = this.curve.get_geometry_serialized();
-    const bufferData = JSON.parse(geometryData);
+  setAnchor(anchor: Vector3) {
+    this.curve.set_anchor(anchor.clone());
+    this.generateGeometry();
+  }
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(bufferData, 3)
+  resetAnchor() {
+    this.curve.reset_anchor();
+    this.generateGeometry();
+  }
+
+  setPlacement(placement: CurvePlacementUpdate) {
+    this.options.translation = placement.translation?.clone() ?? this.options.translation;
+    this.options.rotation = placement.rotation?.clone() ?? this.options.rotation;
+    this.options.scale = placement.scale?.clone() ?? this.options.scale;
+
+    this.curve.set_transform(
+      this.options.translation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.rotation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.scale?.clone() ?? new Vector3(1, 1, 1)
     );
+    this.generateGeometry();
+  }
 
-    this.geometry = geometry;
-    this.material = new THREE.LineBasicMaterial({ color: this.options.color });
+  setTransform(translation: Vector3, rotation: Vector3, scale: Vector3) {
+    this.setPlacement({
+      translation,
+      rotation,
+      scale,
+    });
+  }
+
+  setTranslation(translation: Vector3) {
+    this.setPlacement({ translation });
+  }
+
+  setRotation(rotation: Vector3) {
+    this.setPlacement({ rotation });
+  }
+
+  setScale(scale: Vector3) {
+    this.setPlacement({ scale });
+  }
+
+  private generateGeometry() {
+    const bufferData = Array.from(this.curve.get_geometry_buffer());
+
+    this.writePositionsToGeometry(this.geometry, bufferData);
+    this.geometry.computeBoundingBox();
+    this.geometry.computeBoundingSphere();
+
+    if (this.material instanceof THREE.LineBasicMaterial) {
+      this.material.color.set(this.options.color);
+    } else {
+      if (Array.isArray(this.material)) {
+        this.material.forEach((material) => material.dispose());
+      } else {
+        this.material.dispose();
+      }
+
+      this.material = new THREE.LineBasicMaterial({ color: this.options.color });
+    }
   }
 
   getOffset(
@@ -120,5 +195,27 @@ export class Curve extends THREE.Line {
       beveledVertexIndices: parsed.beveled_vertex_indices ?? [],
       isClosed: Boolean(parsed.is_closed),
     };
+  }
+
+  private writePositionsToGeometry(
+    geometry: THREE.BufferGeometry,
+    positions: number[]
+  ) {
+    const existing = geometry.getAttribute("position");
+    if (
+      !(existing instanceof THREE.BufferAttribute) ||
+      existing.itemSize !== 3 ||
+      existing.count !== positions.length / 3
+    ) {
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      return;
+    }
+
+    const array = existing.array as Float32Array;
+    array.set(positions);
+    existing.needsUpdate = true;
   }
 }

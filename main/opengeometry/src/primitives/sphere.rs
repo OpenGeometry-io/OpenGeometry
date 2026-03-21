@@ -3,6 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::brep::{Brep, BrepBuilder};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
+use crate::spatial::placement::Placement3D;
 use openmaths::Vector3;
 use uuid::Uuid;
 
@@ -14,6 +15,7 @@ pub struct OGSphere {
     radius: f64,
     width_segments: u32,
     height_segments: u32,
+    placement: Placement3D,
     brep: Brep,
 }
 
@@ -39,6 +41,7 @@ impl OGSphere {
             radius: 1.0,
             width_segments: 24,
             height_segments: 16,
+            placement: Placement3D::new(),
             brep: Brep::new(internal_id),
         }
     }
@@ -55,8 +58,44 @@ impl OGSphere {
         self.radius = radius.max(1.0e-6);
         self.width_segments = width_segments.max(3);
         self.height_segments = height_segments.max(2);
+        self.placement.set_anchor(self.center);
 
         self.generate_brep()
+    }
+
+    #[wasm_bindgen]
+    pub fn set_center(&mut self, center: Vector3) {
+        self.center = center;
+        self.placement.set_anchor(self.center);
+    }
+
+    #[wasm_bindgen]
+    pub fn set_transform(
+        &mut self,
+        position: Vector3,
+        rotation: Vector3,
+        scale: Vector3,
+    ) -> Result<(), JsValue> {
+        self.placement
+            .set_transform(position, rotation, scale)
+            .map_err(|err| JsValue::from_str(&err))
+    }
+
+    #[wasm_bindgen]
+    pub fn set_translation(&mut self, translation: Vector3) {
+        self.placement.set_translation(translation);
+    }
+
+    #[wasm_bindgen]
+    pub fn set_rotation(&mut self, rotation: Vector3) {
+        self.placement.set_rotation(rotation);
+    }
+
+    #[wasm_bindgen]
+    pub fn set_scale(&mut self, scale: Vector3) -> Result<(), JsValue> {
+        self.placement
+            .set_scale(scale)
+            .map_err(|err| JsValue::from_str(&err))
     }
 
     pub fn generate_brep(&mut self) -> Result<(), JsValue> {
@@ -75,11 +114,7 @@ impl OGSphere {
 
         let mut vertices = Vec::new();
         // Top pole.
-        vertices.push(Vector3::new(
-            self.center.x,
-            self.center.y + self.radius,
-            self.center.z,
-        ));
+        vertices.push(Vector3::new(0.0, self.radius, 0.0));
 
         // Intermediate rings.
         for iy in 1..height {
@@ -95,19 +130,15 @@ impl OGSphere {
                 let cos_phi = phi.cos();
 
                 vertices.push(Vector3::new(
-                    self.center.x + self.radius * sin_theta * cos_phi,
-                    self.center.y + self.radius * cos_theta,
-                    self.center.z + self.radius * sin_theta * sin_phi,
+                    self.radius * sin_theta * cos_phi,
+                    self.radius * cos_theta,
+                    self.radius * sin_theta * sin_phi,
                 ));
             }
         }
 
         let bottom_id = vertices.len() as u32;
-        vertices.push(Vector3::new(
-            self.center.x,
-            self.center.y - self.radius,
-            self.center.z,
-        ));
+        vertices.push(Vector3::new(0.0, -self.radius, 0.0));
 
         let ring_vertex = |ring: usize, ix: usize| -> u32 {
             // ring is 1..height-1
@@ -171,50 +202,59 @@ impl OGSphere {
 
     #[wasm_bindgen]
     pub fn get_brep_serialized(&self) -> String {
+        serde_json::to_string(&self.world_brep()).unwrap()
+    }
+
+    #[wasm_bindgen]
+    pub fn get_local_brep_serialized(&self) -> String {
         serde_json::to_string(&self.brep).unwrap()
     }
 
     #[wasm_bindgen]
     pub fn get_geometry_serialized(&self) -> String {
-        let mut vertex_buffer: Vec<f64> = Vec::new();
+        let world_brep = self.world_brep();
+        serde_json::to_string(&world_brep.get_triangle_vertex_buffer()).unwrap()
+    }
 
-        for face in &self.brep.faces {
-            let face_vertices = self.brep.get_vertices_by_face_id(face.id);
-            if face_vertices.len() != 3 {
-                continue;
-            }
+    #[wasm_bindgen]
+    pub fn get_local_geometry_serialized(&self) -> String {
+        serde_json::to_string(&self.brep.get_triangle_vertex_buffer()).unwrap()
+    }
 
-            for vertex in face_vertices {
-                vertex_buffer.push(vertex.x);
-                vertex_buffer.push(vertex.y);
-                vertex_buffer.push(vertex.z);
-            }
-        }
+    #[wasm_bindgen]
+    pub fn get_geometry_buffer(&self) -> Vec<f64> {
+        self.world_brep().get_triangle_vertex_buffer()
+    }
 
-        serde_json::to_string(&vertex_buffer).unwrap()
+    #[wasm_bindgen]
+    pub fn get_local_geometry_buffer(&self) -> Vec<f64> {
+        self.brep.get_triangle_vertex_buffer()
     }
 
     #[wasm_bindgen]
     pub fn get_outline_geometry_serialized(&self) -> String {
-        let mut vertex_buffer: Vec<f64> = Vec::new();
+        let world_brep = self.world_brep();
+        serde_json::to_string(&world_brep.get_outline_vertex_buffer()).unwrap()
+    }
 
-        for (start_id, end_id) in self.brep.collect_outline_segments() {
-            let Some(start_vertex) = self.brep.vertices.get(start_id as usize) else {
-                continue;
-            };
-            let Some(end_vertex) = self.brep.vertices.get(end_id as usize) else {
-                continue;
-            };
+    #[wasm_bindgen]
+    pub fn get_local_outline_geometry_serialized(&self) -> String {
+        serde_json::to_string(&self.brep.get_outline_vertex_buffer()).unwrap()
+    }
 
-            vertex_buffer.push(start_vertex.position.x);
-            vertex_buffer.push(start_vertex.position.y);
-            vertex_buffer.push(start_vertex.position.z);
-            vertex_buffer.push(end_vertex.position.x);
-            vertex_buffer.push(end_vertex.position.y);
-            vertex_buffer.push(end_vertex.position.z);
-        }
+    #[wasm_bindgen]
+    pub fn get_outline_geometry_buffer(&self) -> Vec<f64> {
+        self.world_brep().get_outline_vertex_buffer()
+    }
 
-        serde_json::to_string(&vertex_buffer).unwrap()
+    #[wasm_bindgen]
+    pub fn get_local_outline_geometry_buffer(&self) -> Vec<f64> {
+        self.brep.get_outline_vertex_buffer()
+    }
+
+    #[wasm_bindgen]
+    pub fn get_anchor(&self) -> Vector3 {
+        self.placement.anchor
     }
 }
 
@@ -223,7 +263,12 @@ impl OGSphere {
         &self.brep
     }
 
+    pub fn world_brep(&self) -> Brep {
+        self.brep.transformed(&self.placement)
+    }
+
     pub fn to_projected_scene2d(&self, camera: &CameraParameters, hlr: &HlrOptions) -> Scene2D {
-        project_brep_to_scene(&self.brep, camera, hlr)
+        let world_brep = self.world_brep();
+        project_brep_to_scene(&world_brep, camera, hlr)
     }
 }

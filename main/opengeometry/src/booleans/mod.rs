@@ -304,13 +304,13 @@ mod tests {
         cuboid
             .set_config(center, width, height, depth)
             .expect("cuboid config");
-        cuboid.brep().clone()
+        cuboid.world_brep()
     }
 
     fn build_polygon(points: Vec<Vector3>) -> Brep {
         let mut polygon = OGPolygon::new("boolean-polygon".to_string());
         polygon.set_config(points).expect("polygon config");
-        polygon.brep().clone()
+        polygon.world_brep()
     }
 
     fn build_sphere(center: Vector3, radius: f64) -> Brep {
@@ -318,7 +318,43 @@ mod tests {
         sphere
             .set_config(center, radius, 18, 12)
             .expect("sphere config");
-        sphere.brep().clone()
+        sphere.world_brep()
+    }
+
+    fn build_placed_cuboid(
+        center: Vector3,
+        width: f64,
+        height: f64,
+        depth: f64,
+        translation: Vector3,
+        rotation: Vector3,
+        scale: Vector3,
+    ) -> Brep {
+        let mut cuboid = OGCuboid::new("placed-boolean-cuboid".to_string());
+        cuboid
+            .set_config(center, width, height, depth)
+            .expect("cuboid config");
+        cuboid
+            .set_transform(translation, rotation, scale)
+            .expect("placement transform");
+        cuboid.world_brep()
+    }
+
+    fn build_placed_sphere(
+        center: Vector3,
+        radius: f64,
+        translation: Vector3,
+        rotation: Vector3,
+        scale: Vector3,
+    ) -> Brep {
+        let mut sphere = OGSphere::new("placed-boolean-sphere".to_string());
+        sphere
+            .set_config(center, radius, 18, 12)
+            .expect("sphere config");
+        sphere
+            .set_transform(translation, rotation, scale)
+            .expect("placement transform");
+        sphere.world_brep()
     }
 
     fn assert_closed_solid(brep: &Brep) {
@@ -386,6 +422,35 @@ mod tests {
             boolean_subtraction(&lhs, &rhs, BooleanOptions::default()).expect("sphere subtraction");
 
         assert_closed_solid(&output.brep);
+    }
+
+    #[test]
+    fn subtraction_of_placed_sphere_from_rotated_scaled_cuboid_is_watertight() {
+        let lhs = build_placed_cuboid(
+            Vector3::new(0.0, 0.0, 0.0),
+            2.4,
+            1.8,
+            1.6,
+            Vector3::new(0.15, 0.0, 0.1),
+            Vector3::new(0.25, 0.4, -0.15),
+            Vector3::new(1.1, 1.1, 1.1),
+        );
+        let rhs = build_placed_sphere(
+            Vector3::new(0.0, 0.0, 0.0),
+            0.8,
+            Vector3::new(0.45, 0.05, 0.15),
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.95, 0.95, 0.95),
+        );
+
+        let output = boolean_subtraction(&lhs, &rhs, BooleanOptions::default())
+            .expect("placed boolean subtraction");
+
+        assert_closed_solid(&output.brep);
+        assert!(!output
+            .brep
+            .get_feature_outline_vertex_buffer(FEATURE_OUTLINE_CREASE_COS_THRESHOLD)
+            .is_empty());
     }
 
     #[test]

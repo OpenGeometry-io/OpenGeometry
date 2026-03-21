@@ -2,7 +2,7 @@
   "name": "opengeometry",
   "author": "Vishwajeet Vinayak Mane",
   "license": "MPL-2.0",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "CAD Kernel for Web with OpenGeometry",
   "type": "module",
   "main": "index.js",
@@ -14,8 +14,9 @@
     "build-three": "rollup -c rollup.config.js",
     "build-example-three": "npm --prefix main/opengeometry-three run build-example-three",
     "build-core": "cd main/opengeometry && wasm-pack build --target web && cargo build --release",
-    "copy-wasm": "mkdir -p dist && cp main/opengeometry/pkg/opengeometry_bg.wasm dist/ && cp main/opengeometry/pkg/opengeometry_bg.wasm.d.ts dist/ && cp package.json dist/",
-    "build": "npm run build-core && npm run build-three && npm run copy-wasm"
+    "prepare-dist": "node ./scripts/prepare-dist.mjs",
+    "copy-wasm": "npm run prepare-dist",
+    "build": "npm run build-core && npm run build-three && npm run prepare-dist"
   },
   "repository": {
     "type": "git",
@@ -33,7 +34,7 @@
   },
   "homepage": "https://github.com/OpenGeometry-io/OpenGeometry#readme",
   "peerDependencies": {
-    "three": "^0.168.0"
+    "three": ">=0.168.0"
   },
   "dependencies": {
     "tsc": "^2.0.4",

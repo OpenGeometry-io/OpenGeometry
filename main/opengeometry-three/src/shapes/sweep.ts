@@ -1,6 +1,7 @@
 import * as OGKernel from "../../../opengeometry/pkg/opengeometry";
 import { Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import { getUUID } from "../utils/randomizer";
 import {
   createShapeOutlineMesh,
@@ -24,18 +25,34 @@ export interface ISweepOptions {
   capEnd?: boolean;
   fatOutlines?: boolean;
   outlineWidth?: number;
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
 }
 
-export type SweepConfigUpdate = Partial<ISweepOptions>;
+export interface SweepPlacementOptions {
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
+}
+
+export type SweepConfigUpdate = Partial<
+  Omit<ISweepOptions, "translation" | "rotation" | "scale">
+>;
+export type SweepPlacementUpdate = SweepPlacementOptions;
 
 /* eslint-disable no-unused-vars */
 interface ISweepKernelInstance {
   set_config_with_caps: (
     ..._args: [Vector3[], Vector3[], boolean, boolean]
   ) => void;
-  get_geometry_serialized(): string;
+  set_transform: (..._args: [Vector3, Vector3, Vector3]) => void;
+  set_anchor: (..._args: [Vector3]) => void;
+  reset_anchor: () => void;
+  get_geometry_buffer(): Float64Array;
   get_brep_serialized(): string;
-  get_outline_geometry_serialized(): string;
+  get_outline_geometry_buffer(): Float64Array;
+  get_anchor(): Vector3;
 }
 
 type SweepKernelConstructor = new (..._args: [string]) => ISweepKernelInstance;
@@ -59,6 +76,9 @@ export class Sweep extends THREE.Mesh {
     capEnd: true,
     fatOutlines: false,
     outlineWidth: 1,
+    translation: new Vector3(0, 0, 0),
+    rotation: new Vector3(0, 0, 0),
+    scale: new Vector3(1, 1, 1),
   };
 
   private sweep: ISweepKernelInstance;
@@ -90,7 +110,20 @@ export class Sweep extends THREE.Mesh {
     this.options = { ...this.options, ...options };
     this.options.ogid = this.ogid;
 
-    this.setConfig(this.options);
+    this.setConfig({
+      path: this.options.path.map((point) => point.clone()),
+      profile: this.options.profile.map((point) => point.clone()),
+      color: this.options.color,
+      capStart: this.options.capStart,
+      capEnd: this.options.capEnd,
+      fatOutlines: this.options.fatOutlines,
+      outlineWidth: this.options.outlineWidth,
+    });
+    this.setPlacement({
+      translation: this.options.translation?.clone(),
+      rotation: this.options.rotation?.clone(),
+      scale: this.options.scale?.clone(),
+    });
   }
 
   validateOptions() {
@@ -147,6 +180,54 @@ export class Sweep extends THREE.Mesh {
     }
   }
 
+  getAnchor() {
+    const anchor = this.sweep.get_anchor();
+    return new Vector3(anchor.x, anchor.y, anchor.z);
+  }
+
+  setAnchor(anchor: Vector3) {
+    this.sweep.set_anchor(anchor.clone());
+    this.generateGeometry();
+  }
+
+  resetAnchor() {
+    this.sweep.reset_anchor();
+    this.generateGeometry();
+  }
+
+  setPlacement(placement: SweepPlacementUpdate) {
+    this.options.translation = placement.translation?.clone() ?? this.options.translation;
+    this.options.rotation = placement.rotation?.clone() ?? this.options.rotation;
+    this.options.scale = placement.scale?.clone() ?? this.options.scale;
+
+    this.sweep.set_transform(
+      this.options.translation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.rotation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.scale?.clone() ?? new Vector3(1, 1, 1)
+    );
+    this.generateGeometry();
+  }
+
+  setTransform(translation: Vector3, rotation: Vector3, scale: Vector3) {
+    this.setPlacement({
+      translation,
+      rotation,
+      scale,
+    });
+  }
+
+  setTranslation(translation: Vector3) {
+    this.setPlacement({ translation });
+  }
+
+  setRotation(rotation: Vector3) {
+    this.setPlacement({ rotation });
+  }
+
+  setScale(scale: Vector3) {
+    this.setPlacement({ scale });
+  }
+
   cleanGeometry() {
     this.geometry.dispose();
     if (Array.isArray(this.material)) {
@@ -157,32 +238,56 @@ export class Sweep extends THREE.Mesh {
   }
 
   generateGeometry() {
-    this.cleanGeometry();
+    const bufferData = Array.from(this.sweep.get_geometry_buffer());
 
-    const geometryData = this.sweep.get_geometry_serialized();
-    const bufferData = JSON.parse(geometryData);
+    this.writePositionsToGeometry(this.geometry, bufferData);
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(bufferData, 3)
-    );
+    if (this.material instanceof THREE.MeshStandardMaterial) {
+      this.material.color.set(this.options.color);
+      this.material.transparent = true;
+      this.material.opacity = 0.6;
+    } else {
+      if (Array.isArray(this.material)) {
+        this.material.forEach((material) => material.dispose());
+      } else {
+        this.material.dispose();
+      }
 
-    const material = new THREE.MeshStandardMaterial({
-      color: this.options.color,
-      transparent: true,
-      opacity: 0.6,
-    });
-
-    geometry.computeVertexNormals();
-    geometry.computeBoundingBox();
-
-    this.geometry = geometry;
-    this.material = material;
-
-    if (this._outlineEnabled) {
-      this.outline = true;
+      this.material = new THREE.MeshStandardMaterial({
+        color: this.options.color,
+        transparent: true,
+        opacity: 0.6,
+      });
     }
+
+    this.geometry.computeVertexNormals();
+    this.geometry.computeBoundingBox();
+    this.geometry.computeBoundingSphere();
+
+    if (!this._outlineEnabled) {
+      return;
+    }
+
+    const outlineData = Array.from(this.sweep.get_outline_geometry_buffer());
+    if (!this.#outlineMesh) {
+      this.outline = true;
+      return;
+    }
+
+    if (this.#outlineMesh instanceof THREE.LineSegments) {
+      this.writePositionsToGeometry(this.#outlineMesh.geometry, outlineData);
+      this.#outlineMesh.geometry.computeBoundingBox();
+      this.#outlineMesh.geometry.computeBoundingSphere();
+      return;
+    }
+
+    const fatGeometry = this.#outlineMesh.geometry as LineSegmentsGeometry;
+    fatGeometry.setPositions(outlineData);
+
+    const fatOutline = this.#outlineMesh as ShapeOutlineMesh & {
+      computeLineDistances?: () => void;
+    };
+    fatOutline.computeLineDistances?.();
   }
 
   getBrep() {
@@ -207,8 +312,7 @@ export class Sweep extends THREE.Mesh {
     this._outlineEnabled = enable;
     this.clearOutlineMesh();
     if (enable) {
-      const outlineBuff = this.sweep.get_outline_geometry_serialized();
-      const outlineData = JSON.parse(outlineBuff) as number[];
+      const outlineData = Array.from(this.sweep.get_outline_geometry_buffer());
       this.#outlineMesh = createShapeOutlineMesh({
         positions: outlineData,
         color: 0x000000,
@@ -259,5 +363,27 @@ export class Sweep extends THREE.Mesh {
 
   discardGeometry() {
     this.geometry.dispose();
+  }
+
+  private writePositionsToGeometry(
+    geometry: THREE.BufferGeometry,
+    positions: number[]
+  ) {
+    const existing = geometry.getAttribute("position");
+    if (
+      !(existing instanceof THREE.BufferAttribute) ||
+      existing.itemSize !== 3 ||
+      existing.count !== positions.length / 3
+    ) {
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      return;
+    }
+
+    const array = existing.array as Float32Array;
+    array.set(positions);
+    existing.needsUpdate = true;
   }
 }

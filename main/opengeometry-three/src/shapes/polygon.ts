@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OGPolygon, Vector3 } from "../../../opengeometry/pkg/opengeometry";
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import { getUUID } from "../utils/randomizer";
 import {
   createShapeOutlineMesh,
@@ -23,9 +24,21 @@ export interface IPolygonOptions {
   color: number;
   fatOutlines?: boolean;
   outlineWidth?: number;
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
 }
 
-export type PolygonConfigUpdate = Partial<IPolygonOptions>;
+export interface PolygonPlacementOptions {
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
+}
+
+export type PolygonConfigUpdate = Partial<
+  Omit<IPolygonOptions, "translation" | "rotation" | "scale">
+>;
+export type PolygonPlacementUpdate = PolygonPlacementOptions;
 
 export class Polygon extends THREE.Mesh {
   ogid: string;
@@ -35,6 +48,9 @@ export class Polygon extends THREE.Mesh {
     color: 0x00ff00,
     fatOutlines: false,
     outlineWidth: 1,
+    translation: new Vector3(0, 0, 0),
+    rotation: new Vector3(0, 0, 0),
+    scale: new Vector3(1, 1, 1),
   };
   polygon: OGPolygon;
   #outlineMesh: ShapeOutlineMesh | null = null;
@@ -71,8 +87,21 @@ export class Polygon extends THREE.Mesh {
 
     this.options = { ...this.options, ...options };
     this.options.ogid = this.ogid;
-    
-    this.setConfig(this.options);
+
+    this.setConfig({
+      vertices: this.options.vertices.map((vertex) => vertex.clone()),
+      holes: (this.options.holes ?? []).map((hole) =>
+        hole.map((vertex) => vertex.clone())
+      ),
+      color: this.options.color,
+      fatOutlines: this.options.fatOutlines,
+      outlineWidth: this.options.outlineWidth,
+    });
+    this.setPlacement({
+      translation: this.options.translation?.clone(),
+      rotation: this.options.rotation?.clone(),
+      scale: this.options.scale?.clone(),
+    });
 
     // TODO: THIS MIGHT HELP WITH SHARING THE POSITION with KERNEL when something is changed
     // const originalSet = this.position.set.bind(this.position);
@@ -115,7 +144,6 @@ export class Polygon extends THREE.Mesh {
     this.options.outlineWidth = this._outlineWidth;
 
     if (geometryChanged) {
-      this.polygon = new OGPolygon(this.ogid);
       this.polygon.set_config(this.options.vertices.map((vertex) => vertex.clone()));
       (this.options.holes ?? []).forEach((hole) => {
         this.polygon.add_holes(hole.map((vertex) => vertex.clone()));
@@ -131,6 +159,54 @@ export class Polygon extends THREE.Mesh {
     if (outlineStyleChanged && this._outlineEnabled) {
       this.outline = true;
     }
+  }
+
+  getAnchor() {
+    const anchor = this.polygon.get_anchor();
+    return new Vector3(anchor.x, anchor.y, anchor.z);
+  }
+
+  setAnchor(anchor: Vector3) {
+    this.polygon.set_anchor(anchor.clone());
+    this.generateGeometry();
+  }
+
+  resetAnchor() {
+    this.polygon.reset_anchor();
+    this.generateGeometry();
+  }
+
+  setPlacement(placement: PolygonPlacementUpdate) {
+    this.options.translation = placement.translation?.clone() ?? this.options.translation;
+    this.options.rotation = placement.rotation?.clone() ?? this.options.rotation;
+    this.options.scale = placement.scale?.clone() ?? this.options.scale;
+
+    this.polygon.set_transform(
+      this.options.translation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.rotation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.scale?.clone() ?? new Vector3(1, 1, 1)
+    );
+    this.generateGeometry();
+  }
+
+  setTransform(translation: Vector3, rotation: Vector3, scale: Vector3) {
+    this.setPlacement({
+      translation,
+      rotation,
+      scale,
+    });
+  }
+
+  setTranslation(translation: Vector3) {
+    this.setPlacement({ translation });
+  }
+
+  setRotation(rotation: Vector3) {
+    this.setPlacement({ rotation });
+  }
+
+  setScale(scale: Vector3) {
+    this.setPlacement({ scale });
   }
 
   // /**
@@ -201,50 +277,60 @@ export class Polygon extends THREE.Mesh {
   }
 
   generateGeometry() {
-    this.cleanGeometry();
+    const bufferData = Array.from(this.polygon.get_geometry_buffer());
 
-    // this.updateMatrix();
-    // this.transformationMatrix.copy(this.matrix);
-    // console.log("Transformation matrix set for polygon:", this.transformationMatrix.elements);
+    this.writePositionsToGeometry(this.geometry, bufferData);
 
-    this.polygon.generate_geometry();
-    const geometryData = this.polygon.get_geometry_serialized();
-    const bufferData = JSON.parse(geometryData);
+    if (this.material instanceof THREE.MeshBasicMaterial) {
+      this.material.color.set(this.options.color);
+      this.material.side = THREE.DoubleSide;
+    } else {
+      if (Array.isArray(this.material)) {
+        this.material.forEach((material) => material.dispose());
+      } else {
+        this.material.dispose();
+      }
 
-    // TODO: If The Geometry is empty, no need to adjust position
-    if (bufferData.length === 0) {
-      console.warn("Geometry has no position attribute, skipping position adjustment.");
+      this.material = new THREE.MeshBasicMaterial({
+        color: this.options.color,
+        side: THREE.DoubleSide,
+      });
+    }
+
+    if (bufferData.length > 0) {
+      this.geometry.computeVertexNormals();
+      this.geometry.computeBoundingBox();
+      this.geometry.computeBoundingSphere();
+    } else {
+      this.geometry.deleteAttribute("normal");
+      this.geometry.boundingBox = null;
+      this.geometry.boundingSphere = null;
+    }
+
+    if (!this._outlineEnabled) {
       return;
     }
 
-    // Ensure buffer data length is divisible by 3 (x, y, z)
-    if (bufferData.length % 3 !== 0) {
-      return;
-    }
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(bufferData, 3)
-    );
-
-    const material = new THREE.MeshBasicMaterial({
-      color: this.options.color,
-      // transparent: true,
-      // opacity: 1,
-      // TODO: Enabling Double Side untill we have proper face normals from triangulation
-      side: THREE.DoubleSide,
-    });
-
-    geometry.computeVertexNormals();
-    geometry.computeBoundingBox();
-
-    this.geometry = geometry;
-    this.material = material;
-
-    if (this._outlineEnabled) {
+    const outlineData = Array.from(this.polygon.get_outline_geometry_buffer());
+    if (!this.#outlineMesh) {
       this.outline = true;
+      return;
     }
+
+    if (this.#outlineMesh instanceof THREE.LineSegments) {
+      this.writePositionsToGeometry(this.#outlineMesh.geometry, outlineData);
+      this.#outlineMesh.geometry.computeBoundingBox();
+      this.#outlineMesh.geometry.computeBoundingSphere();
+      return;
+    }
+
+    const fatGeometry = this.#outlineMesh.geometry as LineSegmentsGeometry;
+    fatGeometry.setPositions(outlineData);
+
+    const fatOutline = this.#outlineMesh as ShapeOutlineMesh & {
+      computeLineDistances?: () => void;
+    };
+    fatOutline.computeLineDistances?.();
 
     // this.geometry.computeBoundingBox();
     // const originalCenter = new THREE.Vector3();
@@ -272,10 +358,9 @@ export class Polygon extends THREE.Mesh {
 
   addVertices(vertices: Vector3[]) {
     if (!this.polygon) return;
-
-    this.disposeGeometryMaterial();
-    this.polygon.add_vertices(vertices);
-    this.generateGeometry();
+    this.setConfig({
+      vertices: vertices.map((vertex) => vertex.clone()),
+    });
   }
 
   saveTransformationToBREP() {
@@ -343,11 +428,15 @@ export class Polygon extends THREE.Mesh {
 
   addHole(holeVertices: Vector3[]) {
     if (!this.polygon) return;
-    this.options.holes = [...(this.options.holes ?? []), holeVertices.map((vertex) => vertex.clone())];
-    this.polygon.add_holes(holeVertices);
-    
-    this.disposeGeometryMaterial();
-    this.generateGeometry();
+    this.options.holes = [
+      ...(this.options.holes ?? []),
+      holeVertices.map((vertex) => vertex.clone()),
+    ];
+    this.setConfig({
+      holes: (this.options.holes ?? []).map((hole) =>
+        hole.map((vertex) => vertex.clone())
+      ),
+    });
   }
 
   // extrude(height: number) {
@@ -407,8 +496,7 @@ export class Polygon extends THREE.Mesh {
     this._outlineEnabled = enable;
     this.clearOutlineMesh();
     if (enable) {
-      const outline_buff = this.polygon.get_outline_geometry_serialized();
-      const outline_buf = JSON.parse(outline_buff) as number[];
+      const outline_buf = Array.from(this.polygon.get_outline_geometry_buffer());
       this.#outlineMesh = createShapeOutlineMesh({
         positions: outline_buf,
         color: this._outlineColor,
@@ -492,5 +580,27 @@ export class Polygon extends THREE.Mesh {
     // this.polygon = null;
     // this.layerVertices = [];
     // this.layerBackVertices = [];
+  }
+
+  private writePositionsToGeometry(
+    geometry: THREE.BufferGeometry,
+    positions: number[]
+  ) {
+    const existing = geometry.getAttribute("position");
+    if (
+      !(existing instanceof THREE.BufferAttribute) ||
+      existing.itemSize !== 3 ||
+      existing.count !== positions.length / 3
+    ) {
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      return;
+    }
+
+    const array = existing.array as Float32Array;
+    array.set(positions);
+    existing.needsUpdate = true;
   }
 }

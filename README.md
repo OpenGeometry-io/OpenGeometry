@@ -60,16 +60,33 @@ Install from npm:
 npm install opengeometry
 ```
 
-```javascript
-import { OpenGeometry } from "opengeometry";
+```ts
+import { Cuboid, OpenGeometry, Vector3 } from "opengeometry";
 
-const og = new OpenGeometry();
-await og.init();
+await OpenGeometry.create({
+  wasmURL: new URL(
+    "node_modules/opengeometry/opengeometry_bg.wasm",
+    import.meta.url
+  ).href,
+});
 
-// Create a rectangle and extrude it into a 3D shape
-const rect = og.rectangle({ width: 2, height: 1 });
-const extruded = og.extrude(rect, { depth: 0.5 });
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0, 0),
+  width: 2,
+  height: 1,
+  depth: 1,
+  color: 0x33aa66,
+});
+
+// Placement is strict: scale must be positive + uniform.
+cuboid.setPlacement({
+  translation: new Vector3(1, 0, 0),
+  rotation: new Vector3(0, 0.25, 0),
+  scale: new Vector3(1.25, 1.25, 1.25),
+});
 ```
+
+Scenegraph behavior is snapshot-based: `add*ToScene` captures geometry at insert time. If you change placement/config later, push updates explicitly via `replaceBrepEntityInScene` or `refreshBrepEntityInScene`.
 
 For a complete walkthrough, see the [Quick Start guide](https://docs.opengeometry.io/quickstart) or clone the [quickstart-js](https://github.com/OpenGeometry-io/quickstart-js) repo.
 

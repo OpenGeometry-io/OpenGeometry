@@ -5,6 +5,7 @@ import typescript from '@rollup/plugin-typescript';
 
 export default {
   input: 'main/opengeometry-three/index.ts',
+  external: ['three', /^three\//],
   output: {
     file: 'dist/index.js',
     format: 'esm',

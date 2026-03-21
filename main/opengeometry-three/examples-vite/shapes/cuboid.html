@@ -72,12 +72,53 @@
           <input data-control-number type="number" min="1" max="12" step="0.5" value="4" />
         </div>
       </label>
+      <label class="og-control-row" data-control-key="translateX" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Translate X</span>
+          <code class="og-control-value" data-control-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
+          <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="translateZ" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Translate Z</span>
+          <code class="og-control-value" data-control-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
+          <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="rotateYDeg" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Rotate Y (deg)</span>
+          <code class="og-control-value" data-control-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="-180" max="180" step="1" value="0" />
+          <input data-control-number type="number" min="-180" max="180" step="1" value="0" />
+        </div>
+      </label>
+      <label class="og-control-row" data-control-key="scale" data-control-type="number">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Scale</span>
+          <code class="og-control-value" data-control-value>1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-control-range type="range" min="0.5" max="2" step="0.05" value="1" />
+          <input data-control-number type="number" min="0.5" max="2" step="0.05" value="1" />
+        </div>
+      </label>
     </aside>
     <div id="app"></div>
     <script type="module">
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
       import { OpenGeometry, Cuboid, Vector3 } from "@og-three";
 
@@ -91,6 +132,14 @@
 
       function formatControlNumber(value) {
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      }
+
+      function applyTransform(target) {
+        target.setPlacement({
+          translation: new Vector3(config.translateX, 0, config.translateZ),
+          rotation: new Vector3(0, (config.rotateYDeg * Math.PI) / 180, 0),
+          scale: new Vector3(config.scale, config.scale, config.scale),
+        });
       }
 
       // Connect each UI control to the cuboid config.
@@ -149,6 +198,7 @@
         });
 
         cuboid.outline = config.outline;
+        applyTransform(cuboid);
       }
 
       async function main() {
@@ -169,6 +219,15 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
+
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        app.appendChild(stats.dom);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
@@ -199,7 +258,11 @@
           depth: 1.2,
           outline: true,
           fatOutlines: false,
-          outlineWidth: 4
+          outlineWidth: 4,
+          translateX: 0,
+          translateZ: 0,
+          rotateYDeg: 0,
+          scale: 1,
         };
 
         cuboid = new Cuboid({
@@ -214,6 +277,7 @@
 
         cuboid.outline = config.outline;
         scene.add(cuboid);
+        updateGeometry();
 
         function onResize() {
           camera.aspect = window.innerWidth / window.innerHeight;
@@ -226,6 +290,7 @@
         function animate() {
           requestAnimationFrame(animate);
           controls.update();
+          stats.update();
           renderer.render(scene, camera);
         }
 

@@ -87,7 +87,12 @@ export class OpenGeometry {
   }
 
   private async setup(wasmURL?: string) {
-    await init(wasmURL);
+    if (wasmURL) {
+      await init({ module_or_path: wasmURL });
+      return;
+    }
+
+    await init();
   }
 }
 
@@ -100,16 +105,16 @@ export {
 /**
  * Primitive wrappers (line/polyline/arc/rectangle/curve).
  */
-export * from './src/primitives/';
+export * from "./src/primitives/index";
 /**
  * Shape wrappers (polygon/cuboid/cylinder/wedge/opening/sweep/sphere).
  */
-export * from './src/shapes/';
+export * from "./src/shapes/index";
 /**
  * Reusable example builders for quickly wiring demo scenes.
  */
-export * from './src/examples/';
+export * from "./src/examples/index";
 /**
  * Kernel-backed modeling operations.
  */
-export * from './src/operations/';
+export * from "./src/operations/index";

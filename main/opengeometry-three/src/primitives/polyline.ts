@@ -11,9 +11,21 @@ export interface IPolylineOptions {
   points: Vector3[];
   fatLines?: boolean;
   width?: number;
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
 }
 
-export type PolylineConfigUpdate = Partial<IPolylineOptions>;
+export interface PolylinePlacementOptions {
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
+}
+
+export type PolylineConfigUpdate = Partial<
+  Omit<IPolylineOptions, "translation" | "rotation" | "scale">
+>;
+export type PolylinePlacementUpdate = PolylinePlacementOptions;
 
 export interface IOffsetResult {
   points: Vector3[];
@@ -41,7 +53,10 @@ export class Polyline extends THREE.Line {
     points: [],
     color: 0x00ff00,
     fatLines: false,
-    width: 20
+    width: 20,
+    translation: new Vector3(0, 0, 0),
+    rotation: new Vector3(0, 0, 0),
+    scale: new Vector3(1, 1, 1),
   };
 
   isClosed: boolean = false;
@@ -70,7 +85,17 @@ export class Polyline extends THREE.Line {
     this.options = { ...this.options, ...options };
     this.options.ogid = this.ogid;
 
-    this.setConfig(this.options);
+    this.setConfig({
+      points: this.options.points.map((point) => point.clone()),
+      color: this.options.color,
+      fatLines: this.options.fatLines,
+      width: this.options.width,
+    });
+    this.setPlacement({
+      translation: this.options.translation?.clone(),
+      rotation: this.options.rotation?.clone(),
+      scale: this.options.scale?.clone(),
+    });
   }
 
   validateOptions() {
@@ -102,6 +127,54 @@ export class Polyline extends THREE.Line {
     }
   }
 
+  getAnchor() {
+    const anchor = this.polyline.get_anchor();
+    return new Vector3(anchor.x, anchor.y, anchor.z);
+  }
+
+  setAnchor(anchor: Vector3) {
+    this.polyline.set_anchor(anchor.clone());
+    this.generateGeometry();
+  }
+
+  resetAnchor() {
+    this.polyline.reset_anchor();
+    this.generateGeometry();
+  }
+
+  setPlacement(placement: PolylinePlacementUpdate) {
+    this.options.translation = placement.translation?.clone() ?? this.options.translation;
+    this.options.rotation = placement.rotation?.clone() ?? this.options.rotation;
+    this.options.scale = placement.scale?.clone() ?? this.options.scale;
+
+    this.polyline.set_transform(
+      this.options.translation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.rotation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.scale?.clone() ?? new Vector3(1, 1, 1)
+    );
+    this.generateGeometry();
+  }
+
+  setTransform(translation: Vector3, rotation: Vector3, scale: Vector3) {
+    this.setPlacement({
+      translation,
+      rotation,
+      scale,
+    });
+  }
+
+  setTranslation(translation: Vector3) {
+    this.setPlacement({ translation });
+  }
+
+  setRotation(rotation: Vector3) {
+    this.setPlacement({ rotation });
+  }
+
+  setScale(scale: Vector3) {
+    this.setPlacement({ scale });
+  }
+
   addPoint(point: Vector3) {
     if (!this.polyline) return;
 
@@ -109,7 +182,9 @@ export class Polyline extends THREE.Line {
     points.push(point);
 
     if (this.options.points.length < 2) return;
-    this.setConfig(this.options);
+    this.setConfig({
+      points: this.options.points.map((currentPoint) => currentPoint.clone()),
+    });
   }
 
   /**
@@ -173,21 +248,24 @@ export class Polyline extends THREE.Line {
   }
 
   private generateGeometry() {
-    this.discardGeometry();
+    const bufferData = Array.from(this.polyline.get_geometry_buffer());
 
+    this.writePositionsToGeometry(this.geometry, bufferData);
+    this.geometry.computeBoundingBox();
+    this.geometry.computeBoundingSphere();
 
-    this.polyline.generate_geometry();
-    const geometryData = this.polyline.get_geometry_serialized();
-    const bufferData = JSON.parse(geometryData);
+    if (this.material instanceof THREE.LineBasicMaterial) {
+      this.material.color.set(this.options.color);
+    } else {
+      if (Array.isArray(this.material)) {
+        this.material.forEach((material) => material.dispose());
+      } else {
+        this.material.dispose();
+      }
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(bufferData, 3)
-    );
+      this.material = new THREE.LineBasicMaterial({ color: this.options.color });
+    }
 
-    this.geometry = geometry;
-    this.material = new THREE.LineBasicMaterial({ color: this.options.color });
     this.updateRenderStyle(bufferData);
 
     this.isClosed = this.polyline.is_closed();
@@ -219,5 +297,27 @@ export class Polyline extends THREE.Line {
       beveledVertexIndices: parsed.beveled_vertex_indices ?? [],
       isClosed: Boolean(parsed.is_closed),
     };
+  }
+
+  private writePositionsToGeometry(
+    geometry: THREE.BufferGeometry,
+    positions: number[]
+  ) {
+    const existing = geometry.getAttribute("position");
+    if (
+      !(existing instanceof THREE.BufferAttribute) ||
+      existing.itemSize !== 3 ||
+      existing.count !== positions.length / 3
+    ) {
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      return;
+    }
+
+    const array = existing.array as Float32Array;
+    array.set(positions);
+    existing.needsUpdate = true;
   }
 }

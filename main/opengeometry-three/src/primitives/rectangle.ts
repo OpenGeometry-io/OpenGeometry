@@ -13,9 +13,21 @@ export interface IRectangleOptions {
   color: number;
   fatLines?: boolean;
   lineWidth?: number;
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
 }
 
-export type RectangleConfigUpdate = Partial<IRectangleOptions>;
+export interface RectanglePlacementOptions {
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
+}
+
+export type RectangleConfigUpdate = Partial<
+  Omit<IRectangleOptions, "translation" | "rotation" | "scale">
+>;
+export type RectanglePlacementUpdate = RectanglePlacementOptions;
 
 export interface IRectangleOffsetResult {
   points: Vector3[];
@@ -44,6 +56,9 @@ export class Rectangle extends THREE.Line {
     width: 1,
     breadth: 1,
     color: 0x00ff00,
+    translation: new Vector3(0, 0, 0),
+    rotation: new Vector3(0, 0, 0),
+    scale: new Vector3(1, 1, 1),
   };
 
   private polyLineRectangle: OGRectangle;
@@ -93,7 +108,19 @@ export class Rectangle extends THREE.Line {
     this.options = { ...this.options, ...options };
     this.options.ogid = this.ogid;
 
-    this.setConfig(this.options);
+    this.setConfig({
+      center: this.options.center.clone(),
+      width: this.options.width,
+      breadth: this.options.breadth,
+      color: this.options.color,
+      fatLines: this.options.fatLines,
+      lineWidth: this.options.lineWidth,
+    });
+    this.setPlacement({
+      translation: this.options.translation?.clone(),
+      rotation: this.options.rotation?.clone(),
+      scale: this.options.scale?.clone(),
+    });
   }
 
   validateOptions() {
@@ -130,6 +157,44 @@ export class Rectangle extends THREE.Line {
     if (renderChanged) {
       this.updateRenderStyle();
     }
+  }
+
+  getAnchor() {
+    const anchor = this.polyLineRectangle.get_anchor();
+    return new Vector3(anchor.x, anchor.y, anchor.z);
+  }
+
+  setPlacement(placement: RectanglePlacementUpdate) {
+    this.options.translation = placement.translation?.clone() ?? this.options.translation;
+    this.options.rotation = placement.rotation?.clone() ?? this.options.rotation;
+    this.options.scale = placement.scale?.clone() ?? this.options.scale;
+
+    this.polyLineRectangle.set_transform(
+      this.options.translation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.rotation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.scale?.clone() ?? new Vector3(1, 1, 1)
+    );
+    this.generateGeometry();
+  }
+
+  setTransform(translation: Vector3, rotation: Vector3, scale: Vector3) {
+    this.setPlacement({
+      translation,
+      rotation,
+      scale,
+    });
+  }
+
+  setTranslation(translation: Vector3) {
+    this.setPlacement({ translation });
+  }
+
+  setRotation(rotation: Vector3) {
+    this.setPlacement({ rotation });
+  }
+
+  setScale(scale: Vector3) {
+    this.setPlacement({ scale });
   }
 
   getConfig() {
@@ -189,20 +254,24 @@ export class Rectangle extends THREE.Line {
   }
 
   private generateGeometry() {
-    this.discardGeometry();
+    const bufferData = Array.from(this.polyLineRectangle.get_geometry_buffer());
 
-    this.polyLineRectangle.generate_geometry();
-    const geometryData = this.polyLineRectangle.get_geometry_serialized();
-    const bufferData = JSON.parse(geometryData);
+    this.writePositionsToGeometry(this.geometry, bufferData);
+    this.geometry.computeBoundingBox();
+    this.geometry.computeBoundingSphere();
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(bufferData, 3)
-    );
+    if (this.material instanceof THREE.LineBasicMaterial) {
+      this.material.color.set(this.options.color);
+    } else {
+      if (Array.isArray(this.material)) {
+        this.material.forEach((material) => material.dispose());
+      } else {
+        this.material.dispose();
+      }
 
-    this.geometry = geometry;
-    this.material = new THREE.LineBasicMaterial({ color: this.options.color });
+      this.material = new THREE.LineBasicMaterial({ color: this.options.color });
+    }
+
     this.updateRenderStyle(bufferData);
   }
 
@@ -244,5 +313,27 @@ export class Rectangle extends THREE.Line {
 
   discardGeometry() {
     this.geometry.dispose();
+  }
+
+  private writePositionsToGeometry(
+    geometry: THREE.BufferGeometry,
+    positions: number[]
+  ) {
+    const existing = geometry.getAttribute("position");
+    if (
+      !(existing instanceof THREE.BufferAttribute) ||
+      existing.itemSize !== 3 ||
+      existing.count !== positions.length / 3
+    ) {
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      return;
+    }
+
+    const array = existing.array as Float32Array;
+    array.set(positions);
+    existing.needsUpdate = true;
   }
 }

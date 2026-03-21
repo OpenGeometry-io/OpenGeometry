@@ -54,24 +54,44 @@
               <input data-control-number type="number" min="4" max="128" step="1" value="48" />
             </div>
           </label>
-          <label class="og-control-row" data-control-key="centerX" data-control-type="number">
+          <label class="og-control-row" data-control-key="translateX" data-control-type="number">
             <div class="og-control-header">
-              <span class="og-control-label-chip">Center X</span>
+              <span class="og-control-label-chip">Translate X</span>
               <code class="og-control-value" data-control-value>0</code>
             </div>
             <div class="og-control-range">
-              <input data-control-range type="range" min="-3" max="3" step="0.1" value="0" />
-              <input data-control-number type="number" min="-3" max="3" step="0.1" value="0" />
+              <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
+              <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
             </div>
           </label>
-          <label class="og-control-row" data-control-key="centerZ" data-control-type="number">
+          <label class="og-control-row" data-control-key="translateZ" data-control-type="number">
             <div class="og-control-header">
-              <span class="og-control-label-chip">Center Z</span>
+              <span class="og-control-label-chip">Translate Z</span>
               <code class="og-control-value" data-control-value>0</code>
             </div>
             <div class="og-control-range">
-              <input data-control-range type="range" min="-3" max="3" step="0.1" value="0" />
-              <input data-control-number type="number" min="-3" max="3" step="0.1" value="0" />
+              <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
+              <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="rotateYDeg" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Rotate Y (deg)</span>
+              <code class="og-control-value" data-control-value>0</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="-180" max="180" step="1" value="0" />
+              <input data-control-number type="number" min="-180" max="180" step="1" value="0" />
+            </div>
+          </label>
+          <label class="og-control-row" data-control-key="scale" data-control-type="number">
+            <div class="og-control-header">
+              <span class="og-control-label-chip">Scale</span>
+              <code class="og-control-value" data-control-value>1</code>
+            </div>
+            <div class="og-control-range">
+              <input data-control-range type="range" min="0.5" max="2" step="0.05" value="1" />
+              <input data-control-number type="number" min="0.5" max="2" step="0.05" value="1" />
             </div>
           </label>
         </aside>
@@ -94,12 +114,22 @@
         startDeg: 0,
         endDeg: 300,
         segments: 48,
-        centerX: 0,
-        centerZ: 0,
+        translateX: 0,
+        translateZ: 0,
+        rotateYDeg: 0,
+        scale: 1,
       };
 
       function formatControlNumber(value) {
         return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      }
+
+      function applyTransform(target) {
+        target.setPlacement({
+          translation: new Vector3(config.translateX, 0, config.translateZ),
+          rotation: new Vector3(0, (config.rotateYDeg * Math.PI) / 180, 0),
+          scale: new Vector3(config.scale, config.scale, config.scale),
+        });
       }
 
       function setUIControls() {
@@ -151,13 +181,15 @@
         const end = (config.endDeg * Math.PI) / 180;
 
         arc.setConfig({
-          center: new Vector3(config.centerX, 0, config.centerZ),
+          center: new Vector3(0, 0, 0),
           radius: config.radius,
           startAngle: Math.min(start, end),
           endAngle: Math.max(start, end),
           segments: Math.floor(config.segments),
           color: 0xdc2626,
         });
+
+        applyTransform(arc);
       }
 
       async function main() {
@@ -197,7 +229,7 @@
         await OpenGeometry.create({ wasmURL: wasmUrl });
 
         arc = new Arc({
-          center: new Vector3(config.centerX, 0, config.centerZ),
+          center: new Vector3(0, 0, 0),
           radius: config.radius,
           startAngle: (config.startDeg * Math.PI) / 180,
           endAngle: (config.endDeg * Math.PI) / 180,

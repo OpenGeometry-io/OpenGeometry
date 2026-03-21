@@ -3,9 +3,11 @@ use wasm_bindgen::prelude::*;
 
 use crate::brep::{Brep, BrepBuilder};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
-use crate::operations::triangulate::triangulate_polygon_with_holes;
+use crate::spatial::placement::{
+    bounds_center_from_point_sets, points_relative_to_anchor, Placement3D,
+};
 use crate::utility::bgeometry::BufferGeometry;
-use openmaths::{Matrix4, Vector3};
+use openmaths::Vector3;
 use uuid::Uuid;
 
 #[wasm_bindgen]
@@ -14,8 +16,10 @@ pub struct OGPolygon {
     id: String,
     points: Vec<Vector3>,
     holes: Vec<Vec<Vector3>>,
+    placement: Placement3D,
     geometry: BufferGeometry,
     brep: Brep,
+    anchor_initialized: bool,
 }
 
 impl OGPolygon {
@@ -24,7 +28,12 @@ impl OGPolygon {
     }
 
     pub fn to_projected_scene2d(&self, camera: &CameraParameters, hlr: &HlrOptions) -> Scene2D {
-        project_brep_to_scene(&self.brep, camera, hlr)
+        let world_brep = self.world_brep();
+        project_brep_to_scene(&world_brep, camera, hlr)
+    }
+
+    pub fn world_brep(&self) -> Brep {
+        self.brep.transformed(&self.placement)
     }
 }
 
@@ -48,8 +57,10 @@ impl OGPolygon {
             id,
             points: Vec::new(),
             holes: Vec::new(),
+            placement: Placement3D::new(),
             geometry: BufferGeometry::new(internal_id),
             brep: Brep::new(internal_id),
+            anchor_initialized: false,
         }
     }
 
@@ -57,59 +68,51 @@ impl OGPolygon {
     pub fn set_config(&mut self, points: Vec<Vector3>) -> Result<(), JsValue> {
         self.points = points;
         self.holes.clear();
+        self.ensure_anchor_initialized();
         self.generate_brep()
     }
 
     #[wasm_bindgen]
-    pub fn set_transformation(&mut self, transformation: Vec<f64>) -> Result<(), JsValue> {
-        if transformation.len() != 16 {
-            return Err(JsValue::from_str(
-                "Transformation matrix must have exactly 16 elements",
-            ));
-        }
+    pub fn set_transform(
+        &mut self,
+        position: Vector3,
+        rotation: Vector3,
+        scale: Vector3,
+    ) -> Result<(), JsValue> {
+        self.placement
+            .set_transform(position, rotation, scale)
+            .map_err(|err| JsValue::from_str(&err))
+    }
 
-        let transformation_matrix: Matrix4 = Matrix4::set(
-            transformation[0],
-            transformation[4],
-            transformation[8],
-            transformation[12],
-            transformation[1],
-            transformation[5],
-            transformation[9],
-            transformation[13],
-            transformation[2],
-            transformation[6],
-            transformation[10],
-            transformation[14],
-            transformation[3],
-            transformation[7],
-            transformation[11],
-            transformation[15],
-        );
+    #[wasm_bindgen]
+    pub fn set_translation(&mut self, translation: Vector3) {
+        self.placement.set_translation(translation);
+    }
 
-        for point in &mut self.points {
-            point.apply_matrix4(transformation_matrix.clone());
-        }
+    #[wasm_bindgen]
+    pub fn set_rotation(&mut self, rotation: Vector3) {
+        self.placement.set_rotation(rotation);
+    }
 
-        for hole in &mut self.holes {
-            for point in hole {
-                point.apply_matrix4(transformation_matrix.clone());
-            }
-        }
-
-        self.generate_brep()
+    #[wasm_bindgen]
+    pub fn set_scale(&mut self, scale: Vector3) -> Result<(), JsValue> {
+        self.placement
+            .set_scale(scale)
+            .map_err(|err| JsValue::from_str(&err))
     }
 
     #[wasm_bindgen]
     pub fn add_vertices(&mut self, vertices: Vec<Vector3>) -> Result<(), JsValue> {
         self.points = vertices;
         self.holes.clear();
+        self.ensure_anchor_initialized();
         self.generate_brep()
     }
 
     #[wasm_bindgen]
     pub fn add_holes(&mut self, hole: Vec<Vector3>) -> Result<(), JsValue> {
         self.holes.push(hole);
+        self.ensure_anchor_initialized();
         self.generate_brep()
     }
 
@@ -130,7 +133,9 @@ impl OGPolygon {
 
         let mut builder = BrepBuilder::new(self.brep.id);
 
-        let mut all_vertices = self.points.clone();
+        let anchor = self.placement.anchor;
+        let local_points = points_relative_to_anchor(&self.points, anchor);
+        let mut all_vertices = local_points.clone();
         let mut hole_index_sets: Vec<Vec<u32>> = Vec::new();
 
         for hole in &self.holes {
@@ -139,7 +144,8 @@ impl OGPolygon {
             }
 
             let start = all_vertices.len() as u32;
-            all_vertices.extend(hole.iter().copied());
+            let local_hole = points_relative_to_anchor(hole, anchor);
+            all_vertices.extend(local_hole);
             let indices: Vec<u32> = (0..hole.len() as u32)
                 .map(|offset| start + offset)
                 .collect();
@@ -147,7 +153,7 @@ impl OGPolygon {
         }
 
         builder.add_vertices(&all_vertices);
-        let outer_indices: Vec<u32> = (0..self.points.len() as u32).collect();
+        let outer_indices: Vec<u32> = (0..local_points.len() as u32).collect();
 
         builder
             .add_face(&outer_indices, &hole_index_sets)
@@ -167,60 +173,151 @@ impl OGPolygon {
 
     #[wasm_bindgen]
     pub fn get_brep_serialized(&self) -> String {
+        serde_json::to_string(&self.world_brep()).unwrap()
+    }
+
+    #[wasm_bindgen]
+    pub fn get_local_brep_serialized(&self) -> String {
         serde_json::to_string(&self.brep).unwrap()
     }
 
     #[wasm_bindgen]
     pub fn get_geometry_serialized(&self) -> String {
-        let mut vertex_buffer: Vec<f64> = Vec::new();
+        let world_brep = self.world_brep();
+        serde_json::to_string(&world_brep.get_triangle_vertex_buffer()).unwrap()
+    }
 
-        for face in &self.brep.faces {
-            let (face_vertices, holes_vertices) =
-                self.brep.get_vertices_and_holes_by_face_id(face.id);
-            if face_vertices.len() < 3 {
-                continue;
-            }
+    #[wasm_bindgen]
+    pub fn get_local_geometry_serialized(&self) -> String {
+        serde_json::to_string(&self.brep.get_triangle_vertex_buffer()).unwrap()
+    }
 
-            let triangles = triangulate_polygon_with_holes(&face_vertices, &holes_vertices);
-            let all_vertices: Vec<Vector3> = face_vertices
-                .into_iter()
-                .chain(holes_vertices.into_iter().flatten())
-                .collect();
+    #[wasm_bindgen]
+    pub fn get_geometry_buffer(&self) -> Vec<f64> {
+        self.world_brep().get_triangle_vertex_buffer()
+    }
 
-            for triangle in triangles {
-                for vertex_index in triangle {
-                    let vertex = &all_vertices[vertex_index];
-                    vertex_buffer.push(vertex.x);
-                    vertex_buffer.push(vertex.y);
-                    vertex_buffer.push(vertex.z);
-                }
-            }
-        }
-
-        serde_json::to_string(&vertex_buffer).unwrap()
+    #[wasm_bindgen]
+    pub fn get_local_geometry_buffer(&self) -> Vec<f64> {
+        self.brep.get_triangle_vertex_buffer()
     }
 
     #[wasm_bindgen]
     pub fn get_outline_geometry_serialized(&self) -> String {
-        let mut vertex_buffer: Vec<f64> = Vec::new();
+        let world_brep = self.world_brep();
+        serde_json::to_string(&world_brep.get_outline_vertex_buffer()).unwrap()
+    }
 
-        for (start_id, end_id) in self.brep.collect_outline_segments() {
-            let Some(start_vertex) = self.brep.vertices.get(start_id as usize) else {
-                continue;
-            };
-            let Some(end_vertex) = self.brep.vertices.get(end_id as usize) else {
-                continue;
-            };
+    #[wasm_bindgen]
+    pub fn get_local_outline_geometry_serialized(&self) -> String {
+        serde_json::to_string(&self.brep.get_outline_vertex_buffer()).unwrap()
+    }
 
-            vertex_buffer.push(start_vertex.position.x);
-            vertex_buffer.push(start_vertex.position.y);
-            vertex_buffer.push(start_vertex.position.z);
+    #[wasm_bindgen]
+    pub fn get_outline_geometry_buffer(&self) -> Vec<f64> {
+        self.world_brep().get_outline_vertex_buffer()
+    }
 
-            vertex_buffer.push(end_vertex.position.x);
-            vertex_buffer.push(end_vertex.position.y);
-            vertex_buffer.push(end_vertex.position.z);
+    #[wasm_bindgen]
+    pub fn get_local_outline_geometry_buffer(&self) -> Vec<f64> {
+        self.brep.get_outline_vertex_buffer()
+    }
+
+    #[wasm_bindgen]
+    pub fn get_anchor(&self) -> Vector3 {
+        self.placement.anchor
+    }
+
+    #[wasm_bindgen]
+    pub fn set_anchor(&mut self, anchor: Vector3) -> Result<(), JsValue> {
+        self.placement.set_anchor(anchor);
+        self.anchor_initialized = true;
+        self.generate_brep()
+    }
+
+    #[wasm_bindgen]
+    pub fn reset_anchor(&mut self) -> Result<(), JsValue> {
+        self.recompute_anchor_from_bounds();
+        self.anchor_initialized = true;
+        self.generate_brep()
+    }
+}
+
+impl OGPolygon {
+    fn recompute_anchor_from_bounds(&mut self) {
+        let mut point_sets = Vec::with_capacity(self.holes.len() + 1);
+        point_sets.push(self.points.as_slice());
+        for hole in &self.holes {
+            point_sets.push(hole.as_slice());
         }
 
-        serde_json::to_string(&vertex_buffer).unwrap()
+        let anchor =
+            bounds_center_from_point_sets(&point_sets).unwrap_or(Vector3::new(0.0, 0.0, 0.0));
+        self.placement.set_anchor(anchor);
+    }
+
+    fn ensure_anchor_initialized(&mut self) {
+        if self.anchor_initialized {
+            return;
+        }
+        self.recompute_anchor_from_bounds();
+        self.anchor_initialized = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn anchor_stays_stable_across_polygon_config_updates_until_reset() {
+        let mut polygon = OGPolygon::new("polygon-anchor".to_string());
+        polygon
+            .set_config(vec![
+                Vector3::new(0.0, 0.0, 0.0),
+                Vector3::new(10.0, 0.0, 0.0),
+                Vector3::new(10.0, 0.0, 10.0),
+                Vector3::new(0.0, 0.0, 10.0),
+            ])
+            .expect("polygon config");
+        let initial_anchor = polygon.get_anchor();
+        assert_eq!(initial_anchor.x, 5.0);
+        assert_eq!(initial_anchor.z, 5.0);
+
+        polygon
+            .set_config(vec![
+                Vector3::new(10.0, 0.0, 10.0),
+                Vector3::new(20.0, 0.0, 10.0),
+                Vector3::new(20.0, 0.0, 20.0),
+                Vector3::new(10.0, 0.0, 20.0),
+            ])
+            .expect("polygon config update");
+        let anchor_after_update = polygon.get_anchor();
+        assert_eq!(anchor_after_update.x, 5.0);
+        assert_eq!(anchor_after_update.z, 5.0);
+
+        polygon.reset_anchor().expect("reset anchor");
+        let anchor_after_reset = polygon.get_anchor();
+        assert_eq!(anchor_after_reset.x, 15.0);
+        assert_eq!(anchor_after_reset.z, 15.0);
+    }
+
+    #[test]
+    fn placement_rejects_non_uniform_scale() {
+        let mut polygon = OGPolygon::new("polygon-scale".to_string());
+        polygon
+            .set_config(vec![
+                Vector3::new(0.0, 0.0, 0.0),
+                Vector3::new(1.0, 0.0, 0.0),
+                Vector3::new(1.0, 0.0, 1.0),
+            ])
+            .expect("polygon config");
+
+        let result = polygon.placement.set_transform(
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0, 1.2, 1.0),
+        );
+        assert!(result.is_err());
     }
 }

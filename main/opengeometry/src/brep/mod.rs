@@ -8,13 +8,17 @@ pub mod shell;
 pub mod vertex;
 pub mod wire;
 
-use std::collections::{HashMap, HashSet};
+use std::cell::RefCell;
+use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 
-use openmaths::{Matrix4, Vector3};
+use openmaths::Vector3;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{operations::triangulate::triangulate_polygon_with_holes, spatial::placement::Placement3D};
+use crate::{
+    operations::triangulate::triangulate_polygon_with_holes, spatial::placement::Placement3D,
+};
 
 pub use builder::BrepBuilder;
 pub use edge::Edge;
@@ -27,6 +31,22 @@ pub use vertex::Vertex;
 pub use wire::Wire;
 
 const VALIDATION_GUARD_FACTOR: usize = 4;
+const TRANSFORM_CACHE_LIMIT: usize = 128;
+
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+struct TransformCacheKey {
+    brep_id: Uuid,
+    local_signature: u64,
+    anchor: [u64; 3],
+    translation: [u64; 3],
+    rotation: [u64; 3],
+    scale: [u64; 3],
+}
+
+thread_local! {
+    static WORLD_BREP_TRANSFORM_CACHE: RefCell<HashMap<TransformCacheKey, Brep>> =
+        RefCell::new(HashMap::new());
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Brep {
@@ -97,11 +117,39 @@ impl Brep {
     }
 
     /**
-    * Applies the given placement's world transformation to the BREP. This function transforms all vertices in the BREP from their local space to world space using the transformation defined by the placement. The transformation includes translation, rotation, and scaling as specified in the placement's world matrix. After applying this function, the vertices in the BREP will be updated to reflect their new positions in world space, which can then be used for rendering or further processing.
-    */
+     * Applies the given placement's world transformation to the BREP. This function transforms all vertices in the BREP from their local space to world space using the transformation defined by the placement. The transformation includes translation, rotation, and scaling as specified in the placement's world matrix. After applying this function, the vertices in the BREP will be updated to reflect their new positions in world space, which can then be used for rendering or further processing.
+     */
     pub fn apply_transform(&mut self, placement: &Placement3D) {
         let placement_matrix = placement.world_matrix();
-        // TODO: Apply the placement_matrix to all vertices in self.vertices, figure out if we also need to transform halfedges, edges, loops, faces, wires, shells or if transforming vertices is sufficient to achieve the desired effect on the entire BREP which will save us from recomputing all the other elements after transformation.
+        for vertex in &mut self.vertices {
+            vertex.position.apply_matrix4(placement_matrix.clone());
+        }
+
+        if !self.faces.is_empty() {
+            self.recompute_face_normals();
+        }
+    }
+
+    pub fn transformed(&self, placement: &Placement3D) -> Brep {
+        let cache_key = self.transform_cache_key(placement);
+        if let Some(cached) =
+            WORLD_BREP_TRANSFORM_CACHE.with(|cache| cache.borrow().get(&cache_key).cloned())
+        {
+            return cached;
+        }
+
+        let mut transformed = self.clone();
+        transformed.apply_transform(placement);
+
+        WORLD_BREP_TRANSFORM_CACHE.with(|cache| {
+            let mut cache_ref = cache.borrow_mut();
+            if cache_ref.len() >= TRANSFORM_CACHE_LIMIT {
+                cache_ref.clear();
+            }
+            cache_ref.insert(cache_key, transformed.clone());
+        });
+
+        transformed
     }
 
     pub fn bounds_center(&self) -> Option<Vector3> {
@@ -127,6 +175,87 @@ impl Brep {
             (min_y + max_y) * 0.5,
             (min_z + max_z) * 0.5,
         ))
+    }
+
+    fn transform_cache_key(&self, placement: &Placement3D) -> TransformCacheKey {
+        TransformCacheKey {
+            brep_id: self.id,
+            local_signature: self.local_signature(),
+            anchor: vector_bits(placement.anchor),
+            translation: vector_bits(placement.translation()),
+            rotation: vector_bits(placement.rotation()),
+            scale: vector_bits(placement.scale()),
+        }
+    }
+
+    fn local_signature(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+
+        self.vertices.len().hash(&mut hasher);
+        self.halfedges.len().hash(&mut hasher);
+        self.edges.len().hash(&mut hasher);
+        self.loops.len().hash(&mut hasher);
+        self.faces.len().hash(&mut hasher);
+        self.wires.len().hash(&mut hasher);
+        self.shells.len().hash(&mut hasher);
+
+        for vertex in &self.vertices {
+            vertex.id.hash(&mut hasher);
+            vertex.position.x.to_bits().hash(&mut hasher);
+            vertex.position.y.to_bits().hash(&mut hasher);
+            vertex.position.z.to_bits().hash(&mut hasher);
+            vertex.outgoing_halfedge.hash(&mut hasher);
+        }
+
+        for halfedge in &self.halfedges {
+            halfedge.id.hash(&mut hasher);
+            halfedge.from.hash(&mut hasher);
+            halfedge.to.hash(&mut hasher);
+            halfedge.twin.hash(&mut hasher);
+            halfedge.next.hash(&mut hasher);
+            halfedge.prev.hash(&mut hasher);
+            halfedge.edge.hash(&mut hasher);
+            halfedge.face.hash(&mut hasher);
+            halfedge.loop_ref.hash(&mut hasher);
+            halfedge.wire_ref.hash(&mut hasher);
+        }
+
+        for edge in &self.edges {
+            edge.id.hash(&mut hasher);
+            edge.halfedge.hash(&mut hasher);
+            edge.twin_halfedge.hash(&mut hasher);
+        }
+
+        for loop_ref in &self.loops {
+            loop_ref.id.hash(&mut hasher);
+            loop_ref.halfedge.hash(&mut hasher);
+            loop_ref.face.hash(&mut hasher);
+            loop_ref.is_hole.hash(&mut hasher);
+        }
+
+        for face in &self.faces {
+            face.id.hash(&mut hasher);
+            face.normal.x.to_bits().hash(&mut hasher);
+            face.normal.y.to_bits().hash(&mut hasher);
+            face.normal.z.to_bits().hash(&mut hasher);
+            face.outer_loop.hash(&mut hasher);
+            face.inner_loops.hash(&mut hasher);
+            face.shell_ref.hash(&mut hasher);
+        }
+
+        for wire in &self.wires {
+            wire.id.hash(&mut hasher);
+            wire.halfedges.hash(&mut hasher);
+            wire.is_closed.hash(&mut hasher);
+        }
+
+        for shell in &self.shells {
+            shell.id.hash(&mut hasher);
+            shell.faces.hash(&mut hasher);
+            shell.is_closed.hash(&mut hasher);
+        }
+
+        hasher.finish()
     }
 
     pub fn recompute_face_normals(&mut self) {
@@ -951,6 +1080,10 @@ impl Brep {
 
         Ok(())
     }
+}
+
+fn vector_bits(vector: Vector3) -> [u64; 3] {
+    [vector.x.to_bits(), vector.y.to_bits(), vector.z.to_bits()]
 }
 
 fn compute_loop_normal(brep: &Brep, loop_indices: &[u32]) -> Option<Vector3> {

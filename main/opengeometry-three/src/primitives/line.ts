@@ -12,9 +12,21 @@ export interface ILineOptions {
   color: number;
   fatLines?: boolean;
   width?: number;
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
 }
 
-export type LineConfigUpdate = Partial<ILineOptions>;
+export interface LinePlacementOptions {
+  translation?: Vector3;
+  rotation?: Vector3;
+  scale?: Vector3;
+}
+
+export type LineConfigUpdate = Partial<
+  Omit<ILineOptions, "translation" | "rotation" | "scale">
+>;
+export type LinePlacementUpdate = LinePlacementOptions;
 
 export interface ILineOffsetResult {
   points: Vector3[];
@@ -46,7 +58,10 @@ export class Line extends THREE.Line {
     end: new Vector3(1, 0, 0.5),
     color: 0x000000,
     fatLines: false,
-    width: 20
+    width: 20,
+    translation: new Vector3(0, 0, 0),
+    rotation: new Vector3(0, 0, 0),
+    scale: new Vector3(1, 1, 1),
   };
 
   private line: OGLine;
@@ -71,7 +86,18 @@ export class Line extends THREE.Line {
     this.options = { ...this.options, ...options };
     this.options.ogid = this.ogid;
 
-    this.setConfig(this.options);
+    this.setConfig({
+      start: this.options.start.clone(),
+      end: this.options.end.clone(),
+      color: this.options.color,
+      fatLines: this.options.fatLines,
+      width: this.options.width,
+    });
+    this.setPlacement({
+      translation: this.options.translation?.clone(),
+      rotation: this.options.rotation?.clone(),
+      scale: this.options.scale?.clone(),
+    });
   }
 
   validateOptions() {
@@ -104,6 +130,54 @@ export class Line extends THREE.Line {
     if (renderChanged) {
       this.updateRenderStyle();
     }
+  }
+
+  getAnchor() {
+    const anchor = this.line.get_anchor();
+    return new Vector3(anchor.x, anchor.y, anchor.z);
+  }
+
+  setAnchor(anchor: Vector3) {
+    this.line.set_anchor(anchor.clone());
+    this.generateGeometry();
+  }
+
+  resetAnchor() {
+    this.line.reset_anchor();
+    this.generateGeometry();
+  }
+
+  setPlacement(placement: LinePlacementUpdate) {
+    this.options.translation = placement.translation?.clone() ?? this.options.translation;
+    this.options.rotation = placement.rotation?.clone() ?? this.options.rotation;
+    this.options.scale = placement.scale?.clone() ?? this.options.scale;
+
+    this.line.set_transform(
+      this.options.translation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.rotation?.clone() ?? new Vector3(0, 0, 0),
+      this.options.scale?.clone() ?? new Vector3(1, 1, 1)
+    );
+    this.generateGeometry();
+  }
+
+  setTransform(translation: Vector3, rotation: Vector3, scale: Vector3) {
+    this.setPlacement({
+      translation,
+      rotation,
+      scale,
+    });
+  }
+
+  setTranslation(translation: Vector3) {
+    this.setPlacement({ translation });
+  }
+
+  setRotation(rotation: Vector3) {
+    this.setPlacement({ rotation });
+  }
+
+  setScale(scale: Vector3) {
+    this.setPlacement({ scale });
   }
 
   /**
@@ -167,20 +241,24 @@ export class Line extends THREE.Line {
   }
 
   private generateGeometry() {
-    this.discardGeometry();
+    const bufferData = Array.from(this.line.get_geometry_buffer());
 
-    this.line.generate_geometry();
-    const geometryData = this.line.get_geometry_serialized();
-    const bufferData = JSON.parse(geometryData);
+    this.writePositionsToGeometry(this.geometry, bufferData);
+    this.geometry.computeBoundingBox();
+    this.geometry.computeBoundingSphere();
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(bufferData, 3)
-    );
+    if (this.material instanceof THREE.LineBasicMaterial) {
+      this.material.color.set(this.options.color);
+    } else {
+      if (Array.isArray(this.material)) {
+        this.material.forEach((material) => material.dispose());
+      } else {
+        this.material.dispose();
+      }
 
-    this.geometry = geometry;
-    this.material = new THREE.LineBasicMaterial({ color: this.options.color });
+      this.material = new THREE.LineBasicMaterial({ color: this.options.color });
+    }
+
     this.updateRenderStyle(bufferData);
   }
 
@@ -215,5 +293,27 @@ export class Line extends THREE.Line {
       beveledVertexIndices: parsed.beveled_vertex_indices ?? [],
       isClosed: Boolean(parsed.is_closed),
     };
+  }
+
+  private writePositionsToGeometry(
+    geometry: THREE.BufferGeometry,
+    positions: number[]
+  ) {
+    const existing = geometry.getAttribute("position");
+    if (
+      !(existing instanceof THREE.BufferAttribute) ||
+      existing.itemSize !== 3 ||
+      existing.count !== positions.length / 3
+    ) {
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      return;
+    }
+
+    const array = existing.array as Float32Array;
+    array.set(positions);
+    existing.needsUpdate = true;
   }
 }

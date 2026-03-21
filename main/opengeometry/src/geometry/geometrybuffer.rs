@@ -45,7 +45,14 @@ impl GeometryBuffer {
      */
     pub fn apply_transform(&mut self, placement: &Placement3D) {
         let placement_matrix = placement.world_matrix();
-        // TODO: Apply the placement_matrix to all vertices in self.vertices and self.outline_vertices, figure out if outline vertices should be transformed differently or not.
+        transform_flat_vertex_buffer(&mut self.vertices, &placement_matrix);
+        transform_flat_vertex_buffer(&mut self.outline_vertices, &placement_matrix);
+    }
+
+    pub fn transformed(&self, placement: &Placement3D) -> GeometryBuffer {
+        let mut geometry = self.clone();
+        geometry.apply_transform(placement);
+        geometry
     }
 
     pub fn reset_geometry(&mut self) {
@@ -54,9 +61,40 @@ impl GeometryBuffer {
     }
 
     pub fn get_center(&self) -> Vector3 {
-        let mut center = Vector3::new(0.0, 0.0, 0.0);
-        // TODO: calculate center from vertices
+        let Some(first_vertex) = self.vertices.chunks_exact(3).next() else {
+            return Vector3::new(0.0, 0.0, 0.0);
+        };
 
-        center
+        let mut min_x = first_vertex[0];
+        let mut min_y = first_vertex[1];
+        let mut min_z = first_vertex[2];
+        let mut max_x = first_vertex[0];
+        let mut max_y = first_vertex[1];
+        let mut max_z = first_vertex[2];
+
+        for vertex in self.vertices.chunks_exact(3).skip(1) {
+            min_x = min_x.min(vertex[0]);
+            min_y = min_y.min(vertex[1]);
+            min_z = min_z.min(vertex[2]);
+            max_x = max_x.max(vertex[0]);
+            max_y = max_y.max(vertex[1]);
+            max_z = max_z.max(vertex[2]);
+        }
+
+        Vector3::new(
+            (min_x + max_x) * 0.5,
+            (min_y + max_y) * 0.5,
+            (min_z + max_z) * 0.5,
+        )
+    }
+}
+
+fn transform_flat_vertex_buffer(buffer: &mut [f64], matrix: &openmaths::Matrix4) {
+    for vertex in buffer.chunks_exact_mut(3) {
+        let mut point = Vector3::new(vertex[0], vertex[1], vertex[2]);
+        point.apply_matrix4(matrix.clone());
+        vertex[0] = point.x;
+        vertex[1] = point.y;
+        vertex[2] = point.z;
     }
 }

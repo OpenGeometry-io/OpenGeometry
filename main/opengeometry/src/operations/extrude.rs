@@ -1,7 +1,7 @@
 use super::windingsort;
 use crate::{
     brep::{Brep, BrepBuilder},
-    geometry::basegeometry::BaseGeometry,
+    // geometry::basegeometry::BaseGeometry,
 };
 use openmaths::Vector3;
 
@@ -12,48 +12,48 @@ pub struct Geometry {
     pub faces: Vec<Vec<u32>>,
 }
 
-pub fn extrude_polygon_by_buffer_geometry(geom_buf: BaseGeometry, height: f64) -> Geometry {
-    let base = windingsort::ccw_test(geom_buf.get_vertices());
-    if base.len() < 3 {
-        return Geometry {
-            vertices: Vec::new(),
-            edges: Vec::new(),
-            faces: Vec::new(),
-        };
-    }
+// pub fn extrude_polygon_by_buffer_geometry(geom_buf: BaseGeometry, height: f64) -> Geometry {
+//     let base = windingsort::ccw_test(geom_buf.get_vertices());
+//     if base.len() < 3 {
+//         return Geometry {
+//             vertices: Vec::new(),
+//             edges: Vec::new(),
+//             faces: Vec::new(),
+//         };
+//     }
 
-    let mut vertices = base.clone();
-    for point in &base {
-        vertices.push(Vector3::new(point.x, point.y + height, point.z));
-    }
+//     let mut vertices = base.clone();
+//     for point in &base {
+//         vertices.push(Vector3::new(point.x, point.y + height, point.z));
+//     }
 
-    let mut edges = Vec::new();
-    let n = base.len() as u32;
+//     let mut edges = Vec::new();
+//     let n = base.len() as u32;
 
-    for i in 0..n {
-        edges.push(vec![i, (i + 1) % n]);
-        edges.push(vec![i, i + n]);
-        edges.push(vec![i + n, ((i + 1) % n) + n]);
-    }
+//     for i in 0..n {
+//         edges.push(vec![i, (i + 1) % n]);
+//         edges.push(vec![i, i + n]);
+//         edges.push(vec![i + n, ((i + 1) % n) + n]);
+//     }
 
-    let mut faces = Vec::new();
-    faces.push((0..n).collect());
+//     let mut faces = Vec::new();
+//     faces.push((0..n).collect());
 
-    for i in 0..n {
-        let next = (i + 1) % n;
-        faces.push(vec![i, next, next + n, i + n]);
-    }
+//     for i in 0..n {
+//         let next = (i + 1) % n;
+//         faces.push(vec![i, next, next + n, i + n]);
+//     }
 
-    let mut top_face: Vec<u32> = (0..n).map(|i| i + n).collect();
-    top_face.reverse();
-    faces.push(top_face);
+//     let mut top_face: Vec<u32> = (0..n).map(|i| i + n).collect();
+//     top_face.reverse();
+//     faces.push(top_face);
 
-    Geometry {
-        vertices,
-        edges,
-        faces,
-    }
-}
+//     Geometry {
+//         vertices,
+//         edges,
+//         faces,
+//     }
+// }
 
 pub fn extrude_brep_face(brep_face: Brep, height: f64) -> Brep {
     let base_points = if let Some(face) = brep_face.faces.first() {
