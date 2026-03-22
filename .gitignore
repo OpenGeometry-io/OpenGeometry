@@ -34,7 +34,7 @@ main/opengeometry/pkg/
 settings.json
 
 # AI and documentation files
-# .requests/*.md
+.requests/*.md
 .github/*.md
 
 # CAD export artifacts
