@@ -84,6 +84,20 @@ Minimum expectations:
   - why
   - residual risk
 
+### Repository Workflows and Commands (Current)
+
+Use commands that match touched areas:
+
+- Rust core (`main/opengeometry`): `cargo fmt --check`, `cargo check --examples`, `cargo test -q`
+- Root validation: `npm test` (runs Rust tests + Rust example tests via `--manifest-path main/opengeometry/Cargo.toml`)
+- Root build: `npm run build-core`, `npm run build-three`, `npm run build`
+- Dist preparation: `npm run prepare-dist` (or `npm run copy-wasm`)
+- Three.js package examples (`main/opengeometry-three`): `npm --prefix main/opengeometry-three run dev-example-three`, `npm --prefix main/opengeometry-three run build-example-three`, `npm --prefix main/opengeometry-three run preview-example-three`
+- TypeScript linting (`main/opengeometry-three/src`): `npm run lint:check` (or `npm run lint` when fixes are intended)
+
+TODO:
+- Confirm and document a local release dry-run workflow (CI currently uses `npm ci`, `npm run build`, and `npm test` in `.github/workflows/release.yml`).
+
 ## Change Management
 
 - Prefer incremental commits with focused intent.

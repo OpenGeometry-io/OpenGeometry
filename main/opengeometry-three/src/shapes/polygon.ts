@@ -10,6 +10,11 @@ import {
   setShapeOutlineColor,
   ShapeOutlineMesh,
 } from "./outline-utils";
+import {
+  clonePlacement,
+  createParametricEditCapabilities,
+} from "../operations/editor";
+import { createFreeformGeometry } from "../freeform";
 import { subtractShapeOperand } from "./boolean-subtract";
 import type {
   ShapeSubtractOperand,
@@ -161,6 +166,10 @@ export class Polygon extends THREE.Mesh {
     }
   }
 
+  getConfig() {
+    return this.options;
+  }
+
   getAnchor() {
     const anchor = this.polygon.get_anchor();
     return new Vector3(anchor.x, anchor.y, anchor.z);
@@ -209,8 +218,27 @@ export class Polygon extends THREE.Mesh {
     this.setPlacement({ scale });
   }
 
+  getPlacement() {
+    return clonePlacement({
+      translation: this.options.translation,
+      rotation: this.options.rotation,
+      scale: this.options.scale,
+    });
+  }
+
+  getEditCapabilities() {
+    return createParametricEditCapabilities("polygon", "profile");
+  }
+
+  toFreeform(id: string = this.ogid) {
+    return createFreeformGeometry(this.polygon.get_local_brep_serialized(), {
+      id,
+      placement: this.getPlacement(),
+    });
+  }
+
   // /**
-  //  * Sets the placement of the polygon in 3D space.
+   //  * Sets the placement of the polygon in 3D space.
   //  * @param x X-coordinate
   //  * @param y Y-coordinate
   //  * @param z Z-coordinate

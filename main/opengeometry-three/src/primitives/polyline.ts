@@ -4,6 +4,11 @@ import { getUUID } from "../utils/randomizer";
 import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
+import {
+  clonePlacement,
+  createParametricEditCapabilities,
+} from "../operations/editor";
+import { createFreeformGeometry } from "../freeform";
 
 export interface IPolylineOptions {
   ogid?: string;
@@ -127,6 +132,10 @@ export class Polyline extends THREE.Line {
     }
   }
 
+  getConfig() {
+    return this.options;
+  }
+
   getAnchor() {
     const anchor = this.polyline.get_anchor();
     return new Vector3(anchor.x, anchor.y, anchor.z);
@@ -173,6 +182,25 @@ export class Polyline extends THREE.Line {
 
   setScale(scale: Vector3) {
     this.setPlacement({ scale });
+  }
+
+  getPlacement() {
+    return clonePlacement({
+      translation: this.options.translation,
+      rotation: this.options.rotation,
+      scale: this.options.scale,
+    });
+  }
+
+  getEditCapabilities() {
+    return createParametricEditCapabilities("polyline", "profile");
+  }
+
+  toFreeform(id: string = this.ogid) {
+    return createFreeformGeometry(this.polyline.get_local_brep_serialized(), {
+      id,
+      placement: this.getPlacement(),
+    });
   }
 
   addPoint(point: Vector3) {

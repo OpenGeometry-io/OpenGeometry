@@ -1,6 +1,11 @@
 import * as THREE from "three";
 import { OGCurve, Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import { getUUID } from "../utils/randomizer";
+import {
+  clonePlacement,
+  createParametricEditCapabilities,
+} from "../operations/editor";
+import { createFreeformGeometry } from "../freeform";
 
 export interface ICurveOptions {
   ogid?: string;
@@ -101,6 +106,10 @@ export class Curve extends THREE.Line {
     }
   }
 
+  getConfig() {
+    return this.options;
+  }
+
   getAnchor() {
     const anchor = this.curve.get_anchor();
     return new Vector3(anchor.x, anchor.y, anchor.z);
@@ -147,6 +156,25 @@ export class Curve extends THREE.Line {
 
   setScale(scale: Vector3) {
     this.setPlacement({ scale });
+  }
+
+  getPlacement() {
+    return clonePlacement({
+      translation: this.options.translation,
+      rotation: this.options.rotation,
+      scale: this.options.scale,
+    });
+  }
+
+  getEditCapabilities() {
+    return createParametricEditCapabilities("curve", "curve");
+  }
+
+  toFreeform(id: string = this.ogid) {
+    return createFreeformGeometry(this.curve.get_local_brep_serialized(), {
+      id,
+      placement: this.getPlacement(),
+    });
   }
 
   private generateGeometry() {
