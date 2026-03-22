@@ -115,6 +115,10 @@ export * from "./src/shapes/index";
  */
 export * from "./src/examples/index";
 /**
+ * First-class freeform geometry wrapper around the kernel OGFreeformGeometry API.
+ */
+export * from "./src/freeform/index";
+/**
  * Kernel-backed modeling operations.
  */
 export * from "./src/operations/index";

@@ -8,6 +8,11 @@ import {
   sanitizeOutlineWidth,
   ShapeOutlineMesh,
 } from "./outline-utils";
+import {
+  clonePlacement,
+  createParametricEditCapabilities,
+} from "../operations/editor";
+import { createFreeformGeometry } from "../freeform";
 import { subtractShapeOperand } from "./boolean-subtract";
 import type {
   ShapeSubtractOperand,
@@ -97,6 +102,14 @@ export class Cuboid extends THREE.Mesh {
 
   getConfig() {
     return this.options;
+  }
+
+  getPlacement() {
+    return clonePlacement({
+      translation: this.options.translation,
+      rotation: this.options.rotation,
+      scale: this.options.scale,
+    });
   }
 
   setConfig(options: CuboidConfigUpdate) {
@@ -292,6 +305,17 @@ export class Cuboid extends THREE.Mesh {
 
   setScale(scale: Vector3) {
     this.setPlacement({ scale });
+  }
+
+  getEditCapabilities() {
+    return createParametricEditCapabilities("cuboid", "box");
+  }
+
+  toFreeform(id: string = this.ogid) {
+    return createFreeformGeometry(this.cuboid.get_local_brep_serialized(), {
+      id,
+      placement: this.getPlacement(),
+    });
   }
 
   private clearOutlineMesh() {

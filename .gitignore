@@ -33,7 +33,8 @@ main/opengeometry/pkg/
 .vscode/
 settings.json
 
-# Copilot
+# AI and documentation files
+# .requests/*.md
 .github/*.md
 
 # CAD export artifacts

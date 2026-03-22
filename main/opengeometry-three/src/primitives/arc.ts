@@ -4,6 +4,11 @@ import { getUUID } from "../utils/randomizer";
 import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
+import {
+  clonePlacement,
+  createParametricEditCapabilities,
+} from "../operations/editor";
+import { createFreeformGeometry } from "../freeform";
 // import { IArcOptions } from "../base-types";
 
 export interface IArcOptions {
@@ -168,6 +173,25 @@ export class Arc extends THREE.Line {
 
   getConfig() {
     return this.options;
+  }
+
+  getPlacement() {
+    return clonePlacement({
+      translation: this.options.translation,
+      rotation: this.options.rotation,
+      scale: this.options.scale,
+    });
+  }
+
+  getEditCapabilities() {
+    return createParametricEditCapabilities("arc", "curve");
+  }
+
+  toFreeform(id: string = this.ogid) {
+    return createFreeformGeometry(this.arc.get_local_brep_serialized(), {
+      id,
+      placement: this.getPlacement(),
+    });
   }
 
   private getCurrentPositions() {

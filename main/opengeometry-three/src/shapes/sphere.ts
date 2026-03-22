@@ -9,6 +9,11 @@ import {
   sanitizeOutlineWidth,
   ShapeOutlineMesh,
 } from "./outline-utils";
+import {
+  clonePlacement,
+  createParametricEditCapabilities,
+} from "../operations/editor";
+import { createFreeformGeometry } from "../freeform";
 import { subtractShapeOperand } from "./boolean-subtract";
 import type {
   ShapeSubtractOperand,
@@ -49,6 +54,7 @@ interface ISphereKernelInstance {
   set_transform: (..._args: [Vector3, Vector3, Vector3]) => void;
   get_geometry_buffer(): Float64Array;
   get_brep_serialized(): string;
+  get_local_brep_serialized(): string;
   get_outline_geometry_buffer(): Float64Array;
   get_anchor(): Vector3;
 }
@@ -168,6 +174,10 @@ export class Sphere extends THREE.Mesh {
     }
   }
 
+  getConfig() {
+    return this.options;
+  }
+
   getAnchor() {
     const anchor = this.sphere.get_anchor();
     return new Vector3(anchor.x, anchor.y, anchor.z);
@@ -204,6 +214,25 @@ export class Sphere extends THREE.Mesh {
 
   setScale(scale: Vector3) {
     this.setPlacement({ scale });
+  }
+
+  getPlacement() {
+    return clonePlacement({
+      translation: this.options.translation,
+      rotation: this.options.rotation,
+      scale: this.options.scale,
+    });
+  }
+
+  getEditCapabilities() {
+    return createParametricEditCapabilities("sphere", "radial");
+  }
+
+  toFreeform(id: string = this.ogid) {
+    return createFreeformGeometry(this.sphere.get_local_brep_serialized(), {
+      id,
+      placement: this.getPlacement(),
+    });
   }
 
   cleanGeometry() {

@@ -35,5 +35,7 @@ pub mod spatial {
 
 pub mod booleans;
 pub mod brep;
+pub mod editor;
 pub mod export;
+pub mod freeform;
 pub mod scenegraph;

@@ -2,6 +2,11 @@ import * as OGKernel from "../../../opengeometry/pkg/opengeometry";
 import * as THREE from "three";
 import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
+import {
+  createFreeformGeometry,
+  type CreateFreeformGeometryOptions,
+  type FreeformGeometry,
+} from "../freeform";
 import { getUUID } from "../utils/randomizer";
 import {
   createShapeOutlineMesh,
@@ -144,6 +149,17 @@ export class BooleanResult extends THREE.Mesh {
    */
   getBrepSerialized() {
     return this.brepSerialized;
+  }
+
+  /**
+   * Converts the boolean output into a first-class freeform geometry object so
+   * it can participate in direct face/edge/vertex editing.
+   */
+  toFreeform(options?: CreateFreeformGeometryOptions): FreeformGeometry {
+    return createFreeformGeometry(this.getBrepSerialized(), {
+      id: options?.id ?? this.ogid,
+      placement: options?.placement,
+    });
   }
 
   set outline(enable: boolean) {

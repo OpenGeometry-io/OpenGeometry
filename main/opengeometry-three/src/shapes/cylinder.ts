@@ -8,6 +8,11 @@ import {
   sanitizeOutlineWidth,
   ShapeOutlineMesh,
 } from "./outline-utils";
+import {
+  clonePlacement,
+  createParametricEditCapabilities,
+} from "../operations/editor";
+import { createFreeformGeometry } from "../freeform";
 import { subtractShapeOperand } from "./boolean-subtract";
 import type {
   ShapeSubtractOperand,
@@ -149,6 +154,10 @@ export class Cylinder extends THREE.Mesh {
     }
   }
 
+  getConfig() {
+    return this.options;
+  }
+
   getAnchor() {
     const anchor = this.cylinder.get_anchor();
     return new Vector3(anchor.x, anchor.y, anchor.z);
@@ -185,6 +194,25 @@ export class Cylinder extends THREE.Mesh {
 
   setScale(scale: Vector3) {
     this.setPlacement({ scale });
+  }
+
+  getPlacement() {
+    return clonePlacement({
+      translation: this.options.translation,
+      rotation: this.options.rotation,
+      scale: this.options.scale,
+    });
+  }
+
+  getEditCapabilities() {
+    return createParametricEditCapabilities("cylinder", "radial");
+  }
+
+  toFreeform(id: string = this.ogid) {
+    return createFreeformGeometry(this.cylinder.get_local_brep_serialized(), {
+      id,
+      placement: this.getPlacement(),
+    });
   }
 
   cleanGeometry() {
