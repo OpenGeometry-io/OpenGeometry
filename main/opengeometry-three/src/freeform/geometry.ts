@@ -5,37 +5,9 @@ import {
 
 import type {
   CreateFreeformGeometryOptions,
-  EdgeInfo,
-  EditOperationOptions,
-  FaceInfo,
-  FreeformEditCapabilities,
-  FreeformEditResult,
-  FreeformFeatureEditCapabilities,
   FreeformSource,
   ObjectTransformation,
-  TopologyId,
-  TopologyRenderData,
-  VertexInfo,
 } from "./types";
-
-type RawFreeformOperationCapabilities = {
-  can_push_pull_face: boolean;
-  can_move_face: boolean;
-  can_extrude_face: boolean;
-  can_cut_face: boolean;
-  can_move_edge: boolean;
-  can_move_vertex: boolean;
-  can_insert_vertex_on_edge: boolean;
-  can_remove_vertex: boolean;
-  can_split_edge: boolean;
-  can_loop_cut: boolean;
-  reasons?: string[];
-};
-
-type RawFreeformFeatureEditCapabilities = RawFreeformOperationCapabilities & {
-  domain: "face" | "edge" | "vertex";
-  topology_id: TopologyId;
-};
 
 function parseJson<T>(payload: string): T {
   return JSON.parse(payload) as T;
@@ -91,71 +63,8 @@ function toPlainObjectTransformation(transform: ObjectTransformation) {
   };
 }
 
-function normalizeFaceInfo(face: FaceInfo): FaceInfo {
-  return {
-    ...face,
-    centroid: toVector3(face.centroid),
-    normal: toVector3(face.normal),
-  };
-}
-
-function normalizeEdgeInfo(edge: EdgeInfo): EdgeInfo {
-  return {
-    ...edge,
-    start: toVector3(edge.start),
-    end: toVector3(edge.end),
-  };
-}
-
-function normalizeVertexInfo(vertex: VertexInfo): VertexInfo {
-  return {
-    ...vertex,
-    position: toVector3(vertex.position),
-  };
-}
-
-function normalizeFeatureCapabilities(
-  raw: RawFreeformFeatureEditCapabilities
-): FreeformFeatureEditCapabilities {
-  return {
-    domain: raw.domain,
-    topologyId: raw.topology_id,
-    canPushPullFace: raw.can_push_pull_face,
-    canMoveFace: raw.can_move_face,
-    canExtrudeFace: raw.can_extrude_face,
-    canCutFace: raw.can_cut_face,
-    canMoveEdge: raw.can_move_edge,
-    canMoveVertex: raw.can_move_vertex,
-    canInsertVertexOnEdge: raw.can_insert_vertex_on_edge,
-    canRemoveVertex: raw.can_remove_vertex,
-    canSplitEdge: raw.can_split_edge,
-    canLoopCut: raw.can_loop_cut,
-    reasons: raw.reasons,
-  };
-}
-
-function normalizeFreeformCapabilities(
-  raw: RawFreeformOperationCapabilities
-): FreeformEditCapabilities {
-  return {
-    editingMode: "freeform",
-    entityType: "freeform",
-    editFamily: "freeform",
-    canEditConfig: false,
-    canEditPlacement: true,
-    canConvertToFreeform: false,
-    canPushPullFace: raw.can_push_pull_face,
-    canMoveFace: raw.can_move_face,
-    canExtrudeFace: raw.can_extrude_face,
-    canCutFace: raw.can_cut_face,
-    canMoveEdge: raw.can_move_edge,
-    canMoveVertex: raw.can_move_vertex,
-    canInsertVertexOnEdge: raw.can_insert_vertex_on_edge,
-    canRemoveVertex: raw.can_remove_vertex,
-    canSplitEdge: raw.can_split_edge,
-    canLoopCut: raw.can_loop_cut,
-    reasons: raw.reasons,
-  };
+function serializeBrepLike(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
 }
 
 function normalizeFreeformSerialized(source: FreeformSource): string {
@@ -168,7 +77,7 @@ function normalizeFreeformSerialized(source: FreeformSource): string {
   }
 
   if (typeof source.getLocalBrepData === "function") {
-    return JSON.stringify(source.getLocalBrepData());
+    return serializeBrepLike(source.getLocalBrepData());
   }
 
   if (typeof source.getBrepSerialized === "function") {
@@ -176,38 +85,14 @@ function normalizeFreeformSerialized(source: FreeformSource): string {
   }
 
   if (typeof source.getBrepData === "function") {
-    return JSON.stringify(source.getBrepData());
+    return serializeBrepLike(source.getBrepData());
   }
 
   if (typeof source.getBrep === "function") {
-    return JSON.stringify(source.getBrep());
+    return serializeBrepLike(source.getBrep());
   }
 
   return JSON.stringify(source);
-}
-
-function parseEditResult(payload: string): FreeformEditResult {
-  const result = parseJson<FreeformEditResult>(payload);
-  return {
-    ...result,
-    placement: normalizePlacement(result.placement),
-  };
-}
-
-function serializeOptions(options?: EditOperationOptions): string | undefined {
-  if (!options) {
-    return undefined;
-  }
-
-  return JSON.stringify({
-    ...options,
-    constraintAxis: options.constraintAxis
-      ? toPlainVector3(options.constraintAxis)
-      : undefined,
-    constraintPlaneNormal: options.constraintPlaneNormal
-      ? toPlainVector3(options.constraintPlaneNormal)
-      : undefined,
-  });
 }
 
 export class FreeformGeometry {
@@ -269,163 +154,9 @@ export class FreeformGeometry {
     this.geometry.setAnchor(anchor);
   }
 
-  getTopologyRenderData(): TopologyRenderData {
-    return parseJson<TopologyRenderData>(this.geometry.getTopologyRenderData());
-  }
-
-  getFaceInfo(faceId: TopologyId): FaceInfo {
-    return normalizeFaceInfo(parseJson<FaceInfo>(this.geometry.getFaceInfo(faceId)));
-  }
-
-  getEdgeInfo(edgeId: TopologyId): EdgeInfo {
-    return normalizeEdgeInfo(parseJson<EdgeInfo>(this.geometry.getEdgeInfo(edgeId)));
-  }
-
-  getVertexInfo(vertexId: TopologyId): VertexInfo {
-    return normalizeVertexInfo(
-      parseJson<VertexInfo>(this.geometry.getVertexInfo(vertexId))
-    );
-  }
-
-  getEditCapabilities(): FreeformEditCapabilities {
-    return normalizeFreeformCapabilities(
-      parseJson<RawFreeformOperationCapabilities>(
-        this.geometry.getEditCapabilities()
-      )
-    );
-  }
-
-  getFaceEditCapabilities(faceId: TopologyId): FreeformFeatureEditCapabilities {
-    return normalizeFeatureCapabilities(
-      parseJson<RawFreeformFeatureEditCapabilities>(
-        this.geometry.getFaceEditCapabilities(faceId)
-      )
-    );
-  }
-
-  getEdgeEditCapabilities(edgeId: TopologyId): FreeformFeatureEditCapabilities {
-    return normalizeFeatureCapabilities(
-      parseJson<RawFreeformFeatureEditCapabilities>(
-        this.geometry.getEdgeEditCapabilities(edgeId)
-      )
-    );
-  }
-
-  getVertexEditCapabilities(vertexId: TopologyId): FreeformFeatureEditCapabilities {
-    return normalizeFeatureCapabilities(
-      parseJson<RawFreeformFeatureEditCapabilities>(
-        this.geometry.getVertexEditCapabilities(vertexId)
-      )
-    );
-  }
-
-  pushPullFace(
-    faceId: TopologyId,
-    distance: number,
-    options?: EditOperationOptions
-  ): FreeformEditResult {
-    return parseEditResult(
-      this.geometry.pushPullFace(faceId, distance, serializeOptions(options))
-    );
-  }
-
-  extrudeFace(
-    faceId: TopologyId,
-    distance: number,
-    options?: EditOperationOptions
-  ): FreeformEditResult {
-    return parseEditResult(
-      this.geometry.extrudeFace(faceId, distance, serializeOptions(options))
-    );
-  }
-
-  cutFace(
-    faceId: TopologyId,
-    startEdgeId: TopologyId,
-    startT: number,
-    endEdgeId: TopologyId,
-    endT: number,
-    options?: EditOperationOptions
-  ): FreeformEditResult {
-    return parseEditResult(
-      this.geometry.cutFace(
-        faceId,
-        startEdgeId,
-        startT,
-        endEdgeId,
-        endT,
-        serializeOptions(options)
-      )
-    );
-  }
-
-  moveFace(
-    faceId: TopologyId,
-    translation: Vector3,
-    options?: EditOperationOptions
-  ): FreeformEditResult {
-    return parseEditResult(
-      this.geometry.moveFace(faceId, translation, serializeOptions(options))
-    );
-  }
-
-  moveEdge(
-    edgeId: TopologyId,
-    translation: Vector3,
-    options?: EditOperationOptions
-  ): FreeformEditResult {
-    return parseEditResult(
-      this.geometry.moveEdge(edgeId, translation, serializeOptions(options))
-    );
-  }
-
-  moveVertex(
-    vertexId: TopologyId,
-    translation: Vector3,
-    options?: EditOperationOptions
-  ): FreeformEditResult {
-    return parseEditResult(
-      this.geometry.moveVertex(vertexId, translation, serializeOptions(options))
-    );
-  }
-
-  insertVertexOnEdge(
-    edgeId: TopologyId,
-    t: number,
-    options?: EditOperationOptions
-  ): FreeformEditResult {
-    return parseEditResult(
-      this.geometry.insertVertexOnEdge(edgeId, t, serializeOptions(options))
-    );
-  }
-
-  splitEdge(
-    edgeId: TopologyId,
-    t: number,
-    options?: EditOperationOptions
-  ): FreeformEditResult {
-    return parseEditResult(
-      this.geometry.splitEdge(edgeId, t, serializeOptions(options))
-    );
-  }
-
-  loopCut(
-    edgeId: TopologyId,
-    t: number,
-    options?: EditOperationOptions
-  ): FreeformEditResult {
-    return parseEditResult(
-      this.geometry.loopCut(edgeId, t, serializeOptions(options))
-    );
-  }
-
-  removeVertex(
-    vertexId: TopologyId,
-    options?: EditOperationOptions
-  ): FreeformEditResult {
-    return parseEditResult(
-      this.geometry.removeVertex(vertexId, serializeOptions(options))
-    );
+  /** @internal */
+  getKernelGeometry(): OGFreeformGeometry {
+    return this.geometry;
   }
 }
 

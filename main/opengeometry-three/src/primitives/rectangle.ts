@@ -7,7 +7,7 @@ import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import {
   clonePlacement,
   createParametricEditCapabilities,
-} from "../operations/editor";
+} from "../editor";
 import { createFreeformGeometry } from "../freeform";
 
 export interface IRectangleOptions {
@@ -121,6 +121,7 @@ export class Rectangle extends THREE.Line {
       fatLines: this.options.fatLines,
       lineWidth: this.options.lineWidth,
     });
+    
     this.setPlacement({
       translation: this.options.translation?.clone(),
       rotation: this.options.rotation?.clone(),
@@ -218,7 +219,14 @@ export class Rectangle extends THREE.Line {
     return createParametricEditCapabilities("rectangle", "profile");
   }
 
+  canConvertToFreeform() {
+    return true;
+  }
+
   toFreeform(id: string = this.ogid) {
+    if (!this.canConvertToFreeform()) {
+      throw new Error("This entity cannot be converted to freeform.");
+    }
     return createFreeformGeometry(
       this.polyLineRectangle.get_local_brep_serialized(),
       {

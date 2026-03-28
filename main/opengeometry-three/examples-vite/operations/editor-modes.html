@@ -81,7 +81,7 @@
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Polygon, Cuboid, Vector3 } from "@og-three";
+      import { OpenGeometry, Polygon, Cuboid, Vector3, createFreeformEditor } from "@og-three";
 
       const app = document.getElementById("app");
       const polygonMode = document.querySelector("[data-polygon-mode]");
@@ -129,12 +129,12 @@
         ].join(", ");
       }
 
-      function topFaceId(freeform) {
+      function topFaceId(freeformEditor) {
         let bestFaceId = null;
         let bestY = Number.NEGATIVE_INFINITY;
 
-        for (const face of freeform.getTopologyRenderData().faces) {
-          const info = freeform.getFaceInfo(face.face_id);
+        for (const face of freeformEditor.getTopologyRenderData().faces) {
+          const info = freeformEditor.getFaceInfo(face.face_id);
           if (info.centroid.y > bestY) {
             bestY = info.centroid.y;
             bestFaceId = face.face_id;
@@ -144,12 +144,12 @@
         return bestFaceId;
       }
 
-      function previewVerticalEdgeId(freeform) {
+      function previewVerticalEdgeId(freeformEditor) {
         let bestEdgeId = null;
         let bestScore = Number.NEGATIVE_INFINITY;
 
-        for (const edge of freeform.getTopologyRenderData().edges) {
-          const info = freeform.getEdgeInfo(edge.edge_id);
+        for (const edge of freeformEditor.getTopologyRenderData().edges) {
+          const info = freeformEditor.getEdgeInfo(edge.edge_id);
           const dx = Math.abs(info.end.x - info.start.x);
           const dy = Math.abs(info.end.y - info.start.y);
           const dz = Math.abs(info.end.z - info.start.z);
@@ -171,13 +171,13 @@
         return bestEdgeId;
       }
 
-      function singleSideFaceCutSelection(freeform) {
+      function singleSideFaceCutSelection(freeformEditor) {
         let chosenFace = null;
         let bestScore = Number.NEGATIVE_INFINITY;
 
-        for (const face of freeform.getTopologyRenderData().faces) {
-          const faceInfo = freeform.getFaceInfo(face.face_id);
-          const faceCapabilities = freeform.getFaceEditCapabilities(face.face_id);
+        for (const face of freeformEditor.getTopologyRenderData().faces) {
+          const faceInfo = freeformEditor.getFaceInfo(face.face_id);
+          const faceCapabilities = freeformEditor.getFaceEditCapabilities(face.face_id);
           if (!faceCapabilities.canCutFace || Math.abs(faceInfo.normal.y) > 0.2) {
             continue;
           }
@@ -194,7 +194,7 @@
         }
 
         const verticalEdges = chosenFace.edge_ids
-          .map((edgeId) => freeform.getEdgeInfo(edgeId))
+          .map((edgeId) => freeformEditor.getEdgeInfo(edgeId))
           .filter((edgeInfo) => {
             const dx = Math.abs(edgeInfo.end.x - edgeInfo.start.x);
             const dy = Math.abs(edgeInfo.end.y - edgeInfo.start.y);
@@ -405,6 +405,7 @@
         scene.add(cuboid);
 
         let freeform = null;
+        let freeformEditor = null;
         let freeformPreview = null;
         let pushPullCount = 0;
         let polygonEdited = false;
@@ -445,13 +446,13 @@
         }
 
         function rebuildFreeformPreview() {
-          if (!freeform) {
+          if (!freeform || !freeformEditor) {
             clearFreeformPreview();
             return;
           }
 
           clearFreeformPreview();
-          const topologyRenderData = freeform.getTopologyRenderData();
+          const topologyRenderData = freeformEditor.getTopologyRenderData();
           freeformPreview = createFreeformPreview(
             freeform.getGeometrySerialized(),
             freeform.getOutlineGeometrySerialized(),
@@ -489,7 +490,7 @@
             return;
           }
 
-          const freeformCapabilities = freeform.getEditCapabilities();
+          const freeformCapabilities = freeformEditor.getEditCapabilities();
           freeformSummary.textContent =
             `id ${freeform.getId()}, ${summarizeCapabilities(freeformCapabilities)}. `
             + `This orange copy is offset to the right through freeform placement so you can compare it against the green parametric cuboid. `
@@ -532,7 +533,16 @@
         }
 
         function convertCuboidToFreeform() {
+          if (!cuboid.canConvertToFreeform()) {
+            freeformStatus.textContent = "blocked";
+            resultSummary.textContent =
+              "The current cuboid cannot be converted to freeform.";
+            updatePanel();
+            return;
+          }
+
           freeform = cuboid.toFreeform(`${cuboid.ogid}-freeform`);
+          freeformEditor = createFreeformEditor(freeform);
           offsetFreeformForPreview(freeform);
           pushPullCount = 0;
           rebuildFreeformPreview();
@@ -551,7 +561,7 @@
             return;
           }
 
-          const faceId = topFaceId(freeform);
+          const faceId = topFaceId(freeformEditor);
           if (faceId === null) {
             freeformStatus.textContent = "failed";
             resultSummary.textContent =
@@ -560,7 +570,7 @@
             return;
           }
 
-          const result = freeform.pushPullFace(faceId, 0.35, {
+          const result = freeformEditor.pushPullFace(faceId, 0.35, {
             includeTopologyRemap: true,
             includeDeltas: true,
           });
@@ -583,7 +593,7 @@
             return;
           }
 
-          const edgeId = previewVerticalEdgeId(freeform);
+          const edgeId = previewVerticalEdgeId(freeformEditor);
           if (edgeId === null) {
             freeformStatus.textContent = "failed";
             resultSummary.textContent =
@@ -592,7 +602,7 @@
             return;
           }
 
-          const result = freeform.loopCut(edgeId, 0.5, {
+          const result = freeformEditor.loopCut(edgeId, 0.5, {
             includeTopologyRemap: true,
             includeDeltas: true,
           });
@@ -615,7 +625,7 @@
             return;
           }
 
-          const selection = singleSideFaceCutSelection(freeform);
+          const selection = singleSideFaceCutSelection(freeformEditor);
           if (!selection) {
             freeformStatus.textContent = "failed";
             resultSummary.textContent =
@@ -624,7 +634,7 @@
             return;
           }
 
-          const result = freeform.cutFace(
+          const result = freeformEditor.cutFace(
             selection.faceId,
             selection.startEdgeId,
             0.5,
@@ -649,6 +659,7 @@
           setPolygonBaseState();
           setCuboidBaseState();
           freeform = null;
+          freeformEditor = null;
           pushPullCount = 0;
           clearFreeformPreview();
           freeformStatus.textContent = "ready";

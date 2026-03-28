@@ -4,7 +4,7 @@ import { getUUID } from "../utils/randomizer";
 import {
   clonePlacement,
   createParametricEditCapabilities,
-} from "../operations/editor";
+} from "../editor";
 import { createFreeformGeometry } from "../freeform";
 
 export interface ICurveOptions {
@@ -170,7 +170,14 @@ export class Curve extends THREE.Line {
     return createParametricEditCapabilities("curve", "curve");
   }
 
+  canConvertToFreeform() {
+    return true;
+  }
+
   toFreeform(id: string = this.ogid) {
+    if (!this.canConvertToFreeform()) {
+      throw new Error("This entity cannot be converted to freeform.");
+    }
     return createFreeformGeometry(this.curve.get_local_brep_serialized(), {
       id,
       placement: this.getPlacement(),

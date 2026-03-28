@@ -7,7 +7,7 @@ import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import {
   clonePlacement,
   createParametricEditCapabilities,
-} from "../operations/editor";
+} from "../editor";
 import { createFreeformGeometry } from "../freeform";
 
 export interface ILineOptions {
@@ -201,7 +201,14 @@ export class Line extends THREE.Line {
     return createParametricEditCapabilities("line", "profile");
   }
 
+  canConvertToFreeform() {
+    return true;
+  }
+
   toFreeform(id: string = this.ogid) {
+    if (!this.canConvertToFreeform()) {
+      throw new Error("This entity cannot be converted to freeform.");
+    }
     return createFreeformGeometry(this.line.get_local_brep_serialized(), {
       id,
       placement: this.getPlacement(),

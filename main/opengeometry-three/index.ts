@@ -119,6 +119,10 @@ export * from "./src/examples/index";
  */
 export * from "./src/freeform/index";
 /**
+ * Editing helpers that operate on parametric entities and freeform geometry.
+ */
+export * from "./src/editor/index";
+/**
  * Kernel-backed modeling operations.
  */
 export * from "./src/operations/index";

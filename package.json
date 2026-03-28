@@ -2,7 +2,7 @@
   "name": "opengeometry",
   "author": "Vishwajeet Vinayak Mane",
   "license": "MPL-2.0",
-  "version": "3.0.0",
+  "version": "2.0.1",
   "description": "CAD Kernel for Web with OpenGeometry",
   "type": "module",
   "main": "index.js",

@@ -1,18 +1,20 @@
 import * as THREE from "three";
 import { Vector3 } from "../../../opengeometry/pkg/opengeometry";
 import {
-  FreeformGeometry,
   FreeformEditResult,
-} from "../freeform";
+  FreeformEditor,
+  createFreeformEditor,
+} from "../editor";
+import { Line } from "../primitives/line";
 import { Polygon } from "../shapes/polygon";
 import { Cuboid } from "../shapes/cuboid";
 
-function topFaceId(freeform: FreeformGeometry): number | null {
+function topFaceId(freeformEditor: FreeformEditor): number | null {
   let bestFaceId: number | null = null;
   let bestY = Number.NEGATIVE_INFINITY;
 
-  for (const face of freeform.getTopologyRenderData().faces) {
-    const info = freeform.getFaceInfo(face.face_id);
+  for (const face of freeformEditor.getTopologyRenderData().faces) {
+    const info = freeformEditor.getFaceInfo(face.face_id);
     if (info.centroid.y > bestY) {
       bestY = info.centroid.y;
       bestFaceId = face.face_id;
@@ -24,7 +26,8 @@ function topFaceId(freeform: FreeformGeometry): number | null {
 
 /**
  * Demonstrates the intended editing flow for editor-controls:
- * parametric config/placement edits first, then explicit freeform conversion.
+ * parametric config/placement edits first, then explicit freeform conversion,
+ * including wire-backed freeform edge insertion on a converted line.
  */
 export function createEditorModesExample(scene: THREE.Scene) {
   const polygon = new Polygon({
@@ -74,25 +77,57 @@ export function createEditorModesExample(scene: THREE.Scene) {
     rotation: new Vector3(0.0, Math.PI / 9.0, 0.0),
   });
 
+  const guideLine = new Line({
+    start: new Vector3(-3.4, 0.0, 1.6),
+    end: new Vector3(-0.8, 0.0, 1.6),
+    color: 0x475569,
+    fatLines: true,
+    width: 4,
+  });
+  guideLine.setPlacement({
+    translation: new Vector3(0.0, 0.0, 0.2),
+  });
+
+  const guideLineCapabilities = guideLine.getEditCapabilities();
+  const guideLineFreeform = guideLine.toFreeform(`${guideLine.ogid}-freeform`);
+  const guideLineEditor = createFreeformEditor(guideLineFreeform);
+  const guideLineEdge =
+    guideLineEditor.getTopologyRenderData().edges[0]?.edge_id ?? null;
+  let guideLineSplitResult: FreeformEditResult | null = null;
+
+  if (guideLineEdge !== null) {
+    guideLineSplitResult = guideLineEditor.splitEdge(guideLineEdge, 0.5, {
+      includeTopologyRemap: true,
+    });
+  }
+
   const freeform = cuboid.toFreeform(`${cuboid.ogid}-freeform`);
-  const topFace = topFaceId(freeform);
+  const freeformEditor = createFreeformEditor(freeform);
+  const topFace = topFaceId(freeformEditor);
   let freeformResult: FreeformEditResult | null = null;
 
   if (topFace !== null) {
-    freeformResult = freeform.pushPullFace(topFace, 0.35, {
+    freeformResult = freeformEditor.pushPullFace(topFace, 0.35, {
       includeTopologyRemap: true,
     });
   }
 
   scene.add(polygon);
   scene.add(cuboid);
+  scene.add(guideLine);
 
   return {
     polygon,
     cuboid,
+    guideLine,
     polygonCapabilities,
     cuboidCapabilities,
+    guideLineCapabilities,
+    guideLineFreeform,
+    guideLineEditor,
+    guideLineSplitResult,
     freeform,
+    freeformEditor,
     freeformResult,
   };
 }

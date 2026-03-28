@@ -57,11 +57,13 @@ interface KernelBooleanResult {
   reportJson: string;
 }
 
+/* eslint-disable no-unused-vars */
 type KernelBooleanFunction = (
   lhsBrepSerialized: string,
   rhsBrepSerialized: string,
   optionsJson?: string
 ) => KernelBooleanResult;
+/* eslint-enable no-unused-vars */
 
 const BOOLEAN_CREASE_ANGLE = Math.PI / 5;
 const BOOLEAN_OUTLINE_THRESHOLD_DEGREES = 26;
@@ -151,11 +153,18 @@ export class BooleanResult extends THREE.Mesh {
     return this.brepSerialized;
   }
 
+  canConvertToFreeform() {
+    return this.brepSerialized.length > 0;
+  }
+
   /**
    * Converts the boolean output into a first-class freeform geometry object so
    * it can participate in direct face/edge/vertex editing.
    */
   toFreeform(options?: CreateFreeformGeometryOptions): FreeformGeometry {
+    if (!this.canConvertToFreeform()) {
+      throw new Error("This boolean result cannot be converted to freeform.");
+    }
     return createFreeformGeometry(this.getBrepSerialized(), {
       id: options?.id ?? this.ogid,
       placement: options?.placement,

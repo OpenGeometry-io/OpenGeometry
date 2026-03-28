@@ -1,1 +1,1 @@
-export { FreeformGeometry, createFreeformGeometry } from "../../freeform";
+export { FreeformEditor, createFreeformEditor } from "../../editor/freeform";

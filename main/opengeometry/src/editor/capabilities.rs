@@ -15,8 +15,10 @@ impl OGFreeformGeometry {
 
         let mut reasons = Vec::new();
         if !supports_edge_topology_edits {
-            reasons
-                .push("insert/split require an edge that belongs to at least one face".to_string());
+            reasons.push(
+                "insert/split require an edge that belongs to a rebuildable face loop or wire"
+                    .to_string(),
+            );
         }
         if !supports_vertex_removal {
             reasons.push(
@@ -112,13 +114,12 @@ impl OGFreeformGeometry {
             )));
         }
 
-        let supports_topology_edits = self.supports_face_backed_edge_topology_edits(edge_id);
+        let supports_topology_edits = self.supports_rebuildable_edge_topology_edits(edge_id);
         let supports_loop_cut = self.supports_loop_cut_from_edge(edge_id);
         let mut reasons = Vec::new();
         if !supports_topology_edits {
             reasons.push(
-                "insertVertexOnEdge/splitEdge require an edge that belongs to at least one face"
-                    .to_string(),
+                "insertVertexOnEdge/splitEdge require an edge that belongs to a rebuildable face loop or wire".to_string(),
             );
         }
         if !supports_loop_cut {
@@ -220,11 +221,19 @@ impl OGFreeformGeometry {
         self.local_brep
             .edges
             .iter()
-            .any(|edge| self.supports_face_backed_edge_topology_edits(edge.id))
+            .any(|edge| self.supports_rebuildable_edge_topology_edits(edge.id))
     }
 
-    pub(super) fn supports_face_backed_edge_topology_edits(&self, edge_id: u32) -> bool {
-        !incident_faces_for_edge(&self.local_brep, edge_id).is_empty()
+    pub(super) fn supports_rebuildable_edge_topology_edits(&self, edge_id: u32) -> bool {
+        let Some(edge) = self.local_brep.edges.get(edge_id as usize) else {
+            return false;
+        };
+
+        [Some(edge.halfedge), edge.twin_halfedge]
+            .into_iter()
+            .flatten()
+            .filter_map(|halfedge_id| self.local_brep.halfedges.get(halfedge_id as usize))
+            .any(|halfedge| halfedge.face.is_some() || halfedge.wire_ref.is_some())
     }
 
     pub(super) fn supports_any_face_cut(&self) -> bool {

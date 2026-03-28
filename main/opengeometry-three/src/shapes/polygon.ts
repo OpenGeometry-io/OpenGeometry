@@ -13,7 +13,7 @@ import {
 import {
   clonePlacement,
   createParametricEditCapabilities,
-} from "../operations/editor";
+} from "../editor";
 import { createFreeformGeometry } from "../freeform";
 import { subtractShapeOperand } from "./boolean-subtract";
 import type {
@@ -230,7 +230,14 @@ export class Polygon extends THREE.Mesh {
     return createParametricEditCapabilities("polygon", "profile");
   }
 
+  canConvertToFreeform() {
+    return true;
+  }
+
   toFreeform(id: string = this.ogid) {
+    if (!this.canConvertToFreeform()) {
+      throw new Error("This entity cannot be converted to freeform.");
+    }
     return createFreeformGeometry(this.polygon.get_local_brep_serialized(), {
       id,
       placement: this.getPlacement(),
