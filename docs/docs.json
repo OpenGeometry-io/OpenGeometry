@@ -93,6 +93,7 @@
             "group": "3D Shapes",
             "pages": [
               "api/shapes/polygon",
+              "api/shapes/solid",
               "api/shapes/cylinder",
               "api/shapes/cuboid",
               "api/shapes/sphere",

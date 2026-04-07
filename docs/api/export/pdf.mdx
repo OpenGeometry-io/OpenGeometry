@@ -226,14 +226,34 @@ The OGSceneManager provides a convenience method that projects and exports in on
 **Example (Node.js):**
 
 ```javascript
-const { OGSceneManager, OGCuboid, Vector3 } = require("opengeometry");
+import { OpenGeometry, OGSceneManager, Cuboid, Vector3 } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+
+function toBrepSerialized(source) {
+  const value =
+    source && typeof source.getBrepSerialized === "function"
+      ? source.getBrepSerialized()
+      : source && typeof source.getBrepData === "function"
+        ? source.getBrepData()
+        : source && typeof source.getBrep === "function"
+          ? source.getBrep()
+          : source;
+
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
 
 const manager = new OGSceneManager();
 const sceneId = manager.createScene("My Model");
 
-const cuboid = new OGCuboid("origin");
-cuboid.set_config(new Vector3(0, 0, 0), 10.0, 8.0, 6.0);
-manager.addCuboidToScene(sceneId, "box", cuboid);
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0, 0),
+  width: 10.0,
+  height: 8.0,
+  depth: 6.0,
+  color: 0x10b981,
+});
+manager.addBrepEntityToScene(sceneId, "box", "Cuboid", toBrepSerialized(cuboid));
 
 const camera = {
     position: { x: 15, y: 12, z: 15 },

@@ -60,6 +60,7 @@ Each boolean helper accepts a `BooleanOperand` in any of these forms:
   - `getBrep(): unknown`
 
 This means you can pass OpenGeometry shape wrappers (like `Cuboid` and `Opening`) directly.
+`Solid` also works directly here, which makes `polygon.extrude(height)` a first-class boolean input.
 
 ### BooleanExecutionOptions
 
@@ -212,3 +213,4 @@ scene.add(union, intersection);
 
 - [Boolean operations demo](https://demo.opengeometry.io/operations/boolean-operations.html)
 - [Polygon boolean operations demo](https://demo.opengeometry.io/operations/polygon-boolean-operations.html)
+- [Extruded boolean operations demo](https://demo.opengeometry.io/operations/extruded-boolean-operations.html)

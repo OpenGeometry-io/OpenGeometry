@@ -257,14 +257,34 @@ Projects a 3D BRep to a 2D scene.
 **Example:**
 
 ```javascript
-import { OGCuboid, OGSceneManager, Vector3 } from "opengeometry";
+import { OpenGeometry, Cuboid, OGSceneManager, Vector3 } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+
+function toBrepSerialized(source) {
+  const value =
+    source && typeof source.getBrepSerialized === "function"
+      ? source.getBrepSerialized()
+      : source && typeof source.getBrepData === "function"
+        ? source.getBrepData()
+        : source && typeof source.getBrep === "function"
+          ? source.getBrep()
+          : source;
+
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
 
 const manager = new OGSceneManager();
 const sceneId = manager.createScene("Projection Test");
 
-const cuboid = new OGCuboid("origin");
-cuboid.set_config(new Vector3(0, 0, 0), 5.0, 3.0, 2.0);
-manager.addCuboidToScene(sceneId, "box", cuboid);
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0, 0),
+  width: 5.0,
+  height: 3.0,
+  depth: 2.0,
+  color: 0x10b981,
+});
+manager.addBrepEntityToScene(sceneId, "box", "Cuboid", toBrepSerialized(cuboid));
 
 const camera = {
     position: { x: 8, y: 6, z: 8 },

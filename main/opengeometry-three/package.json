@@ -2,7 +2,7 @@
   "name": "@opengeometry/kernel-three",
   "author": "Vishwajeet Vinayak Mane",
   "license": "MPL-2.0",
-  "version": "2.0.1",
+  "version": "2.0.3",
   "description": "OpenGeometry Kernel for Three.js",
   "main": "index.js",
   "scripts": {

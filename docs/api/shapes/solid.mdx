@@ -1,0 +1,193 @@
+---
+title: 'Solid'
+description: 'Generic renderable BRep-backed solid for extrusion outputs and reusable custom solids'
+icon: 'cube'
+---
+
+## Overview
+
+`Solid` is the generic BRep-backed shape wrapper used when the kernel produces a solid that is not a
+dedicated parametric primitive. It extends `THREE.Mesh`, renders directly from freeform/BRep
+buffers, supports booleans, and converts back into a freeform wrapper for direct editing.
+
+The most common way to get a `Solid` is:
+
+```ts
+const solid = polygon.extrude(height);
+```
+
+## Constructor
+
+```ts
+const solid = new Solid(options: ISolidOptions);
+```
+
+### ISolidOptions
+
+<ParamField path="brep" type="FreeformSource" required>
+  Serialized BRep JSON, parsed BRep data, or another wrapper exposing BRep accessor methods.
+</ParamField>
+
+<ParamField path="color" type="number" required>
+  Mesh color for the rendered solid.
+</ParamField>
+
+<ParamField path="fatOutlines" type="boolean" default="false">
+  Use wide outlines backed by Three.js `LineSegments2`.
+</ParamField>
+
+<ParamField path="outlineWidth" type="number" default="1">
+  Outline width used for fat outlines.
+</ParamField>
+
+<ParamField path="anchor" type="Vector3" optional>
+  Optional modeling anchor for placement updates.
+</ParamField>
+
+<ParamField path="translation" type="Vector3" optional>
+  Initial translation for the solid.
+</ParamField>
+
+<ParamField path="rotation" type="Vector3" optional>
+  Initial rotation for the solid.
+</ParamField>
+
+<ParamField path="scale" type="Vector3" optional>
+  Initial scale for the solid.
+</ParamField>
+
+## Static helper
+
+### Solid.extrude()
+
+Extrudes a face-like BRep source and immediately wraps it as a renderable `Solid`.
+
+```ts
+const solid = Solid.extrude(source, height, options);
+```
+
+## Methods
+
+### setPlacement()
+
+Updates translation, rotation, and scale.
+
+```ts
+solid.setPlacement({ translation?, rotation?, scale? }): void
+```
+
+### setAnchor()
+
+Updates the modeling anchor used by the wrapped freeform geometry.
+
+```ts
+solid.setAnchor(anchor: Vector3): void
+```
+
+### toFreeform()
+
+Returns a freeform geometry wrapper for direct editing workflows.
+
+```ts
+const freeform = solid.toFreeform(id?);
+```
+
+### getBrepSerialized()
+
+Returns the world-space serialized BRep payload.
+
+```ts
+solid.getBrepSerialized(): string
+```
+
+### getLocalBrepSerialized()
+
+Returns the local-space serialized BRep payload.
+
+```ts
+solid.getLocalBrepSerialized(): string
+```
+
+### getBrepData()
+
+Returns the parsed world-space BRep object.
+
+```ts
+solid.getBrepData(): object
+```
+
+### subtract()
+
+Subtracts another boolean operand from the solid.
+
+```ts
+const result = solid.subtract(operand, options?);
+```
+
+## Properties
+
+<ResponseField name="ogid" type="string">
+  Stable identifier for the solid wrapper.
+</ResponseField>
+
+<ResponseField name="color" type="number">
+  Gets or sets the solid's render color.
+</ResponseField>
+
+<ResponseField name="outline" type="boolean">
+  Enables or disables outline rendering.
+</ResponseField>
+
+<ResponseField name="fatOutlines" type="boolean">
+  Toggles wide outline rendering.
+</ResponseField>
+
+<ResponseField name="outlineWidth" type="number">
+  Sets the width used when `fatOutlines` is enabled.
+</ResponseField>
+
+<ResponseField name="outlineColor" type="number">
+  Gets or sets the outline color.
+</ResponseField>
+
+## Usage Examples
+
+### Recommended path: polygon extrusion
+
+```ts
+import { Polygon, Vector3 } from "opengeometry";
+
+const profile = new Polygon({
+  vertices: [
+    new Vector3(-1, 0, -0.2),
+    new Vector3(1, 0, -0.2),
+    new Vector3(1, 0, 0.2),
+    new Vector3(-1, 0, 0.2),
+  ],
+  color: 0x2563eb,
+});
+
+const wall = profile.extrude(2.8);
+wall.outline = true;
+```
+
+### Wrap an existing BRep payload
+
+```ts
+import { Solid } from "opengeometry";
+
+const solid = new Solid({
+  brep: existingBrepSerialized,
+  color: 0x10b981,
+});
+```
+
+## See Also
+
+- [Polygon](/api/shapes/polygon)
+- [Extrude](/api/operations/extrude)
+- [Boolean operations](/api/operations/boolean-operations)
+
+## Live demo
+
+- [Extruded boolean operations demo](https://demo.opengeometry.io/operations/extruded-boolean-operations.html)

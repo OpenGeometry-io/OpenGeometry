@@ -10,6 +10,9 @@ import {
 } from "../editor";
 import { createFreeformGeometry } from "../freeform";
 
+/**
+ * Construction options for a line segment wrapper.
+ */
 export interface ILineOptions {
   ogid?: string;
   start: Vector3;
@@ -22,17 +25,30 @@ export interface ILineOptions {
   scale?: Vector3;
 }
 
+/**
+ * Placement updates accepted by `Line`.
+ */
 export interface LinePlacementOptions {
   translation?: Vector3;
   rotation?: Vector3;
   scale?: Vector3;
 }
 
+/**
+ * Partial config payload accepted by `Line.setConfig(...)`.
+ */
 export type LineConfigUpdate = Partial<
   Omit<ILineOptions, "translation" | "rotation" | "scale">
 >;
+
+/**
+ * Alias for `Line` placement updates.
+ */
 export type LinePlacementUpdate = LinePlacementOptions;
 
+/**
+ * Offset result returned by `Line.offset(...)`.
+ */
 export interface ILineOffsetResult {
   points: Vector3[];
   beveledVertexIndices: number[];

@@ -15,13 +15,18 @@ import {
   createParametricEditCapabilities,
 } from "../editor";
 import { createFreeformGeometry } from "../freeform";
+import { Solid } from "./solid";
 import { subtractShapeOperand } from "./boolean-subtract";
 import type {
   ShapeSubtractOperand,
   ShapeSubtractOptions,
   ShapeSubtractResult,
 } from "./boolean-subtract";
+import { extrudeBrepFace } from "../operations/extrude";
 
+/**
+ * Construction options for a planar polygon.
+ */
 export interface IPolygonOptions {
   ogid?: string;
   vertices: Vector3[];
@@ -40,11 +45,21 @@ export interface PolygonPlacementOptions {
   scale?: Vector3;
 }
 
+/**
+ * Partial polygon config updates that regenerate the profile when geometry changes.
+ */
 export type PolygonConfigUpdate = Partial<
   Omit<IPolygonOptions, "translation" | "rotation" | "scale">
 >;
+
+/**
+ * Placement updates accepted by `Polygon`.
+ */
 export type PolygonPlacementUpdate = PolygonPlacementOptions;
 
+/**
+ * Planar polygon mesh with support for holes, booleans, and extrusion to `Solid`.
+ */
 export class Polygon extends THREE.Mesh {
   ogid: string;
   options: IPolygonOptions = {
@@ -64,8 +79,6 @@ export class Polygon extends THREE.Mesh {
   private _outlineWidth = 1;
   private _outlineColor = 0x000000;
 
-  transformationMatrix: THREE.Matrix4 = new THREE.Matrix4();
-
   set color(color: number) {
     this.options.color = color;
     if (this.material instanceof THREE.MeshBasicMaterial) {
@@ -77,14 +90,6 @@ export class Polygon extends THREE.Mesh {
     return this.options.color;
   }
 
-  // private _placement: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
-  // private _yaw: number = 0;
-  // Store local center offset to align outlines
-  // TODO: Can this be moved to Engine? It can increase performance | Needs to be used in other shapes too
-  private _geometryCenterOffset = new THREE.Vector3();
-
-  // TODO: Make Options Optional
-  // constructor(vertices?: Vector3[]) // If no vertices are provided, it will be an empty polygon
   constructor(options?: IPolygonOptions) {
     super();
     this.ogid = options?.ogid ?? getUUID();
@@ -107,21 +112,6 @@ export class Polygon extends THREE.Mesh {
       rotation: this.options.rotation?.clone(),
       scale: this.options.scale?.clone(),
     });
-
-    // TODO: THIS MIGHT HELP WITH SHARING THE POSITION with KERNEL when something is changed
-    // const originalSet = this.position.set.bind(this.position);
-    // this.position.set = (x: number, y: number, z: number) => {
-    //   console.log(`Position set to (${x}, ${y}, ${z})`);
-    //   // your custom logic here (e.g., notify OpenGeometry)
-    //   return originalSet(x, y, z);
-    // };
-
-    // // Optional: Override copy if you're using .copy() too
-    // const originalCopy = this.position.copy.bind(this.position);
-    // this.position.copy = (v: THREE.Vector3) => {
-    //   console.log(`Position copied from ${v.x}, ${v.y}, ${v.z}`);
-    //   return originalCopy(v);
-    // };
   }
 
   validateOptions() {
@@ -226,14 +216,23 @@ export class Polygon extends THREE.Mesh {
     });
   }
 
+  /**
+   * Returns the editing capability payload advertised by parametric wrappers.
+   */
   getEditCapabilities() {
     return createParametricEditCapabilities("polygon", "profile");
   }
 
+  /**
+   * Polygon always supports conversion into the freeform editing wrapper.
+   */
   canConvertToFreeform() {
     return true;
   }
 
+  /**
+   * Returns a freeform wrapper for direct BRep editing of this polygon.
+   */
   toFreeform(id: string = this.ogid) {
     if (!this.canConvertToFreeform()) {
       throw new Error("This entity cannot be converted to freeform.");
@@ -244,71 +243,8 @@ export class Polygon extends THREE.Mesh {
     });
   }
 
-  // /**
-   //  * Sets the placement of the polygon in 3D space.
-  //  * @param x X-coordinate
-  //  * @param y Y-coordinate
-  //  * @param z Z-coordinate
-  //  */
-  // placement(x: number, y: number, z: number) {
-  //   this._placement.set(x, y, z);
-    
-  //   // Do the recalculation of position based on the placement
-  //   const clonedObject = this.clone();
-  //   clonedObject.rotation.set(0, 0, 0);
-
-  //   clonedObject.geometry.computeBoundingBox();
-  //   if (!clonedObject.geometry.boundingBox) return;
-
-  //   const center = new THREE.Vector3();
-  //   clonedObject.geometry.boundingBox.getCenter(center);
-  //   const min = clonedObject.geometry.boundingBox.min;
-  //   this.position.set(
-  //     center.x + this._placement.x - min.x,
-  //     // this._placement.y,
-  //     0.01, // Set Y to a small value to avoid z-fighting
-  //     center.z + this._placement.z - min.z
-  //   );
-  // }
-
-  // positionToPlacement() {
-  //   const clonedObject = this.clone();
-  //   clonedObject.rotation.set(0, 0, 0);
-  //   clonedObject.geometry.computeBoundingBox();
-  //   if (!clonedObject.geometry.boundingBox) return;
-  //   const min = clonedObject.geometry.boundingBox.min;
-
-  //   this._placement.set(
-  //     this.position.x + min.x,
-  //     this.position.y + min.y,
-  //     this.position.z + min.z
-  //   );
-
-  //   // console.log("Placement set to:", this._placement.x, this._placement.y, this._placement.z);
-  // }
-
-  // /**
-  //  * Rotates the polygon around the Y-axis.
-  //  * @param angle Rotation angle in Degrees
-  //  */
-  // set yaw(angle: number) {
-  //   this._yaw = angle;
-    
-  //   this.rotation.set(0, 0, 0);
-  //   this.rotation.y = THREE.MathUtils.degToRad(this._yaw);
-  // }
-
-  // get yaw() {
-  //   return this._yaw;
-  // }
-
   cleanGeometry() {
-    this.geometry.dispose();
-    if (Array.isArray(this.material)) {
-      this.material.forEach(mat => mat.dispose());
-    } else {
-      this.material.dispose();
-    }
+    this.disposeResources();
   }
 
   generateGeometry() {
@@ -366,29 +302,6 @@ export class Polygon extends THREE.Mesh {
       computeLineDistances?: () => void;
     };
     fatOutline.computeLineDistances?.();
-
-    // this.geometry.computeBoundingBox();
-    // const originalCenter = new THREE.Vector3();
-    // this.geometry.boundingBox?.getCenter(originalCenter);
-    // console.log("Original Center:", originalCenter.x, originalCenter.y, originalCenter.z);
-
-    // this.geometry.center();
-    // this.geometry.computeBoundingBox();
-    // const newCenter = new THREE.Vector3();
-    // this.geometry.boundingBox?.getCenter(newCenter);
-    // console.log("New Center after centering:", newCenter.x, newCenter.y, newCenter.z);
-
-    // if (!this.geometry.boundingBox) return;
-    // const min = this.geometry.boundingBox.min;
-    // // console.log("Position before centering:", this.position.x, this.position.y, this.position.z);
-    // console.log("Bounding Box Min:", min.x, min.y, min.z);
-    // this.position.set(-min.x, 0, -min.z);
-
-    // if (this._placement) {
-    //   this.placement(this._placement.x, this._placement.y, this._placement.z);
-    // }
-
-    // console.log("New Position after centering:", this.position.x, this.position.y, this.position.z);
   }
 
   addVertices(vertices: Vector3[]) {
@@ -397,69 +310,6 @@ export class Polygon extends THREE.Mesh {
       vertices: vertices.map((vertex) => vertex.clone()),
     });
   }
-
-  saveTransformationToBREP() {
-    if (!this.polygon) return;
-  }
-
-  // /**
-  //  * Rotates the object around the Y-axis.
-  //  * @param angle Rotation angle in Degrees
-  //  * @returns 
-  //  * @summary If rotation methods from threejs is used, it will rotate around the first vertex which might not be desired.
-  //  */
-  // rotateOnYAxis(angle: number) {
-  //   if (!this.polygon) return;
-  // }
-
-  // resetVertices() {
-  //   if (!this.polygon) return;
-  //   this.layerVertices = [];
-  //   this.geometry.dispose();
-  //   this.polygon?.clear_vertices();
-  //   this.isTriangulated = false;
-  // }
-
-  // addVertex(threeVertex: Vector3) {
-  //   if (this.isTriangulated) {
-  //     this.layerVertices = [];
-  //     this.geometry.dispose();
-  //     this.polygon?.clear_vertices();
-  //     this.isTriangulated = false;
-
-  //     for (const vertex of this.layerBackVertices) {
-  //       this.layerVertices.push(vertex.clone());
-  //     }
-
-  //   };
-
-  //   const backupVertex = new Vector3(
-  //     parseFloat(threeVertex.x.toFixed(2)),
-  //     0,
-  //     parseFloat(threeVertex.z.toFixed(2))
-  //   );
-  //   this.layerBackVertices.push(backupVertex);
-
-  //   const vertex = new Vector3(
-  //     parseFloat(threeVertex.x.toFixed(2)),
-  //     // when doing the parse operation getting -0 instead of 0
-  //     0,
-  //     parseFloat(threeVertex.z.toFixed(2))
-  //   );
-  //   this.layerVertices.push(vertex);
-
-  //   if (this.layerVertices.length > 3) {
-  //     this.polygon?.add_vertices(this.layerVertices);
-  //     const bufFlush = this.polygon?.triangulate();
-      
-  //     if (!bufFlush) {
-  //       return;
-  //     }
-  //     this.addFlushBufferToScene(bufFlush);
-
-  //     this.isTriangulated = true;
-  //   }
-  // }
 
   addHole(holeVertices: Vector3[]) {
     if (!this.polygon) return;
@@ -474,33 +324,31 @@ export class Polygon extends THREE.Mesh {
     });
   }
 
-  // extrude(height: number) {
-  //   if (!this.polygon) return;
-  //   const extruded_buff = this.polygon.extrude_by_height(height);
-  //   console.log(extruded_buff);
-  //   this.generateExtrudedGeometry(extruded_buff);
-  // }
+  /**
+   * Builds a kernel-backed `Solid` by extruding this polygon face by `height`.
+   */
+  extrude(height: number) {
+    const config = this.getConfig();
+    const placement = this.getPlacement();
+    const solid = new Solid({
+      brep: extrudeBrepFace(this.polygon.get_local_brep_serialized(), height),
+      color: config.color,
+      fatOutlines: config.fatOutlines,
+      outlineWidth: config.outlineWidth,
+      anchor: this.getAnchor(),
+      translation: placement.translation.clone(),
+      rotation: placement.rotation.clone(),
+      scale: placement.scale.clone(),
+    });
 
-  // generateExtrudedGeometry(extruded_buff: string) {
-  //   // THIS WORKS
-  //   const flushBuffer = JSON.parse(extruded_buff);
-  //   console.log(flushBuffer);
+    solid.outline = this.outline;
+    solid.outlineColor = this.outlineColor;
+    return solid;
+  }
 
-  //   const geometry = new THREE.BufferGeometry();
-  //   geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flushBuffer), 3));
-  //   geometry.computeVertexNormals();
-  //   this.geometry = geometry;
-
-  //   const material = new THREE.MeshStandardMaterial({
-  //     color: 0x00ff00, 
-  //     side: THREE.FrontSide, 
-  //     transparent: true, 
-  //     opacity: 0.5, 
-  //     // wireframe: true
-  //   });
-  //   this.material = material;
-  // }
-
+  /**
+   * Returns the serialized BRep payload for this polygon.
+   */
   getBrepData() {
     if (!this.polygon) return null;
     const brepData = this.polygon.get_brep_serialized();
@@ -526,7 +374,6 @@ export class Polygon extends THREE.Mesh {
     return getShapeOutlineColor(this.#outlineMesh, this._outlineColor);
   }
 
-  // TODO: Do we need a separate method for Hole Outlines?
   set outline(enable: boolean) {
     this._outlineEnabled = enable;
     this.clearOutlineMesh();
@@ -538,10 +385,6 @@ export class Polygon extends THREE.Mesh {
         fatOutlines: this._fatOutlines,
         outlineWidth: this._outlineWidth,
       });
-
-      // this.#outlineMesh.geometry.center();
-      // this.#outlineMesh.applyMatrix4(this.transformationMatrix);
-
       this.add(this.#outlineMesh);
     }
   }
@@ -574,21 +417,8 @@ export class Polygon extends THREE.Mesh {
     return this._outlineWidth;
   }
 
-  // bTree() {
-  //   if (!this.polygon) return;
-  //   const bTree = this.polygon.binary_tree();
-  //   const parsedData = JSON.parse(bTree);
-  //   console.log(parsedData);
-  // }
-
   disposeGeometryMaterial() {
-    if (this.geometry) {
-      this.geometry.dispose();
-    }
-    if (this.material instanceof THREE.Material) {
-      this.material.dispose();
-    }
-    this.clearOutlineMesh();
+    this.disposeResources();
   }
 
   private clearOutlineMesh() {
@@ -601,20 +431,7 @@ export class Polygon extends THREE.Mesh {
   }
 
   dispose() {
-    // // console.log("Disposing OG - Polygon");
-    // this.geometry.dispose();
-    // if (this.material instanceof THREE.Material) {
-    //   this.material.dispose();
-    // }
-    // if (this.#outlineMesh) {
-    //   this.#outlineMesh.geometry.dispose();
-    //   if (this.#outlineMesh.material instanceof THREE.Material) {
-    //     this.#outlineMesh.material.dispose();
-    //   }
-    // }
-    // this.polygon = null;
-    // this.layerVertices = [];
-    // this.layerBackVertices = [];
+    this.disposeResources();
   }
 
   private writePositionsToGeometry(
@@ -637,5 +454,17 @@ export class Polygon extends THREE.Mesh {
     const array = existing.array as Float32Array;
     array.set(positions);
     existing.needsUpdate = true;
+  }
+
+  private disposeResources() {
+    if (this.geometry) {
+      this.geometry.dispose();
+    }
+    if (Array.isArray(this.material)) {
+      this.material.forEach((material) => material.dispose());
+    } else if (this.material instanceof THREE.Material) {
+      this.material.dispose();
+    }
+    this.clearOutlineMesh();
   }
 }

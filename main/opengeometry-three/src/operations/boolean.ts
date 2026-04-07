@@ -15,6 +15,9 @@ import {
   ShapeOutlineMesh,
 } from "../shapes/outline-utils";
 
+/**
+ * Accepted operand formats for boolean helpers.
+ */
 export type BooleanOperand =
   | string
   | Record<string, unknown>
@@ -24,11 +27,17 @@ export type BooleanOperand =
       getBrepSerialized?: () => string;
     };
 
+/**
+ * Kernel-side boolean tuning options.
+ */
 export interface BooleanKernelOptions {
   tolerance?: number;
   mergeCoplanarFaces?: boolean;
 }
 
+/**
+ * Rendering options applied to the boolean result mesh.
+ */
 export interface BooleanRenderOptions {
   color?: number;
   outline?: boolean;
@@ -36,10 +45,16 @@ export interface BooleanRenderOptions {
   outlineWidth?: number;
 }
 
+/**
+ * Combined kernel and rendering options accepted by boolean helpers.
+ */
 export interface BooleanExecutionOptions extends BooleanRenderOptions {
   kernel?: BooleanKernelOptions;
 }
 
+/**
+ * Structured report returned by the kernel boolean pipeline.
+ */
 export interface BooleanReport {
   operation: string;
   operand_kind: string;

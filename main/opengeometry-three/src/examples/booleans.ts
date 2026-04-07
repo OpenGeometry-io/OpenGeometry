@@ -13,12 +13,13 @@ import { Polygon } from "../shapes/polygon";
 import { Sphere } from "../shapes/sphere";
 
 export type BooleanExampleOperation = "union" | "intersection" | "subtraction";
-export type BooleanExampleMode = "solid" | "polygon";
+export type BooleanExampleMode = "solid" | "polygon" | "extruded";
 
 export interface BooleanExampleBuildOptions extends BooleanExecutionOptions {
   mode: BooleanExampleMode;
   sphereCenter?: Vector3;
   polygonOffset?: Vector3;
+  extrudedOffset?: Vector3;
 }
 
 export interface BooleanExampleBuildResult {
@@ -37,9 +38,7 @@ export function createBooleanExample(
   operation: BooleanExampleOperation,
   options: BooleanExampleBuildOptions
 ): BooleanExampleBuildResult {
-  const preset = options.mode === "solid"
-    ? createSolidPreset(operation, options)
-    : createPolygonPreset(operation, options);
+  const preset = createPreset(operation, options);
 
   const execute = getBooleanExecutor(operation);
   const result = execute(preset.lhsOperand, preset.rhsOperand, options);
@@ -57,6 +56,20 @@ export function createBooleanExample(
     title: preset.title,
     description: preset.description,
   };
+}
+
+function createPreset(
+  operation: BooleanExampleOperation,
+  options: BooleanExampleBuildOptions
+) {
+  switch (options.mode) {
+    case "solid":
+      return createSolidPreset(operation, options);
+    case "polygon":
+      return createPolygonPreset(operation, options);
+    case "extruded":
+      return createExtrudedPreset(operation, options);
+  }
 }
 
 /**
@@ -155,6 +168,60 @@ function createPolygonPreset(
     rhsOperand: rhs,
     lhsVisual: lhs,
     rhsVisual: rhs,
+  };
+}
+
+/**
+ * Builds an extrusion-first preset that exercises polygon.extrude(height) and
+ * reuses the standard solid boolean pipeline.
+ */
+function createExtrudedPreset(
+  operation: BooleanExampleOperation,
+  options: BooleanExampleBuildOptions
+) {
+  const outlineWidth = options.outlineWidth ?? 3;
+  const extrudedOffset = options.extrudedOffset ?? new Vector3(0.0, 0.0, 0.0);
+
+  const wallProfile = new Polygon({
+    vertices: [
+      new Vector3(-2.2, 0.0, -0.18),
+      new Vector3(2.2, 0.0, -0.18),
+      new Vector3(2.2, 0.0, 0.18),
+      new Vector3(-2.2, 0.0, 0.18),
+    ],
+    color: 0x60a5fa,
+    fatOutlines: options.fatOutlines ?? true,
+    outlineWidth,
+  });
+  const openingProfile = new Polygon({
+    vertices: [
+      new Vector3(-0.7, 0.0, -0.34),
+      new Vector3(0.9, 0.0, -0.34),
+      new Vector3(0.9, 0.0, 0.34),
+      new Vector3(-0.7, 0.0, 0.34),
+    ],
+    color: 0xf97316,
+    fatOutlines: options.fatOutlines ?? true,
+    outlineWidth,
+  });
+
+  const wall = wallProfile.extrude(2.8);
+  const opening = openingProfile.extrude(operation === "intersection" ? 1.45 : 1.35);
+  opening.setTranslation(
+    new Vector3(extrudedOffset.x, 0.85, extrudedOffset.z)
+  );
+
+  wall.outline = options.outline ?? true;
+  opening.outline = options.outline ?? true;
+
+  return {
+    title: `${capitalize(operation)} Extruded Solid`,
+    description:
+      "Two polygon.extrude(height) solids overlap to demonstrate renderable BRep booleans.",
+    lhsOperand: wall,
+    rhsOperand: opening,
+    lhsVisual: wall,
+    rhsVisual: opening,
   };
 }
 

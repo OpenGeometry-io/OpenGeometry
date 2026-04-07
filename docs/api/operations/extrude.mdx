@@ -1,30 +1,59 @@
 ---
 title: 'Extrude'
-description: 'Transform 2D polygons into 3D geometry by extruding them along a vertical axis'
+description: 'Create closed solids by extruding a face-like BRep profile through the kernel'
 icon: 'cubes'
 ---
 
 ## Overview
 
-The extrude operation transforms a 2D polygon into a 3D solid by extending it along a height vector. This creates a prismatic geometry with the original polygon as the base, vertical side faces connecting the base to the top, and a parallel top face.
+OpenGeometry's production extrusion path is BRep-first. The kernel extrudes a face or wire into a
+closed solid while preserving loop structure, which means concave profiles and holes are supported.
 
-## Function Signature
+In the Three.js API, the most common public entrypoint is:
 
-### extrude_polygon_by_buffer_geometry
-
-```rust
-pub fn extrude_polygon_by_buffer_geometry(geom_buf: BaseGeometry, height: f64) -> Geometry
+```ts
+const solid = polygon.extrude(height);
 ```
 
-Extrudes a polygon defined by buffer geometry to create a 3D mesh.
+That path uses the same kernel face-extrusion primitive described on this page.
 
-<ParamField path="geom_buf" type="BaseGeometry" required>
-  The base geometry containing the polygon vertices to extrude. Must have at least 3 vertices to form a valid polygon.
-</ParamField>
+## Three.js API
 
-<ParamField path="height" type="f64" required>
-  The extrusion height in the vertical (Y) direction. Positive values extrude upward, negative values extrude downward.
-</ParamField>
+### polygon.extrude()
+
+Extrudes a `Polygon` and returns a renderable [`Solid`](/api/shapes/solid).
+
+```ts
+const solid = polygon.extrude(height);
+```
+
+### Solid.extrude()
+
+Extrudes a face-like BRep source and wraps the result as a `Solid`.
+
+```ts
+const solid = Solid.extrude(source, height, options);
+```
+
+### extrudeBrepFace()
+
+Low-level helper that calls the wasm export directly and returns serialized BRep JSON.
+
+```ts
+import { extrudeBrepFace } from "opengeometry";
+
+const brepSerialized = extrudeBrepFace(source, height);
+```
+
+Accepted `source` forms:
+
+- Serialized local BRep JSON
+- Parsed BRep object
+- Another wrapper exposing `getLocalBrepSerialized()`
+- Another wrapper exposing `getLocalBrepData()`
+- Another wrapper exposing `getBrepSerialized()` or `getBrepData()`
+
+## Rust API
 
 ### extrude_brep_face
 
@@ -32,90 +61,77 @@ Extrudes a polygon defined by buffer geometry to create a 3D mesh.
 pub fn extrude_brep_face(brep_face: Brep, height: f64) -> Brep
 ```
 
-Extrudes a BREP (Boundary Representation) face to create a new BREP object with topological information.
+This is implemented in:
 
-<ParamField path="brep_face" type="Brep" required>
-  The BREP face to extrude. Must contain at least 3 vertices.
-</ParamField>
+`main/opengeometry/src/operations/extrude.rs`
 
-<ParamField path="height" type="f64" required>
-  The extrusion height in the Y direction.
-</ParamField>
+## Behavior
 
-## Return Type
+- The kernel extrudes along the current local Y direction.
+- The source must contain a face-like profile, wire, or at minimum a usable point loop.
+- Outer loops and hole loops are preserved, so polygons with holes stay hole-aware after extrusion.
+- Concave profiles are supported.
+- `height` must be finite and non-zero.
+- The result is a closed-shell BRep suitable for boolean operations.
 
-### Geometry Structure
+## Usage Examples
 
-The `extrude_polygon_by_buffer_geometry` function returns a `Geometry` object with:
+### Polygon to solid workflow
 
-- **vertices**: Complete vertex list including both base and top vertices
-- **edges**: All edges forming the bottom face, top face, and vertical connections
-- **faces**: Bottom face, all side faces (one per edge of the original polygon), and top face
+```ts
+import * as THREE from "three";
+import { OpenGeometry, Polygon, Vector3 } from "opengeometry";
 
-### Brep Structure
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 
-The `extrude_brep_face` function returns a `Brep` using OpenGeometry's current half-edge topology
-schema (see [BRep](/concepts/brep)).
+const scene = new THREE.Scene();
 
-At a high level, the result contains the base face, the top face, and side faces, and it is marked
-as a closed shell.
+const wallProfile = new Polygon({
+  vertices: [
+    new Vector3(-2.2, 0, -0.18),
+    new Vector3(2.2, 0, -0.18),
+    new Vector3(2.2, 0, 0.18),
+    new Vector3(-2.2, 0, 0.18),
+  ],
+  color: 0x60a5fa,
+});
 
-## How It Works
+const openingProfile = new Polygon({
+  vertices: [
+    new Vector3(-0.7, 0, -0.34),
+    new Vector3(0.9, 0, -0.34),
+    new Vector3(0.9, 0, 0.34),
+    new Vector3(-0.7, 0, 0.34),
+  ],
+  color: 0xf97316,
+});
 
-1. **Winding Order**: The input vertices are sorted to counter-clockwise (CCW) order to ensure consistent face normals
-2. **Bottom Face**: Creates edges and a face from the original polygon vertices
-3. **Vertical Edges**: Generates new vertices offset by the height vector (0, height, 0) and connects them to base vertices
-4. **Side Faces**: Creates quadrilateral faces connecting each edge of the base to the corresponding edge on top
-5. **Top Face**: Constructs the top face with reversed vertex order for correct normal orientation
+const wall = wallProfile.extrude(2.8);
+const opening = openingProfile.extrude(1.35);
+opening.setTranslation(new Vector3(0, 0.85, 0));
 
-## Code Examples
+const cut = wall.subtract(opening, {
+  outline: true,
+  kernel: { mergeCoplanarFaces: true },
+});
 
-### Basic Extrusion
-
-```rust
-use opengeometry::{
-    geometry::basegeometry::BaseGeometry,
-    operations::extrude::extrude_polygon_by_buffer_geometry,
-};
-use openmaths::Vector3;
-
-// Create a square base polygon
-let vertices = vec![
-    Vector3::new(0.0, 0.0, 0.0),
-    Vector3::new(1.0, 0.0, 0.0),
-    Vector3::new(1.0, 0.0, 1.0),
-    Vector3::new(0.0, 0.0, 1.0),
-];
-
-let base_geom = BaseGeometry::from_vertices(vertices);
-
-// Extrude 2 units upward
-let extruded = extrude_polygon_by_buffer_geometry(base_geom, 2.0);
-
-// Result: A rectangular box with base at Y=0 and top at Y=2
+scene.add(cut);
 ```
 
-### Extruding a Triangle
+### Direct low-level helper
 
-```rust
-use opengeometry::operations::extrude::extrude_polygon_by_buffer_geometry;
-use opengeometry::geometry::basegeometry::BaseGeometry;
-use openmaths::Vector3;
+```ts
+import { Solid, extrudeBrepFace } from "opengeometry";
 
-// Create a triangular base
-let triangle = vec![
-    Vector3::new(0.0, 0.0, 0.0),
-    Vector3::new(1.0, 0.0, 0.0),
-    Vector3::new(0.5, 0.0, 1.0),
-];
+const extrudedBrep = extrudeBrepFace(localFaceBrepSerialized, 3.0);
 
-let base_geom = BaseGeometry::from_vertices(triangle);
-let prism = extrude_polygon_by_buffer_geometry(base_geom, 1.5);
-
-// Result: A triangular prism
+const solid = new Solid({
+  brep: extrudedBrep,
+  color: 0x10b981,
+});
 ```
 
-### Using BREP Extrusion
+### Rust kernel usage
 
 ```rust
 use opengeometry::{
@@ -125,7 +141,6 @@ use opengeometry::{
 use openmaths::Vector3;
 use uuid::Uuid;
 
-// Build a single face B-Rep (a surface) with BrepBuilder.
 let mut builder = BrepBuilder::new(Uuid::new_v4());
 builder.add_vertices(&[
     Vector3::new(0.0, 0.0, 0.0),
@@ -134,50 +149,19 @@ builder.add_vertices(&[
     Vector3::new(0.0, 0.0, 1.0),
 ]);
 builder.add_face(&[0, 1, 2, 3], &[]).unwrap();
-let brep_face = builder.build().unwrap();
+let profile = builder.build().unwrap();
 
-// Extrude to create a 3D BREP with topological data
-let extruded_brep = extrude_brep_face(brep_face, 3.0);
-
-// Access topological information
-println!("Vertices: {}", extruded_brep.get_vertex_count());
-println!("Edges: {}", extruded_brep.get_edge_count());
-println!("Faces: {}", extruded_brep.get_face_count());
+let solid = extrude_brep_face(profile, 3.0);
+assert!(solid.shells.iter().any(|shell| shell.is_closed));
 ```
-
-## Visual Examples
-
-```
-Input Polygon (Top View):          Extruded Result (3D):
-    
-    v3────v2                        v7────v6
-    │      │                        ╱│    ╱│
-    │      │          +height      ╱ │   ╱ │
-    v0────v1          ────────>   v4─┼─v5  │
-                                   │ v3──┼─v2
-                                   │╱    │╱
-                                   v0────v1
-```
-
-## Implementation Details
-
-### Source Location
-
-`main/opengeometry/src/operations/extrude.rs`
-
-### Edge Cases
-
-- **Minimum Vertices**: Polygons with fewer than 3 vertices are technically invalid, but the function proceeds (returns incomplete geometry)
-- **Direction**: Currently extrudes only in the Y direction; future versions may support arbitrary extrusion vectors
-- **Winding Order**: Automatically corrects to CCW to ensure proper face orientation
 
 ## See Also
 
-- [Sweep](/api/operations/sweep) - Extrude a profile along an arbitrary path
-- [Offset](/api/operations/offset) - Create parallel offset curves
-- [Triangulate](/api/operations/triangulate) - Convert polygons to triangle meshes
+- [Polygon](/api/shapes/polygon)
+- [Solid](/api/shapes/solid)
+- [Sweep](/api/operations/sweep)
+- [Boolean operations](/api/operations/boolean-operations)
 
 ## Live demo
 
-There is no dedicated extrude demo page yet. Start from the demo index:
-[OpenGeometry demos](https://demo.opengeometry.io/).
+- [Extruded boolean operations demo](https://demo.opengeometry.io/operations/extruded-boolean-operations.html)

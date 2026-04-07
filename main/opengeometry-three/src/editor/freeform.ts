@@ -175,6 +175,9 @@ function serializeOptions(options?: EditOperationOptions): string | undefined {
   });
 }
 
+/**
+ * High-level editor facade over the kernel freeform editing API.
+ */
 export class FreeformEditor {
   private readonly geometry: FreeformGeometry;
   private readonly editor: KernelFreeformEditor;
@@ -187,10 +190,16 @@ export class FreeformEditor {
     this.editor = editor;
   }
 
+  /**
+   * Returns the freeform geometry currently managed by this editor.
+   */
   getFreeformGeometry(): FreeformGeometry {
     return this.geometry;
   }
 
+  /**
+   * Returns renderable topology buffers for faces, edges, and vertices.
+   */
   getTopologyRenderData(): TopologyRenderData {
     return normalizeTopologyRenderData(
       parseJson<TopologyRenderData>(
@@ -199,6 +208,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Returns semantic and topological information for a face id.
+   */
   getFaceInfo(faceId: TopologyId): FaceInfo {
     return normalizeFaceInfo(
       parseJson<FaceInfo>(
@@ -207,6 +219,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Returns semantic and topological information for an edge id.
+   */
   getEdgeInfo(edgeId: TopologyId): EdgeInfo {
     return normalizeEdgeInfo(
       parseJson<EdgeInfo>(
@@ -215,6 +230,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Returns semantic and topological information for a vertex id.
+   */
   getVertexInfo(vertexId: TopologyId): VertexInfo {
     return normalizeVertexInfo(
       parseJson<VertexInfo>(
@@ -223,6 +241,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Returns global edit capabilities for the current freeform model.
+   */
   getEditCapabilities(): FreeformEditCapabilities {
     return normalizeFreeformCapabilities(
       parseJson<RawFreeformOperationCapabilities>(
@@ -231,6 +252,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Returns edit capabilities scoped to a single face.
+   */
   getFaceEditCapabilities(faceId: TopologyId): FreeformFeatureEditCapabilities {
     return normalizeFeatureCapabilities(
       parseJson<RawFreeformFeatureEditCapabilities>(
@@ -239,6 +263,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Returns edit capabilities scoped to a single edge.
+   */
   getEdgeEditCapabilities(edgeId: TopologyId): FreeformFeatureEditCapabilities {
     return normalizeFeatureCapabilities(
       parseJson<RawFreeformFeatureEditCapabilities>(
@@ -247,6 +274,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Returns edit capabilities scoped to a single vertex.
+   */
   getVertexEditCapabilities(
     vertexId: TopologyId
   ): FreeformFeatureEditCapabilities {
@@ -260,6 +290,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Offset a face along its editable normal direction.
+   */
   pushPullFace(
     faceId: TopologyId,
     distance: number,
@@ -275,6 +308,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Creates new side faces by extruding a face region.
+   */
   extrudeFace(
     faceId: TopologyId,
     distance: number,
@@ -290,6 +326,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Splits a face by connecting two points sampled on its boundary edges.
+   */
   cutFace(
     faceId: TopologyId,
     startEdgeId: TopologyId,
@@ -311,6 +350,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Moves a face by a translation vector, subject to kernel constraints.
+   */
   moveFace(
     faceId: TopologyId,
     translation: Vector3,
@@ -326,6 +368,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Moves an edge by a translation vector, subject to kernel constraints.
+   */
   moveEdge(
     edgeId: TopologyId,
     translation: Vector3,
@@ -341,6 +386,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Moves a vertex by a translation vector, subject to kernel constraints.
+   */
   moveVertex(
     vertexId: TopologyId,
     translation: Vector3,
@@ -356,6 +404,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Inserts a vertex at parametric position `t` along an edge.
+   */
   insertVertexOnEdge(
     edgeId: TopologyId,
     t: number,
@@ -371,6 +422,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Splits an edge at parametric position `t`.
+   */
   splitEdge(
     edgeId: TopologyId,
     t: number,
@@ -386,6 +440,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Creates a loop cut that propagates from the selected edge when possible.
+   */
   loopCut(
     edgeId: TopologyId,
     t: number,
@@ -401,6 +458,9 @@ export class FreeformEditor {
     );
   }
 
+  /**
+   * Removes a vertex when the current topology allows the edit.
+   */
   removeVertex(
     vertexId: TopologyId,
     options?: EditOperationOptions
@@ -415,6 +475,9 @@ export class FreeformEditor {
   }
 }
 
+/**
+ * Convenience factory for creating a freeform editor around a geometry wrapper.
+ */
 export function createFreeformEditor(
   geometry: FreeformGeometry
 ): FreeformEditor {

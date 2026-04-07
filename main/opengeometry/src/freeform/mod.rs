@@ -83,11 +83,31 @@ impl OGFreeformGeometry {
             .unwrap_or_else(|_| "[]".to_string())
     }
 
+    #[wasm_bindgen(js_name = getGeometryBuffer)]
+    pub fn get_geometry_buffer(&self) -> Vec<f64> {
+        self.world_brep().get_triangle_vertex_buffer()
+    }
+
+    #[wasm_bindgen(js_name = getLocalGeometryBuffer)]
+    pub fn get_local_geometry_buffer(&self) -> Vec<f64> {
+        self.local_brep.get_triangle_vertex_buffer()
+    }
+
     #[wasm_bindgen(js_name = getOutlineGeometrySerialized)]
     pub fn get_outline_geometry_serialized(&self) -> String {
         let world = self.world_brep();
         serde_json::to_string(&world.get_outline_vertex_buffer())
             .unwrap_or_else(|_| "[]".to_string())
+    }
+
+    #[wasm_bindgen(js_name = getOutlineGeometryBuffer)]
+    pub fn get_outline_geometry_buffer(&self) -> Vec<f64> {
+        self.world_brep().get_outline_vertex_buffer()
+    }
+
+    #[wasm_bindgen(js_name = getLocalOutlineGeometryBuffer)]
+    pub fn get_local_outline_geometry_buffer(&self) -> Vec<f64> {
+        self.local_brep.get_outline_vertex_buffer()
     }
 
     #[wasm_bindgen(js_name = getPlacementSerialized)]

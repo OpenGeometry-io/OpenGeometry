@@ -1,16 +1,17 @@
 ---
 title: Three.js Integration
-description: How to use OpenGeometry shapes with Three.js
+description: How to use OpenGeometry primitives, shapes, and booleans with Three.js
 ---
 
-OpenGeometry provides a comprehensive Three.js wrapper that extends `THREE.Mesh` to create CAD-quality 3D shapes backed by the OpenGeometry kernel.
+OpenGeometry provides kernel-backed Three.js wrappers for both line-based primitives and mesh-based
+solids.
 
 ## Installation
 
-All shape classes are exported from the `opengeometry` package:
+The public wrappers are exported from the `opengeometry` package:
 
 ```typescript
-import { OpenGeometry, Polygon, Cuboid, Cylinder, Sphere, Sweep, Vector3 } from "opengeometry";
+import { OpenGeometry, Polygon, Solid, Cuboid, Cylinder, Sphere, Sweep, Vector3 } from "opengeometry";
 ```
 
 ## Initialization
@@ -23,9 +24,9 @@ await OpenGeometry.create({
 });
 ```
 
-## Shape Architecture
+## Wrapper Architecture
 
-### Extending THREE.Mesh
+### Mesh-backed shapes
 
 All OpenGeometry shapes extend `THREE.Mesh`, making them compatible with standard Three.js workflows:
 
@@ -40,6 +41,10 @@ scene.add(polygon);
 polygon.position.set(0, 1, 0);
 polygon.rotation.y = Math.PI / 4;
 ```
+
+Primitive wrappers such as `Line`, `Polyline`, `Arc`, `Curve`, and `Rectangle` extend
+`THREE.Line`, while shape wrappers such as `Polygon`, `Cuboid`, `Cylinder`, `Sphere`, `Sweep`,
+`Opening`, `Wedge`, `Solid`, and `BooleanResult` are mesh-backed.
 
 ### Options Pattern
 
@@ -93,6 +98,14 @@ polygon.addHole([
   new Vector3(0.5, 0, 0.5),
   new Vector3(-0.5, 0, 0.5)
 ]);
+```
+
+#### Polygon extrusion returns `Solid`
+
+```typescript
+const wall = polygon.extrude(2.8);
+wall.outline = true;
+scene.add(wall);
 ```
 
 ### Cuboid
@@ -180,6 +193,22 @@ const sweep = new Sweep({
 scene.add(sweep);
 ```
 
+### Solid
+
+`Solid` is the generic renderable BRep-backed shape returned by workflows such as
+`polygon.extrude(height)`.
+
+```typescript
+import { Solid } from "opengeometry";
+
+const solid = new Solid({
+  brep: someBrepSerialized,
+  color: 0x10b981,
+});
+
+scene.add(solid);
+```
+
 ## Common Patterns
 
 ### Dynamic Configuration with setConfig
@@ -227,7 +256,8 @@ polygon.outlineColor = 0x000000; // Set outline color
 
 Access the underlying boundary representation:
 
-Wrapper shapes expose one of `getBrep()`, `getBrepData()`, or `getBrepSerialized()` depending on the type.
+Wrapper shapes expose one of `getBrep()`, `getBrepData()`, or `getBrepSerialized()` depending on
+the type. `Solid` exposes `getBrepData()`, `getBrepSerialized()`, and `getLocalBrepSerialized()`.
 
 ### Geometry Management
 
@@ -323,3 +353,4 @@ When enabled:
 - See [Examples](/integration/examples) for complete working demos
 - Explore [Line Primitive](/api/primitives/line) for lower-level drawing tools
 - Learn about [Extrude Operation](/api/operations/extrude) for creating 3D geometry
+- Review [Solid](/api/shapes/solid) for generic BRep-backed solids

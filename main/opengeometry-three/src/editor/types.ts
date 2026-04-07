@@ -2,8 +2,14 @@ import { Vector3 } from "../../../opengeometry/pkg/opengeometry";
 
 import type { ObjectTransformation } from "../freeform/types";
 
+/**
+ * Numeric identifier used for faces, edges, and vertices in freeform topology APIs.
+ */
 export type TopologyId = number;
 
+/**
+ * Kernel edit permissions shared by global and feature-scoped freeform capabilities.
+ */
 export interface FreeformOperationCapabilities {
   canPushPullFace: boolean;
   canMoveFace: boolean;
@@ -18,6 +24,9 @@ export interface FreeformOperationCapabilities {
   reasons?: string[];
 }
 
+/**
+ * Global editing capabilities for a freeform geometry object.
+ */
 export interface FreeformEditCapabilities extends FreeformOperationCapabilities {
   editingMode: "freeform";
   entityType: "freeform";
@@ -27,14 +36,23 @@ export interface FreeformEditCapabilities extends FreeformOperationCapabilities 
   canConvertToFreeform: false;
 }
 
+/**
+ * Feature-scoped editing capabilities for a single face, edge, or vertex.
+ */
 export interface FreeformFeatureEditCapabilities
   extends FreeformOperationCapabilities {
   domain: "face" | "edge" | "vertex";
   topologyId: TopologyId;
 }
 
+/**
+ * How a topology id changed after an edit.
+ */
 export type TopologyRemapStatus = "unchanged" | "split" | "merged" | "deleted";
 
+/**
+ * Maps an old topology id to the ids that replaced it.
+ */
 export interface TopologyRemapEntry {
   old_id: TopologyId;
   new_ids: TopologyId[];
@@ -42,12 +60,18 @@ export interface TopologyRemapEntry {
   status: TopologyRemapStatus;
 }
 
+/**
+ * Newly created topology ids emitted by a freeform edit.
+ */
 export interface TopologyCreatedIds {
   faces: TopologyId[];
   edges: TopologyId[];
   vertices: TopologyId[];
 }
 
+/**
+ * Topology remap payload returned by edits that change face/edge/vertex ids.
+ */
 export interface TopologyRemap {
   faces: TopologyRemapEntry[];
   edges: TopologyRemapEntry[];
@@ -55,8 +79,14 @@ export interface TopologyRemap {
   created_ids: TopologyCreatedIds;
 }
 
+/**
+ * Diagnostic severities returned by freeform validity checks.
+ */
 export type DiagnosticSeverity = "info" | "warning" | "error";
 
+/**
+ * Individual diagnostic emitted by a freeform edit or validation pass.
+ */
 export interface FreeformDiagnostic {
   code: string;
   severity: DiagnosticSeverity;
@@ -65,12 +95,18 @@ export interface FreeformDiagnostic {
   topology_id?: TopologyId;
 }
 
+/**
+ * Validity summary returned after a freeform edit.
+ */
 export interface FreeformValidity {
   ok: boolean;
   healed?: boolean;
   diagnostics: FreeformDiagnostic[];
 }
 
+/**
+ * Face metadata returned by the freeform editor.
+ */
 export interface FaceInfo {
   face_id: TopologyId;
   centroid: Vector3;
@@ -82,6 +118,9 @@ export interface FaceInfo {
   adjacent_face_ids: TopologyId[];
 }
 
+/**
+ * Edge metadata returned by the freeform editor.
+ */
 export interface EdgeInfo {
   edge_id: TopologyId;
   curve_type: string;
@@ -92,6 +131,9 @@ export interface EdgeInfo {
   incident_face_ids: TopologyId[];
 }
 
+/**
+ * Vertex metadata returned by the freeform editor.
+ */
 export interface VertexInfo {
   vertex_id: TopologyId;
   position: Vector3;
@@ -99,28 +141,43 @@ export interface VertexInfo {
   face_ids: TopologyId[];
 }
 
+/**
+ * Triangulated face render data for topology overlays.
+ */
 export interface TopologyFaceRenderData {
   face_id: TopologyId;
   positions: number[];
   indices: number[];
 }
 
+/**
+ * Edge polyline render data for topology overlays.
+ */
 export interface TopologyEdgeRenderData {
   edge_id: TopologyId;
   positions: number[];
 }
 
+/**
+ * Vertex render data for topology overlays.
+ */
 export interface TopologyVertexRenderData {
   vertex_id: TopologyId;
   position: Vector3;
 }
 
+/**
+ * Full renderable topology payload emitted by the freeform editor.
+ */
 export interface TopologyRenderData {
   faces: TopologyFaceRenderData[];
   edges: TopologyEdgeRenderData[];
   vertices: TopologyVertexRenderData[];
 }
 
+/**
+ * Structured result payload returned by freeform edit operations.
+ */
 export interface FreeformEditResult {
   entity_id: string;
   brep_serialized?: string;
@@ -136,6 +193,9 @@ export interface FreeformEditResult {
   placement: ObjectTransformation;
 }
 
+/**
+ * Optional flags that control how much auxiliary data an edit returns.
+ */
 export interface EditOperationOptions {
   includeBrepSerialized?: boolean;
   includeLocalBrepSerialized?: boolean;
@@ -150,6 +210,9 @@ export interface EditOperationOptions {
   openSurfaceMode?: boolean;
 }
 
+/**
+ * High-level editing mode families exposed by public wrappers.
+ */
 export type EditingMode = "parametric" | "freeform";
 export type ParametricEntityType =
   | "line"
@@ -175,12 +238,18 @@ export type EditFamily =
   | "freeform";
 export type ParametricEditFamily = Exclude<EditFamily, "freeform">;
 
+/**
+ * Shared placement structure for parametric wrappers.
+ */
 export interface ParametricPlacement {
   translation: Vector3;
   rotation: Vector3;
   scale: Vector3;
 }
 
+/**
+ * Base capability payload shared by parametric and freeform wrappers.
+ */
 export interface BaseEditCapabilities {
   editingMode: EditingMode;
   entityType: EntityType;
@@ -190,6 +259,9 @@ export interface BaseEditCapabilities {
   canConvertToFreeform: boolean;
 }
 
+/**
+ * Capability payload returned by parametric wrappers such as `Polygon` or `Cuboid`.
+ */
 export interface ParametricEditCapabilities extends BaseEditCapabilities {
   editingMode: "parametric";
   entityType: ParametricEntityType;

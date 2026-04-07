@@ -10,6 +10,9 @@ import {
 } from "../editor";
 import { createFreeformGeometry } from "../freeform";
 
+/**
+ * Construction options for a rectangle profile wrapper.
+ */
 export interface IRectangleOptions {
   ogid?: string;
   center: Vector3;
@@ -23,17 +26,30 @@ export interface IRectangleOptions {
   scale?: Vector3;
 }
 
+/**
+ * Placement updates accepted by `Rectangle`.
+ */
 export interface RectanglePlacementOptions {
   translation?: Vector3;
   rotation?: Vector3;
   scale?: Vector3;
 }
 
+/**
+ * Partial config payload accepted by `Rectangle.setConfig(...)`.
+ */
 export type RectangleConfigUpdate = Partial<
   Omit<IRectangleOptions, "translation" | "rotation" | "scale">
 >;
+
+/**
+ * Alias for `Rectangle` placement updates.
+ */
 export type RectanglePlacementUpdate = RectanglePlacementOptions;
 
+/**
+ * Offset result returned by `Rectangle.offset(...)`.
+ */
 export interface IRectangleOffsetResult {
   points: Vector3[];
   beveledVertexIndices: number[];
@@ -54,6 +70,9 @@ type OffsetKernelFn = (
 ) => string;
 /* eslint-enable no-unused-vars */
 
+/**
+ * Rectangle wrapper backed by the kernel OGRectangle primitive.
+ */
 export class Rectangle extends THREE.Line {
   ogid: string;
   options: IRectangleOptions = {

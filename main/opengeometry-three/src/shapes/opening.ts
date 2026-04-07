@@ -20,6 +20,9 @@ import type {
   ShapeSubtractResult,
 } from "./boolean-subtract";
 
+/**
+ * Construction options for an architectural opening volume.
+ */
 export interface IOpeningOptions {
   ogid?: string;
   center: Vector3;
@@ -34,17 +37,30 @@ export interface IOpeningOptions {
   scale?: Vector3;
 }
 
+/**
+ * Placement updates accepted by `Opening`.
+ */
 export interface OpeningPlacementOptions {
   translation?: Vector3;
   rotation?: Vector3;
   scale?: Vector3;
 }
 
+/**
+ * Partial config payload accepted by `Opening.setConfig(...)`.
+ */
 export type OpeningConfigUpdate = Partial<
   Omit<IOpeningOptions, "translation" | "rotation" | "scale">
 >;
+
+/**
+ * Alias for `Opening` placement updates.
+ */
 export type OpeningPlacementUpdate = OpeningPlacementOptions;
 
+/**
+ * Opening wrapper used as a subtractive solid in architectural workflows.
+ */
 export class Opening extends THREE.Mesh {
   ogid: string;
   options: IOpeningOptions = {

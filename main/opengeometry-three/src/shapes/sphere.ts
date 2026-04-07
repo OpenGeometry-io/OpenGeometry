@@ -21,6 +21,9 @@ import type {
   ShapeSubtractResult,
 } from "./boolean-subtract";
 
+/**
+ * Construction options for a sphere shape.
+ */
 export interface ISphereOptions {
   ogid?: string;
   center: Vector3;
@@ -35,15 +38,25 @@ export interface ISphereOptions {
   scale?: Vector3;
 }
 
+/**
+ * Placement updates accepted by `Sphere`.
+ */
 export interface SpherePlacementOptions {
   translation?: Vector3;
   rotation?: Vector3;
   scale?: Vector3;
 }
 
+/**
+ * Partial config payload accepted by `Sphere.setConfig(...)`.
+ */
 export type SphereConfigUpdate = Partial<
   Omit<ISphereOptions, "translation" | "rotation" | "scale">
 >;
+
+/**
+ * Alias for `Sphere` placement updates.
+ */
 export type SpherePlacementUpdate = SpherePlacementOptions;
 
 /* eslint-disable no-unused-vars */
@@ -62,6 +75,9 @@ interface ISphereKernelInstance {
 type SphereKernelConstructor = new (..._args: [string]) => ISphereKernelInstance;
 /* eslint-enable no-unused-vars */
 
+/**
+ * Sphere wrapper backed by the kernel sphere primitive.
+ */
 export class Sphere extends THREE.Mesh {
   ogid: string;
   options: ISphereOptions = {

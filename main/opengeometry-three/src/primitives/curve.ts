@@ -7,6 +7,9 @@ import {
 } from "../editor";
 import { createFreeformGeometry } from "../freeform";
 
+/**
+ * Construction options for a control-point-driven curve.
+ */
 export interface ICurveOptions {
   ogid?: string;
   controlPoints: Vector3[];
@@ -16,17 +19,30 @@ export interface ICurveOptions {
   scale?: Vector3;
 }
 
+/**
+ * Placement updates accepted by `Curve`.
+ */
 export interface CurvePlacementOptions {
   translation?: Vector3;
   rotation?: Vector3;
   scale?: Vector3;
 }
 
+/**
+ * Partial config payload accepted by `Curve.setConfig(...)`.
+ */
 export type CurveConfigUpdate = Partial<
   Omit<ICurveOptions, "translation" | "rotation" | "scale">
 >;
+
+/**
+ * Alias for `Curve` placement updates.
+ */
 export type CurvePlacementUpdate = CurvePlacementOptions;
 
+/**
+ * Offset result returned by `Curve.offset(...)`.
+ */
 export interface ICurveOffsetResult {
   points: Vector3[];
   beveledVertexIndices: number[];
@@ -47,6 +63,9 @@ type OffsetKernelFn = (
 ) => string;
 /* eslint-enable no-unused-vars */
 
+/**
+ * Curve wrapper backed by the kernel OGCurve primitive.
+ */
 export class Curve extends THREE.Line {
   ogid: string;
   options: ICurveOptions = {

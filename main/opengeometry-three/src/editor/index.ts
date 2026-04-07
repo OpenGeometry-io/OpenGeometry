@@ -1,3 +1,6 @@
+/**
+ * Public editor helpers for parametric and freeform modeling workflows.
+ */
 export * from "./types";
 export {
   clonePlacement,

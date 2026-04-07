@@ -5,8 +5,19 @@ import type {
   BooleanResult,
 } from "../operations/boolean";
 
+/**
+ * Operand types accepted by shape instance `.subtract(...)` helpers.
+ */
 export type ShapeSubtractOperand = BooleanOperand;
+
+/**
+ * Options accepted by shape instance `.subtract(...)` helpers.
+ */
 export type ShapeSubtractOptions = BooleanExecutionOptions;
+
+/**
+ * Return type for shape instance `.subtract(...)` helpers.
+ */
 export type ShapeSubtractResult = BooleanResult;
 
 /**

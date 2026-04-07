@@ -10,6 +10,9 @@ import {
 } from "../editor";
 import { createFreeformGeometry } from "../freeform";
 
+/**
+ * Construction options for an ordered polyline wrapper.
+ */
 export interface IPolylineOptions {
   ogid?: string;
   color: number;
@@ -21,17 +24,30 @@ export interface IPolylineOptions {
   scale?: Vector3;
 }
 
+/**
+ * Placement updates accepted by `Polyline`.
+ */
 export interface PolylinePlacementOptions {
   translation?: Vector3;
   rotation?: Vector3;
   scale?: Vector3;
 }
 
+/**
+ * Partial config payload accepted by `Polyline.setConfig(...)`.
+ */
 export type PolylineConfigUpdate = Partial<
   Omit<IPolylineOptions, "translation" | "rotation" | "scale">
 >;
+
+/**
+ * Alias for `Polyline` placement updates.
+ */
 export type PolylinePlacementUpdate = PolylinePlacementOptions;
 
+/**
+ * Offset result returned by `Polyline.offset(...)`.
+ */
 export interface IOffsetResult {
   points: Vector3[];
   beveledVertexIndices: number[];
@@ -52,6 +68,9 @@ type OffsetKernelFn = (
 ) => string;
 /* eslint-enable no-unused-vars */
 
+/**
+ * Polyline wrapper backed by the kernel OGPolyline primitive.
+ */
 export class Polyline extends THREE.Line {
   ogid: string;
   options: IPolylineOptions = {

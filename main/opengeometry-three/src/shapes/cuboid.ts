@@ -20,12 +20,18 @@ import type {
   ShapeSubtractResult,
 } from "./boolean-subtract";
 
+/**
+ * Placement updates accepted by `Cuboid`.
+ */
 export interface CuboidPlacementOptions {
   translation?: Vector3;
   rotation?: Vector3;
   scale?: Vector3;
 }
 
+/**
+ * Construction options for a cuboid shape.
+ */
 export interface ICuboidOptions extends CuboidPlacementOptions {
   ogid?: string;
   center: Vector3;
@@ -37,12 +43,21 @@ export interface ICuboidOptions extends CuboidPlacementOptions {
   outlineWidth?: number;
 }
 
+/**
+ * Partial config payload accepted by `Cuboid.setConfig(...)`.
+ */
 export type CuboidConfigUpdate = Partial<
   Omit<ICuboidOptions, "translation" | "rotation" | "scale">
 >;
 
+/**
+ * Alias for `Cuboid` placement updates.
+ */
 export type CuboidPlacementUpdate = CuboidPlacementOptions;
 
+/**
+ * Box-shaped solid wrapper backed by the kernel cuboid primitive.
+ */
 export class Cuboid extends THREE.Mesh {
   ogid: string;
   options: ICuboidOptions = {

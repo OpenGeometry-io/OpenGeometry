@@ -20,6 +20,9 @@ import type {
   ShapeSubtractResult,
 } from "./boolean-subtract";
 
+/**
+ * Construction options for a cylinder shape.
+ */
 export interface ICylinderOptions {
   ogid?: string;
   center: Vector3;
@@ -35,17 +38,30 @@ export interface ICylinderOptions {
   scale?: Vector3;
 }
 
+/**
+ * Placement updates accepted by `Cylinder`.
+ */
 export interface CylinderPlacementOptions {
   translation?: Vector3;
   rotation?: Vector3;
   scale?: Vector3;
 }
 
+/**
+ * Partial config payload accepted by `Cylinder.setConfig(...)`.
+ */
 export type CylinderConfigUpdate = Partial<
   Omit<ICylinderOptions, "translation" | "rotation" | "scale">
 >;
+
+/**
+ * Alias for `Cylinder` placement updates.
+ */
 export type CylinderPlacementUpdate = CylinderPlacementOptions;
 
+/**
+ * Cylinder wrapper backed by the kernel cylindrical primitive.
+ */
 export class Cylinder extends THREE.Mesh {
   ogid: string;
   options: ICylinderOptions = {

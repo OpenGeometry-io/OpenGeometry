@@ -20,6 +20,9 @@ import type {
   ShapeSubtractResult,
 } from "./boolean-subtract";
 
+/**
+ * Construction options for a wedge/prism shape.
+ */
 export interface IWedgeOptions {
   ogid?: string;
   center: Vector3;
@@ -34,17 +37,30 @@ export interface IWedgeOptions {
   scale?: Vector3;
 }
 
+/**
+ * Placement updates accepted by `Wedge`.
+ */
 export interface WedgePlacementOptions {
   translation?: Vector3;
   rotation?: Vector3;
   scale?: Vector3;
 }
 
+/**
+ * Partial config payload accepted by `Wedge.setConfig(...)`.
+ */
 export type WedgeConfigUpdate = Partial<
   Omit<IWedgeOptions, "translation" | "rotation" | "scale">
 >;
+
+/**
+ * Alias for `Wedge` placement updates.
+ */
 export type WedgePlacementUpdate = WedgePlacementOptions;
 
+/**
+ * Wedge wrapper backed by the kernel wedge primitive.
+ */
 export class Wedge extends THREE.Mesh {
   ogid: string;
   options: IWedgeOptions = {

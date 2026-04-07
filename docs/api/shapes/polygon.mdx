@@ -1,304 +1,253 @@
 ---
 title: 'Polygon'
-description: 'Create 2D polygons with support for holes and triangulation'
+description: 'Create planar polygons with holes, outlines, booleans, and kernel-backed extrusion'
 icon: 'draw-polygon'
 ---
 
 ## Overview
 
-The `Polygon` class creates 2D polygonal shapes on the XY plane. It supports complex polygons with holes, automatic triangulation, and outline rendering. Polygons are defined by counter-clockwise (CCW) vertices, with holes specified in clockwise (CW) order.
+`Polygon` is the main planar profile wrapper in the Three.js API. It creates a triangulated face on
+the XZ plane, supports holes, can participate in coplanar booleans, converts to freeform geometry,
+and can be extruded into a renderable [`Solid`](/api/shapes/solid).
+
+Outer vertices should be provided in counter-clockwise order when viewed from above. Hole loops
+should be provided in clockwise order.
 
 ## Constructor
 
-```typescript
+```ts
 const polygon = new Polygon(options?: IPolygonOptions);
 ```
 
 ### IPolygonOptions
 
 <ParamField path="ogid" type="string" optional>
-  Unique identifier for the polygon. Auto-generated if not provided.
+  Unique identifier for the polygon. Auto-generated when omitted.
 </ParamField>
 
 <ParamField path="vertices" type="Vector3[]" required>
-  Array of vertices defining the polygon boundary. Must be in counter-clockwise order when viewed from above (positive Y-axis).
-  
-  ```typescript
-  vertices: [
-    new Vector3(0, 0, 0),
-    new Vector3(10, 0, 0),
-    new Vector3(10, 0, 10),
-    new Vector3(0, 0, 10)
-  ]
-  ```
+  Vertices for the outer loop of the polygon.
+</ParamField>
+
+<ParamField path="holes" type="Vector3[][]" optional>
+  Optional inner loops. Each hole is its own vertex array.
 </ParamField>
 
 <ParamField path="color" type="number" required>
-  Hexadecimal color value for the polygon fill.
-  
-  ```typescript
-  color: 0x00ff00  // Green
-  ```
+  Fill color for the polygon face.
 </ParamField>
 
 <ParamField path="fatOutlines" type="boolean" default="false">
-  Use wide outlines backed by Three.js `LineSegments2` (instead of thin `LineSegments`).
+  Use wide outlines backed by Three.js `LineSegments2`.
 </ParamField>
 
 <ParamField path="outlineWidth" type="number" default="1">
   Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
 </ParamField>
 
+<ParamField path="translation" type="Vector3" optional>
+  Initial translation for the polygon mesh.
+</ParamField>
+
+<ParamField path="rotation" type="Vector3" optional>
+  Initial Euler rotation for the polygon mesh.
+</ParamField>
+
+<ParamField path="scale" type="Vector3" optional>
+  Initial scale for the polygon mesh.
+</ParamField>
+
 ## Methods
 
 ### setConfig()
 
-Updates the polygon configuration and regenerates geometry.
+Updates polygon geometry or styling and regenerates the face when needed.
 
-```typescript
-polygon.setConfig(options: IPolygonOptions): void
-```
-
-**Example:**
-```typescript
-polygon.setConfig({
-  vertices: [
-    new Vector3(0, 0, 0),
-    new Vector3(5, 0, 0),
-    new Vector3(5, 0, 5),
-    new Vector3(0, 0, 5)
-  ],
-  color: 0xff0000
-});
+```ts
+polygon.setConfig(options: PolygonConfigUpdate): void
 ```
 
 ### addVertices()
 
-Replaces all vertices with a new set and regenerates the polygon.
+Replaces the outer loop with a new set of vertices.
 
-```typescript
+```ts
 polygon.addVertices(vertices: Vector3[]): void
-```
-
-**Example:**
-```typescript
-const newVertices = [
-  new Vector3(0, 0, 0),
-  new Vector3(10, 0, 0),
-  new Vector3(5, 0, 10)
-];
-polygon.addVertices(newVertices);
 ```
 
 ### addHole()
 
-Adds a hole to the polygon. Hole vertices must be in clockwise order.
+Adds a new hole loop to the polygon.
 
-```typescript
+```ts
 polygon.addHole(holeVertices: Vector3[]): void
 ```
 
-**Example:**
-```typescript
-const holeVertices = [
-  new Vector3(2, 0, 2),
-  new Vector3(2, 0, 4),
-  new Vector3(4, 0, 4),
-  new Vector3(4, 0, 2)
-];
-polygon.addHole(holeVertices);
+### extrude()
+
+Extrudes the polygon face through the kernel BRep-face extrusion path and returns a renderable
+[`Solid`](/api/shapes/solid).
+
+```ts
+const solid = polygon.extrude(height);
 ```
 
-### getBrepData()
+<ParamField path="height" type="number" required>
+  Finite, non-zero extrusion height along the current kernel extrusion direction.
+</ParamField>
 
-Returns the B-Rep (Boundary Representation) data as a JSON string.
+### toFreeform()
 
-```typescript
-polygon.getBrepData(): string | null
+Converts the polygon into a freeform geometry wrapper for direct editing workflows.
+
+```ts
+const freeform = polygon.toFreeform(id?);
 ```
 
 ### subtract()
 
-Subtracts another boolean operand (such as an `Opening`) from this polygon and returns a renderable result mesh.
+Runs a coplanar boolean subtraction against another boolean operand.
 
-```typescript
+```ts
 const result = polygon.subtract(operand, options?);
 ```
 
-### generateGeometry()
+### getBrepData()
 
-Regenerates the THREE.js geometry from the current polygon configuration. Automatically called after configuration changes.
+Returns the serialized BRep JSON string for the polygon face.
 
-```typescript
-polygon.generateGeometry(): void
+```ts
+polygon.getBrepData(): string | null
 ```
 
 ### dispose()
 
-Cleans up geometry and material resources.
+Disposes geometry, materials, and outline resources owned by the polygon.
 
-```typescript
+```ts
 polygon.dispose(): void
 ```
 
 ## Properties
 
 <ResponseField name="ogid" type="string">
-  Unique identifier for the polygon instance.
+  Stable identifier for the polygon wrapper.
 </ResponseField>
 
 <ResponseField name="options" type="IPolygonOptions">
-  Current polygon configuration including vertices and color.
-</ResponseField>
-
-<ResponseField name="transformationMatrix" type="THREE.Matrix4">
-  Transformation matrix for the polygon geometry.
+  Current polygon configuration and placement state.
 </ResponseField>
 
 <ResponseField name="color" type="number">
-  Get or set the polygon fill color.
-  
-  ```typescript
-  polygon.color = 0xff0000;  // Set to red
-  const currentColor = polygon.color;  // Get current color
-  ```
+  Gets or sets the polygon fill color.
 </ResponseField>
 
 <ResponseField name="outline" type="boolean">
-  Enable or disable outline rendering.
-  
-  ```typescript
-  polygon.outline = true;   // Show outline
-  polygon.outline = false;  // Hide outline
-  ```
+  Enables or disables outline rendering.
 </ResponseField>
 
 <ResponseField name="fatOutlines" type="boolean">
-  When enabled, outlines are rendered using a wide-line implementation (instead of thin lines).
+  Toggles wide outline rendering.
 </ResponseField>
 
 <ResponseField name="outlineWidth" type="number">
-  Outline width used for fat outlines.
+  Sets the width used when `fatOutlines` is enabled.
 </ResponseField>
 
 <ResponseField name="outlineColor" type="number">
-  Get or set the outline color (default: 0x000000 - black).
-  
-  ```typescript
-  polygon.outlineColor = 0x0000ff;  // Blue outline
-  ```
+  Gets or sets the outline color.
 </ResponseField>
 
 ## Usage Examples
 
-### Basic Rectangle
+### Polygon with hole
 
-```typescript
+```ts
 import { Polygon, Vector3 } from "opengeometry";
 
-const rectangle = new Polygon({
+const slab = new Polygon({
   vertices: [
     new Vector3(0, 0, 0),
-    new Vector3(10, 0, 0),
-    new Vector3(10, 0, 8),
-    new Vector3(0, 0, 8)
+    new Vector3(8, 0, 0),
+    new Vector3(8, 0, 6),
+    new Vector3(0, 0, 6),
   ],
-  color: 0x00ff00
+  holes: [[
+    new Vector3(5, 0, 4),
+    new Vector3(5, 0, 2),
+    new Vector3(3, 0, 2),
+    new Vector3(3, 0, 4),
+  ]],
+  color: 0x2563eb,
 });
 
-// Enable outline
-rectangle.outline = true;
-rectangle.outlineColor = 0x000000;
+slab.outline = true;
 ```
 
-### Polygon with Hole
+### Extrude and subtract an opening
 
-```typescript
-import { Polygon, Vector3 } from "opengeometry";
+```ts
+import * as THREE from "three";
+import { OpenGeometry, Polygon, Vector3 } from "opengeometry";
 
-// Create outer polygon
-const polygon = new Polygon({
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+
+const scene = new THREE.Scene();
+
+const wallProfile = new Polygon({
   vertices: [
-    new Vector3(0, 0, 0),
-    new Vector3(20, 0, 0),
-    new Vector3(20, 0, 20),
-    new Vector3(0, 0, 20)
+    new Vector3(-2.2, 0, -0.18),
+    new Vector3(2.2, 0, -0.18),
+    new Vector3(2.2, 0, 0.18),
+    new Vector3(-2.2, 0, 0.18),
   ],
-  color: 0x3498db
+  color: 0x60a5fa,
 });
 
-// Add a rectangular hole in the center
-polygon.addHole([
-  new Vector3(8, 0, 8),   // Clockwise order
-  new Vector3(8, 0, 12),
-  new Vector3(12, 0, 12),
-  new Vector3(12, 0, 8)
-]);
-```
-
-### Complex Shape
-
-```typescript
-import { Polygon, Vector3 } from "opengeometry";
-
-// L-shaped polygon
-const lShape = new Polygon({
+const openingProfile = new Polygon({
   vertices: [
-    new Vector3(0, 0, 0),
-    new Vector3(10, 0, 0),
-    new Vector3(10, 0, 5),
-    new Vector3(5, 0, 5),
-    new Vector3(5, 0, 15),
-    new Vector3(0, 0, 15)
+    new Vector3(-0.7, 0, -0.34),
+    new Vector3(0.9, 0, -0.34),
+    new Vector3(0.9, 0, 0.34),
+    new Vector3(-0.7, 0, 0.34),
   ],
-  color: 0xe74c3c
+  color: 0xf97316,
 });
 
-lShape.outline = true;
-```
+const wall = wallProfile.extrude(2.8);
+const opening = openingProfile.extrude(1.35);
+opening.setTranslation(new Vector3(0, 0.85, 0));
 
-## Implementation Details
-
-### Triangulation
-
-The polygon is automatically triangulated using the `triangulate_polygon_with_holes` function from the Rust kernel. This ensures proper rendering of complex shapes with holes.
-
-### Geometry Generation
-
-Geometry is stored as a THREE.BufferGeometry with double-sided material to ensure visibility from both sides:
-
-```typescript
-const material = new THREE.MeshBasicMaterial({
-  color: this.options.color,
-  side: THREE.DoubleSide,
+const cut = wall.subtract(opening, {
+  outline: true,
+  fatOutlines: true,
+  outlineWidth: 2,
+  kernel: { mergeCoplanarFaces: true },
 });
+
+scene.add(cut);
 ```
-
-### Outline Rendering
-
-Outlines are rendered as THREE.LineSegments, positioned as a child of the polygon mesh to maintain transformation hierarchy.
 
 ## Best Practices
 
 <Tip>
-  **Vertex Order:** Always define outer polygon vertices in counter-clockwise (CCW) order and hole vertices in clockwise (CW) order when viewed from above.
+  Keep outer loops counter-clockwise and hole loops clockwise to match the kernel's face-building
+  expectations.
 </Tip>
 
-<Warning>
-  **Minimum Vertices:** Polygons require at least 3 vertices. The geometry generation will fail silently if fewer vertices are provided.
-</Warning>
-
 <Info>
-  **Performance:** For polygons with many vertices or multiple holes, consider enabling outline rendering only when necessary, as it adds additional geometry.
+  Use `polygon.extrude(height)` when you want a proper renderable solid. Use `polygon.toFreeform()`
+  when you want direct topology editing instead.
 </Info>
 
 ## See Also
 
-- [Boolean operations](/api/operations/boolean-operations) - Union, intersection, and subtraction
-- [Cuboid](/api/shapes/cuboid) - For rectangular 3D boxes
-- [Cylinder](/api/shapes/cylinder) - For circular extrusions
-- [Sweep](/api/shapes/sweep) - For extruding profiles along paths
+- [Solid](/api/shapes/solid)
+- [Extrude](/api/operations/extrude)
+- [Boolean operations](/api/operations/boolean-operations)
+- [Sweep](/api/shapes/sweep)
 
 ## Live demo
 
-Try it in the browser: [Polygon demo](https://demo.opengeometry.io/shapes/polygon.html).
+- [Polygon demo](https://demo.opengeometry.io/shapes/polygon.html)
+- [Extruded boolean operations demo](https://demo.opengeometry.io/operations/extruded-boolean-operations.html)

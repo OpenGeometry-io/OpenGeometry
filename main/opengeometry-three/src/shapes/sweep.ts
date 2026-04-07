@@ -21,6 +21,9 @@ import type {
   ShapeSubtractResult,
 } from "./boolean-subtract";
 
+/**
+ * Construction options for a swept solid.
+ */
 export interface ISweepOptions {
   ogid?: string;
   path: Vector3[];
@@ -35,15 +38,25 @@ export interface ISweepOptions {
   scale?: Vector3;
 }
 
+/**
+ * Placement updates accepted by `Sweep`.
+ */
 export interface SweepPlacementOptions {
   translation?: Vector3;
   rotation?: Vector3;
   scale?: Vector3;
 }
 
+/**
+ * Partial config payload accepted by `Sweep.setConfig(...)`.
+ */
 export type SweepConfigUpdate = Partial<
   Omit<ISweepOptions, "translation" | "rotation" | "scale">
 >;
+
+/**
+ * Alias for `Sweep` placement updates.
+ */
 export type SweepPlacementUpdate = SweepPlacementOptions;
 
 /* eslint-disable no-unused-vars */
@@ -64,6 +77,9 @@ interface ISweepKernelInstance {
 type SweepKernelConstructor = new (..._args: [string]) => ISweepKernelInstance;
 /* eslint-enable no-unused-vars */
 
+/**
+ * Sweep wrapper backed by the kernel sweep primitive.
+ */
 export class Sweep extends THREE.Mesh {
   ogid: string;
   options: ISweepOptions = {

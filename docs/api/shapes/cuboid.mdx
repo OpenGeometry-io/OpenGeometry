@@ -94,7 +94,7 @@ cuboid.setConfig({
 Returns the B-Rep (Boundary Representation) data as a parsed JSON object.
 
 ```typescript
-cuboid.getBrepData(): object | null
+cuboid.getBrepData(): object
 ```
 
 **Example:**
@@ -203,10 +203,6 @@ cuboid.discardGeometry(): void
 
 <ResponseField name="outlineWidth" type="number">
   Outline width used for fat outlines.
-</ResponseField>
-
-<ResponseField name="outlineMesh" type="THREE.LineSegments | object | null">
-  Reference to the outline mesh if outline is enabled.
 </ResponseField>
 
 ## Usage Examples

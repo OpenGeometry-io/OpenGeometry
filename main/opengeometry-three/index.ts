@@ -13,21 +13,33 @@ import { OPEN_GEOMETRY_THREE_VERSION, OpenGeometryOptions } from "./src/base-typ
 
 export type OUTLINE_TYPE = "front" | "side" | "top";
 
+/**
+ * Binary STL export payload returned by export helpers.
+ */
 export interface OGStlExportResult {
   bytes: Uint8Array;
   reportJson: string;
 }
 
+/**
+ * STEP text export payload returned by export helpers.
+ */
 export interface OGStepExportResult {
   text: string;
   reportJson: string;
 }
 
+/**
+ * IFC text export payload returned by export helpers.
+ */
 export interface OGIfcExportResult {
   text: string;
   reportJson: string;
 }
 
+/**
+ * Shared runtime entrypoint used to initialize the OpenGeometry wasm module.
+ */
 export class OpenGeometry {
   static version = OPEN_GEOMETRY_THREE_VERSION;
   static instance: OpenGeometry | null = null;

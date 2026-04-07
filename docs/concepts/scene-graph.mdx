@@ -31,7 +31,7 @@ Each entity in a scene wraps a BREP body:
 ```rust
 pub struct SceneEntity {
     pub id: String,      // Unique entity ID
-    pub kind: String,    // Type: "OGLine", "OGCuboid", etc.
+    pub kind: String,    // Type label: "Line", "Cuboid", etc.
     pub brep: Brep,      // Underlying boundary representation
 }
 ```
@@ -64,7 +64,7 @@ let mut scene = OGScene::new("Test Scene");
 
 let entity = SceneEntity {
     id: Uuid::new_v4().to_string(),
-    kind: "OGCuboid".to_string(),
+    kind: "Cuboid".to_string(),
     brep: cuboid.brep().clone(),
 };
 
@@ -178,10 +178,10 @@ Every entity in a scene contains a complete BREP representation:
 ```
 OGScene
   └─ SceneEntity ("wall-1")
-       ├─ kind: "OGCuboid"
+       ├─ kind: "Cuboid"
        └─ brep: Brep { vertices, halfedges, edges, loops, faces, wires, shells }
   └─ SceneEntity ("window-1")
-       ├─ kind: "OGRectangle" 
+       ├─ kind: "Rectangle" 
        └─ brep: Brep { vertices, halfedges, edges, loops, faces, wires, shells }
 ```
 
@@ -228,15 +228,38 @@ let json = manager.project_scene_to_2d_json(&scene_id, &camera, &hlr)?;
 The `OGSceneManager` is exposed to JavaScript via `wasm-bindgen`:
 
 ```typescript
-import { OGSceneManager } from 'opengeometry';
+import { OpenGeometry, Cuboid, OGSceneManager, Vector3 } from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+
+function toBrepSerialized(source) {
+  const value =
+    source && typeof source.getBrepSerialized === "function"
+      ? source.getBrepSerialized()
+      : source && typeof source.getBrepData === "function"
+        ? source.getBrepData()
+        : source && typeof source.getBrep === "function"
+          ? source.getBrep()
+          : source;
+
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
 
 const manager = new OGSceneManager();
 
 // Create scene
 const sceneId = manager.createScene('My Scene');
 
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0.5, 0),
+  width: 1,
+  height: 1,
+  depth: 1,
+  color: 0x10b981,
+});
+
 // Add entity
-manager.addCuboidToScene(sceneId, 'box-1', cuboid);
+manager.addBrepEntityToScene(sceneId, 'box-1', 'Cuboid', toBrepSerialized(cuboid));
 
 // Project to 2D
 const cameraJson = JSON.stringify({ /* camera params */ });
@@ -268,7 +291,7 @@ const projection = manager.projectTo2DCamera(sceneId, cameraJson);
 Many methods have variants that operate on the current scene:
 
 ```typescript
-manager.addCuboidToCurrentScene('box-1', cuboid);
+manager.addBrepEntityToCurrentScene('box-1', 'Cuboid', toBrepSerialized(cuboid));
 manager.projectCurrentTo2DCamera(cameraJson);
 ```
 

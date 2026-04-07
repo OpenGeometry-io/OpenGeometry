@@ -24,7 +24,7 @@
 
 ---
 
-> **Actively under development.** We're building OpenGeometry in the open. APIs, examples, and package structure are evolving — breaking changes are still possible. Star the repo to follow along.
+> **Actively maintained and growing.** We're building OpenGeometry in the open. APIs, examples, and package structure are evolving, we are actively improving and expanding the project. Star the repo to follow along. If you have questions or want to get involved, join the [Discord](https://discord.com/invite/cZY2Vm6E) or check out the [issues](https://github.com/OpenGeometry-io/OpenGeometry/issues)
 
 ---
 

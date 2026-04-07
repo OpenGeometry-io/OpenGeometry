@@ -3,8 +3,14 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 
+/**
+ * Outline mesh variants used by shape wrappers.
+ */
 export type ShapeOutlineMesh = THREE.LineSegments | LineSegments2;
 
+/**
+ * Options for building a shape outline mesh.
+ */
 export interface ShapeOutlineMeshOptions {
   positions: number[];
   color?: number;
@@ -22,6 +28,9 @@ function getOutlineResolution() {
   return new THREE.Vector2(window.innerWidth, window.innerHeight);
 }
 
+/**
+ * Clamps outline width inputs to the supported positive finite range.
+ */
 export function sanitizeOutlineWidth(width?: number) {
   if (!Number.isFinite(width) || typeof width !== "number" || width <= 0) {
     return DEFAULT_OUTLINE_WIDTH;
@@ -29,6 +38,9 @@ export function sanitizeOutlineWidth(width?: number) {
   return width;
 }
 
+/**
+ * Creates either a thin or fat outline mesh from line segment positions.
+ */
 export function createShapeOutlineMesh({
   positions,
   color = DEFAULT_OUTLINE_COLOR,
@@ -58,6 +70,9 @@ export function createShapeOutlineMesh({
   return new THREE.LineSegments(outlineGeometry, outlineMaterial);
 }
 
+/**
+ * Disposes the geometry and material owned by an outline mesh.
+ */
 export function disposeShapeOutlineMesh(mesh: ShapeOutlineMesh | null) {
   if (!mesh) {
     return;
@@ -71,6 +86,9 @@ export function disposeShapeOutlineMesh(mesh: ShapeOutlineMesh | null) {
   mesh.material.dispose();
 }
 
+/**
+ * Updates the color of an existing outline mesh in place.
+ */
 export function setShapeOutlineColor(mesh: ShapeOutlineMesh | null, color: number) {
   if (!mesh) {
     return;
@@ -86,6 +104,9 @@ export function setShapeOutlineColor(mesh: ShapeOutlineMesh | null, color: numbe
   }
 }
 
+/**
+ * Reads the current outline color, falling back when no outline exists.
+ */
 export function getShapeOutlineColor(
   mesh: ShapeOutlineMesh | null,
   fallback: number = DEFAULT_OUTLINE_COLOR

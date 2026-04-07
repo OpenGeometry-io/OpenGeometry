@@ -9,8 +9,10 @@ import {
   createParametricEditCapabilities,
 } from "../editor";
 import { createFreeformGeometry } from "../freeform";
-// import { IArcOptions } from "../base-types";
 
+/**
+ * Construction options for an arc or full-circle primitive.
+ */
 export interface IArcOptions {
   ogid?: string;
   center: Vector3;
@@ -26,17 +28,30 @@ export interface IArcOptions {
   scale?: Vector3;
 }
 
+/**
+ * Placement updates accepted by `Arc`.
+ */
 export interface ArcPlacementOptions {
   translation?: Vector3;
   rotation?: Vector3;
   scale?: Vector3;
 }
 
+/**
+ * Partial config payload accepted by `Arc.setConfig(...)`.
+ */
 export type ArcConfigUpdate = Partial<
   Omit<IArcOptions, "translation" | "rotation" | "scale">
 >;
+
+/**
+ * Alias for `Arc` placement updates.
+ */
 export type ArcPlacementUpdate = ArcPlacementOptions;
 
+/**
+ * Arc wrapper backed by the kernel OGArc primitive.
+ */
 export class Arc extends THREE.Line {
   ogid: string;
   options: IArcOptions = {

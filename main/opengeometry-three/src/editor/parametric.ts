@@ -15,6 +15,9 @@ function cloneVector(
   return vector?.clone() ?? new Vector3(...fallback);
 }
 
+/**
+ * Returns the canonical capability payload exposed by parametric wrappers.
+ */
 export function createParametricEditCapabilities(
   entityType: ParametricEntityType,
   editFamily: ParametricEditFamily
@@ -29,6 +32,9 @@ export function createParametricEditCapabilities(
   };
 }
 
+/**
+ * Normalizes optional placement fields into concrete vectors.
+ */
 export function clonePlacement(
   placement: Partial<ParametricPlacement>
 ): ParametricPlacement {
@@ -39,6 +45,10 @@ export function clonePlacement(
   };
 }
 
+/**
+ * Converts a parametric placement payload into the freeform/object transform
+ * structure expected by BRep-backed helpers.
+ */
 export function toObjectTransformation(
   placement: ParametricPlacement | ObjectTransformation
 ): ObjectTransformation {
