@@ -1,0 +1,143 @@
+# OpenGeometry
+
+OpenGeometry is a CAD kernel for the web built with Rust, WebAssembly, and Three.js. The main
+public JavaScript package in this repo is `opengeometry` (version `2.0.3`).
+
+## Start here
+
+- `README.md`
+- `docs/what-is-opengeometry.mdx`
+- `docs/installation.mdx`
+- `docs/quickstart.mdx`
+- `docs/integration/threejs.mdx`
+- `docs/integration/examples.mdx`
+
+## Runtime initialization
+
+```ts
+import { OpenGeometry } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+```
+
+Initialize once before creating `Vector3`, primitives, shapes, or calling boolean/extrusion
+helpers. `Vector3` is wasm-backed in this package, so constructing it before `OpenGeometry.create`
+will fail.
+
+## Main public TypeScript API
+
+Import from the public package name:
+
+```ts
+import {
+  OpenGeometry,
+  Vector3,
+  Line,
+  Arc,
+  Curve,
+  Polyline,
+  Rectangle,
+  Polygon,
+  Solid,
+  Cuboid,
+  Cylinder,
+  Sphere,
+  Wedge,
+  Sweep,
+  Opening,
+  booleanUnion,
+  booleanIntersection,
+  booleanSubtraction,
+  extrudeBrepFace,
+  OGSceneManager,
+} from "opengeometry";
+```
+
+## Core modeling concepts
+
+- Primitives are line-based wrappers:
+  - `Line`
+  - `Arc`
+  - `Curve`
+  - `Polyline`
+  - `Rectangle`
+- Shapes are mesh-backed wrappers:
+  - `Polygon`
+  - `Solid`
+  - `Cuboid`
+  - `Cylinder`
+  - `Sphere`
+  - `Wedge`
+  - `Sweep`
+  - `Opening`
+
+## Important public workflows
+
+- `polygon.extrude(height)` returns a `Solid`
+- `Solid.extrude(source, height, options)` extrudes a face-like BRep source into a `Solid`
+- `Opening.subtractFrom(host, options?)` is the host-cutting workflow for walls/slabs/etc.
+- `shape.subtract(operand, options?)` is available on solid shape wrappers
+- Standalone boolean helpers return `BooleanResult`
+- `toFreeform()` converts wrappers and boolean results into editable freeform geometry
+
+## Scene, export, and projection
+
+- `OGSceneManager` stores named BRep snapshots in wasm
+- Use `addBrepEntityToScene(...)` for wrapper-first scene insertion
+- Projection helpers:
+  - `projectTo2DCamera(...)`
+  - `projectTo2DLines(...)`
+- Export helpers:
+  - `exportBrepToStl(...)`
+  - `exportSceneToStl(...)`
+  - `exportBrepToStep(...)`
+  - `exportSceneToStep(...)`
+  - `exportBrepToIfc(...)`
+  - `exportSceneToIfc(...)`
+
+## BRep accessor precedence
+
+When serializing wrapper geometry for booleans, scene insertion, or export, prefer:
+
+1. `getBrepSerialized()`
+2. `getBrepData()`
+3. `getBrep()`
+
+`Polygon.getBrepData()` is a notable exception: it returns serialized BRep JSON.
+
+## Canonical docs pages
+
+- `docs/api/core/opengeometry.mdx`
+- `docs/api/primitives/line.mdx`
+- `docs/api/primitives/arc.mdx`
+- `docs/api/primitives/curve.mdx`
+- `docs/api/primitives/polyline.mdx`
+- `docs/api/primitives/rectangle.mdx`
+- `docs/api/shapes/polygon.mdx`
+- `docs/api/shapes/solid.mdx`
+- `docs/api/shapes/cuboid.mdx`
+- `docs/api/shapes/cylinder.mdx`
+- `docs/api/shapes/sphere.mdx`
+- `docs/api/shapes/wedge.mdx`
+- `docs/api/shapes/sweep.mdx`
+- `docs/api/shapes/opening.mdx`
+- `docs/api/operations/extrude.mdx`
+- `docs/api/operations/boolean-operations.mdx`
+- `docs/api/scene/scene-management.mdx`
+
+## Repo map
+
+- `main/opengeometry` - Rust core and wasm bindings
+- `main/opengeometry-three` - Three.js wrapper layer
+- `main/opengeometry-three/examples-vite` - standalone public examples
+- `docs` - Mintlify documentation source
+
+## Good example pages for agents
+
+- `main/opengeometry-three/examples-vite/primitives/line.html`
+- `main/opengeometry-three/examples-vite/shapes/polygon.html`
+- `main/opengeometry-three/examples-vite/shapes/cuboid.html`
+- `main/opengeometry-three/examples-vite/operations/boolean-operations.html`
+- `main/opengeometry-three/examples-vite/operations/extruded-boolean-operations.html`
+- `main/opengeometry-three/examples-vite/operations/stl-export.html`
+- `main/opengeometry-three/examples-vite/operations/step-export.html`

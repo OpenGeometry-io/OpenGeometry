@@ -4,7 +4,10 @@
     <title>OpenGeometry Boolean Operations Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="OpenGeometry solid boolean operations example" />
+    <meta
+      name="description"
+      content="Simple OpenGeometry solid boolean example for Three.js."
+    />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
   <body class="og-example-page">
@@ -12,327 +15,261 @@
       <a href="../index.html" class="og-badge-title-link">Back</a>
       <span class="og-badge-title">Boolean Operations</span>
     </div>
-    <aside class="og-controls" data-control-panel>
-      <h3>Boolean Operation Controls</h3>
-      <p class="og-control-summary" data-summary>Loading solid boolean example...</p>
-      <p class="og-control-summary" data-metrics>Preparing result metrics...</p>
-      <label class="og-control-row" data-control-key="operation" data-control-type="select">
+
+    <aside class="og-controls">
+      <h3>Solid Boolean</h3>
+      <p class="og-control-summary">
+        The translucent cuboid and sphere are shown on the left. The boolean result is rebuilt on
+        the right after every change.
+      </p>
+
+      <label class="og-control-row" data-control="operation">
         <div class="og-control-header">
           <span class="og-control-label-chip">Operation</span>
         </div>
-        <select class="og-control-select" data-control-select aria-label="Operation">
-          <option value="union" selected>Union</option>
+        <select class="og-control-select" data-select aria-label="Operation">
+          <option value="union">Union</option>
           <option value="intersection">Intersection</option>
-          <option value="subtraction">Subtraction</option>
+          <option value="subtraction" selected>Subtraction</option>
         </select>
       </label>
-      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
+
+      <label class="og-control-row" data-control="offset-x">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Outlines</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Fat Outlines</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Outline Width</span>
-          <code class="og-control-value" data-control-value>3</code>
+          <span class="og-control-label-chip">Sphere Offset X</span>
+          <code class="og-control-value" data-value>0.35</code>
         </div>
         <div class="og-control-range">
-          <input data-control-range type="range" min="1" max="8" step="1" value="3" />
-          <input data-control-number type="number" min="1" max="8" step="1" value="3" />
+          <input data-range type="range" min="-1.2" max="1.2" step="0.05" value="0.35" />
+          <input data-number type="number" min="-1.2" max="1.2" step="0.05" value="0.35" />
         </div>
-      </label>
-      <label class="og-control-row" data-control-key="sphereX" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Sphere X</span>
-          <code class="og-control-value" data-control-value>0.45</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="-1.25" max="1.25" step="0.01" value="0.45" />
-          <input data-control-number type="number" min="-1.25" max="1.25" step="0.01" value="0.45" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="sphereY" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Sphere Y</span>
-          <code class="og-control-value" data-control-value>0.12</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="-1.25" max="1.25" step="0.01" value="0.12" />
-          <input data-control-number type="number" min="-1.25" max="1.25" step="0.01" value="0.12" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="sphereZ" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Sphere Z</span>
-          <code class="og-control-value" data-control-value>0.18</code>
-        </div>
-        <div class="og-control-range">
-          <input data-control-range type="range" min="-1.25" max="1.25" step="0.01" value="0.18" />
-          <input data-control-number type="number" min="-1.25" max="1.25" step="0.01" value="0.18" />
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="showOperandA" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Operand A</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="showOperandB" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Operand B</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="showResult" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Result</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="resultColor" data-control-type="color">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Result Color</span>
-        </div>
-        <input data-control-color type="color" class="og-control-color" value="#14b8a6" />
       </label>
     </aside>
+
     <div id="app"></div>
+
     <script type="module">
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Vector3, createBooleanExample } from "@og-three";
+      import {
+        booleanIntersection,
+        booleanSubtraction,
+        booleanUnion,
+        Cuboid,
+        OpenGeometry,
+        Sphere,
+        Vector3,
+      } from "@og-three";
 
       const app = document.getElementById("app");
-      const summary = document.querySelector("[data-summary]");
-      const metrics = document.querySelector("[data-metrics]");
+      if (!app) {
+        throw new Error("Missing #app container");
+      }
 
-      let scene;
-      let camera;
-      let renderer;
-      let controls;
-      let currentExample = null;
-      let rebuildQueued = false;
       const config = {
-        operation: "union",
-        outline: true,
-        fatOutlines: true,
-        outlineWidth: 3,
-        sphereX: 0.45,
-        sphereY: 0.12,
-        sphereZ: 0.18,
-        showOperandA: true,
-        showOperandB: true,
-        showResult: true,
-        resultColor: "#14b8a6",
+        operation: "subtraction",
+        offsetX: 0.35,
       };
 
-      function parseColor(color) {
-        return Number.parseInt(color.replace("#", "0x"), 16);
+      let scene = null;
+      let currentGroup = null;
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
       }
 
-      function scheduleRebuild() {
-        if (rebuildQueued) return;
-        rebuildQueued = true;
-        requestAnimationFrame(() => {
-          rebuildQueued = false;
-          rebuildExample();
-        });
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
       }
 
-      function rebuildExample() {
-        if (!scene) return;
-        if (currentExample?.group) {
-          scene.remove(currentExample.group);
-          disposeObject(currentExample.group);
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
+
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
         }
 
-        currentExample = createBooleanExample(config.operation, {
-          mode: "solid",
-          outline: config.outline,
-          fatOutlines: config.fatOutlines,
-          outlineWidth: config.outlineWidth,
-          color: parseColor(config.resultColor),
-          sphereCenter: new Vector3(config.sphereX, config.sphereY, config.sphereZ),
-        });
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
+          }
 
-        currentExample.lhs.visible = config.showOperandA;
-        currentExample.rhs.visible = config.showOperandB;
-        currentExample.result.visible = config.showResult;
-        summary.textContent = `${currentExample.title}. ${currentExample.description}`;
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
 
-        const report = currentExample.result.report;
-        metrics.textContent = report
-          ? `Faces ${report.output_face_count}, shells ${report.output_shell_count}, empty ${report.empty ? "yes" : "no"}`
-          : "Result metrics unavailable.";
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
+      }
 
-        scene.add(currentExample.group);
+      function attachSelectControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const select = row?.querySelector("[data-select]");
+
+        if (!row || !select) {
+          throw new Error(`Missing select control: ${name}`);
+        }
+
+        const commit = (value) => {
+          select.value = value;
+          onChange(value);
+        };
+
+        select.addEventListener("change", () => commit(select.value));
+        commit(select.value);
       }
 
       function disposeObject(object) {
         object.traverse((child) => {
-          if (child.geometry) {
-            child.geometry.dispose();
-          }
+          child.geometry?.dispose?.();
           if (Array.isArray(child.material)) {
-            child.material.forEach((material) => material.dispose());
-          } else if (child.material) {
-            child.material.dispose();
+            child.material.forEach((material) => material?.dispose?.());
+            return;
           }
+          child.material?.dispose?.();
         });
       }
 
-      function updateVisibility() {
-        if (!currentExample) return;
-        currentExample.lhs.visible = config.showOperandA;
-        currentExample.rhs.visible = config.showOperandB;
-        currentExample.result.visible = config.showResult;
+      function getExecutor() {
+        switch (config.operation) {
+          case "union":
+            return booleanUnion;
+          case "intersection":
+            return booleanIntersection;
+          default:
+            return booleanSubtraction;
+        }
       }
 
-      function formatControlNumber(value) {
-        return Number(value).toFixed(2).replace(/\.?0+$/, "");
-      }
+      function rebuildExample() {
+        if (!scene) {
+          return;
+        }
 
-      function setUIControls() {
-        document.querySelectorAll("[data-control-key]").forEach((control) => {
-          const key = control.getAttribute("data-control-key");
-          const type = control.getAttribute("data-control-type");
+        if (currentGroup) {
+          scene.remove(currentGroup);
+          disposeObject(currentGroup);
+        }
 
-          if (type === "select") {
-            const selectInput = control.querySelector("[data-control-select]");
-
-            const setValue = (value) => {
-              config[key] = value;
-              selectInput.value = value;
-              scheduleRebuild();
-            };
-
-            selectInput.value = config[key];
-            selectInput.addEventListener("change", () => setValue(selectInput.value));
-          }
-
-          if (type === "number") {
-            const rangeInput = control.querySelector("[data-control-range]");
-            const numberInput = control.querySelector("[data-control-number]");
-            const valueDisplay = control.querySelector("[data-control-value]");
-
-            const setValue = (raw) => {
-              config[key] = Number(raw);
-              rangeInput.value = raw;
-              numberInput.value = raw;
-              valueDisplay.textContent = formatControlNumber(raw);
-              scheduleRebuild();
-            };
-
-            rangeInput.addEventListener("input", () => setValue(rangeInput.value));
-            numberInput.addEventListener("input", () => setValue(numberInput.value));
-          }
-
-          if (type === "boolean") {
-            const toggleInput = control.querySelector("[data-control-toggle]");
-            const state = control.querySelector("[data-control-bool-state]");
-
-            const setValue = (checked) => {
-              config[key] = checked;
-              toggleInput.checked = checked;
-
-              const isStyleControl = key === "outline" || key === "fatOutlines";
-              state.textContent = checked
-                ? (isStyleControl ? "Enabled" : "Visible")
-                : (isStyleControl ? "Disabled" : "Hidden");
-
-              if (isStyleControl) {
-                scheduleRebuild();
-                return;
-              }
-
-              updateVisibility();
-            };
-
-            toggleInput.addEventListener("change", () => setValue(toggleInput.checked));
-          }
-
-          if (type === "color") {
-            const colorInput = control.querySelector("[data-control-color]");
-            colorInput.addEventListener("input", () => {
-              config[key] = colorInput.value;
-              scheduleRebuild();
-            });
-          }
+        const cuboid = new Cuboid({
+          center: new Vector3(0, 0.75, 0),
+          width: 2.4,
+          height: 1.5,
+          depth: 1.6,
+          color: 0x60a5fa,
+          outlineWidth: 2,
         });
+        cuboid.outline = true;
+
+        const sphere = new Sphere({
+          center: new Vector3(0.55, 0.82, 0.2),
+          radius: 0.82,
+          widthSegments: 28,
+          heightSegments: 18,
+          color: 0xf97316,
+          outlineWidth: 2,
+        });
+        sphere.outline = true;
+        sphere.setPlacement({
+          translation: new Vector3(config.offsetX, 0, 0),
+        });
+
+        const result = getExecutor()(cuboid, sphere, {
+          outline: true,
+          outlineWidth: 2,
+        });
+
+        cuboid.position.x = -4;
+        sphere.position.x = -4;
+        result.position.x = 4;
+
+        currentGroup = new THREE.Group();
+        currentGroup.add(cuboid);
+        currentGroup.add(sphere);
+        currentGroup.add(result);
+        scene.add(currentGroup);
+
+        console.groupCollapsed("[boolean-solid] rebuilt");
+        console.log("Config", { ...config });
+        console.log("Report", result.report);
+        console.groupEnd();
       }
 
       async function main() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0xeef2ff);
 
-        camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 4000);
-        camera.position.set(5.6, 4.4, 6.4);
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        camera.position.set(10.5, 6.4, 11.5);
 
-        renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
 
-        controls = new OrbitControls(camera, renderer.domElement);
+        const stats = mountStats();
+        const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(0, 0.5, 0);
+        controls.target.set(0, 1.2, 0);
         controls.update();
 
-        scene.add(new THREE.GridHelper(32, 32, 0x4460ff, 0xd5ddff));
-        scene.add(new THREE.AmbientLight(0xffffff, 0.74));
+        scene.add(new THREE.GridHelper(30, 30, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.82));
 
-        const key = new THREE.DirectionalLight(0xffffff, 0.94);
-        key.position.set(6, 9, 5);
-        scene.add(key);
-
-        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
-        fill.position.set(-6, 4, -6);
-        scene.add(fill);
+        const light = new THREE.DirectionalLight(0xffffff, 1.15);
+        light.position.set(7, 9, 5);
+        scene.add(light);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        attachSelectControl("operation", (value) => {
+          config.operation = value;
+          rebuildExample();
+        });
+        attachNumberControl("offset-x", (value) => {
+          config.offsetX = value;
+          rebuildExample();
+        });
+
         rebuildExample();
-        setUIControls();
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
 
         window.addEventListener("resize", () => {
           camera.aspect = window.innerWidth / window.innerHeight;
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight);
         });
-
-        renderer.setAnimationLoop(() => {
-          controls.update();
-          renderer.render(scene, camera);
-        });
       }
 
-      main().catch((error) => {
-        console.error(error);
-        summary.textContent = error instanceof Error ? error.message : String(error);
-      });
+      void main();
     </script>
   </body>
 </html>

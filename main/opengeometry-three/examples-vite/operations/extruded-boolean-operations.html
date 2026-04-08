@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Extruded Boolean Operations Example</title>
+    <title>OpenGeometry Extruded Boolean Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="OpenGeometry extruded solid boolean operations example" />
+    <meta
+      name="description"
+      content="Simple OpenGeometry extruded boolean example for Three.js."
+    />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
   <body class="og-example-page">
@@ -12,318 +15,267 @@
       <a href="../index.html" class="og-badge-title-link">Back</a>
       <span class="og-badge-title">Extruded Boolean Operations</span>
     </div>
-    <aside class="og-controls" data-control-panel>
-      <h3>Extruded Boolean Controls</h3>
-      <p class="og-control-summary" data-summary>Loading extruded boolean example...</p>
-      <p class="og-control-summary" data-metrics>Preparing result metrics...</p>
-      <label class="og-control-row" data-control-key="operation" data-control-type="select">
+
+    <aside class="og-controls">
+      <h3>Wall Minus Opening</h3>
+      <p class="og-control-summary">
+        This page shows the production-style flow: build two polygons, call
+        <code>polygon.extrude(height)</code>, then subtract the opening from the wall.
+      </p>
+
+      <label class="og-control-row" data-control="wall-height">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Operation</span>
-        </div>
-        <select class="og-control-select" data-control-select aria-label="Operation">
-          <option value="union">Union</option>
-          <option value="intersection">Intersection</option>
-          <option value="subtraction" selected>Subtraction</option>
-        </select>
-      </label>
-      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Outlines</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Fat Outlines</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Outline Width</span>
-          <code class="og-control-value" data-control-value>3</code>
+          <span class="og-control-label-chip">Wall Height</span>
+          <code class="og-control-value" data-value>2.8</code>
         </div>
         <div class="og-control-range">
-          <input data-control-range type="range" min="1" max="8" step="1" value="3" />
-          <input data-control-number type="number" min="1" max="8" step="1" value="3" />
+          <input data-range type="range" min="1.5" max="4" step="0.1" value="2.8" />
+          <input data-number type="number" min="1.5" max="4" step="0.1" value="2.8" />
         </div>
       </label>
-      <label class="og-control-row" data-control-key="operandBX" data-control-type="number">
+
+      <label class="og-control-row" data-control="opening-width">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Operand B X</span>
-          <code class="og-control-value" data-control-value>0</code>
+          <span class="og-control-label-chip">Opening Width</span>
+          <code class="og-control-value" data-value>1.4</code>
         </div>
         <div class="og-control-range">
-          <input data-control-range type="range" min="-1.5" max="1.5" step="0.01" value="0" />
-          <input data-control-number type="number" min="-1.5" max="1.5" step="0.01" value="0" />
+          <input data-range type="range" min="0.6" max="2.2" step="0.05" value="1.4" />
+          <input data-number type="number" min="0.6" max="2.2" step="0.05" value="1.4" />
         </div>
       </label>
-      <label class="og-control-row" data-control-key="operandBZ" data-control-type="number">
+
+      <label class="og-control-row" data-control="opening-height">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Operand B Z</span>
-          <code class="og-control-value" data-control-value>0</code>
+          <span class="og-control-label-chip">Opening Height</span>
+          <code class="og-control-value" data-value>1.6</code>
         </div>
         <div class="og-control-range">
-          <input data-control-range type="range" min="-1.5" max="1.5" step="0.01" value="0" />
-          <input data-control-number type="number" min="-1.5" max="1.5" step="0.01" value="0" />
+          <input data-range type="range" min="0.8" max="2.4" step="0.05" value="1.6" />
+          <input data-number type="number" min="0.8" max="2.4" step="0.05" value="1.6" />
         </div>
       </label>
-      <label class="og-control-row" data-control-key="showOperandA" data-control-type="boolean">
+
+      <label class="og-control-row" data-control="sill">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Operand A</span>
+          <span class="og-control-label-chip">Sill Height</span>
+          <code class="og-control-value" data-value>0.55</code>
         </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
+        <div class="og-control-range">
+          <input data-range type="range" min="0" max="1.2" step="0.05" value="0.55" />
+          <input data-number type="number" min="0" max="1.2" step="0.05" value="0.55" />
         </div>
-      </label>
-      <label class="og-control-row" data-control-key="showOperandB" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Operand B</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="showResult" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Result</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Visible</span>
-        </div>
-      </label>
-      <label class="og-control-row" data-control-key="resultColor" data-control-type="color">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Result Color</span>
-        </div>
-        <input data-control-color type="color" class="og-control-color" value="#14b8a6" />
       </label>
     </aside>
+
     <div id="app"></div>
+
     <script type="module">
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Vector3, createBooleanExample } from "@og-three";
+      import { OpenGeometry, Polygon, Vector3 } from "@og-three";
 
       const app = document.getElementById("app");
-      const summary = document.querySelector("[data-summary]");
-      const metrics = document.querySelector("[data-metrics]");
+      if (!app) {
+        throw new Error("Missing #app container");
+      }
 
-      let scene;
-      let camera;
-      let renderer;
-      let controls;
-      let currentExample = null;
-      let rebuildQueued = false;
       const config = {
-        operation: "subtraction",
-        outline: true,
-        fatOutlines: true,
-        outlineWidth: 3,
-        operandBX: 0,
-        operandBZ: 0,
-        showOperandA: true,
-        showOperandB: true,
-        showResult: true,
-        resultColor: "#14b8a6",
+        wallHeight: 2.8,
+        openingWidth: 1.4,
+        openingHeight: 1.6,
+        sillHeight: 0.55,
       };
 
-      function parseColor(color) {
-        return Number.parseInt(color.replace("#", "0x"), 16);
+      let scene = null;
+      let currentGroup = null;
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
       }
 
-      function scheduleRebuild() {
-        if (rebuildQueued) return;
-        rebuildQueued = true;
-        requestAnimationFrame(() => {
-          rebuildQueued = false;
-          rebuildExample();
-        });
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
       }
 
-      function rebuildExample() {
-        if (!scene) return;
-        if (currentExample?.group) {
-          scene.remove(currentExample.group);
-          disposeObject(currentExample.group);
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
+
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
         }
 
-        currentExample = createBooleanExample(config.operation, {
-          mode: "extruded",
-          outline: config.outline,
-          fatOutlines: config.fatOutlines,
-          outlineWidth: config.outlineWidth,
-          color: parseColor(config.resultColor),
-          extrudedOffset: new Vector3(config.operandBX, 0, config.operandBZ),
-        });
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
+          }
 
-        console.log("Example report:", currentExample);
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
 
-        currentExample.lhs.visible = config.showOperandA;
-        currentExample.rhs.visible = config.showOperandB;
-        currentExample.result.visible = config.showResult;
-        summary.textContent = `${currentExample.title}. ${currentExample.description}`;
-
-        const report = currentExample.result.report;
-        metrics.textContent = report
-          ? `Faces ${report.output_face_count}, shells ${report.output_shell_count}, empty ${report.empty ? "yes" : "no"}`
-          : "Result metrics unavailable.";
-
-        scene.add(currentExample.group);
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
       }
 
       function disposeObject(object) {
         object.traverse((child) => {
-          if (child.geometry) {
-            child.geometry.dispose();
-          }
+          child.geometry?.dispose?.();
           if (Array.isArray(child.material)) {
-            child.material.forEach((material) => material.dispose());
-          } else if (child.material) {
-            child.material.dispose();
+            child.material.forEach((material) => material?.dispose?.());
+            return;
           }
+          child.material?.dispose?.();
         });
       }
 
-      function updateVisibility() {
-        if (!currentExample) return;
-        currentExample.lhs.visible = config.showOperandA;
-        currentExample.rhs.visible = config.showOperandB;
-        currentExample.result.visible = config.showResult;
-      }
+      function rebuildExample() {
+        if (!scene) {
+          return;
+        }
 
-      function formatControlNumber(value) {
-        return Number(value).toFixed(2).replace(/\.?0+$/, "");
-      }
+        if (currentGroup) {
+          scene.remove(currentGroup);
+          disposeObject(currentGroup);
+        }
 
-      function setUIControls() {
-        document.querySelectorAll("[data-control-key]").forEach((control) => {
-          const key = control.getAttribute("data-control-key");
-          const type = control.getAttribute("data-control-type");
-
-          if (type === "select") {
-            const selectInput = control.querySelector("[data-control-select]");
-
-            const setValue = (value) => {
-              config[key] = value;
-              selectInput.value = value;
-              scheduleRebuild();
-            };
-
-            selectInput.value = config[key];
-            selectInput.addEventListener("change", () => setValue(selectInput.value));
-          }
-
-          if (type === "number") {
-            const rangeInput = control.querySelector("[data-control-range]");
-            const numberInput = control.querySelector("[data-control-number]");
-            const valueDisplay = control.querySelector("[data-control-value]");
-
-            const setValue = (raw) => {
-              config[key] = Number(raw);
-              rangeInput.value = raw;
-              numberInput.value = raw;
-              valueDisplay.textContent = formatControlNumber(raw);
-              scheduleRebuild();
-            };
-
-            rangeInput.addEventListener("input", () => setValue(rangeInput.value));
-            numberInput.addEventListener("input", () => setValue(numberInput.value));
-          }
-
-          if (type === "boolean") {
-            const toggleInput = control.querySelector("[data-control-toggle]");
-            const state = control.querySelector("[data-control-bool-state]");
-
-            const setValue = (checked) => {
-              config[key] = checked;
-              toggleInput.checked = checked;
-
-              const isStyleControl = key === "outline" || key === "fatOutlines";
-              state.textContent = checked
-                ? (isStyleControl ? "Enabled" : "Visible")
-                : (isStyleControl ? "Disabled" : "Hidden");
-
-              if (isStyleControl) {
-                scheduleRebuild();
-                return;
-              }
-
-              updateVisibility();
-            };
-
-            toggleInput.addEventListener("change", () => setValue(toggleInput.checked));
-          }
-
-          if (type === "color") {
-            const colorInput = control.querySelector("[data-control-color]");
-            colorInput.addEventListener("input", () => {
-              config[key] = colorInput.value;
-              scheduleRebuild();
-            });
-          }
+        const wallProfile = new Polygon({
+          vertices: [
+            new Vector3(-2.2, 0, -0.18),
+            new Vector3(2.2, 0, -0.18),
+            new Vector3(2.2, 0, 0.18),
+            new Vector3(-2.2, 0, 0.18),
+          ],
+          color: 0x60a5fa,
+          outlineWidth: 2,
         });
+        const openingProfile = new Polygon({
+          vertices: [
+            new Vector3(-config.openingWidth * 0.5, 0, -0.26),
+            new Vector3(config.openingWidth * 0.5, 0, -0.26),
+            new Vector3(config.openingWidth * 0.5, 0, 0.26),
+            new Vector3(-config.openingWidth * 0.5, 0, 0.26),
+          ],
+          color: 0xf97316,
+          outlineWidth: 2,
+        });
+
+        const wall = wallProfile.extrude(config.wallHeight);
+        wall.outline = true;
+
+        const opening = openingProfile.extrude(config.openingHeight);
+        opening.outline = true;
+        opening.setPlacement({
+          translation: new Vector3(0, config.sillHeight, 0),
+        });
+
+        const result = wall.subtract(opening, {
+          outline: true,
+          outlineWidth: 2,
+          kernel: {
+            mergeCoplanarFaces: true,
+          },
+        });
+
+        wall.position.x = -4;
+        opening.position.x = -4;
+        result.position.x = 4;
+
+        currentGroup = new THREE.Group();
+        currentGroup.add(wall);
+        currentGroup.add(opening);
+        currentGroup.add(result);
+        scene.add(currentGroup);
+
+        console.groupCollapsed("[boolean-extruded] rebuilt");
+        console.log("Config", { ...config });
+        console.log("Report", result.report);
+        console.groupEnd();
       }
 
       async function main() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0xeef2ff);
 
-        camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 4000);
-        camera.position.set(6.0, 4.6, 6.8);
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        camera.position.set(11.5, 6.8, 12.5);
 
-        renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
 
-        controls = new OrbitControls(camera, renderer.domElement);
+        const stats = mountStats();
+        const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(0, 0.8, 0);
+        controls.target.set(0, 1.6, 0);
         controls.update();
 
-        scene.add(new THREE.GridHelper(28, 28, 0x4460ff, 0xd5ddff));
-        scene.add(new THREE.AmbientLight(0xffffff, 0.74));
+        scene.add(new THREE.GridHelper(30, 30, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.82));
 
-        const key = new THREE.DirectionalLight(0xffffff, 0.94);
-        key.position.set(6, 9, 5);
-        scene.add(key);
-
-        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
-        fill.position.set(-6, 4, -6);
-        scene.add(fill);
+        const light = new THREE.DirectionalLight(0xffffff, 1.15);
+        light.position.set(7, 9, 5);
+        scene.add(light);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        attachNumberControl("wall-height", (value) => {
+          config.wallHeight = value;
+          rebuildExample();
+        });
+        attachNumberControl("opening-width", (value) => {
+          config.openingWidth = value;
+          rebuildExample();
+        });
+        attachNumberControl("opening-height", (value) => {
+          config.openingHeight = value;
+          rebuildExample();
+        });
+        attachNumberControl("sill", (value) => {
+          config.sillHeight = value;
+          rebuildExample();
+        });
+
         rebuildExample();
-        setUIControls();
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
 
         window.addEventListener("resize", () => {
           camera.aspect = window.innerWidth / window.innerHeight;
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight);
         });
-
-        renderer.setAnimationLoop(() => {
-          controls.update();
-          renderer.render(scene, camera);
-        });
       }
 
-      main().catch((error) => {
-        console.error(error);
-        summary.textContent = error instanceof Error ? error.message : String(error);
-      });
+      void main();
     </script>
   </body>
 </html>

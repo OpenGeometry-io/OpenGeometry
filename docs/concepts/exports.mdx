@@ -11,6 +11,13 @@ OpenGeometry supports both 2D and 3D export workflows:
   as PDF in native builds
 - **3D interchange**: export B-Reps or scenes to STL, STEP, or IFC
 
+For Three.js applications, a common public workflow looks like this:
+
+1. Build geometry with wrapper classes such as `Cuboid`, `Opening`, `Polygon`, `Solid`, or boolean
+   results.
+2. Serialize the resulting B-Rep payload.
+3. Export that single B-Rep directly, or add it to `OGSceneManager` and export a named scene.
+
 ## Runtime differences
 
 ### Browser/WASM
@@ -35,6 +42,15 @@ Scene exports accept an optional `config_json` string:
 - If `config_json` is omitted, `null`, `undefined`, or an empty string, OpenGeometry uses defaults.
 - If you provide `config_json`, the payload must deserialize into the full config struct. Missing
   required fields cause an error. If you want defaults, omit the config entirely.
+
+For wrapper-first code, prefer serialized accessors when available:
+
+- `getBrepSerialized()`
+- `getBrepData()`
+- `getBrep()`
+
+`BooleanResult` follows the same pattern and can be exported directly after a union, intersection,
+or subtraction.
 
 ## Experimental status
 

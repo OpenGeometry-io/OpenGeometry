@@ -1,197 +1,161 @@
 ---
 title: 'Scene Graph'
-description: 'Managing multiple geometric entities with OGScene and OGSceneManager'
+description: 'Managing named B-Rep scene snapshots with OGSceneManager'
 ---
 
-The scene graph system in OpenGeometry provides a hierarchical structure for managing collections of geometric entities. It enables organizing, manipulating, and rendering multiple BREP bodies as a cohesive scene.
+The scene graph system in OpenGeometry stores named collections of geometric entities inside the
+kernel. In public applications, `OGSceneManager` is most useful when you want to:
+
+- keep a long-lived scene snapshot in wasm
+- project a multi-entity model to 2D
+- export that model to STL, STEP, or IFC
+
+Unlike a Three.js scene, `OGSceneManager` stores **B-Rep snapshots**, not live mesh references.
 
 ## Overview
 
-The scene graph consists of two primary structures defined in `src/scenegraph.rs`:
+The scene graph consists of two primary structures defined in `main/opengeometry/src/scenegraph.rs`:
 
-- **OGScene** - A named collection of geometric entities
-- **OGSceneManager** - Manages multiple scenes and provides WASM-exposed API
+- **OGScene**: a named collection of serialized entities
+- **OGSceneManager**: the public wasm-facing manager for scenes, entities, projection, and export
 
 ## OGScene
 
-A scene is a container for geometric entities:
+A scene is a named container for entities:
 
 ```rust
 pub struct OGScene {
-    pub id: String,           // UUID identifier
-    pub name: String,         // Human-readable name
+    pub id: String,
+    pub name: String,
     pub entities: Vec<SceneEntity>,
 }
 ```
 
 ### SceneEntity
 
-Each entity in a scene wraps a BREP body:
+Each entity stores a B-Rep payload plus application-facing identifiers:
 
 ```rust
 pub struct SceneEntity {
-    pub id: String,      // Unique entity ID
-    pub kind: String,    // Type label: "Line", "Cuboid", etc.
-    pub brep: Brep,      // Underlying boundary representation
+    pub id: String,
+    pub kind: String,
+    pub brep: Brep,
 }
 ```
 
-The `kind` field identifies the primitive or shape type that generated the BREP, enabling type-aware operations.
+The `kind` field is an app-facing label. It can match the wrapper type (`"Cuboid"`, `"Solid"`,
+`"Polygon"`) but it does not have to.
 
-## Creating Scenes
+## Public workflow
 
-### Basic Scene Creation
+For Three.js applications, the public workflow is wrapper-first:
 
-```rust
-use opengeometry::scenegraph::OGScene;
+1. Create wrapper geometry such as `Cuboid`, `Solid`, `Opening`, or `Polygon`.
+2. Serialize its B-Rep payload.
+3. Add that payload to `OGSceneManager`.
+4. Project or export the stored scene.
 
-let scene = OGScene::new("My Building");
-println!("Scene ID: {}", scene.id);
-```
+```ts
+import { Cuboid, OGSceneManager, OpenGeometry, Vector3 } from "opengeometry";
 
-Scenes are automatically assigned a UUID and start with an empty entity list.
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 
-### Adding Entities
+function toBrepSerialized(source: unknown) {
+  const value =
+    source && typeof (source as { getBrepSerialized?: () => string }).getBrepSerialized === "function"
+      ? (source as { getBrepSerialized: () => string }).getBrepSerialized()
+      : source && typeof (source as { getBrepData?: () => unknown }).getBrepData === "function"
+        ? (source as { getBrepData: () => unknown }).getBrepData()
+        : source && typeof (source as { getBrep?: () => unknown }).getBrep === "function"
+          ? (source as { getBrep: () => unknown }).getBrep()
+          : source;
 
-Entities are added using the `upsert_entity` method:
-
-```rust
-use opengeometry::scenegraph::SceneEntity;
-use opengeometry::brep::Brep;
-use uuid::Uuid;
-
-let mut scene = OGScene::new("Test Scene");
-
-let entity = SceneEntity {
-    id: Uuid::new_v4().to_string(),
-    kind: "Cuboid".to_string(),
-    brep: cuboid.brep().clone(),
-};
-
-scene.upsert_entity(entity);
-```
-
-**Upsert behavior:**
-- If entity ID exists → replaces existing entity
-- If entity ID is new → appends to entity list
-
-### Removing Entities
-
-```rust
-let removed = scene.remove_entity("entity-uuid");
-if removed {
-    println!("Entity removed");
+  return typeof value === "string" ? value : JSON.stringify(value);
 }
+
+const manager = new OGSceneManager();
+const sceneId = manager.createScene("Building");
+
+const cuboid = new Cuboid({
+  center: new Vector3(0, 1.5, 0),
+  width: 5,
+  height: 3,
+  depth: 2,
+  color: 0x10b981,
+});
+
+manager.addBrepEntityToScene(sceneId, "box-1", "Cuboid", toBrepSerialized(cuboid));
 ```
 
-Returns `true` if entity was found and removed, `false` otherwise.
+## Scene lifecycle
 
-## OGSceneManager
+### createScene()
 
-The scene manager provides a stateful API for working with multiple scenes:
-
-```rust
-pub struct OGSceneManager {
-    scenes: HashMap<String, OGScene>,
-    current_scene_id: Option<String>,
-}
+```ts
+const sceneId = manager.createScene("Floor Plan");
 ```
 
-### Creating Scenes
+### setCurrentScene() / getCurrentSceneId()
 
-```rust
-let mut manager = OGSceneManager::new();
-let scene_id = manager.create_scene_internal("Floor Plan");
+```ts
+manager.setCurrentScene(sceneId);
+const currentSceneId = manager.getCurrentSceneId();
 ```
 
-The newly created scene automatically becomes the current scene.
+### listScenes()
 
-### Managing Active Scene
+Returns a JSON array of scene summaries.
 
-```rust
-// Set current scene
-manager.set_current_scene(scene_id)?;
-
-// Get current scene ID
-if let Some(id) = manager.get_current_scene_id() {
-    println!("Current scene: {}", id);
-}
+```ts
+const summaries = JSON.parse(manager.listScenes());
 ```
 
-### Removing Scenes
+### removeScene()
 
-```rust
-let removed = manager.remove_scene(scene_id);
+```ts
+const removed = manager.removeScene(sceneId);
 ```
 
-If the removed scene was current, the manager automatically selects another scene as current.
+## Entity management
 
-## Adding Entities to Scenes
+### addBrepEntityToScene() / addBrepEntityToCurrentScene()
 
-The scene manager provides convenience methods for adding primitives:
+These are the most general public entity entrypoints:
 
-### From BREP
-
-```rust
-manager.add_brep_entity_to_scene_internal(
-    &scene_id,
-    "wall-1",
-    "CustomShape",
-    &brep
-)?;
+```ts
+manager.addBrepEntityToScene(sceneId, "wall-1", "Cuboid", toBrepSerialized(cuboid));
+manager.addBrepEntityToCurrentScene("wall-2", "Cuboid", toBrepSerialized(cuboid));
 ```
 
-### From Primitives
+### replace / refresh helpers
 
-```rust
-use opengeometry::primitives::cuboid::OGCuboid;
-use openmaths::Vector3;
+When you want to overwrite an existing entity ID, these helpers are also available:
 
-let mut cuboid = OGCuboid::new("box-1".to_string());
-cuboid
-    .set_config(Vector3::new(0.0, 0.0, 0.0), 1.0, 2.0, 3.0)
-    .unwrap();
+- `replaceBrepEntityInScene(...)`
+- `replaceBrepEntityInCurrentScene(...)`
+- `refreshBrepEntityInScene(...)`
+- `refreshBrepEntityInCurrentScene(...)`
 
-manager.add_cuboid_to_scene_internal(&scene_id, "box-1", &cuboid)?;
-```
+They all keep the same public idea: update a stored scene entity using a serialized B-Rep payload.
 
-Supported primitives:
-- `add_line_to_scene_internal`
-- `add_polyline_to_scene_internal`
-- `add_arc_to_scene_internal`
-- `add_rectangle_to_scene_internal`
-- `add_polygon_to_scene_internal`
-- `add_cuboid_to_scene_internal`
-- `add_cylinder_to_scene_internal`
-- `add_sphere_to_scene_internal`
-- `add_wedge_to_scene_internal`
+### Primitive-specific add helpers
 
-Each method:
-1. Extracts the BREP from the primitive
-2. Creates a SceneEntity with appropriate `kind`
-3. Adds to the specified scene
+`OGSceneManager` also exposes typed add helpers such as:
 
-## Scene to BREP Relationship
+- `addLineToScene(...)`
+- `addPolylineToScene(...)`
+- `addArcToScene(...)`
+- `addRectangleToScene(...)`
+- `addPolygonToScene(...)`
+- `addCuboidToScene(...)`
+- `addCylinderToScene(...)`
+- `addSphereToScene(...)`
+- `addWedgeToScene(...)`
 
-Every entity in a scene contains a complete BREP representation:
+These are handy when you are already working with lower-level kernel objects. For wrapper-first
+apps, `addBrepEntityToScene(...)` is usually the most consistent approach.
 
-```
-OGScene
-  └─ SceneEntity ("wall-1")
-       ├─ kind: "Cuboid"
-       └─ brep: Brep { vertices, halfedges, edges, loops, faces, wires, shells }
-  └─ SceneEntity ("window-1")
-       ├─ kind: "Rectangle" 
-       └─ brep: Brep { vertices, halfedges, edges, loops, faces, wires, shells }
-```
-
-This design means:
-- Each entity is self-contained
-- No shared vertex/edge pools between entities
-- Easy to add/remove entities without topology updates
-- Straightforward serialization
-
-## 2D Projection
+## Projection and export
 
 Scenes can be projected to 2D with hidden line removal:
 
@@ -199,170 +163,48 @@ Scenes can be projected to 2D with hidden line removal:
 2D projection and hidden line removal are experimental. Output and options may change.
 </Warning>
 
-```rust
-use opengeometry::export::{CameraParameters, HlrOptions};
-
-let camera = CameraParameters::default();
-let hlr = HlrOptions::default();
-
-let scene_2d = scene.project_to_2d(&camera, &hlr);
-```
-
-This projects all entities in the scene and combines them into a single 2D representation.
-
-### Via Scene Manager
-
-```rust
-let scene_2d = manager.project_scene_to_2d(
-    &scene_id,
-    &camera,
-    &hlr
-)?;
-
-// Or as JSON
-let json = manager.project_scene_to_2d_json(&scene_id, &camera, &hlr)?;
-```
-
-## WASM API
-
-The `OGSceneManager` is exposed to JavaScript via `wasm-bindgen`:
-
 ```typescript
-import { OpenGeometry, Cuboid, OGSceneManager, Vector3 } from 'opengeometry';
-
-await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
-
-function toBrepSerialized(source) {
-  const value =
-    source && typeof source.getBrepSerialized === "function"
-      ? source.getBrepSerialized()
-      : source && typeof source.getBrepData === "function"
-        ? source.getBrepData()
-        : source && typeof source.getBrep === "function"
-          ? source.getBrep()
-          : source;
-
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-const manager = new OGSceneManager();
-
-// Create scene
-const sceneId = manager.createScene('My Scene');
-
-const cuboid = new Cuboid({
-  center: new Vector3(0, 0.5, 0),
-  width: 1,
-  height: 1,
-  depth: 1,
-  color: 0x10b981,
+const cameraJson = JSON.stringify({
+  position: { x: 8, y: 6, z: 8 },
+  target: { x: 0, y: 0, z: 0 },
+  up: { x: 0, y: 1, z: 0 },
+  near: 0.1,
+  projection_mode: "Orthographic",
 });
 
-// Add entity
-manager.addBrepEntityToScene(sceneId, 'box-1', 'Cuboid', toBrepSerialized(cuboid));
+const hlrJson = JSON.stringify({
+  hide_hidden_edges: true,
+});
 
-// Project to 2D
-const cameraJson = JSON.stringify({ /* camera params */ });
-const projection = manager.projectTo2DCamera(sceneId, cameraJson);
+const scene2dJson = manager.projectTo2DCamera(sceneId, cameraJson, hlrJson);
+const scene2d = JSON.parse(scene2dJson);
 ```
 
-### WASM Methods
+The same stored-scene model is used for export:
 
-**Scene Management:**
-- `createScene(name: string): string`
-- `removeScene(sceneId: string): boolean`
-- `setCurrentScene(sceneId: string)`
-- `getCurrentSceneId(): string | undefined`
-- `listScenes(): string` (JSON array)
-
-**Entity Management:**
-- `addBrepEntityToScene(sceneId, entityId, kind, brepJson)`
-- `addLineToScene(sceneId, entityId, line)`
-- `addCuboidToScene(sceneId, entityId, cuboid)`
-- ... (one method per primitive type)
-- `removeEntityFromScene(sceneId, entityId): boolean`
-
-**Projection:**
-- `projectTo2DCamera(sceneId, cameraJson, hlrJson): string`
-- `projectTo2DLines(sceneId, cameraJson, hlrJson): string`
-
-### Current Scene Shortcuts
-
-Many methods have variants that operate on the current scene:
-
-```typescript
-manager.addBrepEntityToCurrentScene('box-1', 'Cuboid', toBrepSerialized(cuboid));
-manager.projectCurrentTo2DCamera(cameraJson);
+```ts
+const stl = manager.exportSceneToStl(sceneId);
+const step = manager.exportSceneToStep(sceneId);
+const ifc = manager.exportSceneToIfc(sceneId);
 ```
 
-## Scene Serialization
+## Serialization and snapshots
 
-Scenes and entities are fully serializable:
+Scenes are serializable snapshots:
 
-```rust
-// Serialize scene
-let json = serde_json::to_string(&scene)?;
-
-// Via manager (WASM)
-let json = manager.get_scene_serialized(scene_id)?;
+```ts
+const sceneJson = manager.getSceneSerialized(sceneId);
+const removed = manager.removeEntityFromScene(sceneId, "box-1");
 ```
 
-Serialized format includes:
-- Scene ID and name
-- All entities with their IDs, kinds, and complete BREP data
-
-## Example: Building a Multi-Entity Scene
-
-```rust
-use opengeometry::scenegraph::OGSceneManager;
-use opengeometry::primitives::cuboid::OGCuboid;
-use opengeometry::primitives::cylinder::OGCylinder;
-use openmaths::Vector3;
-
-let mut manager = OGSceneManager::new();
-let scene_id = manager.create_scene_internal("Building");
-
-// Add foundation
-let mut foundation = OGCuboid::new("foundation".to_string());
-foundation
-    .set_config(Vector3::new(0.0, 0.25, 0.0), 10.0, 0.5, 10.0)
-    .unwrap();
-manager.add_cuboid_to_scene_internal(&scene_id, "foundation", &foundation)?;
-
-// Add columns
-for i in 0..4 {
-    let mut column = OGCylinder::new(format!("column-{}", i));
-    let x = if i % 2 == 0 { -4.0 } else { 4.0 };
-    let z = if i < 2 { -4.0 } else { 4.0 };
-    column
-        .set_config(
-            Vector3::new(x, 1.5, z),
-            0.3,
-            3.0,
-            std::f64::consts::PI * 2.0,
-            32,
-        )
-        .unwrap();
-
-    let id = format!("column-{}", i);
-    manager.add_cylinder_to_scene_internal(&scene_id, &id, &column)?;
-}
-
-println!("{}", manager.get_scene_serialized(scene_id.clone()).unwrap());
-```
-
-## Performance Considerations
-
-- **Entity lookup**: O(n) search by ID (consider HashMap for large scenes)
-- **BREP cloning**: Each add operation clones the BREP
-- **Projection**: All entities processed together, efficient for batch operations
-- **Serialization**: Full scene serialization can be expensive for large models
+This makes `OGSceneManager` useful for export pipelines, collaboration snapshots, and derived 2D
+documents, but it also means scene entities are not live references back to your Three.js meshes.
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="BREP Structure" icon="cube" href="/concepts/brep">
-    Learn about the entity data structure
+  <Card title="Scene Management" icon="sitemap" href="/api/scene/scene-management">
+    See the public OGSceneManager API
   </Card>
   <Card title="Projection" icon="film-simple" href="/api/export/projection">
     Understand 2D projection and hidden line removal

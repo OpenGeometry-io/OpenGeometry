@@ -359,10 +359,10 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Arc</h3>
             </div>
-            <p class="og-card-desc">Circular arc with span and segment controls.</p>
+            <p class="og-card-desc">Circular arc with direct radius, start, end, and segment controls.</p>
             <div class="og-tag-row">
               <span class="og-tag">Radius</span>
-              <span class="og-tag">Span</span>
+              <span class="og-tag">Angles</span>
             </div>
             <a class="og-open" href="./primitives/arc.html">Open example</a>
           </article>
@@ -370,10 +370,10 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Curve</h3>
             </div>
-            <p class="og-card-desc">Control-point curve for route and profile sketching.</p>
+            <p class="og-card-desc">Control-point curve example with direct edits to the inner control points.</p>
             <div class="og-tag-row">
-              <span class="og-tag">Sag</span>
-              <span class="og-tag">Lift</span>
+              <span class="og-tag">Control Points</span>
+              <span class="og-tag">Curve</span>
             </div>
             <a class="og-open" href="./primitives/curve.html">Open example</a>
           </article>
@@ -381,10 +381,10 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Line</h3>
             </div>
-            <p class="og-card-desc">Two-point line primitive with direct endpoint control.</p>
+            <p class="og-card-desc">Two-point line primitive with direct start and end point controls.</p>
             <div class="og-tag-row">
-              <span class="og-tag">Length</span>
-              <span class="og-tag">Angle</span>
+              <span class="og-tag">Start</span>
+              <span class="og-tag">End</span>
             </div>
             <a class="og-open" href="./primitives/line.html">Open example</a>
           </article>
@@ -392,10 +392,10 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Polyline</h3>
             </div>
-            <p class="og-card-desc">Open and closed path definitions for profile work.</p>
+            <p class="og-card-desc">Ordered point-list polyline example with direct edits to the inner points.</p>
             <div class="og-tag-row">
-              <span class="og-tag">Closure</span>
-              <span class="og-tag">Span</span>
+              <span class="og-tag">Points</span>
+              <span class="og-tag">Path</span>
             </div>
             <a class="og-open" href="./primitives/polyline.html">Open example</a>
           </article>
@@ -434,7 +434,7 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Cuboid Placement</h3>
             </div>
-            <p class="og-card-desc">Placement audit page for cuboid mesh, outline, geometry, and BRep alignment.</p>
+            <p class="og-card-desc">Focused placement example for translation, rotation, and scale on one cuboid.</p>
             <div class="og-tag-row">
               <span class="og-tag">Translation</span>
               <span class="og-tag">Rotation</span>
@@ -468,10 +468,10 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Polygon</h3>
             </div>
-            <p class="og-card-desc">Planar polygon triangulation for surfaces and slabs.</p>
+            <p class="og-card-desc">Polygon face example with direct profile changes and an optional hole.</p>
             <div class="og-tag-row">
-              <span class="og-tag">Sides</span>
-              <span class="og-tag">Radius</span>
+              <span class="og-tag">Vertices</span>
+              <span class="og-tag">Holes</span>
             </div>
             <a class="og-open" href="./shapes/polygon.html">Open example</a>
           </article>
@@ -490,10 +490,10 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Sweep</h3>
             </div>
-            <p class="og-card-desc">Profile along path sweep for framing and custom sections.</p>
+            <p class="og-card-desc">Sweep solid built from a visible path and a simple profile.</p>
             <div class="og-tag-row">
               <span class="og-tag">Path</span>
-              <span class="og-tag">Caps</span>
+              <span class="og-tag">Profile</span>
             </div>
             <a class="og-open" href="./shapes/sweep.html">Open example</a>
           </article>
@@ -514,14 +514,14 @@
       <section id="operations" class="og-section-card">
         <div class="og-section-head">
           <h2 class="og-section-title"><a href="#operations" class="og-anchor">Operations</a></h2>
-          <p class="og-section-count">8 core demos</p>
+          <p class="og-section-count">9 core demos</p>
         </div>
         <div class="og-grid">
           <article class="og-example-card">
             <div class="og-card-top">
               <h3 class="og-card-title">Boolean Operations</h3>
             </div>
-            <p class="og-card-desc">Solid union, intersection, and subtraction in one selector-driven page.</p>
+            <p class="og-card-desc">Solid union, intersection, and subtraction with inputs on the left and the result on the right.</p>
             <div class="og-tag-row">
               <span class="og-tag">Solid</span>
               <span class="og-tag">Select</span>
@@ -554,7 +554,7 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Parametric and Freeform</h3>
             </div>
-            <p class="og-card-desc">Shows native config and placement edits first, then explicit freeform conversion.</p>
+            <p class="og-card-desc">Start parametric, convert to freeform, then push-pull one face on the copy.</p>
             <div class="og-tag-row">
               <span class="og-tag">Parametric</span>
               <span class="og-tag">Freeform</span>
@@ -572,12 +572,22 @@
             </div>
             <a class="og-open" href="./operations/offset.html">Open example</a>
           </article>
-          <!-- STEP Export is temporarily hidden from the catalog until the example is fixed. -->
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">STEP Export</h3>
+            </div>
+            <p class="og-card-desc">Single-shape STEP export workflow with direct download.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">STEP</span>
+              <span class="og-tag">Export</span>
+            </div>
+            <a class="og-open" href="./operations/step-export.html">Open example</a>
+          </article>
           <article class="og-example-card">
             <div class="og-card-top">
               <h3 class="og-card-title">STL Export</h3>
             </div>
-            <p class="og-card-desc">Binary STL export workflow with direct download.</p>
+            <p class="og-card-desc">Single-shape binary STL export workflow with direct download.</p>
             <div class="og-tag-row">
               <span class="og-tag">STL</span>
               <span class="og-tag">Export</span>
@@ -588,7 +598,7 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Sweep Path + Profile</h3>
             </div>
-            <p class="og-card-desc">Operation-level sweep assembled from primitive inputs.</p>
+            <p class="og-card-desc">Sweep example that keeps both the path and profile easy to follow.</p>
             <div class="og-tag-row">
               <span class="og-tag">Path</span>
               <span class="og-tag">Profile</span>
@@ -599,7 +609,7 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Wall from Offsets</h3>
             </div>
-            <p class="og-card-desc">Composite wall profile assembled from offset centerlines.</p>
+            <p class="og-card-desc">Build a wall solid from one centerline and its two offsets.</p>
             <div class="og-tag-row">
               <span class="og-tag">Wall</span>
               <span class="og-tag">Offsets</span>

@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="OpenGeometry example showing parametric object editing and explicit freeform conversion."
+      content="Simple OpenGeometry parametric to freeform example for Three.js."
     />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
@@ -15,126 +15,162 @@
       <a href="../index.html" class="og-badge-title-link">Back</a>
       <span class="og-badge-title">Parametric and Freeform</span>
     </div>
-    <aside class="og-controls" data-control-panel>
-      <h3>Try the Flow</h3>
+
+    <aside class="og-controls">
+      <h3>Guided Flow</h3>
       <p class="og-control-summary">
-        Start with parametric edits on the blue polygon and green cuboid. Then convert the cuboid
-        into a separate orange freeform copy and test one-face cuts, loop cuts, and push-pull on that copy.
+        Start with the blue parametric cuboid. Resize it, convert it to a freeform copy, then
+        push-pull the top face on the orange copy.
       </p>
+
       <div class="og-control-row">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Polygon</span>
-          <code class="og-control-value" data-polygon-mode>parametric</code>
+          <span class="og-control-label-chip">Status</span>
+          <code class="og-control-value" data-status>ready</code>
         </div>
-        <p class="og-control-summary" data-polygon-summary>Loading polygon capabilities...</p>
-        <button class="og-control-action og-control-action-cyan" data-action="polygon-parametric">
-          Edit Polygon Parametric
-        </button>
-      </div>
-      <div class="og-control-row">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Cuboid</span>
-          <code class="og-control-value" data-cuboid-mode>parametric</code>
-        </div>
-        <p class="og-control-summary" data-cuboid-summary>Loading cuboid capabilities...</p>
-        <button class="og-control-action og-control-action-cyan" data-action="cuboid-parametric">
-          Resize and Rotate Cuboid
-        </button>
-      </div>
-      <div class="og-control-row">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Freeform</span>
-          <code class="og-control-value" data-freeform-mode>freeform</code>
-        </div>
-        <p class="og-control-summary" data-freeform-summary>
-          No freeform copy yet. Convert the current cuboid when you are ready.
+        <p class="og-control-summary" data-summary>
+          Click the buttons from top to bottom. The parametric cuboid stays on the left and the
+          freeform copy appears on the right.
         </p>
-        <button class="og-control-action og-control-action-amber" data-action="convert-freeform">
-          Convert Cuboid to Freeform
-        </button>
-        <button class="og-control-action og-control-action-amber" data-action="push-pull" disabled>
-          Push-Pull Freeform Top Face
-        </button>
-        <button class="og-control-action og-control-action-amber" data-action="loop-cut" disabled>
-          Loop Cut Freeform Side Ring
-        </button>
-        <button class="og-control-action og-control-action-amber" data-action="cut-face" disabled>
-          Cut One Freeform Side Face
-        </button>
       </div>
-      <div class="og-control-row">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Result</span>
-          <code class="og-control-value" data-freeform-status>ready</code>
-        </div>
-        <p class="og-control-summary" data-result-summary>
-          Use the buttons above from top to bottom. Reset returns the scene to the starting point.
-        </p>
-        <button class="og-control-action og-control-action-rose" data-action="reset">
-          Reset Demo
-        </button>
-      </div>
+
+      <button class="og-control-action og-control-action-cyan" data-action="resize">
+        Resize Parametric Cuboid
+      </button>
+      <button class="og-control-action og-control-action-amber" data-action="convert">
+        Convert to Freeform
+      </button>
+      <button class="og-control-action og-control-action-amber" data-action="push-pull" disabled>
+        Push-Pull Top Face
+      </button>
+      <button class="og-control-action og-control-action-rose" data-action="reset">
+        Reset Demo
+      </button>
     </aside>
+
     <div id="app"></div>
+
     <script type="module">
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Polygon, Cuboid, Vector3, createFreeformEditor } from "@og-three";
+      import {
+        createFreeformEditor,
+        Cuboid,
+        OpenGeometry,
+        Solid,
+        Vector3,
+      } from "@og-three";
 
       const app = document.getElementById("app");
-      const polygonMode = document.querySelector("[data-polygon-mode]");
-      const polygonSummary = document.querySelector("[data-polygon-summary]");
-      const cuboidMode = document.querySelector("[data-cuboid-mode]");
-      const cuboidSummary = document.querySelector("[data-cuboid-summary]");
-      const freeformMode = document.querySelector("[data-freeform-mode]");
-      const freeformSummary = document.querySelector("[data-freeform-summary]");
-      const resultSummary = document.querySelector("[data-result-summary]");
-      const freeformStatus = document.querySelector("[data-freeform-status]");
-      const polygonButton = document.querySelector('[data-action="polygon-parametric"]');
-      const cuboidButton = document.querySelector('[data-action="cuboid-parametric"]');
-      const convertButton = document.querySelector('[data-action="convert-freeform"]');
+      const statusNode = document.querySelector("[data-status]");
+      const summaryNode = document.querySelector("[data-summary]");
+      const resizeButton = document.querySelector('[data-action="resize"]');
+      const convertButton = document.querySelector('[data-action="convert"]');
       const pushPullButton = document.querySelector('[data-action="push-pull"]');
-      const loopCutButton = document.querySelector('[data-action="loop-cut"]');
-      const cutFaceButton = document.querySelector('[data-action="cut-face"]');
       const resetButton = document.querySelector('[data-action="reset"]');
 
-      const FREEFORM_OFFSET_X = 3.1;
-
-      function polygonBaseVertices() {
-        return [
-          new Vector3(-3.2, 0.0, -0.8),
-          new Vector3(-2.2, 0.0, 0.4),
-          new Vector3(-1.0, 0.0, 0.0),
-          new Vector3(-1.5, 0.0, -1.2),
-        ];
+      if (
+        !app ||
+        !statusNode ||
+        !summaryNode ||
+        !resizeButton ||
+        !convertButton ||
+        !pushPullButton ||
+        !resetButton
+      ) {
+        throw new Error("Missing parametric/freeform example nodes");
       }
 
-      function polygonEditedVertices() {
-        return [
-          new Vector3(-3.45, 0.0, -1.0),
-          new Vector3(-1.9, 0.0, 0.8),
-          new Vector3(-0.65, 0.0, -0.15),
-          new Vector3(-1.8, 0.0, -1.55),
-        ];
+      let scene = null;
+      let cuboid = null;
+      let freeform = null;
+      let freeformEditor = null;
+      let freeformPreview = null;
+      let parametricEdited = false;
+      let pushPullCount = 0;
+
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
       }
 
-      function summarizeCapabilities(capabilities) {
-        return [
-          `family ${capabilities.editFamily}`,
-          `config ${capabilities.canEditConfig ? "yes" : "no"}`,
-          `placement ${capabilities.canEditPlacement ? "yes" : "no"}`,
-          `convert ${capabilities.canConvertToFreeform ? "yes" : "no"}`,
-        ].join(", ");
+      function setStatus(status, summary) {
+        statusNode.textContent = status;
+        summaryNode.textContent = summary;
       }
 
-      function topFaceId(freeformEditor) {
+      function disposeObject(object) {
+        object.traverse((child) => {
+          child.geometry?.dispose?.();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((material) => material?.dispose?.());
+            return;
+          }
+          child.material?.dispose?.();
+        });
+      }
+
+      function resetCuboidState() {
+        cuboid.setConfig({
+          center: new Vector3(0, 0.75, 0),
+          width: 1.4,
+          height: 1.5,
+          depth: 1.1,
+          color: 0x2563eb,
+          outlineWidth: 2,
+        });
+        cuboid.setPlacement({
+          translation: new Vector3(-2.5, 0, 0),
+          rotation: new Vector3(0, 0, 0),
+          scale: new Vector3(1, 1, 1),
+        });
+        cuboid.outline = true;
+        parametricEdited = false;
+      }
+
+      function rebuildFreeformPreview() {
+        if (!scene) {
+          return;
+        }
+
+        if (freeformPreview) {
+          scene.remove(freeformPreview);
+          disposeObject(freeformPreview);
+          freeformPreview = null;
+        }
+
+        if (!freeform) {
+          pushPullButton.disabled = true;
+          return;
+        }
+
+        freeformPreview = new Solid({
+          brep: freeform,
+          color: 0xf97316,
+          outlineWidth: 2,
+          translation: new Vector3(2.7, 0, 0),
+        });
+        freeformPreview.outline = true;
+        scene.add(freeformPreview);
+        pushPullButton.disabled = false;
+      }
+
+      function findTopFaceId(editor) {
         let bestFaceId = null;
         let bestY = Number.NEGATIVE_INFINITY;
 
-        for (const face of freeformEditor.getTopologyRenderData().faces) {
-          const info = freeformEditor.getFaceInfo(face.face_id);
+        for (const face of editor.getTopologyRenderData().faces) {
+          const info = editor.getFaceInfo(face.face_id);
           if (info.centroid.y > bestY) {
             bestY = info.centroid.y;
             bestFaceId = face.face_id;
@@ -144,547 +180,148 @@
         return bestFaceId;
       }
 
-      function previewVerticalEdgeId(freeformEditor) {
-        let bestEdgeId = null;
-        let bestScore = Number.NEGATIVE_INFINITY;
+      function resizeParametricCuboid() {
+        cuboid.setConfig({
+          center: new Vector3(0, 0.95, 0),
+          width: 1.9,
+          height: 1.9,
+          depth: 1.25,
+          color: 0x2563eb,
+          outlineWidth: 2,
+        });
+        cuboid.setPlacement({
+          translation: new Vector3(-2.5, 0, 0),
+          rotation: new Vector3(0, Math.PI / 7, 0),
+          scale: new Vector3(1, 1, 1),
+        });
+        cuboid.outline = true;
+        parametricEdited = true;
 
-        for (const edge of freeformEditor.getTopologyRenderData().edges) {
-          const info = freeformEditor.getEdgeInfo(edge.edge_id);
-          const dx = Math.abs(info.end.x - info.start.x);
-          const dy = Math.abs(info.end.y - info.start.y);
-          const dz = Math.abs(info.end.z - info.start.z);
+        console.groupCollapsed("[editor-modes] parametric edit");
+        console.log("Cuboid config", cuboid.getConfig());
+        console.log("Placement", cuboid.getPlacement());
+        console.groupEnd();
 
-          if (dy < 0.2 || dx > 1.0e-4 || dz > 1.0e-4) {
-            continue;
-          }
-
-          const averageX = (info.start.x + info.end.x) * 0.5;
-          const averageZ = (info.start.z + info.end.z) * 0.5;
-          const score = averageZ * 2.0 + averageX;
-
-          if (score > bestScore) {
-            bestScore = score;
-            bestEdgeId = edge.edge_id;
-          }
-        }
-
-        return bestEdgeId;
-      }
-
-      function singleSideFaceCutSelection(freeformEditor) {
-        let chosenFace = null;
-        let bestScore = Number.NEGATIVE_INFINITY;
-
-        for (const face of freeformEditor.getTopologyRenderData().faces) {
-          const faceInfo = freeformEditor.getFaceInfo(face.face_id);
-          const faceCapabilities = freeformEditor.getFaceEditCapabilities(face.face_id);
-          if (!faceCapabilities.canCutFace || Math.abs(faceInfo.normal.y) > 0.2) {
-            continue;
-          }
-
-          const score = faceInfo.centroid.x * 2.0 + faceInfo.centroid.z;
-          if (score > bestScore) {
-            bestScore = score;
-            chosenFace = faceInfo;
-          }
-        }
-
-        if (!chosenFace) {
-          return null;
-        }
-
-        const verticalEdges = chosenFace.edge_ids
-          .map((edgeId) => freeformEditor.getEdgeInfo(edgeId))
-          .filter((edgeInfo) => {
-            const dx = Math.abs(edgeInfo.end.x - edgeInfo.start.x);
-            const dy = Math.abs(edgeInfo.end.y - edgeInfo.start.y);
-            const dz = Math.abs(edgeInfo.end.z - edgeInfo.start.z);
-            return dy > 0.2 && dy > dx && dy > dz;
-          });
-
-        if (verticalEdges.length < 2) {
-          return null;
-        }
-
-        let bestPair = null;
-        let bestDistance = Number.NEGATIVE_INFINITY;
-        for (let leftIndex = 0; leftIndex < verticalEdges.length - 1; leftIndex += 1) {
-          for (let rightIndex = leftIndex + 1; rightIndex < verticalEdges.length; rightIndex += 1) {
-            const left = verticalEdges[leftIndex];
-            const right = verticalEdges[rightIndex];
-            const leftMid = new Vector3(
-              (left.start.x + left.end.x) * 0.5,
-              (left.start.y + left.end.y) * 0.5,
-              (left.start.z + left.end.z) * 0.5
-            );
-            const rightMid = new Vector3(
-              (right.start.x + right.end.x) * 0.5,
-              (right.start.y + right.end.y) * 0.5,
-              (right.start.z + right.end.z) * 0.5
-            );
-
-            const dx = rightMid.x - leftMid.x;
-            const dz = rightMid.z - leftMid.z;
-            const distance = dx * dx + dz * dz;
-            if (distance > bestDistance) {
-              bestDistance = distance;
-              bestPair = {
-                faceId: chosenFace.face_id,
-                startEdgeId: left.edge_id,
-                endEdgeId: right.edge_id,
-              };
-            }
-          }
-        }
-
-        return bestPair;
-      }
-
-      function flattenTopologyEdgePositions(topologyRenderData) {
-        const positions = [];
-        for (const edge of topologyRenderData.edges) {
-          positions.push(...edge.positions);
-        }
-        return positions;
-      }
-
-      function createFreeformPreview(
-        serializedGeometry,
-        serializedOutlineGeometry,
-        topologyRenderData,
-        color
-      ) {
-        const surfacePositions = JSON.parse(serializedGeometry);
-        const outlinePositions = JSON.parse(serializedOutlineGeometry);
-        const topologyEdgePositions = flattenTopologyEdgePositions(topologyRenderData);
-
-        const surfaceGeometry = new THREE.BufferGeometry();
-        surfaceGeometry.setAttribute(
-          "position",
-          new THREE.Float32BufferAttribute(surfacePositions, 3)
+        setStatus(
+          "parametric",
+          "The blue cuboid was edited through its normal config and placement API. Convert it now if you want direct face editing."
         );
-        surfaceGeometry.computeVertexNormals();
-        surfaceGeometry.computeBoundingSphere();
-
-        const surfaceMaterial = new THREE.MeshStandardMaterial({
-          color,
-          transparent: true,
-          opacity: 0.78,
-          side: THREE.DoubleSide,
-          polygonOffset: true,
-          polygonOffsetFactor: 1,
-          polygonOffsetUnits: 1,
-        });
-
-        const surfaceMesh = new THREE.Mesh(surfaceGeometry, surfaceMaterial);
-        const preview = new THREE.Group();
-        preview.add(surfaceMesh);
-
-        if (topologyEdgePositions.length > 0) {
-          const topologyGeometry = new THREE.BufferGeometry();
-          topologyGeometry.setAttribute(
-            "position",
-            new THREE.Float32BufferAttribute(topologyEdgePositions, 3)
-          );
-
-          const topologyEdges = new THREE.LineSegments(
-            topologyGeometry,
-            new THREE.LineBasicMaterial({
-              color: 0x111827,
-              transparent: true,
-              opacity: 0.45,
-            })
-          );
-          preview.add(topologyEdges);
-        }
-
-        if (outlinePositions.length > 0) {
-          const outlineGeometry = new THREE.BufferGeometry();
-          outlineGeometry.setAttribute(
-            "position",
-            new THREE.Float32BufferAttribute(outlinePositions, 3)
-          );
-
-          const outline = new THREE.LineSegments(
-            outlineGeometry,
-            new THREE.LineBasicMaterial({
-              color: 0x111827,
-              transparent: true,
-              opacity: 0.88,
-            })
-          );
-          preview.add(outline);
-        }
-
-        return preview;
       }
 
-      function disposeObject(object) {
-        object.traverse((child) => {
-          if (child.geometry) {
-            child.geometry.dispose();
-          }
-          if (Array.isArray(child.material)) {
-            child.material.forEach((material) => material.dispose());
-          } else if (child.material) {
-            child.material.dispose();
-          }
-        });
+      function convertToFreeform() {
+        freeform = cuboid.toFreeform(`${cuboid.ogid}-freeform`);
+        freeformEditor = createFreeformEditor(freeform);
+        pushPullCount = 0;
+        rebuildFreeformPreview();
+
+        console.groupCollapsed("[editor-modes] converted");
+        console.log("Parametric edited", parametricEdited);
+        console.log("Freeform id", freeform.getId());
+        console.groupEnd();
+
+        setStatus(
+          "converted",
+          "The orange freeform copy was created from the current cuboid state. The blue cuboid is still parametric."
+        );
       }
 
-      function offsetFreeformForPreview(freeformGeometry) {
-        const placement = freeformGeometry.getPlacement();
-        freeformGeometry.setPlacement({
-          anchor: placement.anchor.clone(),
-          translation: new Vector3(
-            placement.translation.x + FREEFORM_OFFSET_X,
-            placement.translation.y,
-            placement.translation.z
-          ),
-          rotation: placement.rotation.clone(),
-          scale: placement.scale.clone(),
+      function pushPullTopFace() {
+        if (!freeformEditor) {
+          return;
+        }
+
+        const faceId = findTopFaceId(freeformEditor);
+        if (faceId === null) {
+          setStatus("error", "Could not find a top face on the freeform copy.");
+          return;
+        }
+
+        const result = freeformEditor.pushPullFace(faceId, 0.35, {
+          includeTopologyRemap: true,
+          includeDeltas: true,
         });
+        pushPullCount += 1;
+        rebuildFreeformPreview();
+
+        console.groupCollapsed("[editor-modes] push-pull");
+        console.log("Face", faceId);
+        console.log("Result", result);
+        console.groupEnd();
+
+        setStatus(
+          result.validity.ok ? "freeform" : "failed",
+          result.validity.ok
+            ? `Push-pull #${pushPullCount} changed the freeform copy. Check the console for the topology report.`
+            : (result.validity.diagnostics[0]?.message ?? "Push-pull failed.")
+        );
+      }
+
+      function resetDemo() {
+        resetCuboidState();
+        freeform = null;
+        freeformEditor = null;
+        pushPullCount = 0;
+        rebuildFreeformPreview();
+        setStatus(
+          "ready",
+          "Click the buttons from top to bottom. The parametric cuboid stays on the left and the freeform copy appears on the right."
+        );
       }
 
       async function main() {
-        const scene = new THREE.Scene();
+        scene = new THREE.Scene();
         scene.background = new THREE.Color(0xeef2ff);
 
         const camera = new THREE.PerspectiveCamera(
           55,
           window.innerWidth / window.innerHeight,
           0.1,
-          4000
+          100
         );
-        camera.position.set(6.4, 4.5, 8.0);
+        camera.position.set(9.2, 5.5, 10.5);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        app.appendChild(renderer.domElement);
+        app.replaceChildren(renderer.domElement);
 
+        const stats = mountStats();
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(0.8, 0.7, 0.2);
+        controls.target.set(0, 1.3, 0);
+        controls.update();
 
-        scene.add(new THREE.AmbientLight(0xffffff, 1.6));
+        scene.add(new THREE.GridHelper(28, 28, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.82));
 
-        const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
-        keyLight.position.set(5, 9, 7);
-        scene.add(keyLight);
-
-        const rimLight = new THREE.DirectionalLight(0x93c5fd, 1.1);
-        rimLight.position.set(-6, 5, -4);
-        scene.add(rimLight);
-
-        const grid = new THREE.GridHelper(20, 20, 0x94a3b8, 0xcbd5e1);
-        scene.add(grid);
+        const light = new THREE.DirectionalLight(0xffffff, 1.15);
+        light.position.set(7, 9, 5);
+        scene.add(light);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
 
-        const polygon = new Polygon({
-          vertices: polygonBaseVertices(),
+        cuboid = new Cuboid({
+          center: new Vector3(0, 0.75, 0),
+          width: 1.4,
+          height: 1.5,
+          depth: 1.1,
           color: 0x2563eb,
-          fatOutlines: true,
-          outlineWidth: 4,
+          outlineWidth: 2,
         });
-        polygon.outline = true;
-        scene.add(polygon);
-
-        const cuboid = new Cuboid({
-          center: new Vector3(1.2, 0.8, 0.0),
-          width: 1.2,
-          height: 1.4,
-          depth: 1.0,
-          color: 0x10b981,
-          fatOutlines: true,
-          outlineWidth: 4,
-        });
-        cuboid.outline = true;
         scene.add(cuboid);
 
-        let freeform = null;
-        let freeformEditor = null;
-        let freeformPreview = null;
-        let pushPullCount = 0;
-        let polygonEdited = false;
-        let cuboidEdited = false;
-
-        function setPolygonBaseState() {
-          polygon.setConfig({ vertices: polygonBaseVertices() });
-          polygon.setPlacement({
-            translation: new Vector3(0.0, 0.0, 0.0),
-            rotation: new Vector3(0.0, 0.0, 0.0),
-            scale: new Vector3(1.0, 1.0, 1.0),
-          });
-          polygonEdited = false;
-        }
-
-        function setCuboidBaseState() {
-          cuboid.setConfig({
-            center: new Vector3(1.2, 0.8, 0.0),
-            width: 1.2,
-            height: 1.4,
-            depth: 1.0,
-          });
-          cuboid.setPlacement({
-            translation: new Vector3(0.0, 0.0, 0.0),
-            rotation: new Vector3(0.0, 0.0, 0.0),
-            scale: new Vector3(1.0, 1.0, 1.0),
-          });
-          cuboidEdited = false;
-        }
-
-        function clearFreeformPreview() {
-          if (!freeformPreview) {
-            return;
-          }
-          scene.remove(freeformPreview);
-          disposeObject(freeformPreview);
-          freeformPreview = null;
-        }
-
-        function rebuildFreeformPreview() {
-          if (!freeform || !freeformEditor) {
-            clearFreeformPreview();
-            return;
-          }
-
-          clearFreeformPreview();
-          const topologyRenderData = freeformEditor.getTopologyRenderData();
-          freeformPreview = createFreeformPreview(
-            freeform.getGeometrySerialized(),
-            freeform.getOutlineGeometrySerialized(),
-            topologyRenderData,
-            0xf97316
-          );
-          scene.add(freeformPreview);
-        }
-
-        function updatePanel() {
-          const polygonCapabilities = polygon.getEditCapabilities();
-          const cuboidCapabilities = cuboid.getEditCapabilities();
-
-          polygonMode.textContent = polygonCapabilities.editingMode;
-          cuboidMode.textContent = cuboidCapabilities.editingMode;
-          freeformMode.textContent = freeform ? "freeform" : "waiting";
-
-          polygonSummary.textContent =
-            `id ${polygon.ogid}, ${summarizeCapabilities(polygonCapabilities)}. `
-            + (polygonEdited
-              ? "Parametric edit applied to vertices and placement."
-              : "Still at base shape.");
-          cuboidSummary.textContent =
-            `id ${cuboid.ogid}, ${summarizeCapabilities(cuboidCapabilities)}. `
-            + (cuboidEdited
-              ? "Parametric resize and rotation applied."
-              : "Still at base shape.");
-
-          if (!freeform) {
-            freeformSummary.textContent =
-              "No freeform copy yet. Convert the current cuboid snapshot to create one.";
-            pushPullButton.disabled = true;
-            loopCutButton.disabled = true;
-            cutFaceButton.disabled = true;
-            return;
-          }
-
-          const freeformCapabilities = freeformEditor.getEditCapabilities();
-          freeformSummary.textContent =
-            `id ${freeform.getId()}, ${summarizeCapabilities(freeformCapabilities)}. `
-            + `This orange copy is offset to the right through freeform placement so you can compare it against the green parametric cuboid. `
-            + `The preview now uses surface fill, actual topology edges, and kernel outline edges.`;
-          pushPullButton.disabled = false;
-          loopCutButton.disabled = !freeformCapabilities.canLoopCut;
-          cutFaceButton.disabled = !freeformCapabilities.canCutFace;
-        }
-
-        function applyPolygonParametricEdit() {
-          polygon.setConfig({
-            vertices: polygonEditedVertices(),
-          });
-          polygon.setPlacement({
-            translation: new Vector3(0.0, 0.0, -0.15),
-          });
-          polygonEdited = true;
-          freeformStatus.textContent = "parametric";
-          resultSummary.textContent =
-            "Polygon edited through config and placement only. No freeform conversion was used.";
-          updatePanel();
-        }
-
-        function applyCuboidParametricEdit() {
-          cuboid.setConfig({
-            width: 1.8,
-            height: 1.95,
-            depth: 1.15,
-          });
-          cuboid.setPlacement({
-            translation: new Vector3(0.25, 0.0, 0.15),
-            rotation: new Vector3(0.0, Math.PI / 7.5, 0.0),
-            scale: new Vector3(1.0, 1.0, 1.0),
-          });
-          cuboidEdited = true;
-          freeformStatus.textContent = "parametric";
-          resultSummary.textContent =
-            "Cuboid edited through native config and placement. Convert now if you want direct face editing.";
-          updatePanel();
-        }
-
-        function convertCuboidToFreeform() {
-          if (!cuboid.canConvertToFreeform()) {
-            freeformStatus.textContent = "blocked";
-            resultSummary.textContent =
-              "The current cuboid cannot be converted to freeform.";
-            updatePanel();
-            return;
-          }
-
-          freeform = cuboid.toFreeform(`${cuboid.ogid}-freeform`);
-          freeformEditor = createFreeformEditor(freeform);
-          offsetFreeformForPreview(freeform);
-          pushPullCount = 0;
-          rebuildFreeformPreview();
-          freeformStatus.textContent = "converted";
-          resultSummary.textContent =
-            "Freeform copy created from the current cuboid state. The green cuboid remains parametric; the orange copy is offset using freeform placement and is now direct-editable.";
-          updatePanel();
-        }
-
-        function pushPullFreeform() {
-          if (!freeform) {
-            freeformStatus.textContent = "blocked";
-            resultSummary.textContent =
-              "Convert the cuboid to freeform first. Push-pull only works on the orange freeform copy.";
-            updatePanel();
-            return;
-          }
-
-          const faceId = topFaceId(freeformEditor);
-          if (faceId === null) {
-            freeformStatus.textContent = "failed";
-            resultSummary.textContent =
-              "Could not identify a top face on the freeform copy.";
-            updatePanel();
-            return;
-          }
-
-          const result = freeformEditor.pushPullFace(faceId, 0.35, {
-            includeTopologyRemap: true,
-            includeDeltas: true,
-          });
-
-          pushPullCount += 1;
-          rebuildFreeformPreview();
-          freeformStatus.textContent = result.validity.ok ? "applied" : "failed";
-          resultSummary.textContent =
-            `Freeform push-pull #${pushPullCount} changed topology ${result.topology_changed ? "yes" : "no"}, `
-            + `diagnostics ${result.validity.diagnostics.length}, changed faces ${result.changed_faces?.length ?? 0}.`;
-          updatePanel();
-        }
-
-        function loopCutFreeformRing() {
-          if (!freeform) {
-            freeformStatus.textContent = "blocked";
-            resultSummary.textContent =
-              "Convert the cuboid to freeform first. Loop cut only works on the orange freeform copy.";
-            updatePanel();
-            return;
-          }
-
-          const edgeId = previewVerticalEdgeId(freeformEditor);
-          if (edgeId === null) {
-            freeformStatus.textContent = "failed";
-            resultSummary.textContent =
-              "Could not find a suitable vertical edge to drive the loop cut.";
-            updatePanel();
-            return;
-          }
-
-          const result = freeformEditor.loopCut(edgeId, 0.5, {
-            includeTopologyRemap: true,
-            includeDeltas: true,
-          });
-
-          rebuildFreeformPreview();
-          freeformStatus.textContent = result.validity.ok ? "loop cut" : "failed";
-          resultSummary.textContent = result.validity.ok
-            ? `Loop cut used edge ${edgeId} to split the closed quad ring. Created faces ${result.topology_remap?.created_ids.faces.length ?? 0}, created vertices ${result.topology_remap?.created_ids.vertices.length ?? 0}.`
-            : (result.validity.diagnostics[0]?.message
-              ?? `Loop cut failed on edge ${edgeId} without a diagnostic message.`);
-          updatePanel();
-        }
-
-        function cutSingleFreeformFace() {
-          if (!freeform) {
-            freeformStatus.textContent = "blocked";
-            resultSummary.textContent =
-              "Convert the cuboid to freeform first. Face cutting only works on the orange freeform copy.";
-            updatePanel();
-            return;
-          }
-
-          const selection = singleSideFaceCutSelection(freeformEditor);
-          if (!selection) {
-            freeformStatus.textContent = "failed";
-            resultSummary.textContent =
-              "Could not find a cuttable side face with a clear pair of opposite edges.";
-            updatePanel();
-            return;
-          }
-
-          const result = freeformEditor.cutFace(
-            selection.faceId,
-            selection.startEdgeId,
-            0.5,
-            selection.endEdgeId,
-            0.5,
-            {
-              includeTopologyRemap: true,
-              includeDeltas: true,
-            }
-          );
-
-          rebuildFreeformPreview();
-          freeformStatus.textContent = result.validity.ok ? "face cut" : "failed";
-          resultSummary.textContent = result.validity.ok
-            ? `Cut side face ${selection.faceId} between edges ${selection.startEdgeId} and ${selection.endEdgeId}. Created faces ${result.topology_remap?.created_ids.faces.length ?? 0}, created edges ${result.topology_remap?.created_ids.edges.length ?? 0}.`
-            : (result.validity.diagnostics[0]?.message
-              ?? `Face cut failed on face ${selection.faceId} without a diagnostic message.`);
-          updatePanel();
-        }
-
-        function resetDemo() {
-          setPolygonBaseState();
-          setCuboidBaseState();
-          freeform = null;
-          freeformEditor = null;
-          pushPullCount = 0;
-          clearFreeformPreview();
-          freeformStatus.textContent = "ready";
-          resultSummary.textContent =
-            "Scene reset. Try the buttons from top to bottom to walk through parametric editing, one-face cutting, and ring loop cuts on the freeform copy.";
-          updatePanel();
-        }
-
-        polygonButton.addEventListener("click", applyPolygonParametricEdit);
-        cuboidButton.addEventListener("click", applyCuboidParametricEdit);
-        convertButton.addEventListener("click", convertCuboidToFreeform);
-        pushPullButton.addEventListener("click", pushPullFreeform);
-        loopCutButton.addEventListener("click", loopCutFreeformRing);
-        cutFaceButton.addEventListener("click", cutSingleFreeformFace);
+        resizeButton.addEventListener("click", resizeParametricCuboid);
+        convertButton.addEventListener("click", convertToFreeform);
+        pushPullButton.addEventListener("click", pushPullTopFace);
         resetButton.addEventListener("click", resetDemo);
 
         resetDemo();
 
-        function render() {
+        renderer.setAnimationLoop(() => {
+          stats.update();
           controls.update();
           renderer.render(scene, camera);
-          requestAnimationFrame(render);
-        }
-
-        render();
+        });
 
         window.addEventListener("resize", () => {
           camera.aspect = window.innerWidth / window.innerHeight;
@@ -693,11 +330,7 @@
         });
       }
 
-      main().catch((error) => {
-        console.error(error);
-        freeformStatus.textContent = "error";
-        resultSummary.textContent = error instanceof Error ? error.message : String(error);
-      });
+      void main();
     </script>
   </body>
 </html>

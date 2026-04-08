@@ -1,85 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-      <title>OpenGeometry Rectangle Example</title>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <meta name="description" content="OpenGeometry Demo" />
-      <meta name="author" content="Vishwajeet Mane" />
-    </head>
+    <title>OpenGeometry Rectangle Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Simple OpenGeometry rectangle example for Three.js." />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
   <body class="og-example-page">
     <div class="og-badge-title-card">
       <a href="../index.html" class="og-badge-title-link">Back</a>
       <span class="og-badge-title">Rectangle</span>
     </div>
-    <aside class="og-controls" data-control-panel>
-          <h3>Rectangle Parameters</h3>
-          <label class="og-control-row" data-control-key="width" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Width</span>
-              <code class="og-control-value" data-control-value>1.8</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.2" max="5" step="0.05" value="1.8" />
-              <input data-control-number type="number" min="0.2" max="5" step="0.05" value="1.8" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="breadth" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Breadth</span>
-              <code class="og-control-value" data-control-value>1.1</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.2" max="5" step="0.05" value="1.1" />
-              <input data-control-number type="number" min="0.2" max="5" step="0.05" value="1.1" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="translateX" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Translate X</span>
-              <code class="og-control-value" data-control-value>0</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
-              <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="translateZ" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Translate Z</span>
-              <code class="og-control-value" data-control-value>0</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
-              <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="rotateYDeg" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Rotate Y (deg)</span>
-              <code class="og-control-value" data-control-value>0</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="-180" max="180" step="1" value="0" />
-              <input data-control-number type="number" min="-180" max="180" step="1" value="0" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="scale" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Scale</span>
-              <code class="og-control-value" data-control-value>1</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.5" max="2" step="0.05" value="1" />
-              <input data-control-number type="number" min="0.5" max="2" step="0.05" value="1" />
-            </div>
-          </label>
-        </aside>
+
+    <aside class="og-controls">
+      <h3>Rectangle</h3>
+      <p class="og-control-summary">
+        A rectangle is just a simple closed profile. This page keeps the example focused on width,
+        breadth, and line style.
+      </p>
+
+      <label class="og-control-row" data-control="width">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Width</span>
+          <code class="og-control-value" data-value>3</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="6" step="0.1" value="3" />
+          <input data-number type="number" min="0.5" max="6" step="0.1" value="3" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="breadth">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Breadth</span>
+          <code class="og-control-value" data-value>2</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="5" step="0.1" value="2" />
+          <input data-number type="number" min="0.5" max="5" step="0.1" value="2" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="fat-lines">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Fat Lines</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-toggle type="checkbox" class="og-toggle" aria-label="Fat lines" />
+          <span class="og-control-bool-state" data-state>Disabled</span>
+        </div>
+      </label>
+    </aside>
+
     <div id="app"></div>
+
     <script type="module">
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
       import { OpenGeometry, Rectangle, Vector3 } from "@og-three";
 
@@ -88,81 +68,93 @@
         throw new Error("Missing #app container");
       }
 
-      let rectangle;
-      let config = {
-        width: 1.8,
-        breadth: 1.1,
-        translateX: 0,
-        translateZ: 0,
-        rotateYDeg: 0,
-        scale: 1,
+      const config = {
+        width: 3,
+        breadth: 2,
+        fatLines: false,
       };
 
-      function formatControlNumber(value) {
-        return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      let rectangle = null;
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
       }
 
-      function applyTransform(target) {
-        target.setPlacement({
-          translation: new Vector3(config.translateX, 0, config.translateZ),
-          rotation: new Vector3(0, (config.rotateYDeg * Math.PI) / 180, 0),
-          scale: new Vector3(config.scale, config.scale, config.scale),
-        });
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
       }
 
-      function setUIControls() {
-        const controls = document.querySelectorAll("[data-control-key]");
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
 
-        controls.forEach((control) => {
-          const key = control.getAttribute("data-control-key");
-          const type = control.getAttribute("data-control-type");
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
+        }
 
-          if (type === "number") {
-            const rangeInput = control.querySelector("[data-control-range]");
-            const numberInput = control.querySelector("[data-control-number]");
-            const valueDisplay = control.querySelector("[data-control-value]");
-
-            function setNumberValue(value) {
-              const numericValue = parseFloat(value);
-              if (!Number.isFinite(numericValue)) return;
-
-              config[key] = numericValue;
-              rangeInput.value = String(numericValue);
-              numberInput.value = String(numericValue);
-              valueDisplay.textContent = formatControlNumber(numericValue);
-              updateGeometry();
-            }
-
-            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
-            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
           }
 
-          if (type === "boolean") {
-            const toggleInput = control.querySelector("[data-control-toggle]");
-            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
 
-            function setBooleanValue(checked) {
-              config[key] = checked;
-              toggleInput.checked = checked;
-              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
-              updateGeometry();
-            }
-
-            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
-          }
-        });
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
       }
 
-      function updateGeometry() {
-        if (!rectangle) return;
+      function attachBooleanControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const toggle = row?.querySelector("[data-toggle]");
+        const state = row?.querySelector("[data-state]");
+
+        if (!row || !toggle || !state) {
+          throw new Error(`Missing boolean control: ${name}`);
+        }
+
+        const commit = (checked) => {
+          toggle.checked = checked;
+          state.textContent = checked ? "Enabled" : "Disabled";
+          onChange(checked);
+        };
+
+        toggle.addEventListener("change", () => commit(toggle.checked));
+        commit(toggle.checked);
+      }
+
+      function updateRectangle() {
+        if (!rectangle) {
+          return;
+        }
+
         rectangle.setConfig({
           center: new Vector3(0, 0, 0),
           width: config.width,
           breadth: config.breadth,
-          color: 0x1f2937,
+          color: 0x7c3aed,
+          fatLines: config.fatLines,
+          lineWidth: config.fatLines ? 10 : 2,
         });
 
-        applyTransform(rectangle);
+        console.groupCollapsed("[rectangle] updated");
+        console.log("Config", { ...config });
+        console.groupEnd();
       }
 
       async function main() {
@@ -173,31 +165,27 @@
           55,
           window.innerWidth / window.innerHeight,
           0.1,
-          4000
+          100
         );
-
-        camera.position.set(5.5, 4.2, 6.5);
+        camera.position.set(5.6, 4.2, 6.4);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
 
+        const stats = mountStats();
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(0, 0.8, 0);
+        controls.target.set(0, 0.2, 0);
         controls.update();
 
-        scene.add(new THREE.GridHelper(32, 32, 0x4460ff, 0xd5ddff));
-        scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-        const key = new THREE.DirectionalLight(0xffffff, 0.9);
-        key.position.set(6, 8, 4);
-        scene.add(key);
-
-        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
-        fill.position.set(-5, 3, -6);
-        scene.add(fill);
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
 
@@ -205,28 +193,36 @@
           center: new Vector3(0, 0, 0),
           width: config.width,
           breadth: config.breadth,
-          color: 0x1f2937,
+          color: 0x7c3aed,
         });
         scene.add(rectangle);
 
-        updateGeometry();
+        attachNumberControl("width", (value) => {
+          config.width = value;
+          updateRectangle();
+        });
+        attachNumberControl("breadth", (value) => {
+          config.breadth = value;
+          updateRectangle();
+        });
+        attachBooleanControl("fat-lines", (value) => {
+          config.fatLines = value;
+          updateRectangle();
+        });
 
-        function onResize() {
+        updateRectangle();
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
           camera.aspect = window.innerWidth / window.innerHeight;
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        window.addEventListener("resize", onResize);
-
-        function animate() {
-          requestAnimationFrame(animate);
-          controls.update();
-          renderer.render(scene, camera);
-        }
-
-        animate();
-        setUIControls();
+        });
       }
 
       void main();

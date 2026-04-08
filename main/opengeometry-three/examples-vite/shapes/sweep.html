@@ -1,264 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-      <title>OpenGeometry Sweep Example</title>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <meta name="description" content="OpenGeometry Demo" />
-      <meta name="author" content="Vishwajeet Mane" />
-    </head>
+    <title>OpenGeometry Sweep Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Simple OpenGeometry sweep example for Three.js." />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
   <body class="og-example-page">
     <div class="og-badge-title-card">
       <a href="../index.html" class="og-badge-title-link">Back</a>
       <span class="og-badge-title">Sweep</span>
     </div>
-    <aside class="og-controls" data-control-panel>
-          <h3>Sweep Parameters</h3>
-          <label class="og-control-row" data-control-key="height" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Path Height</span>
-              <code class="og-control-value" data-control-value>2.3</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.4" max="4" step="0.05" value="2.3" />
-              <input data-control-number type="number" min="0.4" max="4" step="0.05" value="2.3" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="spread" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Path Spread</span>
-              <code class="og-control-value" data-control-value>1</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.4" max="2" step="0.05" value="1" />
-              <input data-control-number type="number" min="0.4" max="2" step="0.05" value="1" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="profileWidth" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Profile Width</span>
-              <code class="og-control-value" data-control-value>0.5</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.1" max="1.5" step="0.05" value="0.5" />
-              <input data-control-number type="number" min="0.1" max="1.5" step="0.05" value="0.5" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="profileDepth" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Profile Depth</span>
-              <code class="og-control-value" data-control-value>0.4</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.1" max="1.5" step="0.05" value="0.4" />
-              <input data-control-number type="number" min="0.1" max="1.5" step="0.05" value="0.4" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="capStart" data-control-type="boolean">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Cap Start</span>
-            </div>
-            <div class="og-control-bool">
-              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Cap Start" checked />
-              <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="capEnd" data-control-type="boolean">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Cap End</span>
-            </div>
-            <div class="og-control-bool">
-              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Cap End" checked />
-              <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Outline</span>
-            </div>
-            <div class="og-control-bool">
-              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
-              <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Fat Outlines</span>
-            </div>
-            <div class="og-control-bool">
-              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Fat Outlines" />
-              <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Outline Width</span>
-              <code class="og-control-value" data-control-value>4</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="1" max="12" step="0.5" value="4" />
-              <input data-control-number type="number" min="1" max="12" step="0.5" value="4" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="translateX" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Translate X</span>
-              <code class="og-control-value" data-control-value>0</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
-              <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="translateZ" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Translate Z</span>
-              <code class="og-control-value" data-control-value>0</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
-              <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="rotateYDeg" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Rotate Y (deg)</span>
-              <code class="og-control-value" data-control-value>0</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="-180" max="180" step="1" value="0" />
-              <input data-control-number type="number" min="-180" max="180" step="1" value="0" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="scale" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Scale</span>
-              <code class="og-control-value" data-control-value>1</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.5" max="2" step="0.05" value="1" />
-              <input data-control-number type="number" min="0.5" max="2" step="0.05" value="1" />
-            </div>
-          </label>
-        </aside>
+
+    <aside class="og-controls">
+      <h3>Sweep</h3>
+      <p class="og-control-summary">
+        A sweep uses two arrays: `path` and `profile`. The dark line is the current path.
+      </p>
+
+      <label class="og-control-row" data-control="path-4-y">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Path 4 Y</span>
+          <code class="og-control-value" data-value>2.4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="1" max="4" step="0.1" value="2.4" />
+          <input data-number type="number" min="1" max="4" step="0.1" value="2.4" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="path-3-x">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Path 3 X</span>
+          <code class="og-control-value" data-value>0.4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="-1.2" max="1.2" step="0.05" value="0.4" />
+          <input data-number type="number" min="-1.2" max="1.2" step="0.05" value="0.4" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="profile-2-x">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Profile 2 X</span>
+          <code class="og-control-value" data-value>0.4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.2" max="1.4" step="0.05" value="0.4" />
+          <input data-number type="number" min="0.2" max="1.4" step="0.05" value="0.4" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="profile-3-z">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Profile 3 Z</span>
+          <code class="og-control-value" data-value>0.25</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.1" max="1" step="0.05" value="0.25" />
+          <input data-number type="number" min="0.1" max="1" step="0.05" value="0.25" />
+        </div>
+      </label>
+    </aside>
+
     <div id="app"></div>
+
     <script type="module">
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Sweep, Vector3 } from "@og-three";
+      import { OpenGeometry, Polyline, Sweep, Vector3 } from "@og-three";
 
       const app = document.getElementById("app");
       if (!app) {
         throw new Error("Missing #app container");
       }
 
-      let sweep;
-      let config = {
-        height: 2.3,
-        spread: 1.0,
-        profileWidth: 0.5,
-        profileDepth: 0.4,
-        capStart: true,
-        capEnd: true,
-        outline: true,
-        fatOutlines: false,
-        outlineWidth: 4,
-        translateX: 0,
-        translateZ: 0,
-        rotateYDeg: 0,
-        scale: 1,
-      };
+      let config = null;
 
-      function formatControlNumber(value) {
-        return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      function createConfig() {
+        return {
+          path: [
+            new Vector3(-1.4, 0, -1.6),
+            new Vector3(-0.5, 0.6, -0.5),
+            new Vector3(0.4, 1.3, 0.8),
+            new Vector3(1.2, 2.4, 2.1),
+          ],
+          profile: [
+            new Vector3(-0.4, 0, -0.25),
+            new Vector3(0.4, 0, -0.25),
+            new Vector3(0.4, 0, 0.25),
+            new Vector3(-0.4, 0, 0.25),
+          ],
+          capStart: true,
+          capEnd: true,
+          color: 0x3b82f6,
+          outlineWidth: 2,
+        };
       }
 
-      function applyTransform(target) {
-        target.setPlacement({
-          translation: new Vector3(config.translateX, 0, config.translateZ),
-          rotation: new Vector3(0, (config.rotateYDeg * Math.PI) / 180, 0),
-          scale: new Vector3(config.scale, config.scale, config.scale),
-        });
+      let pathGuide = null;
+      let sweep = null;
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
       }
 
-      function buildPath(height, spread) {
-        return [
-          new Vector3(-2.0, 0.0, -1.2),
-          new Vector3(-1.0, height * 0.25, -0.2 * spread),
-          new Vector3(0.2, height * 0.55, 0.7 * spread),
-          new Vector3(1.3, height * 0.8, 0.2 * spread),
-          new Vector3(2.1, height, -0.9 * spread),
-        ];
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
       }
 
-      function buildProfile(width, depth) {
-        return [
-          new Vector3(-width * 0.5, 0, -depth * 0.5),
-          new Vector3(width * 0.5, 0, -depth * 0.5),
-          new Vector3(width * 0.5, 0, depth * 0.5),
-          new Vector3(-width * 0.5, 0, depth * 0.5),
-        ];
-      }
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
 
-      function setUIControls() {
-        const controls = document.querySelectorAll("[data-control-key]");
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
+        }
 
-        controls.forEach((control) => {
-          const key = control.getAttribute("data-control-key");
-          const type = control.getAttribute("data-control-type");
-
-          if (type === "number") {
-            const rangeInput = control.querySelector("[data-control-range]");
-            const numberInput = control.querySelector("[data-control-number]");
-            const valueDisplay = control.querySelector("[data-control-value]");
-
-            function setNumberValue(value) {
-              const numericValue = parseFloat(value);
-              if (!Number.isFinite(numericValue)) return;
-
-              config[key] = numericValue;
-              rangeInput.value = String(numericValue);
-              numberInput.value = String(numericValue);
-              valueDisplay.textContent = formatControlNumber(numericValue);
-              updateGeometry();
-            }
-
-            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
-            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
           }
 
-          if (type === "boolean") {
-            const toggleInput = control.querySelector("[data-control-toggle]");
-            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
 
-            function setBooleanValue(checked) {
-              config[key] = checked;
-              toggleInput.checked = checked;
-              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
-              updateGeometry();
-            }
-
-            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
-          }
-        });
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
       }
 
-      function updateGeometry() {
-        if (!sweep) return;
+      function updateSweep() {
+        if (!pathGuide || !sweep) {
+          return;
+        }
+
+        pathGuide.setConfig({
+          points: config.path.map((point) => point.clone()),
+          color: 0x111827,
+        });
+
         sweep.setConfig({
-          path: buildPath(config.height, config.spread),
-          profile: buildProfile(config.profileWidth, config.profileDepth),
-          color: 0x0ea5e9,
+          path: config.path.map((point) => point.clone()),
+          profile: config.profile.map((point) => point.clone()),
           capStart: config.capStart,
           capEnd: config.capEnd,
-          fatOutlines: config.fatOutlines,
+          color: config.color,
           outlineWidth: config.outlineWidth,
         });
+        sweep.outline = true;
 
-        sweep.outline = config.outline;
-        applyTransform(sweep);
+        console.groupCollapsed("[sweep] updated");
+        console.log("Config", config);
+        console.groupEnd();
       }
 
       async function main() {
@@ -269,64 +181,79 @@
           55,
           window.innerWidth / window.innerHeight,
           0.1,
-          4000
+          100
         );
-
-        camera.position.set(5.5, 4.2, 6.5);
+        camera.position.set(6.8, 5.2, 8.4);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
 
+        const stats = mountStats();
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(0, 0.8, 0);
+        controls.target.set(0, 1.2, 0.5);
         controls.update();
 
-        scene.add(new THREE.GridHelper(32, 32, 0x4460ff, 0xd5ddff));
-        scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-        const key = new THREE.DirectionalLight(0xffffff, 0.9);
-        key.position.set(6, 8, 4);
-        scene.add(key);
-
-        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
-        fill.position.set(-5, 3, -6);
-        scene.add(fill);
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
+        config = createConfig();
+
+        pathGuide = new Polyline({
+          points: config.path.map((point) => point.clone()),
+          color: 0x111827,
+        });
+        scene.add(pathGuide);
 
         sweep = new Sweep({
-          path: buildPath(config.height, config.spread),
-          profile: buildProfile(config.profileWidth, config.profileDepth),
-          color: 0x0ea5e9,
+          path: config.path.map((point) => point.clone()),
+          profile: config.profile.map((point) => point.clone()),
+          color: config.color,
           capStart: config.capStart,
           capEnd: config.capEnd,
-          fatOutlines: config.fatOutlines,
           outlineWidth: config.outlineWidth,
         });
-        sweep.outline = config.outline;
         scene.add(sweep);
 
-        updateGeometry();
+        attachNumberControl("path-4-y", (value) => {
+          config.path[3].y = value;
+          updateSweep();
+        });
+        attachNumberControl("path-3-x", (value) => {
+          config.path[2].x = value;
+          updateSweep();
+        });
+        attachNumberControl("profile-2-x", (value) => {
+          config.profile[1].x = value;
+          config.profile[2].x = value;
+          updateSweep();
+        });
+        attachNumberControl("profile-3-z", (value) => {
+          config.profile[2].z = value;
+          config.profile[3].z = value;
+          updateSweep();
+        });
 
-        function onResize() {
+        updateSweep();
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
           camera.aspect = window.innerWidth / window.innerHeight;
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        window.addEventListener("resize", onResize);
-
-        function animate() {
-          requestAnimationFrame(animate);
-          controls.update();
-          renderer.render(scene, camera);
-        }
-
-        animate();
-        setUIControls();
+        });
       }
 
       void main();

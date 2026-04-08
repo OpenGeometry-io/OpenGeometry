@@ -4,7 +4,7 @@
     <title>OpenGeometry STL Export Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="OpenGeometry STL export example" />
+    <meta name="description" content="Simple OpenGeometry STL export example." />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
   <body class="og-example-page">
@@ -13,197 +13,50 @@
       <span class="og-badge-title">STL Export</span>
     </div>
 
-    <aside class="og-controls" data-control-panel>
+    <aside class="og-controls">
       <h3>STL Export</h3>
       <p class="og-control-summary">
-        Pick a shape, tune parameters, and export a binary STL. Current shape details and export
-        reports are logged to the console.
+        Build one cuboid, then export it as a binary STL file. The export report stays in the
+        console.
       </p>
 
-      <label class="og-control-row" data-control-key="shape" data-control-type="select">
+      <label class="og-control-row" data-control="width">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Shape</span>
+          <span class="og-control-label-chip">Width</span>
+          <code class="og-control-value" data-value>1.8</code>
         </div>
-        <select class="og-control-select" data-control-select aria-label="Shape">
-          <option value="cuboid" selected>Cuboid</option>
-          <option value="cylinder">Cylinder</option>
-          <option value="sphere">Sphere</option>
-          <option value="wedge">Wedge</option>
-        </select>
-      </label>
-
-      <div class="og-control-group" data-shape-group="cuboid">
-        <label class="og-control-row" data-control-key="cuboidWidth" data-control-type="number">
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Width</span>
-            <code class="og-control-value" data-control-value>1.8</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.8" />
-            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.8" />
-          </div>
-        </label>
-        <label class="og-control-row" data-control-key="cuboidHeight" data-control-type="number">
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Height</span>
-            <code class="og-control-value" data-control-value>1.4</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.4" />
-            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.4" />
-          </div>
-        </label>
-        <label class="og-control-row" data-control-key="cuboidDepth" data-control-type="number">
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Depth</span>
-            <code class="og-control-value" data-control-value>1.1</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.1" />
-            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.1" />
-          </div>
-        </label>
-      </div>
-
-      <div class="og-control-group" data-shape-group="cylinder" hidden>
-        <label class="og-control-row" data-control-key="cylinderRadius" data-control-type="number">
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Radius</span>
-            <code class="og-control-value" data-control-value>0.8</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="0.2" max="3" step="0.05" value="0.8" />
-            <input data-control-number type="number" min="0.2" max="3" step="0.05" value="0.8" />
-          </div>
-        </label>
-        <label class="og-control-row" data-control-key="cylinderHeight" data-control-type="number">
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Height</span>
-            <code class="og-control-value" data-control-value>1.8</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.8" />
-            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.8" />
-          </div>
-        </label>
-        <label
-          class="og-control-row"
-          data-control-key="cylinderSegments"
-          data-control-type="number"
-        >
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Segments</span>
-            <code class="og-control-value" data-control-value>36</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="6" max="96" step="1" value="36" />
-            <input data-control-number type="number" min="6" max="96" step="1" value="36" />
-          </div>
-        </label>
-        <label
-          class="og-control-row"
-          data-control-key="cylinderAngleDeg"
-          data-control-type="number"
-        >
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Angle (deg)</span>
-            <code class="og-control-value" data-control-value>360</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="20" max="360" step="1" value="360" />
-            <input data-control-number type="number" min="20" max="360" step="1" value="360" />
-          </div>
-        </label>
-      </div>
-
-      <div class="og-control-group" data-shape-group="sphere" hidden>
-        <label class="og-control-row" data-control-key="sphereRadius" data-control-type="number">
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Radius</span>
-            <code class="og-control-value" data-control-value>1</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="0.2" max="3" step="0.05" value="1" />
-            <input data-control-number type="number" min="0.2" max="3" step="0.05" value="1" />
-          </div>
-        </label>
-        <label
-          class="og-control-row"
-          data-control-key="sphereWidthSegments"
-          data-control-type="number"
-        >
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Width Segments</span>
-            <code class="og-control-value" data-control-value>32</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="3" max="96" step="1" value="32" />
-            <input data-control-number type="number" min="3" max="96" step="1" value="32" />
-          </div>
-        </label>
-        <label
-          class="og-control-row"
-          data-control-key="sphereHeightSegments"
-          data-control-type="number"
-        >
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Height Segments</span>
-            <code class="og-control-value" data-control-value>20</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="2" max="64" step="1" value="20" />
-            <input data-control-number type="number" min="2" max="64" step="1" value="20" />
-          </div>
-        </label>
-      </div>
-
-      <div class="og-control-group" data-shape-group="wedge" hidden>
-        <label class="og-control-row" data-control-key="wedgeWidth" data-control-type="number">
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Width</span>
-            <code class="og-control-value" data-control-value>2</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="2" />
-            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="2" />
-          </div>
-        </label>
-        <label class="og-control-row" data-control-key="wedgeHeight" data-control-type="number">
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Height</span>
-            <code class="og-control-value" data-control-value>1.8</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.8" />
-            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.8" />
-          </div>
-        </label>
-        <label class="og-control-row" data-control-key="wedgeDepth" data-control-type="number">
-          <div class="og-control-header">
-            <span class="og-control-label-chip">Depth</span>
-            <code class="og-control-value" data-control-value>1.4</code>
-          </div>
-          <div class="og-control-range">
-            <input data-control-range type="range" min="0.2" max="4" step="0.05" value="1.4" />
-            <input data-control-number type="number" min="0.2" max="4" step="0.05" value="1.4" />
-          </div>
-        </label>
-      </div>
-
-      <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Outline</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
-          <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="4" step="0.1" value="1.8" />
+          <input data-number type="number" min="0.5" max="4" step="0.1" value="1.8" />
         </div>
       </label>
 
-      <button type="button" class="og-control-action og-control-action-cyan" data-action="export-stl">
+      <label class="og-control-row" data-control="height">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Height</span>
+          <code class="og-control-value" data-value>1.4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="4" step="0.1" value="1.4" />
+          <input data-number type="number" min="0.5" max="4" step="0.1" value="1.4" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="depth">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Depth</span>
+          <code class="og-control-value" data-value>1.1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="4" step="0.1" value="1.1" />
+          <input data-number type="number" min="0.5" max="4" step="0.1" value="1.1" />
+        </div>
+      </label>
+
+      <button type="button" class="og-control-action og-control-action-cyan" data-export>
         Export Binary STL
       </button>
-      <a data-download-link hidden></a>
+      <a hidden data-download></a>
     </aside>
 
     <div id="app"></div>
@@ -212,279 +65,96 @@
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import {
-        Cuboid,
-        Cylinder,
-        OGSceneManager,
-        OpenGeometry,
-        Sphere,
-        Vector3,
-        Wedge,
-      } from "@og-three";
+      import { Cuboid, OGSceneManager, OpenGeometry, Vector3 } from "@og-three";
 
       const app = document.getElementById("app");
-      if (!app) {
-        throw new Error("Missing #app container");
+      const exportButton = document.querySelector("[data-export]");
+      const downloadLink = document.querySelector("[data-download]");
+
+      if (!app || !exportButton || !downloadLink) {
+        throw new Error("Missing STL export page nodes");
       }
 
-      const panel = document.querySelector("[data-control-panel]");
-      const exportButton = panel?.querySelector('[data-action="export-stl"]');
-
-      if (!panel || !exportButton) {
-        throw new Error("Missing static STL export UI nodes");
-      }
-
-      const ENTITY_ID = "stl-shape";
-
-      let shapeObjects;
-      let currentExport = null;
-      let config = {
-        shape: "cuboid",
-        cuboidWidth: 1.8,
-        cuboidHeight: 1.4,
-        cuboidDepth: 1.1,
-        cylinderRadius: 0.8,
-        cylinderHeight: 1.8,
-        cylinderSegments: 36,
-        cylinderAngleDeg: 360,
-        sphereRadius: 1,
-        sphereWidthSegments: 32,
-        sphereHeightSegments: 20,
-        wedgeWidth: 2,
-        wedgeHeight: 1.8,
-        wedgeDepth: 1.4,
-        outline: true,
+      const config = {
+        width: 1.8,
+        height: 1.4,
+        depth: 1.1,
       };
 
-      function clamp(value, min, max) {
-        return Math.min(max, Math.max(min, value));
+      let cuboid = null;
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
       }
 
-      function formatControlNumber(value) {
-        return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
       }
 
-      function updateShapeGroups() {
-        const groups = panel.querySelectorAll("[data-shape-group]");
-        groups.forEach((group) => {
-          group.hidden = group.getAttribute("data-shape-group") !== config.shape;
-        });
-      }
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
 
-      function logReadyState() {
-        if (!currentExport) {
-          return;
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
         }
 
-        console.groupCollapsed(`[stl-export] ${currentExport.summary.shape} ready`);
-        console.log(currentExport.summary);
-        console.groupEnd();
-      }
-
-      function setUIControls() {
-        const controls = panel.querySelectorAll("[data-control-key]");
-
-        controls.forEach((control) => {
-          const key = control.getAttribute("data-control-key");
-          const type = control.getAttribute("data-control-type");
-
-          if (type === "number") {
-            const rangeInput = control.querySelector("[data-control-range]");
-            const numberInput = control.querySelector("[data-control-number]");
-            const valueDisplay = control.querySelector("[data-control-value]");
-
-            const min = parseFloat(rangeInput.min);
-            const max = parseFloat(rangeInput.max);
-            const integer = rangeInput.step === "1";
-
-            function setNumberValue(value, shouldUpdate = true) {
-              const numericValue = parseFloat(value);
-              if (!Number.isFinite(numericValue)) {
-                return;
-              }
-
-              const clampedValue = integer
-                ? Math.round(clamp(numericValue, min, max))
-                : clamp(numericValue, min, max);
-
-              config[key] = clampedValue;
-              rangeInput.value = String(clampedValue);
-              numberInput.value = String(clampedValue);
-              valueDisplay.textContent = formatControlNumber(clampedValue);
-
-              if (shouldUpdate) {
-                updateGeometry();
-              }
-            }
-
-            setNumberValue(config[key], false);
-            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
-            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
           }
 
-          if (type === "boolean") {
-            const toggleInput = control.querySelector("[data-control-toggle]");
-            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
 
-            function setBooleanValue(checked, shouldUpdate = true) {
-              config[key] = checked;
-              toggleInput.checked = checked;
-              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
-
-              if (shouldUpdate) {
-                updateGeometry();
-              }
-            }
-
-            setBooleanValue(Boolean(config[key]), false);
-            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
-          }
-
-          if (type === "select") {
-            const selectInput = control.querySelector("[data-control-select]");
-
-            function setSelectValue(value, shouldUpdate = true) {
-              config[key] = value;
-              selectInput.value = String(value);
-              updateShapeGroups();
-
-              if (shouldUpdate) {
-                updateGeometry();
-              }
-            }
-
-            setSelectValue(config[key], false);
-            selectInput.addEventListener("change", () => setSelectValue(selectInput.value));
-          }
-        });
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
       }
 
-      function updateGeometry() {
-        if (!shapeObjects) {
-          return;
-        }
-
-        let activeObject;
-
-        if (config.shape === "cuboid") {
-          shapeObjects.cuboid.setConfig({
-            center: new Vector3(0, config.cuboidHeight * 0.5, 0),
-            width: config.cuboidWidth,
-            height: config.cuboidHeight,
-            depth: config.cuboidDepth,
-            color: 0x0ea5e9,
-          });
-          shapeObjects.cuboid.outline = config.outline;
-
-          activeObject = {
-            kind: "OGCuboid",
-            brepData: shapeObjects.cuboid.getBrepData(),
-            fileName: "opengeometry-cuboid.stl",
-            summary: {
-              shape: "Cuboid",
-              width: config.cuboidWidth,
-              height: config.cuboidHeight,
-              depth: config.cuboidDepth,
-              outline: config.outline,
-            },
-          };
-        }
-
-        if (config.shape === "cylinder") {
-          shapeObjects.cylinder.setConfig({
-            center: new Vector3(0, config.cylinderHeight * 0.5, 0),
-            radius: config.cylinderRadius,
-            height: config.cylinderHeight,
-            segments: Math.max(3, Math.floor(config.cylinderSegments)),
-            angle: (Math.floor(config.cylinderAngleDeg) * Math.PI) / 180,
-            color: 0xf59e0b,
-          });
-          shapeObjects.cylinder.outline = config.outline;
-
-          activeObject = {
-            kind: "OGCylinder",
-            brepData: shapeObjects.cylinder.getBrep(),
-            fileName: "opengeometry-cylinder.stl",
-            summary: {
-              shape: "Cylinder",
-              radius: config.cylinderRadius,
-              height: config.cylinderHeight,
-              segments: Math.max(3, Math.floor(config.cylinderSegments)),
-              angleDeg: Math.floor(config.cylinderAngleDeg),
-              outline: config.outline,
-            },
-          };
-        }
-
-        if (config.shape === "sphere") {
-          shapeObjects.sphere.setConfig({
-            center: new Vector3(0, config.sphereRadius, 0),
-            radius: config.sphereRadius,
-            widthSegments: Math.max(3, Math.floor(config.sphereWidthSegments)),
-            heightSegments: Math.max(2, Math.floor(config.sphereHeightSegments)),
-            color: 0x0891b2,
-          });
-          shapeObjects.sphere.outline = config.outline;
-
-          activeObject = {
-            kind: "OGSphere",
-            brepData: shapeObjects.sphere.getBrep(),
-            fileName: "opengeometry-sphere.stl",
-            summary: {
-              shape: "Sphere",
-              radius: config.sphereRadius,
-              widthSegments: Math.max(3, Math.floor(config.sphereWidthSegments)),
-              heightSegments: Math.max(2, Math.floor(config.sphereHeightSegments)),
-              outline: config.outline,
-            },
-          };
-        }
-
-        if (config.shape === "wedge") {
-          shapeObjects.wedge.setConfig({
-            center: new Vector3(0, config.wedgeHeight * 0.5, 0),
-            width: config.wedgeWidth,
-            height: config.wedgeHeight,
-            depth: config.wedgeDepth,
-            color: 0x7c3aed,
-          });
-          shapeObjects.wedge.outline = config.outline;
-
-          activeObject = {
-            kind: "OGWedge",
-            brepData: shapeObjects.wedge.getBrepData(),
-            fileName: "opengeometry-wedge.stl",
-            summary: {
-              shape: "Wedge",
-              width: config.wedgeWidth,
-              height: config.wedgeHeight,
-              depth: config.wedgeDepth,
-              outline: config.outline,
-            },
-          };
-        }
-
-        Object.entries(shapeObjects).forEach(([shape, object]) => {
-          object.visible = shape === config.shape;
-        });
-
-        currentExport = activeObject;
-        logReadyState();
-      }
-
-      function downloadBytes(bytes, filename, mime) {
-        const link = panel.querySelector("[data-download-link]");
-        if (!link) {
-          throw new Error("Missing download link node");
-        }
-
-        const blob = new Blob([bytes], { type: mime });
+      function downloadBytes(bytes, filename) {
+        const blob = new Blob([bytes], { type: "model/stl" });
         const url = URL.createObjectURL(blob);
-        link.href = url;
-        link.download = filename;
-        link.click();
+        downloadLink.href = url;
+        downloadLink.download = filename;
+        downloadLink.click();
         URL.revokeObjectURL(url);
+      }
+
+      function updateCuboid() {
+        if (!cuboid) {
+          return;
+        }
+
+        cuboid.setConfig({
+          center: new Vector3(0, config.height * 0.5, 0),
+          width: config.width,
+          height: config.height,
+          depth: config.depth,
+          color: 0x0ea5e9,
+          outlineWidth: 2,
+        });
+        cuboid.outline = true;
+
+        console.groupCollapsed("[stl-export] shape updated");
+        console.log("Config", { ...config });
+        console.groupEnd();
       }
 
       async function main() {
@@ -495,126 +165,92 @@
           55,
           window.innerWidth / window.innerHeight,
           0.1,
-          4000
+          100
         );
-        camera.position.set(5.8, 4.4, 7.4);
+        camera.position.set(5.8, 4.5, 6.8);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
 
+        const stats = mountStats();
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.target.set(0, 0.9, 0);
         controls.update();
 
-        scene.add(new THREE.GridHelper(32, 32, 0x4460ff, 0xd5ddff));
-        scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-        const key = new THREE.DirectionalLight(0xffffff, 0.9);
-        key.position.set(6, 8, 4);
-        scene.add(key);
-
-        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
-        fill.position.set(-5, 3, -6);
-        scene.add(fill);
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
 
-        shapeObjects = {
-          cuboid: new Cuboid({
-            center: new Vector3(0, config.cuboidHeight * 0.5, 0),
-            width: config.cuboidWidth,
-            height: config.cuboidHeight,
-            depth: config.cuboidDepth,
-            color: 0x0ea5e9,
-          }),
-          cylinder: new Cylinder({
-            center: new Vector3(0, config.cylinderHeight * 0.5, 0),
-            radius: config.cylinderRadius,
-            height: config.cylinderHeight,
-            segments: Math.max(3, Math.floor(config.cylinderSegments)),
-            angle: (Math.floor(config.cylinderAngleDeg) * Math.PI) / 180,
-            color: 0xf59e0b,
-          }),
-          sphere: new Sphere({
-            center: new Vector3(0, config.sphereRadius, 0),
-            radius: config.sphereRadius,
-            widthSegments: Math.max(3, Math.floor(config.sphereWidthSegments)),
-            heightSegments: Math.max(2, Math.floor(config.sphereHeightSegments)),
-            color: 0x0891b2,
-          }),
-          wedge: new Wedge({
-            center: new Vector3(0, config.wedgeHeight * 0.5, 0),
-            width: config.wedgeWidth,
-            height: config.wedgeHeight,
-            depth: config.wedgeDepth,
-            color: 0x7c3aed,
-          }),
-        };
+        cuboid = new Cuboid({
+          center: new Vector3(0, config.height * 0.5, 0),
+          width: config.width,
+          height: config.height,
+          depth: config.depth,
+          color: 0x0ea5e9,
+          outlineWidth: 2,
+        });
+        scene.add(cuboid);
 
-        Object.values(shapeObjects).forEach((object) => {
-          object.visible = false;
-          scene.add(object);
+        attachNumberControl("width", (value) => {
+          config.width = value;
+          updateCuboid();
+        });
+        attachNumberControl("height", (value) => {
+          config.height = value;
+          updateCuboid();
+        });
+        attachNumberControl("depth", (value) => {
+          config.depth = value;
+          updateCuboid();
         });
 
-        function onResize() {
+        updateCuboid();
+
+        exportButton.addEventListener("click", () => {
+          const manager = new OGSceneManager();
+          const sceneId = manager.createScene("stl-export-scene");
+          manager.addBrepEntityToScene(
+            sceneId,
+            "stl-cuboid",
+            "OGCuboid",
+            JSON.stringify(cuboid.getBrepData())
+          );
+
+          const result = manager.exportSceneToStl(sceneId, JSON.stringify({
+            header: "OpenGeometry STL Export",
+            scale: 1,
+            error_policy: "BestEffort",
+            validate_topology: true,
+          }));
+
+          const report = JSON.parse(result.reportJson);
+          downloadBytes(result.bytes, "opengeometry-cuboid.stl");
+
+          console.groupCollapsed("[stl-export] export complete");
+          console.log("Config", { ...config });
+          console.log("Report", report);
+          console.log("Bytes", result.bytes.length);
+          console.groupEnd();
+        });
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
           camera.aspect = window.innerWidth / window.innerHeight;
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        window.addEventListener("resize", onResize);
-
-        function animate() {
-          requestAnimationFrame(animate);
-          controls.update();
-          renderer.render(scene, camera);
-        }
-
-        animate();
-
-        setUIControls();
-        updateShapeGroups();
-        updateGeometry();
-
-        exportButton.addEventListener("click", () => {
-          if (!currentExport) {
-            return;
-          }
-
-          try {
-            const manager = new OGSceneManager();
-            const sceneId = manager.createScene("stl-export-scene");
-
-            manager.addBrepEntityToScene(
-              sceneId,
-              ENTITY_ID,
-              currentExport.kind,
-              JSON.stringify(currentExport.brepData)
-            );
-
-            const exportConfig = {
-              header: "OpenGeometry STL Export",
-              scale: 1,
-              error_policy: "BestEffort",
-              validate_topology: true,
-            };
-
-            const result = manager.exportSceneToStl(sceneId, JSON.stringify(exportConfig));
-            const report = JSON.parse(result.reportJson);
-
-            downloadBytes(result.bytes, currentExport.fileName, "model/stl");
-
-            console.groupCollapsed(`[stl-export] ${currentExport.fileName}`);
-            console.log("Shape", currentExport.summary);
-            console.log("Report", report);
-            console.log("Bytes", result.bytes.length);
-            console.groupEnd();
-          } catch (error) {
-            console.error("[stl-export] Export failed", error);
-          }
         });
       }
 

@@ -1,23 +1,23 @@
 ---
 title: Examples
-description: Core example architecture and the curated OpenGeometry example catalog
+description: The standalone OpenGeometry example catalog and how the customer-facing demos are structured
 ---
 
 OpenGeometry ships a compact public example set for `opengeometry`.
 
 The goal is simple: each core demo should be easy to open, easy to read, and small enough to use
-as a reference when you are wiring the kernel into your own scene.
+as a direct reference when wiring the kernel into your own Three.js scene.
 
 ## Core catalog
 
-The in-repo source of truth for public Three.js examples lives in the Three.js adapter package under
-`main/` (look for the `examples-vite/` folder).
+The source of truth for the public Three.js examples lives in the Three.js adapter package under
+`main/opengeometry-three/examples-vite/`.
 
-The public catalog keeps a curated core set:
+The current customer-facing catalog includes:
 
 - Primitives: `line`, `arc`, `curve`, `polyline`, `rectangle`
-- Shapes: `cuboid`, `cylinder`, `opening`, `polygon`, `sphere`, `sweep`, `wedge`
-- Operations: `boolean-operations`, `polygon-boolean-operations`, `extruded-boolean-operations`, `offset`, `stl-export`, `sweep-path-profile`, `wall-from-offsets`
+- Shapes: `cuboid`, `cuboid-placement`, `cylinder`, `opening`, `polygon`, `sphere`, `sweep`, `wedge`
+- Operations: `boolean-operations`, `polygon-boolean-operations`, `extruded-boolean-operations`, `offset`, `step-export`, `stl-export`, `sweep-path-profile`, `wall-from-offsets`, `editor-modes`
 
 ## Hosted demos
 
@@ -26,27 +26,31 @@ You can browse the hosted demo index at [demo.opengeometry.io](https://demo.open
 The URL paths mirror the `examples-vite/` folder. For example:
 
 - `examples-vite/primitives/line.html` -> `https://demo.opengeometry.io/primitives/line.html`
-- `examples-vite/operations/stl-export.html` -> `https://demo.opengeometry.io/operations/stl-export.html`
+- `examples-vite/shapes/polygon.html` -> `https://demo.opengeometry.io/shapes/polygon.html`
 - `examples-vite/operations/extruded-boolean-operations.html` -> `https://demo.opengeometry.io/operations/extruded-boolean-operations.html`
 
 ## Example structure
 
-Each core example is a checked-in standalone HTML page.
+Each public example page is a standalone HTML file.
 
 The page contract is intentionally simple:
 
-- Static title card in the page body
+- Static title card markup
 - Static control panel markup
 - One `#app` mount point
-- Optional `#stats` only when the page is intentionally a performance demo
-- One inline `<script type="module">` with local scene setup and control binding
+- One inline `<script type="module">`
+- Local scene/camera/renderer setup inside that file
+- A local `config` object that mirrors the real wrapper API payload
+- Local DOM listeners that update the scene directly
+- A Stats/FPS panel on the page
+- Console logging kept for learning and debugging
 
-Core examples do not use a shared page runtime, generated page wrappers, or slug-based loaders.
+The public pages do not rely on a shared example runtime, slug-based loader, or generated example
+shell.
 
 ## Authoring pattern
 
-The current examples follow a single-page pattern: create the object once, keep one local `config`
-object, and update geometry through `setConfig(...)`.
+The examples follow a simple create-once, update-with-`setConfig(...)` pattern.
 
 ```html
 <body class="og-example-page">
@@ -55,7 +59,7 @@ object, and update geometry through `setConfig(...)`.
     <span class="og-badge-title">Cuboid</span>
   </div>
 
-  <aside class="og-controls" data-control-panel>
+  <aside class="og-controls">
     <!-- static control rows -->
   </aside>
 
@@ -65,52 +69,61 @@ object, and update geometry through `setConfig(...)`.
     import "../src/styles/theme.css";
     import * as THREE from "three";
     import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+    import Stats from "three/examples/jsm/libs/stats.module.js";
     import { OpenGeometry, Cuboid, Vector3 } from "opengeometry";
 
     const app = document.getElementById("app");
     let cuboid;
+
     const config = {
-      width: 1.8,
+      center: new Vector3(0, 0.8, 0),
+      width: 2,
       height: 1.6,
       depth: 1.2,
+      color: 0x0ea5e9,
+      outlineWidth: 2,
+    };
+
+    const viewState = {
       outline: true,
     };
 
-    function setUIControls() {
-      // bind existing inputs and update config
-    }
-
     function updateGeometry() {
       cuboid.setConfig({
-        center: new Vector3(0, config.height * 0.5, 0),
+        center: config.center.clone(),
         width: config.width,
         height: config.height,
         depth: config.depth,
-        color: 0x10b981,
+        color: config.color,
+        outlineWidth: config.outlineWidth,
       });
-      cuboid.outline = config.outline;
+      cuboid.outline = viewState.outline;
+      console.log("[cuboid] updated", config, viewState);
     }
 
     async function main() {
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 4000);
+      const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       const controls = new OrbitControls(camera, renderer.domElement);
+      const stats = new Stats();
 
       app.replaceChildren(renderer.domElement);
+      document.body.appendChild(stats.dom);
+
       await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 
       cuboid = new Cuboid({
-        center: new Vector3(0, config.height * 0.5, 0),
+        center: config.center.clone(),
         width: config.width,
         height: config.height,
         depth: config.depth,
-        color: 0x10b981,
+        color: config.color,
+        outlineWidth: config.outlineWidth,
       });
 
       scene.add(cuboid);
       updateGeometry();
-      setUIControls();
     }
 
     void main();
@@ -118,29 +131,16 @@ object, and update geometry through `setConfig(...)`.
 </body>
 ```
 
-In this repository, local example authoring uses the `@og-three` alias inside the Vite config. When
-you copy the pattern into an application or a separate example repo, import from the published
-package name `opengeometry`.
+## Package names in local examples vs published apps
 
-## Shared styling
+In this repository, example authoring may use local Vite aliasing during development. In your own
+application, import from the published package name:
 
-The shared example UI skin lives in the example catalog stylesheet (`theme.css`) inside the
-`examples-vite/` folder.
+```ts
+import { OpenGeometry, Cuboid, Polygon, Vector3 } from "opengeometry";
+```
 
-That stylesheet is used by the public example pages for:
-
-- The compact title card
-- The compact right-side control panel
-- Shared input, toggle, textarea, and button styling
-
-The goal is utility UI, not showcase UI. Control panels should feel like production tooling.
-
-## Extra requests
-
-The public catalog stays intentionally small. If you want to see additional example coverage,
-surface the request through GitHub or Discord and keep the request tied to a concrete workflow.
-
-## Run the core examples locally
+## Run the examples locally
 
 1. Install dependencies in the repository root.
 
@@ -151,21 +151,19 @@ npm install
 2. Start the Three.js example dev server.
 
 ```bash
-npm run dev-example-three
+npm --prefix main/opengeometry-three run dev-example-three
 ```
 
-Run the command from the Three.js adapter package directory (the one that contains `vite.examples.config.mjs`).
+3. Open the served catalog or a direct page such as `/primitives/line.html` or `/shapes/polygon.html`.
 
-3. Open the served catalog or a direct page such as `/primitives/line.html` or `/operations/stl-export.html`.
-
-4. Build the catalog for production review when you change examples.
+4. Build the catalog for release review when you change examples.
 
 ```bash
-npm run build-example-three
+npm --prefix main/opengeometry-three run build-example-three
 ```
 
 ## Related reading
 
-- Review [Three.js integration](/integration/threejs) for the public API
-- Review [Polygon shape](/api/shapes/polygon) for shape-specific details
-- Review [Line primitive](/api/primitives/line) for lower-level drawing primitives
+- [Three.js integration](/integration/threejs)
+- [Polygon](/api/shapes/polygon)
+- [Boolean operations](/api/operations/boolean-operations)

@@ -8,7 +8,8 @@ icon: "shapes"
 
 OpenGeometry exposes kernel-backed boolean operations that work on B-Rep payloads. The helpers accept
 multiple operand formats (wrapper objects, raw B-Rep objects, or serialized JSON) and return a
-renderable `THREE.Mesh` result with access to the output B-Rep and a structured report.
+renderable `BooleanResult` mesh with access to the output B-Rep, a structured report, and freeform
+conversion helpers.
 
 To learn how booleans work and what to expect from them, read [Booleans](/concepts/booleans).
 
@@ -110,6 +111,10 @@ All boolean helpers return a `BooleanResult`, which extends `THREE.Mesh`.
 
 <ResponseField name="getBrepSerialized" type="() => string">
   Returns the output B-Rep JSON string (useful for export and persistence).
+</ResponseField>
+
+<ResponseField name="toFreeform" type="(options?: { id?: string; placement?: { translation?: Vector3; rotation?: Vector3; scale?: Vector3 } }) => FreeformGeometry">
+  Converts the boolean output into a freeform geometry object for direct editing.
 </ResponseField>
 
 <ResponseField name="outline" type="boolean">

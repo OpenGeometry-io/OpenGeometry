@@ -1,19 +1,13 @@
 ---
 title: Curve
-description: A curve primitive represented through control points
+description: A control-point-driven curve primitive
 icon: 'bezier-curve'
 ---
 
 ## Overview
 
-The Curve primitive represents a curve in 3D space defined by a series of control points. Currently, the curve is represented as a polyline through these control points. It is an open path (non-closed) and is useful for creating smooth or complex curved paths.
-
-**Use Cases:**
-- Creating curved paths and contours
-- Spline-like representations
-- Profile curves for sweep operations
-- Offset operations for parallel curves
-- Complex path definitions
+`Curve` is a line-based wrapper driven by a `controlPoints` array. It supports kernel-backed
+placement, anchor management, freeform conversion, and offset generation for parallel guide paths.
 
 ## Constructor
 
@@ -24,354 +18,163 @@ The Curve primitive represents a curve in 3D space defined by a series of contro
     ```
   </Tab>
   <Tab title="TypeScript">
-    ```typescript
+    ```ts
     const curve = new Curve(options?: ICurveOptions);
     ```
   </Tab>
 </Tabs>
 
-## Live demo
+### ICurveOptions
 
-Try it in the browser: [Curve demo](https://demo.opengeometry.io/primitives/curve.html).
-
-### Rust Constructor Parameters
-
-<ParamField path="id" type="String" required>
-  Unique identifier for the curve instance
+<ParamField path="ogid" type="string" optional>
+  Unique identifier for the curve. Auto-generated when omitted.
 </ParamField>
 
-### TypeScript Constructor Parameters
-
-<ParamField path="options" type="ICurveOptions">
-  Configuration options for the curve
+<ParamField path="controlPoints" type="Vector3[]" required>
+  Ordered control points used to build the curve geometry.
 </ParamField>
 
-<ParamField path="options.ogid" type="string">
-  Optional unique identifier (auto-generated if not provided)
+<ParamField path="color" type="number" required>
+  Curve color as a hex number.
 </ParamField>
 
-<ParamField path="options.controlPoints" type="Vector3[]" required>
-  Array of control points defining the curve path
+<ParamField path="translation" type="Vector3" optional>
+  Initial placement translation.
 </ParamField>
 
-<ParamField path="options.color" type="number" required>
-  Curve color as a hexadecimal number (e.g., 0x00aa55)
+<ParamField path="rotation" type="Vector3" optional>
+  Initial placement rotation in radians.
+</ParamField>
+
+<ParamField path="scale" type="Vector3" optional>
+  Initial placement scale.
 </ParamField>
 
 ## Methods
 
-### set_config
+### setConfig()
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    curve.set_config(control_points: Vec<Vector3>);
-    ```
-    Updates the curve's control points and regenerates geometry.
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    curve.setConfig(options: ICurveOptions);
-    ```
-    Updates the curve configuration and regenerates geometry.
-  </Tab>
-</Tabs>
+Updates the control point array or render color.
 
-### generate_geometry
+```ts
+curve.setConfig(options: CurveConfigUpdate): void
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    curve.generate_geometry();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    // Called automatically by setConfig
-    ```
-  </Tab>
-</Tabs>
+### getConfig(), getPlacement()
 
-Generates vertices and edges connecting the control points sequentially.
+Returns the current curve config or cloned placement values.
 
-### get_geometry_serialized
+```ts
+const config = curve.getConfig();
+const placement = curve.getPlacement();
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let geometry: String = curve.get_geometry_serialized();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    // Used internally for rendering
-    ```
-  </Tab>
-</Tabs>
+### getAnchor(), setAnchor(), resetAnchor()
 
-Returns serialized vertex buffer data as a JSON string.
+Reads or updates the modeling anchor used by the kernel-backed primitive.
 
-### get_offset_serialized
+```ts
+const anchor = curve.getAnchor();
+curve.setAnchor(anchor);
+curve.resetAnchor();
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let offset_data = curve.get_offset_serialized(
-        distance: f64,
-        acute_threshold_degrees: f64,
-        bevel: bool
-    );
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    const result = curve.getOffset(
-        distance: number,
-        acuteThresholdDegrees: number = 35.0,
-        bevel: boolean = true
-    ): ICurveOffsetResult;
-    ```
-  </Tab>
-</Tabs>
+### setPlacement(), setTransform(), setTranslation(), setRotation(), setScale()
 
-Generates an offset curve parallel to the original at the specified distance. The curve is treated as an open path.
+Placement helpers for moving the curve through the kernel transform path.
 
-<ParamField path="distance" type="number" required>
-  Distance to offset the curve (positive or negative)
-</ParamField>
+```ts
+curve.setPlacement({ translation?, rotation?, scale? });
+```
 
-<ParamField path="acuteThresholdDegrees" type="number" default="35.0">
-  Angle threshold for beveling acute corners
-</ParamField>
+### getOffset()
 
-<ParamField path="bevel" type="boolean" default="true">
-  Enable beveling at acute angles
-</ParamField>
+Returns an offset result for the current curve.
 
-### get_brep_serialized
+```ts
+const offset = curve.getOffset(
+  distance,
+  acuteThresholdDegrees = 35,
+  bevel = true
+);
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let brep: String = curve.get_brep_serialized();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    // Available through internal API
-    ```
-  </Tab>
-</Tabs>
+### toFreeform()
 
-Returns the complete BREP representation including vertices and edges.
+Converts the curve into a freeform geometry wrapper.
 
-### dispose
-
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    curve.dispose();
-    ```
-    Clears the BREP and control points to free memory.
-  </Tab>
-</Tabs>
+```ts
+const freeform = curve.toFreeform(id?);
+```
 
 ## Properties
 
-<ResponseField name="id" type="String">
-  Unique identifier for the curve instance
+<ResponseField name="ogid" type="string">
+  Stable identifier for the curve wrapper.
 </ResponseField>
 
-<ResponseField name="control_points" type="Vec<Vector3>">
-  Array of control points defining the curve
-</ResponseField>
-
-<ResponseField name="brep" type="Brep">
-  Internal BREP representation containing vertices and edges
+<ResponseField name="options" type="ICurveOptions">
+  Current curve configuration and placement state.
 </ResponseField>
 
 <ResponseField name="color" type="number">
-  Curve color (TypeScript only, settable)
+  Gets or sets the curve color.
 </ResponseField>
 
-## Code Examples
+## Examples
 
-### Creating a Simple Curve
+### Create a guide curve
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    use opengeometry::primitives::OGCurve;
-    use openmaths::Vector3;
+```ts
+import { Curve, Vector3 } from "opengeometry";
 
-    let mut curve = OGCurve::new("curve-1".to_string());
-    let control_points = vec![
-        Vector3::new(0.0, 0.0, 0.0),
-        Vector3::new(5.0, 0.0, 3.0),
-        Vector3::new(10.0, 0.0, 2.0),
-        Vector3::new(15.0, 0.0, 5.0),
-    ];
-    curve.set_config(control_points);
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    import { Curve, Vector3 } from "opengeometry";
+const curve = new Curve({
+  controlPoints: [
+    new Vector3(-2.5, 0, -1.5),
+    new Vector3(-0.9, 0, 0.8),
+    new Vector3(0.8, 0, 0.55),
+    new Vector3(2.4, 0, 1.4),
+  ],
+  color: 0x16a34a,
+});
+```
 
-    const curve = new Curve({
-      controlPoints: [
-        new Vector3(0, 0, 0),
-        new Vector3(5, 0, 3),
-        new Vector3(10, 0, 2),
-        new Vector3(15, 0, 5)
-      ],
-      color: 0x00aa55
-    });
-    ```
-  </Tab>
-</Tabs>
+### Offset a curve into a second guide
 
-### Creating a Wave Pattern
+```ts
+const centerline = new Curve({
+  controlPoints: [
+    new Vector3(-3, 0, -1.1),
+    new Vector3(-1.2, 0, 0.7),
+    new Vector3(0.8, 0, 0.2),
+    new Vector3(2.9, 0, 1.4),
+  ],
+  color: 0x0f172a,
+});
 
-<Tabs>
-  <Tab title="TypeScript">
-    ```typescript
-    // Generate a sine wave using control points
-    const controlPoints = [];
-    for (let i = 0; i <= 20; i++) {
-      const x = i * 2;
-      const z = Math.sin(i * 0.5) * 5;
-      controlPoints.push(new Vector3(x, 0, z));
-    }
+const offset = centerline.getOffset(0.35);
 
-    const wave = new Curve({
-      controlPoints,
-      color: 0x0088ff
-    });
-    ```
-  </Tab>
-</Tabs>
+const outerGuide = new Curve({
+  controlPoints: offset.points,
+  color: 0x2563eb,
+});
+```
 
-### Generating Offset Curves
+### Update the control points
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let offset_data = curve.get_offset_serialized(2.0, 35.0, true);
-    let result: OffsetResult = serde_json::from_str(&offset_data).unwrap();
-    
-    println!("Offset points: {}", result.points.len());
-    println!("Is closed: {}", result.is_closed);  // false for curves
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    const offsetResult = curve.getOffset(2.0, 35.0, true);
-    
-    console.log(offsetResult.points);              // Vector3[]
-    console.log(offsetResult.beveledVertexIndices); // number[]
-    console.log(offsetResult.isClosed);            // false (curves are open)
-    
-    // Create a parallel curve
-    const parallelCurve = new Curve({
-      controlPoints: offsetResult.points,
-      color: 0xff0088
-    });
-    ```
-  </Tab>
-</Tabs>
+```ts
+curve.setConfig({
+  controlPoints: [
+    new Vector3(-2.5, 0, -1.4),
+    new Vector3(-1.1, 0, 1.2),
+    new Vector3(1.2, 0, 0.7),
+    new Vector3(2.8, 0, 1.9),
+  ],
+});
 
-### Creating Multiple Parallel Curves
+curve.setTranslation(new Vector3(0, 0.15, 0));
+```
 
-<Tabs>
-  <Tab title="TypeScript">
-    ```typescript
-    const baseCurve = new Curve({
-      controlPoints: [
-        new Vector3(0, 0, 0),
-        new Vector3(10, 0, 5),
-        new Vector3(20, 0, 3),
-        new Vector3(30, 0, 8)
-      ],
-      color: 0xff0000
-    });
+## Live demo
 
-    // Create offset curves on both sides
-    const distances = [2, 4, 6];
-    const upperCurves = distances.map(d => {
-      const offset = baseCurve.getOffset(d);
-      return new Curve({
-        controlPoints: offset.points,
-        color: 0x0000ff
-      });
-    });
-
-    const lowerCurves = distances.map(d => {
-      const offset = baseCurve.getOffset(-d);
-      return new Curve({
-        controlPoints: offset.points,
-        color: 0x00ff00
-      });
-    });
-    ```
-  </Tab>
-</Tabs>
-
-### Updating Curve Control Points
-
-<Tabs>
-  <Tab title="TypeScript">
-    ```typescript
-    curve.setConfig({
-      controlPoints: [
-        new Vector3(0, 0, 0),
-        new Vector3(8, 0, 4),
-        new Vector3(16, 0, 1),
-        new Vector3(24, 0, 6)
-      ],
-      color: 0xffff00
-    });
-
-    // Change color
-    curve.color = 0xff00ff;
-    ```
-  </Tab>
-</Tabs>
-
-### Bezier-like Curve Approximation
-
-<Tabs>
-  <Tab title="TypeScript">
-    ```typescript
-    // Approximate a quadratic bezier with control points
-    function quadraticBezier(
-      p0: Vector3, 
-      p1: Vector3, 
-      p2: Vector3, 
-      segments: number
-    ): Vector3[] {
-      const points = [];
-      for (let i = 0; i <= segments; i++) {
-        const t = i / segments;
-        const x = (1-t)*(1-t)*p0.x + 2*(1-t)*t*p1.x + t*t*p2.x;
-        const y = (1-t)*(1-t)*p0.y + 2*(1-t)*t*p1.y + t*t*p2.y;
-        const z = (1-t)*(1-t)*p0.z + 2*(1-t)*t*p1.z + t*t*p2.z;
-        points.push(new Vector3(x, y, z));
-      }
-      return points;
-    }
-
-    const bezierPoints = quadraticBezier(
-      new Vector3(0, 0, 0),
-      new Vector3(10, 0, 10),
-      new Vector3(20, 0, 0),
-      20
-    );
-
-    const bezierCurve = new Curve({
-      controlPoints: bezierPoints,
-      color: 0xff00ff
-    });
-    ```
-  </Tab>
-</Tabs>
+- [Curve demo](https://demo.opengeometry.io/primitives/curve.html)

@@ -1,17 +1,21 @@
 ---
 title: STEP export (experimental)
-description: Export B-Reps and scenes to STEP (Part 21) text
+description: Export B-Reps and scenes to STEP Part 21 text
 ---
+
+## Overview
+
+OpenGeometry can export a single B-Rep payload or a stored wasm scene to **STEP Part 21** text.
+For Three.js applications, the usual flow is:
+
+1. Create wrapper geometry such as `Cuboid`, `Solid`, or a boolean result.
+2. Serialize that B-Rep payload.
+3. Export either the single B-Rep or a named `OGSceneManager` scene.
 
 <Warning>
 STEP export is experimental and may change. If you hit an exporter limitation or confusing output,
 reach out on [Discord](https://discord.gg/9wJpbfgGGA).
 </Warning>
-
-## Overview
-
-OpenGeometry can export B-Reps to **STEP Part 21** text. You can export a single B-Rep payload or
-export a whole scene through `OGSceneManager`.
 
 ## Initialization
 
@@ -25,7 +29,9 @@ await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 
 ## Export APIs
 
-### exportBrepToStep
+### exportBrepToStep()
+
+Export a single serialized B-Rep JSON payload.
 
 ```ts
 import { OGSceneManager } from "opengeometry";
@@ -34,7 +40,9 @@ const manager = new OGSceneManager();
 const result = manager.exportBrepToStep(brepSerialized);
 ```
 
-### exportSceneToStep / exportCurrentSceneToStep
+### exportSceneToStep() / exportCurrentSceneToStep()
+
+Export a stored scene or the current scene.
 
 ```ts
 import { OGSceneManager } from "opengeometry";
@@ -43,8 +51,7 @@ const manager = new OGSceneManager();
 const sceneId = manager.createScene("step export");
 
 const result = manager.exportSceneToStep(sceneId);
-// or:
-const result2 = manager.exportCurrentSceneToStep();
+const currentResult = manager.exportCurrentSceneToStep();
 ```
 
 ## Result type
@@ -56,14 +63,15 @@ const result2 = manager.exportCurrentSceneToStep();
 </ResponseField>
 
 <ResponseField name="reportJson" type="string">
-  A JSON string containing export statistics (skipped entities, triangle counts, topology errors).
+  A JSON string containing export statistics such as skipped entities, topology validation notes,
+  and schema details.
 </ResponseField>
 
 ## Config JSON
 
 All STEP exports accept an optional `config_json` string. If it is `null`, `undefined`, or an empty
 string, OpenGeometry uses defaults. If you provide `config_json`, it must deserialize into the full
-`StepExportConfig` shape (required fields must be present).
+`StepExportConfig` shape.
 
 Default configuration (Rust):
 
@@ -91,18 +99,47 @@ Example JSON payload:
 }
 ```
 
-## Key constraints
+## Example
 
-- When `require_closed_shell` is `true`, non-solid inputs are skipped in best-effort mode.
-- When `validate_topology` is `true`, invalid B-Reps are skipped (or fail in strict mode).
-
-## Examples
-
-### Export and download STEP in the browser
+### Export wrapper geometry to STEP
 
 ```ts
-const result = manager.exportCurrentSceneToStep();
+import { Cuboid, OGSceneManager, Vector3 } from "opengeometry";
 
+function toBrepSerialized(source: unknown) {
+  const value =
+    source && typeof (source as { getBrepSerialized?: () => string }).getBrepSerialized === "function"
+      ? (source as { getBrepSerialized: () => string }).getBrepSerialized()
+      : source && typeof (source as { getBrepData?: () => unknown }).getBrepData === "function"
+        ? (source as { getBrepData: () => unknown }).getBrepData()
+        : source && typeof (source as { getBrep?: () => unknown }).getBrep === "function"
+          ? (source as { getBrep: () => unknown }).getBrep()
+          : source;
+
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+const manager = new OGSceneManager();
+const sceneId = manager.createScene("step export");
+
+const cuboid = new Cuboid({
+  center: new Vector3(0, 0.5, 0),
+  width: 2,
+  height: 1,
+  depth: 1.2,
+  color: 0x0ea5e9,
+});
+
+manager.addBrepEntityToScene(sceneId, "box-1", "Cuboid", toBrepSerialized(cuboid));
+
+const result = manager.exportSceneToStep(sceneId);
+console.log(result.text);
+console.log(JSON.parse(result.reportJson));
+```
+
+### Download STEP in the browser
+
+```ts
 const blob = new Blob([result.text], { type: "text/plain" });
 const url = URL.createObjectURL(blob);
 
@@ -123,7 +160,7 @@ Native-only builds also expose `exportSceneToStepFile(...)` (not available in br
 ## Related
 
 - [Exports](/concepts/exports) for an overview of available exporters and runtime constraints
-- [STL export](/api/export/stl)
+- [STL export](/api/export/stl) (experimental)
 - [IFC export](/api/export/ifc) (experimental)
 
 ## Live demo

@@ -34,6 +34,11 @@ Go to the API pages:
 Extrusion turns a planar profile into a 3D result by pushing it along a direction (currently the Y
 axis in the kernel operation).
 
+In the current Three.js wrapper API, the main entrypoints are:
+
+- `polygon.extrude(height)` for polygon-to-solid workflows
+- `Solid.extrude(source, height, options)` when you already have a face-like B-Rep source
+
 Go to the API page:
 
 - [Extrude](/api/operations/extrude)
@@ -43,6 +48,12 @@ Go to the API page:
 Sweeps generate 3D geometry by moving a profile along a path. This is useful for rails, pipes,
 moldings, and architectural trims.
 
+In the public Three.js layer, the most direct API is usually the `Sweep` shape wrapper:
+
+```ts
+const sweep = new Sweep({ path, profile, capStart: true, capEnd: true });
+```
+
 Go to the API pages:
 
 - [Sweep operation](/api/operations/sweep)
@@ -51,6 +62,9 @@ Go to the API pages:
 ## Booleans
 
 Booleans combine solids or cut one solid by another.
+
+The standalone boolean helpers return a renderable `BooleanResult`, which can also be converted to
+freeform for downstream editing.
 
 Go to the API and concept pages:
 
@@ -62,4 +76,3 @@ Go to the API and concept pages:
 - If you are exporting results, start with [Exports](/concepts/exports).
 - If you want to understand kernel topology, read [BRep](/concepts/brep).
 - Browse the hosted demos at [demo.opengeometry.io](https://demo.opengeometry.io/).
-

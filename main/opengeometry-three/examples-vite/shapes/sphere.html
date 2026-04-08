@@ -1,123 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-      <title>OpenGeometry Sphere Example</title>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <meta name="description" content="OpenGeometry Demo" />
-      <meta name="author" content="Vishwajeet Mane" />
-    </head>
+    <title>OpenGeometry Sphere Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Simple OpenGeometry sphere example for Three.js." />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
   <body class="og-example-page">
     <div class="og-badge-title-card">
       <a href="../index.html" class="og-badge-title-link">Back</a>
       <span class="og-badge-title">Sphere</span>
     </div>
-    <aside class="og-controls" data-control-panel>
-          <h3>Sphere Parameters</h3>
-          <label class="og-control-row" data-control-key="radius" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Radius</span>
-              <code class="og-control-value" data-control-value>1</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.2" max="3" step="0.05" value="1" />
-              <input data-control-number type="number" min="0.2" max="3" step="0.05" value="1" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="widthSegments" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Width Segments</span>
-              <code class="og-control-value" data-control-value>32</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="3" max="96" step="1" value="32" />
-              <input data-control-number type="number" min="3" max="96" step="1" value="32" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="heightSegments" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Height Segments</span>
-              <code class="og-control-value" data-control-value>20</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="2" max="64" step="1" value="20" />
-              <input data-control-number type="number" min="2" max="64" step="1" value="20" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Outline</span>
-            </div>
-            <div class="og-control-bool">
-              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
-              <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Fat Outlines</span>
-            </div>
-            <div class="og-control-bool">
-              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Fat Outlines" />
-              <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Outline Width</span>
-              <code class="og-control-value" data-control-value>4</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="1" max="12" step="0.5" value="4" />
-              <input data-control-number type="number" min="1" max="12" step="0.5" value="4" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="translateX" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Translate X</span>
-              <code class="og-control-value" data-control-value>0</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
-              <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="translateZ" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Translate Z</span>
-              <code class="og-control-value" data-control-value>0</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="-2" max="2" step="0.05" value="0" />
-              <input data-control-number type="number" min="-2" max="2" step="0.05" value="0" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="rotateYDeg" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Rotate Y (deg)</span>
-              <code class="og-control-value" data-control-value>0</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="-180" max="180" step="1" value="0" />
-              <input data-control-number type="number" min="-180" max="180" step="1" value="0" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="scale" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Scale</span>
-              <code class="og-control-value" data-control-value>1</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.5" max="2" step="0.05" value="1" />
-              <input data-control-number type="number" min="0.5" max="2" step="0.05" value="1" />
-            </div>
-          </label>
-        </aside>
+
+    <aside class="og-controls">
+      <h3>Sphere</h3>
+      <p class="og-control-summary">
+        Radius changes the size. `widthSegments` and `heightSegments` control the render mesh
+        tessellation.
+      </p>
+
+      <label class="og-control-row" data-control="radius">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Radius</span>
+          <code class="og-control-value" data-value>1.1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.4" max="2.2" step="0.05" value="1.1" />
+          <input data-number type="number" min="0.4" max="2.2" step="0.05" value="1.1" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="width-segments">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Width Segments</span>
+          <code class="og-control-value" data-value>28</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="8" max="48" step="1" value="28" />
+          <input data-number type="number" min="8" max="48" step="1" value="28" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="height-segments">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Height Segments</span>
+          <code class="og-control-value" data-value>18</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="6" max="32" step="1" value="18" />
+          <input data-number type="number" min="6" max="32" step="1" value="18" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="outline">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Outline</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
+          <span class="og-control-bool-state" data-state>Enabled</span>
+        </div>
+      </label>
+    </aside>
+
     <div id="app"></div>
+
     <script type="module">
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
       import { OpenGeometry, Sphere, Vector3 } from "@og-three";
 
@@ -126,89 +79,105 @@
         throw new Error("Missing #app container");
       }
 
-      let sphere;
-      let config = {
-        radius: 1.0,
-        widthSegments: 32,
-        heightSegments: 20,
+      let config = null;
+
+      function createConfig() {
+        return {
+          center: new Vector3(0, 1.1, 0),
+          radius: 1.1,
+          widthSegments: 28,
+          heightSegments: 18,
+          color: 0x0891b2,
+          outlineWidth: 2,
+        };
+      }
+      const viewState = {
         outline: true,
-        fatOutlines: false,
-        outlineWidth: 4,
-        translateX: 0,
-        translateZ: 0,
-        rotateYDeg: 0,
-        scale: 1,
       };
 
-      function formatControlNumber(value) {
-        return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      let sphere = null;
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
       }
 
-      function applyTransform(target) {
-        target.setPlacement({
-          translation: new Vector3(config.translateX, 0, config.translateZ),
-          rotation: new Vector3(0, (config.rotateYDeg * Math.PI) / 180, 0),
-          scale: new Vector3(config.scale, config.scale, config.scale),
-        });
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
       }
 
-      function setUIControls() {
-        const controls = document.querySelectorAll("[data-control-key]");
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
 
-        controls.forEach((control) => {
-          const key = control.getAttribute("data-control-key");
-          const type = control.getAttribute("data-control-type");
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
+        }
 
-          if (type === "number") {
-            const rangeInput = control.querySelector("[data-control-range]");
-            const numberInput = control.querySelector("[data-control-number]");
-            const valueDisplay = control.querySelector("[data-control-value]");
-
-            function setNumberValue(value) {
-              const numericValue = parseFloat(value);
-              if (!Number.isFinite(numericValue)) return;
-
-              config[key] = numericValue;
-              rangeInput.value = String(numericValue);
-              numberInput.value = String(numericValue);
-              valueDisplay.textContent = formatControlNumber(numericValue);
-              updateGeometry();
-            }
-
-            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
-            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
           }
 
-          if (type === "boolean") {
-            const toggleInput = control.querySelector("[data-control-toggle]");
-            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
 
-            function setBooleanValue(checked) {
-              config[key] = checked;
-              toggleInput.checked = checked;
-              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
-              updateGeometry();
-            }
-
-            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
-          }
-        });
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
       }
 
-      function updateGeometry() {
-        if (!sphere) return;
+      function attachBooleanControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const toggle = row?.querySelector("[data-toggle]");
+        const state = row?.querySelector("[data-state]");
+
+        if (!row || !toggle || !state) {
+          throw new Error(`Missing boolean control: ${name}`);
+        }
+
+        const commit = (checked) => {
+          toggle.checked = checked;
+          state.textContent = checked ? "Enabled" : "Disabled";
+          onChange(checked);
+        };
+
+        toggle.addEventListener("change", () => commit(toggle.checked));
+        commit(toggle.checked);
+      }
+
+      function updateSphere() {
+        if (!sphere) {
+          return;
+        }
+
         sphere.setConfig({
-          center: new Vector3(0, config.radius, 0),
+          center: config.center.clone(),
           radius: config.radius,
-          widthSegments: Math.floor(config.widthSegments),
-          heightSegments: Math.floor(config.heightSegments),
-          color: 0x0891b2,
-          fatOutlines: config.fatOutlines,
+          widthSegments: Math.round(config.widthSegments),
+          heightSegments: Math.round(config.heightSegments),
+          color: config.color,
           outlineWidth: config.outlineWidth,
         });
+        sphere.outline = viewState.outline;
 
-        sphere.outline = config.outline;
-        applyTransform(sphere);
+        console.groupCollapsed("[sphere] updated");
+        console.log("Config", config);
+        console.log("View", viewState);
+        console.groupEnd();
       }
 
       async function main() {
@@ -219,64 +188,72 @@
           55,
           window.innerWidth / window.innerHeight,
           0.1,
-          4000
+          100
         );
-
-        camera.position.set(5.5, 4.2, 6.5);
+        camera.position.set(5.7, 4.5, 6.9);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
 
+        const stats = mountStats();
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(0, 0.8, 0);
+        controls.target.set(0, 1, 0);
         controls.update();
 
-        scene.add(new THREE.GridHelper(32, 32, 0x4460ff, 0xd5ddff));
-        scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-        const key = new THREE.DirectionalLight(0xffffff, 0.9);
-        key.position.set(6, 8, 4);
-        scene.add(key);
-
-        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
-        fill.position.set(-5, 3, -6);
-        scene.add(fill);
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
+        config = createConfig();
 
         sphere = new Sphere({
-          center: new Vector3(0, config.radius, 0),
+          center: config.center.clone(),
           radius: config.radius,
-          widthSegments: Math.floor(config.widthSegments),
-          heightSegments: Math.floor(config.heightSegments),
-          color: 0x0891b2,
-          fatOutlines: config.fatOutlines,
+          widthSegments: config.widthSegments,
+          heightSegments: config.heightSegments,
+          color: config.color,
           outlineWidth: config.outlineWidth,
         });
-        sphere.outline = config.outline;
         scene.add(sphere);
 
-        updateGeometry();
+        attachNumberControl("radius", (value) => {
+          config.radius = value;
+          config.center.y = value;
+          updateSphere();
+        });
+        attachNumberControl("width-segments", (value) => {
+          config.widthSegments = value;
+          updateSphere();
+        });
+        attachNumberControl("height-segments", (value) => {
+          config.heightSegments = value;
+          updateSphere();
+        });
+        attachBooleanControl("outline", (value) => {
+          viewState.outline = value;
+          updateSphere();
+        });
 
-        function onResize() {
+        updateSphere();
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
           camera.aspect = window.innerWidth / window.innerHeight;
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        window.addEventListener("resize", onResize);
-
-        function animate() {
-          requestAnimationFrame(animate);
-          controls.update();
-          renderer.render(scene, camera);
-        }
-
-        animate();
-        setUIControls();
+        });
       }
 
       void main();

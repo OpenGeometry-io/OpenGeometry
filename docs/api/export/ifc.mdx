@@ -1,18 +1,18 @@
 ---
 title: IFC export (experimental)
-description: Export scenes to IFC4 text with optional semantics mapping
+description: Export B-Reps and scenes to IFC4 text with optional semantics mapping
 ---
+
+## Overview
+
+OpenGeometry can export a single B-Rep payload or a stored wasm scene to **IFC4** text. In
+practice, scene export is the stronger public workflow because IFC semantics are keyed by scene
+entity IDs.
 
 <Warning>
 IFC export is experimental and may change. If you hit an exporter limitation or confusing output,
 reach out on [Discord](https://discord.gg/9wJpbfgGGA).
 </Warning>
-
-## Overview
-
-OpenGeometry can export B-Reps and scenes to **IFC4** (text / Part 21 style). You can export a
-single B-Rep payload or export a whole scene through `OGSceneManager`. IFC export supports an
-optional semantics mapping that lets you control which IFC classes to emit and attach properties.
 
 ## Initialization
 
@@ -26,7 +26,9 @@ await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 
 ## Export APIs
 
-### exportBrepToIfc
+### exportBrepToIfc()
+
+Export a single serialized B-Rep JSON payload.
 
 ```ts
 import { OGSceneManager } from "opengeometry";
@@ -35,7 +37,9 @@ const manager = new OGSceneManager();
 const result = manager.exportBrepToIfc(brepSerialized);
 ```
 
-### exportSceneToIfc / exportCurrentSceneToIfc
+### exportSceneToIfc() / exportCurrentSceneToIfc()
+
+Export a stored scene or the current scene.
 
 ```ts
 import { OGSceneManager } from "opengeometry";
@@ -44,8 +48,7 @@ const manager = new OGSceneManager();
 const sceneId = manager.createScene("ifc export");
 
 const result = manager.exportSceneToIfc(sceneId);
-// or:
-const result2 = manager.exportCurrentSceneToIfc();
+const currentResult = manager.exportCurrentSceneToIfc();
 ```
 
 ## Result type
@@ -57,14 +60,15 @@ const result2 = manager.exportCurrentSceneToIfc();
 </ResponseField>
 
 <ResponseField name="reportJson" type="string">
-  A JSON string containing export statistics (elements written, semantics applied, fallbacks, and more).
+  A JSON string containing export statistics such as elements written, semantics applied, fallback
+  classes, and validation notes.
 </ResponseField>
 
 ## Config JSON
 
 All IFC exports accept an optional `config_json` string. If it is `null`, `undefined`, or an empty
 string, OpenGeometry uses defaults. If you provide `config_json`, it must deserialize into the full
-`IfcExportConfig` shape (required fields must be present).
+`IfcExportConfig` shape.
 
 Example JSON payload:
 
@@ -83,18 +87,7 @@ Example JSON payload:
     "wall-1": {
       "ifc_class": "IFCWALL",
       "name": "Exterior wall",
-      "description": "Demo export wall",
-      "tag": "W1",
-      "property_sets": {
-        "Pset_WallCommon": {
-          "Reference": "W1"
-        }
-      },
-      "quantity_sets": {
-        "BaseQuantities": {
-          "Length": 6.0
-        }
-      }
+      "tag": "W1"
     }
   }
 }
@@ -102,14 +95,10 @@ Example JSON payload:
 
 ### Semantics mapping
 
-The `semantics` map is keyed by your `entity_id` values in the scene. When you specify
-`ifc_class`, OpenGeometry validates it against the allowed list and:
+The `semantics` map is keyed by your `entity_id` values in the scene. This is why scene export is
+usually the better IFC workflow when you want class mapping or property data.
 
-- Uses the requested class when it is supported
-- Falls back to `IFCBUILDINGELEMENTPROXY` in best-effort mode
-- Errors in strict mode
-
-Supported classes:
+Supported classes include:
 
 - `IFCBUILDINGELEMENTPROXY`
 - `IFCWALL`
@@ -124,13 +113,66 @@ Supported classes:
 - `IFCRAILING`
 - `IFCFOOTING`
 
-## Examples
+## Example
 
-### Export and download IFC in the browser
+### Export a wrapper scene to IFC
 
 ```ts
-const result = manager.exportCurrentSceneToIfc();
+import { Cuboid, OGSceneManager, Vector3 } from "opengeometry";
 
+function toBrepSerialized(source: unknown) {
+  const value =
+    source && typeof (source as { getBrepSerialized?: () => string }).getBrepSerialized === "function"
+      ? (source as { getBrepSerialized: () => string }).getBrepSerialized()
+      : source && typeof (source as { getBrepData?: () => unknown }).getBrepData === "function"
+        ? (source as { getBrepData: () => unknown }).getBrepData()
+        : source && typeof (source as { getBrep?: () => unknown }).getBrep === "function"
+          ? (source as { getBrep: () => unknown }).getBrep()
+          : source;
+
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+const manager = new OGSceneManager();
+const sceneId = manager.createScene("ifc export");
+
+const wall = new Cuboid({
+  center: new Vector3(0, 1.5, 0),
+  width: 6,
+  height: 3,
+  depth: 0.3,
+  color: 0x9ca3af,
+});
+
+manager.addBrepEntityToScene(sceneId, "wall-1", "Cuboid", toBrepSerialized(wall));
+
+const configJson = JSON.stringify({
+  schema: "Ifc4Add2",
+  project_name: "OpenGeometry Project",
+  site_name: "OpenGeometry Site",
+  building_name: "OpenGeometry Building",
+  storey_name: "Level 01",
+  scale: 1.0,
+  error_policy: "BestEffort",
+  validate_topology: true,
+  require_closed_shell: true,
+  semantics: {
+    "wall-1": {
+      ifc_class: "IFCWALL",
+      name: "Exterior wall",
+      tag: "W1",
+    },
+  },
+});
+
+const result = manager.exportSceneToIfc(sceneId, configJson);
+console.log(result.text);
+console.log(JSON.parse(result.reportJson));
+```
+
+### Download IFC in the browser
+
+```ts
 const blob = new Blob([result.text], { type: "text/plain" });
 const url = URL.createObjectURL(blob);
 
@@ -151,7 +193,7 @@ Native-only builds also expose `exportSceneToIfcFile(...)` (not available in bro
 ## Related
 
 - [Exports](/concepts/exports) for an overview of available exporters and runtime constraints
-- [STL export](/api/export/stl)
+- [STL export](/api/export/stl) (experimental)
 - [STEP export](/api/export/step) (experimental)
 
 ## Live demo

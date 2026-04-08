@@ -1,372 +1,196 @@
 ---
 title: 'Sphere'
-description: 'Create spherical shapes with customizable resolution'
+description: 'Create spherical solids with configurable radius, tessellation, placement, and booleans'
 icon: 'globe'
 ---
 
 ## Overview
 
-The `Sphere` class creates 3D spherical shapes with customizable radius and segment resolution. Spheres are generated using UV parameterization with configurable width and height segments for controlling geometry smoothness.
+`Sphere` creates a spherical solid with configurable `widthSegments` and `heightSegments`. It
+supports kernel-backed placement, freeform conversion, parsed BRep access, and boolean
+subtraction.
 
 ## Constructor
 
-```typescript
+```ts
 const sphere = new Sphere(options?: ISphereOptions);
 ```
 
 ### ISphereOptions
 
 <ParamField path="ogid" type="string" optional>
-  Unique identifier for the sphere. Auto-generated if not provided.
+  Unique identifier for the sphere. Auto-generated when omitted.
 </ParamField>
 
 <ParamField path="center" type="Vector3" required>
-  Center point of the sphere in 3D space.
-  
-  ```typescript
-  center: new Vector3(0, 0, 0)
-  ```
+  Center point of the sphere.
 </ParamField>
 
 <ParamField path="radius" type="number" required>
-  Radius of the sphere.
-  
-  ```typescript
-  radius: 5  // Units in scene space
-  ```
+  Sphere radius.
 </ParamField>
 
 <ParamField path="widthSegments" type="number" required>
-  Number of horizontal segments (longitude). Higher values create smoother spheres.
-  
-  ```typescript
-  widthSegments: 24  // Default value
-  ```
+  Horizontal tessellation count.
 </ParamField>
 
 <ParamField path="heightSegments" type="number" required>
-  Number of vertical segments (latitude). Higher values create smoother spheres.
-  
-  ```typescript
-  heightSegments: 16  // Default value
-  ```
+  Vertical tessellation count.
 </ParamField>
 
 <ParamField path="color" type="number" required>
-  Hexadecimal color value for the sphere.
-  
-  ```typescript
-  color: 0x00ff00  // Green
-  ```
+  Mesh color as a hex number.
 </ParamField>
 
 <ParamField path="fatOutlines" type="boolean" default="false">
-  Use wide outlines backed by Three.js `LineSegments2` (instead of thin `LineSegments`).
+  Enables wide outline rendering with `LineSegments2`.
 </ParamField>
 
 <ParamField path="outlineWidth" type="number" default="1">
-  Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
+  Outline width used when `fatOutlines` is enabled.
+</ParamField>
+
+<ParamField path="translation" type="Vector3" optional>
+  Initial placement translation.
+</ParamField>
+
+<ParamField path="rotation" type="Vector3" optional>
+  Initial placement rotation in radians.
+</ParamField>
+
+<ParamField path="scale" type="Vector3" optional>
+  Initial placement scale.
 </ParamField>
 
 ## Methods
 
-### setConfig()
+### setConfig(), getConfig()
 
-Updates the sphere configuration and regenerates geometry.
+Updates or reads the current sphere config.
 
-```typescript
-sphere.setConfig(options: ISphereOptions): void
+```ts
+sphere.setConfig(options: SphereConfigUpdate): void
+const config = sphere.getConfig();
 ```
 
-**Example:**
-```typescript
-sphere.setConfig({
-  center: new Vector3(0, 5, 0),
-  radius: 8,
-  widthSegments: 32,
-  heightSegments: 24,
-  color: 0x3498db
-});
+### getPlacement(), getAnchor()
+
+Returns cloned placement values or the current kernel anchor.
+
+```ts
+const placement = sphere.getPlacement();
+const anchor = sphere.getAnchor();
+```
+
+### setPlacement(), setTransform(), setTranslation(), setRotation(), setScale()
+
+Placement helpers for moving the sphere through the kernel transform path.
+
+```ts
+sphere.setPlacement({ translation?, rotation?, scale? });
+```
+
+### toFreeform()
+
+Converts the sphere into a freeform geometry wrapper.
+
+```ts
+const freeform = sphere.toFreeform(id?);
 ```
 
 ### getBrep()
 
-Returns the B-Rep (Boundary Representation) data as a parsed JSON object.
+Returns the parsed BRep object for the current sphere.
 
-```typescript
-sphere.getBrep(): object
-```
-
-**Example:**
-```typescript
-const brepData = sphere.getBrep();
-console.log('Vertices:', brepData.vertices.length);
-console.log('Edges:', brepData.edges.length);
-console.log('Faces:', brepData.faces.length);
+```ts
+const brep = sphere.getBrep();
 ```
 
 ### subtract()
 
-Subtracts another boolean operand (such as an `Opening`) from this sphere and returns a renderable result mesh.
+Subtracts another boolean operand from the sphere and returns a renderable boolean result.
 
-```typescript
+```ts
 const result = sphere.subtract(operand, options?);
 ```
 
-### generateGeometry()
+### generateGeometry(), discardGeometry()
 
-Regenerates the THREE.js geometry from the current configuration. Called automatically after setConfig().
+Rebuilds or disposes the current Three.js geometry.
 
-```typescript
+```ts
 sphere.generateGeometry(): void
-```
-
-### discardGeometry()
-
-Disposes of the current geometry to free memory.
-
-```typescript
 sphere.discardGeometry(): void
 ```
 
 ## Properties
 
 <ResponseField name="ogid" type="string">
-  Unique identifier for the sphere instance.
+  Stable identifier for the sphere wrapper.
 </ResponseField>
 
 <ResponseField name="options" type="ISphereOptions">
-  Current sphere configuration.
-  
-  ```typescript
-  const currentRadius = sphere.options.radius;
-  const currentSegments = sphere.options.widthSegments;
-  ```
+  Current sphere configuration and placement state.
 </ResponseField>
 
 <ResponseField name="radius" type="number">
-  Get or set the sphere radius. Setting triggers geometry regeneration.
-  
-  ```typescript
-  sphere.radius = 10;  // Update radius and regenerate
-  ```
+  Sets the sphere radius and regenerates geometry.
 </ResponseField>
 
 <ResponseField name="color" type="number">
-  Get or set the sphere color.
-  
-  ```typescript
-  sphere.color = 0xff0000;  // Change to red
-  ```
+  Gets or sets the render color.
 </ResponseField>
 
 <ResponseField name="outline" type="boolean">
-  Enable or disable outline rendering showing the sphere's wireframe edges.
-  
-  ```typescript
-  sphere.outline = true;   // Show wireframe
-  sphere.outline = false;  // Hide wireframe
-  ```
+  Enables or disables outline rendering.
 </ResponseField>
 
 <ResponseField name="fatOutlines" type="boolean">
-  When enabled, outlines are rendered using a wide-line implementation (instead of thin lines).
+  Enables or disables wide outlines.
 </ResponseField>
 
 <ResponseField name="outlineWidth" type="number">
-  Outline width used for fat outlines.
+  Outline width used for wide outlines.
 </ResponseField>
 
-## Usage Examples
+## Examples
 
-### Basic Sphere
+### Create a sphere
 
-```typescript
+```ts
 import { Sphere, Vector3 } from "opengeometry";
 
 const sphere = new Sphere({
-  center: new Vector3(0, 0, 0),
-  radius: 5,
-  widthSegments: 24,
-  heightSegments: 16,
-  color: 0x2ecc71
-});
-
-// Add to scene
-scene.add(sphere);
-```
-
-### High-Resolution Sphere
-
-```typescript
-import { Sphere, Vector3 } from "opengeometry";
-
-// Smooth sphere for close-up viewing
-const smoothSphere = new Sphere({
-  center: new Vector3(0, 0, 0),
-  radius: 8,
-  widthSegments: 48,  // High horizontal resolution
-  heightSegments: 32,  // High vertical resolution
-  color: 0x3498db
-});
-
-smoothSphere.outline = true;
-```
-
-### Low-Poly Sphere
-
-```typescript
-import { Sphere, Vector3 } from "opengeometry";
-
-// Faceted appearance for stylized visuals
-const lowPolySphere = new Sphere({
-  center: new Vector3(0, 0, 0),
-  radius: 6,
-  widthSegments: 8,   // Low segment count
-  heightSegments: 6,
-  color: 0xe74c3c
+  center: new Vector3(0, 1.1, 0),
+  radius: 1.1,
+  widthSegments: 28,
+  heightSegments: 18,
+  color: 0x0891b2,
 });
 ```
 
-### Animated Sphere
+### Increase detail and move it
 
-```typescript
-import { Sphere, Vector3 } from "opengeometry";
-
-const sphere = new Sphere({
-  center: new Vector3(0, 0, 0),
-  radius: 5,
-  widthSegments: 32,
-  heightSegments: 24,
-  color: 0x9b59b6
-});
-
-// Pulsating animation
-function animate() {
-  const time = Date.now() * 0.001;
-  sphere.radius = 5 + Math.sin(time * 2) * 1.5;
-  requestAnimationFrame(animate);
-}
-animate();
-```
-
-### Planet with Outline
-
-```typescript
-import { Sphere, Vector3 } from "opengeometry";
-
-const planet = new Sphere({
-  center: new Vector3(0, 0, 0),
-  radius: 10,
+```ts
+sphere.setConfig({
+  radius: 1.4,
   widthSegments: 40,
-  heightSegments: 30,
-  color: 0x1e8bc3
+  heightSegments: 28,
 });
 
-planet.outline = true;
-```
-
-## Implementation Details
-
-### UV Sphere Generation
-
-Spheres are generated using parametric equations with UV coordinates:
-
-**Rust Implementation:** `/workspace/source/main/opengeometry/src/primitives/sphere.rs:76-106`
-
-```rust
-for iy in 0..=height {
-    let v = iy as f64 / height as f64;
-    let theta = v * std::f64::consts::PI;
-    let sin_theta = theta.sin();
-    let cos_theta = theta.cos();
-
-    for ix in 0..=width {
-        let u = ix as f64 / width as f64;
-        let phi = u * std::f64::consts::PI * 2.0;
-        let sin_phi = phi.sin();
-        let cos_phi = phi.cos();
-
-        let x = self.center.x + self.radius * sin_theta * cos_phi;
-        let y = self.center.y + self.radius * cos_theta;
-        let z = self.center.z + self.radius * sin_theta * sin_phi;
-    }
-}
-```
-
-### Material Configuration
-
-Spheres use MeshStandardMaterial with transparency:
-
-```typescript
-const material = new THREE.MeshStandardMaterial({
-  color: this.options.color,
-  transparent: true,
-  opacity: 0.6,
+sphere.setPlacement({
+  translation: new Vector3(2, 0.3, 0),
+  rotation: new Vector3(0, 0, 0),
+  scale: new Vector3(1, 1, 1),
 });
 ```
 
-### Outline from B-Rep Edges
+### Convert to freeform for direct edits
 
-Unlike other shapes, sphere outlines are generated from the B-Rep edge data to properly represent the geometry:
-
-```typescript
-const brep = this.getBrep();
-const lineBuffer: number[] = [];
-
-for (const edge of brep.edges ?? []) {
-  const start = brep.vertices?.[edge.v1]?.position;
-  const end = brep.vertices?.[edge.v2]?.position;
-  if (!start || !end) continue;
-  
-  lineBuffer.push(
-    start.x, start.y, start.z,
-    end.x, end.y, end.z
-  );
-}
+```ts
+const freeform = sphere.toFreeform();
 ```
-
-### Face Generation
-
-The sphere is composed of triangular faces, with special handling for the poles to avoid degenerate triangles:
-
-**Source:** `/workspace/source/main/opengeometry/src/primitives/sphere.rs:111-136`
-
-## Best Practices
-
-<Tip>
-  **Segment Optimization:** Use `widthSegments: 24` and `heightSegments: 16` for general purposes. Increase for close-ups (32/24 or 48/32), decrease for distant objects (12/8) to improve performance.
-</Tip>
-
-<Warning>
-  **Minimum Segments:** The Rust implementation enforces minimum values: `widthSegments >= 3` and `heightSegments >= 2`. Lower values will be automatically clamped.
-</Warning>
-
-<Info>
-  **Aspect Ratio:** For most realistic spheres, maintain a `widthSegments:heightSegments` ratio of approximately 3:2 (e.g., 24:16, 30:20, 48:32).
-</Info>
-
-## Performance Considerations
-
-### Vertex Count
-
-The total number of vertices generated is `(widthSegments + 1) × (heightSegments + 1)`:
-
-- 24×16 segments = 425 vertices
-- 32×24 segments = 825 vertices  
-- 48×32 segments = 1,617 vertices
-
-### Face Count
-
-Approximate number of triangular faces: `widthSegments × heightSegments × 2`
-
-## See Also
-
-- [Boolean operations](/api/operations/boolean-operations) - Union, intersection, and subtraction
-- [Cylinder](/api/shapes/cylinder) - For cylindrical shapes
-- [Cuboid](/api/shapes/cuboid) - For rectangular boxes
-- [Sweep](/api/shapes/sweep) - For custom revolution shapes
 
 ## Live demo
 
-Try it in the browser: [Sphere demo](https://demo.opengeometry.io/shapes/sphere.html).
+- [Sphere demo](https://demo.opengeometry.io/shapes/sphere.html)

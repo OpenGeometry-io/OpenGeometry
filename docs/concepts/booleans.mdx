@@ -24,6 +24,15 @@ You can use either:
 
 All of these call the same kernel entry points under the hood.
 
+The operands can be:
+
+- Wrapper objects such as `Cuboid`, `Opening`, `Solid`, or other shapes that expose B-Rep accessors
+- Parsed B-Rep objects
+- Serialized B-Rep JSON strings
+
+That means `polygon.extrude(height)` fits naturally into boolean workflows because it returns a
+`Solid`.
+
 ## Initialization requirement
 
 Booleans require the WASM module to be initialized:
@@ -62,6 +71,8 @@ merging. If you see missing details, lower tolerance.
 - Read `result.report` to get counts and an `empty` flag.
 - Start with simple operands (two cuboids), then move to complex geometry.
 - Turn on outlines (default for the helpers) so you can see output edges clearly.
+- Use `result.toFreeform()` when you want to inspect or continue editing the output as direct
+  geometry.
 
 ## Status and limitations
 

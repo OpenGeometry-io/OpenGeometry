@@ -1,14 +1,16 @@
 ---
 title: Scene Management
-description: Managing collections of geometry entities in OpenGeometry
+description: Manage named scene collections and export/project them through OGSceneManager
 ---
 
 ## Overview
 
-The scene management system provides a way to organize multiple geometry entities, manage their lifecycle, and apply operations to entire collections. The `OGScene` class represents a collection of geometry entities, while `OGSceneManager` provides high-level scene operations.
+`OGSceneManager` stores named scene collections inside the wasm layer and exposes scene-level
+projection and export APIs. In Three.js applications, you typically use wrapper shapes to generate
+BRep payloads, then add those payloads to a scene through `OGSceneManager`.
 
 <Note>
-Initialize the WASM module once before using `OGSceneManager`:
+Initialize the runtime once before using `OGSceneManager`:
 
 ```ts
 import { OpenGeometry } from "opengeometry";
@@ -17,65 +19,63 @@ await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 ```
 </Note>
 
-## OGScene
+## Core scene operations
 
-### Structure
+### createScene()
 
-```rust
-pub struct OGScene {
-    pub id: String,
-    pub name: String,
-    pub entities: Vec<SceneEntity>,
-}
+Creates a new scene and returns its ID.
+
+```ts
+const sceneId = manager.createScene("Project Name");
 ```
 
-A scene is a named collection of geometry entities, each with a unique ID and associated BRep representation.
+### removeScene()
 
-### Creating a Scene
+Removes a scene by ID.
 
-```rust
-pub fn new(name: impl Into<String>) -> Self
+```ts
+const removed = manager.removeScene(sceneId);
 ```
 
-Creates a new empty scene with a generated UUID.
+### setCurrentScene()
 
-**Example:**
+Sets the current scene for APIs that operate without an explicit scene ID.
 
-```javascript
-const manager = new OGSceneManager();
-const sceneId = manager.createScene("My Architecture Model");
+```ts
+manager.setCurrentScene(sceneId);
 ```
 
-### Managing Entities
+### listScenes()
 
-#### upsert_entity
+Returns a JSON array of scene summaries.
 
-```rust
-pub fn upsert_entity(&mut self, entity: SceneEntity)
+```ts
+const scenes = JSON.parse(manager.listScenes());
 ```
 
-Inserts or updates an entity in the scene. If an entity with the same ID exists, it will be replaced; otherwise, the entity is added.
+## Adding wrapper geometry
 
-**Example:**
+For wrapper shapes, add serialized BRep payloads with `addBrepEntityToScene(...)` or
+`addBrepEntityToCurrentScene(...)`.
 
-```javascript
-import { OGSceneManager, Cuboid, Sphere, Vector3 } from "opengeometry";
+```ts
+import { Cuboid, OGSceneManager, Sphere, Vector3 } from "opengeometry";
 
-function toBrepSerialized(source) {
+function toBrepSerialized(source: unknown) {
   const value =
-    source && typeof source.getBrepSerialized === "function"
-      ? source.getBrepSerialized()
-      : source && typeof source.getBrepData === "function"
-        ? source.getBrepData()
-        : source && typeof source.getBrep === "function"
-          ? source.getBrep()
+    source && typeof (source as { getBrepSerialized?: () => string }).getBrepSerialized === "function"
+      ? (source as { getBrepSerialized: () => string }).getBrepSerialized()
+      : source && typeof (source as { getBrepData?: () => unknown }).getBrepData === "function"
+        ? (source as { getBrepData: () => unknown }).getBrepData()
+        : source && typeof (source as { getBrep?: () => unknown }).getBrep === "function"
+          ? (source as { getBrep: () => unknown }).getBrep()
           : source;
 
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 
 const manager = new OGSceneManager();
-const sceneId = manager.createScene("My Architecture Model");
+const sceneId = manager.createScene("Architecture Model");
 
 const cuboid = new Cuboid({
   center: new Vector3(0, 0.5, 0),
@@ -84,7 +84,6 @@ const cuboid = new Cuboid({
   depth: 3,
   color: 0x9ca3af,
 });
-manager.addBrepEntityToScene(sceneId, "cuboid-1", "Cuboid", toBrepSerialized(cuboid));
 
 const sphere = new Sphere({
   center: new Vector3(0, 2.5, 0),
@@ -93,300 +92,79 @@ const sphere = new Sphere({
   heightSegments: 24,
   color: 0x0ea5e9,
 });
+
+manager.addBrepEntityToScene(sceneId, "cuboid-1", "Cuboid", toBrepSerialized(cuboid));
 manager.addBrepEntityToScene(sceneId, "sphere-1", "Sphere", toBrepSerialized(sphere));
 ```
 
-#### remove_entity
+### addBrepEntityToCurrentScene()
 
-```rust
-pub fn remove_entity(&mut self, entity_id: &str) -> bool
-```
+Adds a serialized BRep payload to the current scene.
 
-Removes an entity from the scene by ID. Returns `true` if the entity was found and removed.
-
-**Example:**
-
-```javascript
-const removed = manager.removeEntityFromScene(sceneId, "cuboid-1");
-if (removed) {
-    console.log("Entity removed successfully");
-}
-```
-
-### Projection
-
-<Warning>
-Projection and hidden line removal are experimental. Output and option shapes may change. If you
-hit an exporter limitation or confusing output, reach out on
-[Discord](https://discord.gg/9wJpbfgGGA).
-</Warning>
-
-#### project_to_2d
-
-```rust
-pub fn project_to_2d(&self, camera: &CameraParameters, hlr: &HlrOptions) -> Scene2D
-```
-
-Projects all entities in the scene to 2D using the specified camera parameters and hidden line removal options.
-
-**Example:**
-
-```javascript
-const cameraJson = JSON.stringify({
-    position: { x: 10, y: 10, z: 10 },
-    target: { x: 0, y: 0, z: 0 },
-    up: { x: 0, y: 1, z: 0 },
-    near: 0.1,
-    projection_mode: "Orthographic"
-});
-
-const hlrJson = JSON.stringify({
-    hide_hidden_edges: true
-});
-
-const scene2d = manager.projectTo2DCamera(sceneId, cameraJson, hlrJson);
-const projected = JSON.parse(scene2d);
-```
-
-You can also project using the extra helper methods:
-
-- `projectTo2DCameraPretty(...)` (pretty-printed JSON)
-- `projectTo2DLines(...)` (a flattened line-segment payload)
-- `projectTo2DLinesPretty(...)`
-- `projectCurrentTo2DCamera(...)` and `projectCurrentTo2DLines(...)`
-
-See [Projection & Hidden Line Removal](/api/export/projection) for the 2D output shapes.
-
-## SceneEntity
-
-### Structure
-
-```rust
-pub struct SceneEntity {
-    pub id: String,
-    pub kind: String,
-    pub brep: Brep,
-}
-```
-
-Each entity in a scene has:
-- **id**: Unique identifier for the entity
-- **kind**: Type descriptor (for example `"Cuboid"`, `"Sphere"`, or any app-defined label)
-- **brep**: The boundary representation of the geometry
-
-## OGSceneManager
-
-The scene manager provides a high-level API for managing multiple scenes and adding various geometry types.
-
-### Scene Operations
-
-#### createScene
-
-```javascript
-const sceneId = manager.createScene("Project Name");
-```
-
-Creates a new scene and sets it as the current scene.
-
-#### removeScene
-
-```javascript
-const removed = manager.removeScene(sceneId);
-```
-
-Removes a scene by ID. If it was the current scene, another scene becomes current.
-
-#### setCurrentScene
-
-```javascript
-manager.setCurrentScene(sceneId);
-```
-
-Sets the active scene for operations that don't specify a scene ID.
-
-#### listScenes
-
-```javascript
-const scenesJson = manager.listScenes();
-const scenes = JSON.parse(scenesJson);
-// Returns array of SceneSummary objects
-```
-
-Returns a JSON array of scene summaries containing ID, name, and entity count.
-
-### Adding Entities
-
-For OpenGeometry wrapper shapes, use `addBrepEntityToScene(...)` or `addBrepEntityToCurrentScene(...)`
-and pass a serialized B-Rep string.
-
-```javascript
-function toBrepSerialized(source) {
-  const value =
-    source && typeof source.getBrepSerialized === "function"
-      ? source.getBrepSerialized()
-      : source && typeof source.getBrepData === "function"
-        ? source.getBrepData()
-        : source && typeof source.getBrep === "function"
-          ? source.getBrep()
-          : source;
-
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-// Add to specific scene
-manager.addBrepEntityToScene(sceneId, "wall-1", "Cuboid", toBrepSerialized(cuboid));
-
-// Add to current scene
+```ts
 manager.addBrepEntityToCurrentScene("opening-1", "Opening", toBrepSerialized(opening));
 ```
 
-<Note>
-`OGSceneManager` also exposes lower-level helpers like `addLineToScene(...)` that accept kernel
-primitive instances. If you are using the Three.js wrapper API (`Cuboid`, `Line`, etc.), prefer the
-`addBrepEntity*` methods.
-</Note>
+### removeEntityFromScene()
 
-### Complete Example: Multi-Entity Scene
+Removes a scene entity by ID.
 
-```javascript
-import { OpenGeometry, OGSceneManager, Cuboid, Cylinder, Sphere, Vector3 } from "opengeometry";
+```ts
+const removed = manager.removeEntityFromScene(sceneId, "cuboid-1");
+```
 
-await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+## Projection helpers
 
-function toBrepSerialized(source) {
-  const value =
-    source && typeof source.getBrepSerialized === "function"
-      ? source.getBrepSerialized()
-      : source && typeof source.getBrepData === "function"
-        ? source.getBrepData()
-        : source && typeof source.getBrep === "function"
-          ? source.getBrep()
-          : source;
+`OGSceneManager` exposes projection helpers that turn stored scene geometry into 2D JSON payloads.
 
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-// Create scene manager and new scene
-const manager = new OGSceneManager();
-const sceneId = manager.createScene("Building Components");
-
-// Add foundation (cuboid)
-const foundation = new Cuboid({
-  center: new Vector3(0, 0.5, 0),
-  width: 20,
-  height: 1,
-  depth: 15,
-  color: 0x9ca3af,
-});
-manager.addBrepEntityToScene(sceneId, "foundation", "Cuboid", toBrepSerialized(foundation));
-
-// Add columns (cylinders)
-for (let i = 0; i < 4; i++) {
-    const x = (i % 2) * 18 - 9;
-    const z = Math.floor(i / 2) * 13 - 6.5;
-    const column = new Cylinder({
-      center: new Vector3(x, 1.5, z),
-      radius: 0.5,
-      height: 3.0,
-      segments: 32,
-      angle: Math.PI * 2,
-      color: 0x2563eb,
-    });
-    manager.addBrepEntityToScene(sceneId, `column-${i}`, "Cylinder", toBrepSerialized(column));
-}
-
-// Add decorative sphere
-const dome = new Sphere({
-  center: new Vector3(0, 5, 0),
-  radius: 1.5,
-  widthSegments: 32,
-  heightSegments: 24,
-  color: 0xf97316,
-});
-manager.addBrepEntityToScene(sceneId, "dome", "Sphere", toBrepSerialized(dome));
-
-// Get scene info
-const scenesJson = manager.listScenes();
-const scenes = JSON.parse(scenesJson);
-console.log(`Scene contains ${scenes[0].entity_count} entities`);
-
-// Project to 2D for technical drawing
+```ts
 const cameraJson = JSON.stringify({
-    position: { x: 30, y: 20, z: 25 },
-    target: { x: 0, y: 2, z: 0 },
-    up: { x: 0, y: 1, z: 0 },
-    near: 0.1,
-    projection_mode: "Orthographic"
+  position: { x: 8, y: 6, z: 8 },
+  target: { x: 0, y: 0, z: 0 },
+  up: { x: 0, y: 1, z: 0 },
+  near: 0.1,
+  projection_mode: "Orthographic",
 });
 
-const hlrJson = JSON.stringify({ hide_hidden_edges: true });
+const hlrJson = JSON.stringify({
+  hide_hidden_edges: true,
+});
+
 const scene2dJson = manager.projectTo2DCamera(sceneId, cameraJson, hlrJson);
 const scene2d = JSON.parse(scene2dJson);
-
-console.log(`Projected scene has ${scene2d.paths.length} paths`);
 ```
 
-### Exporting scenes
+Related helpers include:
 
-`OGSceneManager` also exposes scene export methods:
+- `projectTo2DCameraPretty(...)`
+- `projectTo2DLines(...)`
+- `projectTo2DLinesPretty(...)`
+- `projectCurrentTo2DCamera(...)`
+- `projectCurrentTo2DLines(...)`
 
-<Warning>
-Export APIs are experimental. Output, config schemas, and file-writing helpers may change. If you
-hit an exporter limitation or confusing output, reach out on
-[Discord](https://discord.gg/9wJpbfgGGA).
-</Warning>
+## Export helpers
 
-- STL (experimental): [STL export](/api/export/stl)
-- STEP (experimental): [STEP export](/api/export/step)
-- IFC (experimental): [IFC export](/api/export/ifc)
+The same scene storage model is used for scene-level export APIs such as:
 
-## Scene Summary
+- `exportSceneToStl(...)`
+- `exportSceneToStep(...)`
+- `exportSceneToIfc(...)`
+- `exportCurrentSceneToStl(...)`
+- `exportCurrentSceneToStep(...)`
+- `exportCurrentSceneToIfc(...)`
 
-```rust
-pub struct SceneSummary {
-    pub id: String,
-    pub name: String,
-    pub entity_count: usize,
-}
-```
+See the export pages for result formats and config JSON shapes.
 
-Provides lightweight metadata about a scene without loading all geometry data.
+## Notes
 
-## Best Practices
+- Scene entities are stored as named BRep payloads, not as live Three.js object references.
+- `kind` is an app-facing label. It can match the wrapper type, but it does not need to.
+- For wrapper-first apps, `OGSceneManager` is most useful when you need projection, export, or
+  long-lived scene snapshots inside the wasm layer.
 
-### Entity IDs
+## Related reading
 
-- Use descriptive IDs that indicate purpose: `"wall-north"`, `"column-A1"`
-- Keep IDs unique within a scene
-- Use consistent naming conventions for entity groups
-
-### Performance
-
-- Scenes can contain thousands of entities efficiently
-- Use `upsert_entity` for batch updates without removing/re-adding
-- Remove entities when no longer needed to reduce memory
-
-### Scene Organization
-
-```javascript
-// Create separate scenes for different views or versions
-const designScene = manager.createScene("Design Iteration 1");
-const analysisScene = manager.createScene("Structural Analysis");
-
-// Switch between scenes
-manager.setCurrentScene(designScene);
-// ... add design entities
-
-manager.setCurrentScene(analysisScene);
-// ... add analysis-specific entities
-```
-
-## Related
-
-- [Projection](/api/export/projection) (experimental) - Converting 3D scenes to 2D drawings
-- [PDF export](/api/export/pdf) (experimental) - Exporting scenes to PDF format
-- [Line Primitive](/api/primitives/line) - Basic 2D geometry that can be added to scenes
-
-## Live demo
-
-Start from the demo index (most demos create scenes internally): [OpenGeometry demos](https://demo.opengeometry.io/).
+- [Projection & hidden line removal](/api/export/projection)
+- [STL export](/api/export/stl)
+- [STEP export](/api/export/step)
+- [IFC export](/api/export/ifc)

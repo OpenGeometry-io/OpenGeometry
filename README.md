@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="https://opengeometry.io">Website</a> · <a href="https://docs.opengeometry.io">Documentation</a> · <a href="https://demos.opengeometry.io">Live Demos</a> · <a href="https://opengeometry.io/blog">Blog</a> · <a href="https://www.npmjs.com/package/opengeometry">npm</a>
+  <a href="https://opengeometry.io">Website</a> · <a href="https://docs.opengeometry.io">Documentation</a> · <a href="https://demo.opengeometry.io">Live Demos</a> · <a href="https://opengeometry.io/blog">Blog</a> · <a href="https://www.npmjs.com/package/opengeometry">npm</a>
 </p>
 
 ---
@@ -39,7 +39,7 @@ Whether you're building a parametric modeler, a BIM viewer, a 3D configurator, o
 | Category | Capabilities |
 | --- | --- |
 | **Primitives** | Lines, arcs, curves, polylines, rectangles |
-| **Shapes** | Polygons, cylinders, cuboids, spheres, wedges |
+| **Shapes** | Polygons, solids, cuboids, cylinders, spheres, wedges, sweeps, openings |
 | **Operations** | Triangulation, extrusion, sweep, offset, boolean operations |
 | **Exports** | STL, STEP, IFC, PDF projection |
 | **Integration** | Three.js scene management, WebAssembly-powered performance |
@@ -48,7 +48,7 @@ Whether you're building a parametric modeler, a BIM viewer, a 3D configurator, o
 
 See OpenGeometry in action — interactive, browser-based demos showcasing the kernel's capabilities:
 
-**[demos.opengeometry.io](https://demos.opengeometry.io)**
+**[demo.opengeometry.io](https://demo.opengeometry.io)**
 
 Demos include primitives rendering, shape generation, sweep operations, boolean operations, file exports, and more. All running client-side via WebAssembly.
 
@@ -140,7 +140,7 @@ npm test
 - Contributors interested in the **Rust → WASM geometry pipeline**
 - Anyone exploring **open-source CAD kernel internals**
 
-If you just want a quick look, start with the [hosted demos](https://demos.opengeometry.io) or the [quickstart repo](https://github.com/OpenGeometry-io/quickstart-js).
+If you just want a quick look, start with the [hosted demos](https://demo.opengeometry.io) or the [quickstart repo](https://github.com/OpenGeometry-io/quickstart-js).
 
 ## Community
 
@@ -159,6 +159,8 @@ OpenGeometry is open source under the [MPL-2.0 license](./LICENSE.md). Contribut
 ## AI Agent Docs Policy
 
 - Repository-level AI agent instructions are in [AGENTS.md](./AGENTS.md).
+- LLM-friendly repo entrypoints are [llms.txt](./llms.txt), [llms-full.txt](./llms-full.txt), and
+  [llm.txt](./llm.txt).
 - All AI-generated documentation must live under [`AI-DOCs/`](./AI-DOCs/).
 - AI-generated docs should not be added under app/code folders unless explicitly requested.
 

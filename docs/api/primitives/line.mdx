@@ -1,18 +1,14 @@
 ---
 title: Line
-description: A simple line primitive defined by two points
+description: A line primitive defined by start and end points
 icon: 'minus'
 ---
 
 ## Overview
 
-The Line primitive represents a straight line segment in 3D space, defined by a start point and an end point. It is the simplest 2D primitive in OpenGeometry and is suitable for creating linear segments, edges, and simple geometric constructions.
-
-**Use Cases:**
-- Drawing straight line segments
-- Creating basic geometric shapes
-- Defining edges in technical drawings
-- Path offset operations for parallel lines
+`Line` is the simplest line-based wrapper in the Three.js API. It creates a straight segment between
+two points, supports optional wide-line rendering, exposes placement helpers, and can generate
+offset geometry for parallel construction workflows.
 
 ## Constructor
 
@@ -23,265 +19,184 @@ The Line primitive represents a straight line segment in 3D space, defined by a 
     ```
   </Tab>
   <Tab title="TypeScript">
-    ```typescript
+    ```ts
     const line = new Line(options?: ILineOptions);
     ```
   </Tab>
 </Tabs>
 
-## Live demo
+### ILineOptions
 
-Try it in the browser: [Line demo](https://demo.opengeometry.io/primitives/line.html).
-
-### Rust Constructor Parameters
-
-<ParamField path="id" type="String" required>
-  Unique identifier for the line instance
+<ParamField path="ogid" type="string" optional>
+  Unique identifier for the line. Auto-generated when omitted.
 </ParamField>
 
-### TypeScript Constructor Parameters
-
-<ParamField path="options" type="ILineOptions">
-  Configuration options for the line
+<ParamField path="start" type="Vector3" required>
+  Start point of the segment.
 </ParamField>
 
-<ParamField path="options.ogid" type="string">
-  Optional unique identifier (auto-generated if not provided)
+<ParamField path="end" type="Vector3" required>
+  End point of the segment.
 </ParamField>
 
-<ParamField path="options.start" type="Vector3" required>
-  Starting point of the line
+<ParamField path="color" type="number" required>
+  Line color as a hex number.
 </ParamField>
 
-<ParamField path="options.end" type="Vector3" required>
-  Ending point of the line
+<ParamField path="fatLines" type="boolean" default="false">
+  Enables wide-line rendering with `Line2`.
 </ParamField>
 
-<ParamField path="options.color" type="number" required>
-  Line color as a hexadecimal number (e.g., 0x000000 for black)
+<ParamField path="width" type="number" default="20">
+  Wide-line width used when `fatLines` is enabled.
 </ParamField>
 
-<ParamField path="options.fatLines" type="boolean" default="false">
-  Enable thick line rendering using Line2
+<ParamField path="translation" type="Vector3" optional>
+  Initial placement translation.
 </ParamField>
 
-<ParamField path="options.width" type="number" default="20">
-  Line width when fatLines is enabled
+<ParamField path="rotation" type="Vector3" optional>
+  Initial placement rotation in radians.
+</ParamField>
+
+<ParamField path="scale" type="Vector3" optional>
+  Initial placement scale.
 </ParamField>
 
 ## Methods
 
-### set_config
+### setConfig()
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    line.set_config(start: Vector3, end: Vector3);
-    ```
-    Updates the line's start and end points.
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    line.setConfig(options: ILineOptions);
-    ```
-    Updates the line configuration and regenerates geometry.
-  </Tab>
-</Tabs>
+Updates geometry or render style and regenerates the segment when needed.
 
-### generate_geometry
+```ts
+line.setConfig(options: LineConfigUpdate): void
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    line.generate_geometry();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    // Called automatically by setConfig
-    ```
-  </Tab>
-</Tabs>
+### getConfig()
 
-Generates the BREP (Boundary Representation) geometry for the line, creating vertices and edges.
+Returns the current line options.
 
-### get_geometry_serialized
+```ts
+const config = line.getConfig();
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let geometry: String = line.get_geometry_serialized();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    // Used internally for rendering
-    ```
-  </Tab>
-</Tabs>
+### getPlacement()
 
-Returns serialized vertex buffer data as a JSON string.
+Returns the current placement values as cloned vectors.
 
-### get_offset_serialized
+```ts
+const placement = line.getPlacement();
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let offset_data = line.get_offset_serialized(
-        distance: f64,
-        acute_threshold_degrees: f64,
-        bevel: bool
-    );
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    const result = line.getOffset(
-        distance: number,
-        acuteThresholdDegrees: number = 35.0,
-        bevel: boolean = true
-    ): ILineOffsetResult;
-    ```
-  </Tab>
-</Tabs>
+### setPlacement()
 
-Generates an offset path parallel to the line at the specified distance.
+Updates translation, rotation, or scale through the kernel-backed placement path.
 
-<ParamField path="distance" type="number" required>
-  Distance to offset the line (positive or negative)
-</ParamField>
+```ts
+line.setPlacement({ translation?, rotation?, scale? }): void
+```
 
-<ParamField path="acuteThresholdDegrees" type="number" default="35.0">
-  Angle threshold for beveling acute corners
-</ParamField>
+### setTransform(), setTranslation(), setRotation(), setScale()
 
-<ParamField path="bevel" type="boolean" default="true">
-  Enable beveling at acute angles
-</ParamField>
+Convenience placement helpers.
 
-### get_brep_serialized
+```ts
+line.setTransform(translation, rotation, scale);
+line.setTranslation(translation);
+line.setRotation(rotation);
+line.setScale(scale);
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let brep: String = line.get_brep_serialized();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    // Available through internal API
-    ```
-  </Tab>
-</Tabs>
+### getOffset()
 
-Returns the complete BREP representation as JSON.
+Returns a parallel offset result for the current segment.
+
+```ts
+const offset = line.getOffset(
+  distance,
+  acuteThresholdDegrees = 35,
+  bevel = true
+);
+```
+
+### toFreeform()
+
+Converts the line into a freeform geometry wrapper for direct editing.
+
+```ts
+const freeform = line.toFreeform(id?);
+```
+
+### discardGeometry()
+
+Disposes the current Three.js geometry buffer. Use this only when you are handling lifecycle
+manually.
+
+```ts
+line.discardGeometry(): void
+```
 
 ## Properties
 
-<ResponseField name="id" type="String">
-  Unique identifier for the line instance
+<ResponseField name="ogid" type="string">
+  Stable identifier for the line wrapper.
 </ResponseField>
 
-<ResponseField name="start" type="Vector3">
-  Starting point of the line (Rust only)
-</ResponseField>
-
-<ResponseField name="end" type="Vector3">
-  Ending point of the line (Rust only)
-</ResponseField>
-
-<ResponseField name="brep" type="Brep">
-  Internal BREP representation containing vertices and edges
+<ResponseField name="options" type="ILineOptions">
+  Current line configuration and placement state.
 </ResponseField>
 
 <ResponseField name="color" type="number">
-  Line color (TypeScript only, settable)
+  Gets or sets the rendered line color.
 </ResponseField>
 
-## Code Examples
+## Examples
 
-### Creating a Basic Line
+### Create a line
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    use opengeometry::primitives::OGLine;
-    use openmaths::Vector3;
+```ts
+import { Line, Vector3 } from "opengeometry";
 
-    let mut line = OGLine::new("line-1".to_string());
-    line.set_config(
-        Vector3::new(0.0, 0.0, 0.0),
-        Vector3::new(10.0, 0.0, 0.0)
-    );
-    line.generate_geometry();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    import { Line, Vector3 } from "opengeometry";
+const line = new Line({
+  start: new Vector3(-2, 0, -0.8),
+  end: new Vector3(2, 0, 0.8),
+  color: 0x111827,
+  fatLines: true,
+  width: 10,
+});
 
-    const line = new Line({
-      start: new Vector3(0, 0, 0),
-      end: new Vector3(10, 0, 0),
-      color: 0x000000
-    });
-    ```
-  </Tab>
-</Tabs>
+line.setTranslation(new Vector3(0, 0.2, 0));
+```
 
-### Generating Offset Lines
+### Create a parallel guide
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let offset_data = line.get_offset_serialized(2.0, 35.0, true);
-    let result: OffsetResult = serde_json::from_str(&offset_data).unwrap();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    const offsetResult = line.getOffset(
-      2.0,  // distance
-      35.0, // acute threshold
-      true  // bevel
-    );
+```ts
+const baseLine = new Line({
+  start: new Vector3(-2, 0, 0),
+  end: new Vector3(2, 0, 0),
+  color: 0x111827,
+});
 
-    console.log(offsetResult.points);              // Vector3[]
-    console.log(offsetResult.beveledVertexIndices); // number[]
-    console.log(offsetResult.isClosed);            // false for lines
-    ```
-  </Tab>
-</Tabs>
+const offset = baseLine.getOffset(0.4);
 
-### Using Fat Lines
+const guideLine = new Line({
+  start: offset.points[0],
+  end: offset.points[1],
+  color: 0x2563eb,
+});
+```
 
-<Tabs>
-  <Tab title="TypeScript">
-    ```typescript
-    const thickLine = new Line({
-      start: new Vector3(0, 0, 0),
-      end: new Vector3(10, 5, 0),
-      color: 0xff0000,
-      fatLines: true,
-      width: 50
-    });
-    ```
-  </Tab>
-</Tabs>
+### Update endpoints after creation
 
-### Updating Line Configuration
+```ts
+line.setConfig({
+  start: new Vector3(-3, 0, -0.6),
+  end: new Vector3(3, 0, 1.1),
+  color: 0xf97316,
+});
+```
 
-<Tabs>
-  <Tab title="TypeScript">
-    ```typescript
-    line.setConfig({
-      start: new Vector3(0, 0, 0),
-      end: new Vector3(15, 10, 0),
-      color: 0x00ff00
-    });
+## Live demo
 
-    // Change color dynamically
-    line.color = 0x0000ff;
-    ```
-  </Tab>
-</Tabs>
+- [Line demo](https://demo.opengeometry.io/primitives/line.html)

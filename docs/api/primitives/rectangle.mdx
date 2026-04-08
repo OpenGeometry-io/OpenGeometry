@@ -1,18 +1,14 @@
 ---
 title: Rectangle
-description: A rectangular primitive defined by center, width, and breadth
+description: A rectangular profile defined by center, width, and breadth
 icon: 'vector-square'
 ---
 
 ## Overview
 
-The Rectangle primitive represents a closed rectangular path in 3D space. It is defined by a center point, width (along the X-axis), and breadth (along the Z-axis). The rectangle lies in the XZ plane with Y as the normal direction.
-
-**Use Cases:**
-- Creating rectangular shapes and boundaries
-- Base profiles for extrusion
-- Floor plans and section cuts
-- Offset operations for creating concentric rectangles
+`Rectangle` is a closed line-based profile wrapper on the XZ plane. It supports wide-line
+rendering, offset generation, anchor management, placement helpers, freeform conversion, and a
+parsed BRep accessor.
 
 ## Constructor
 
@@ -23,339 +19,186 @@ The Rectangle primitive represents a closed rectangular path in 3D space. It is 
     ```
   </Tab>
   <Tab title="TypeScript">
-    ```typescript
+    ```ts
     const rectangle = new Rectangle(options?: IRectangleOptions);
     ```
   </Tab>
 </Tabs>
 
-## Live demo
+### IRectangleOptions
 
-Try it in the browser: [Rectangle demo](https://demo.opengeometry.io/primitives/rectangle.html).
-
-### Rust Constructor Parameters
-
-<ParamField path="id" type="String" required>
-  Unique identifier for the rectangle instance
+<ParamField path="ogid" type="string" optional>
+  Unique identifier for the rectangle. Auto-generated when omitted.
 </ParamField>
 
-### TypeScript Constructor Parameters
-
-<ParamField path="options" type="IRectangleOptions">
-  Configuration options for the rectangle
+<ParamField path="center" type="Vector3" required>
+  Center point of the rectangle.
 </ParamField>
 
-<ParamField path="options.ogid" type="string">
-  Optional unique identifier (auto-generated if not provided)
+<ParamField path="width" type="number" required>
+  Rectangle width along the X axis.
 </ParamField>
 
-<ParamField path="options.center" type="Vector3" required>
-  Center point of the rectangle
+<ParamField path="breadth" type="number" required>
+  Rectangle breadth along the Z axis.
 </ParamField>
 
-<ParamField path="options.width" type="number" required>
-  Width of the rectangle along the X-axis
+<ParamField path="color" type="number" required>
+  Rectangle color as a hex number.
 </ParamField>
 
-<ParamField path="options.breadth" type="number" required>
-  Breadth of the rectangle along the Z-axis
+<ParamField path="fatLines" type="boolean" default="false">
+  Enables wide-line rendering with `Line2`.
 </ParamField>
 
-<ParamField path="options.color" type="number" required>
-  Rectangle color as a hexadecimal number (e.g., 0x00ff00 for green)
+<ParamField path="lineWidth" type="number" optional>
+  Wide-line width used when `fatLines` is enabled.
+</ParamField>
+
+<ParamField path="translation" type="Vector3" optional>
+  Initial placement translation.
+</ParamField>
+
+<ParamField path="rotation" type="Vector3" optional>
+  Initial placement rotation in radians.
+</ParamField>
+
+<ParamField path="scale" type="Vector3" optional>
+  Initial placement scale.
 </ParamField>
 
 ## Methods
 
-### set_config
+### setConfig()
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    rectangle.set_config(
-        center: Vector3,
-        width: f64,
-        breadth: f64
-    );
-    ```
-    Updates the rectangle's geometric parameters.
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    rectangle.setConfig(options: IRectangleOptions);
-    ```
-    Updates the rectangle configuration and regenerates geometry.
-  </Tab>
-</Tabs>
+Updates geometry or render style.
 
-### generate_geometry
+```ts
+rectangle.setConfig(options: RectangleConfigUpdate): void
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    rectangle.generate_geometry();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    // Called automatically by setConfig
-    ```
-  </Tab>
-</Tabs>
+### getConfig(), getPlacement()
 
-Generates four vertices forming the rectangle and creates edges connecting them. The geometry includes a face for the closed rectangle.
+Returns the current rectangle config or cloned placement values.
 
-### get_geometry_serialized
+```ts
+const config = rectangle.getConfig();
+const placement = rectangle.getPlacement();
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let geometry: String = rectangle.get_geometry_serialized();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    // Used internally for rendering
-    ```
-  </Tab>
-</Tabs>
+### getAnchor(), setAnchor(), resetAnchor()
 
-Returns serialized vertex buffer data including the closing vertex (first vertex repeated).
+Reads or updates the modeling anchor used by the kernel-backed primitive.
 
-### get_offset_serialized
+```ts
+const anchor = rectangle.getAnchor();
+rectangle.setAnchor(anchor);
+rectangle.resetAnchor();
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let offset_data = rectangle.get_offset_serialized(
-        distance: f64,
-        acute_threshold_degrees: f64,
-        bevel: bool
-    );
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    const result = rectangle.getOffset(
-        distance: number,
-        acuteThresholdDegrees: number = 35.0,
-        bevel: boolean = true
-    ): IRectangleOffsetResult;
-    ```
-  </Tab>
-</Tabs>
+### setPlacement(), setTransform(), setTranslation(), setRotation(), setScale()
 
-Generates an offset rectangle at the specified distance. Positive distances create larger rectangles, negative distances create smaller ones.
+Placement helpers for moving the rectangle through the kernel transform path.
 
-<ParamField path="distance" type="number" required>
-  Distance to offset the rectangle (positive = outward, negative = inward)
-</ParamField>
+```ts
+rectangle.setPlacement({ translation?, rotation?, scale? });
+```
 
-<ParamField path="acuteThresholdDegrees" type="number" default="35.0">
-  Angle threshold for beveling acute corners
-</ParamField>
+### getOffset()
 
-<ParamField path="bevel" type="boolean" default="true">
-  Enable beveling at acute angles
-</ParamField>
+Returns an offset result for the current rectangle profile.
 
-### get_brep_serialized
+```ts
+const offset = rectangle.getOffset(
+  distance,
+  acuteThresholdDegrees = 35,
+  bevel = true
+);
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let brep: String = rectangle.get_brep_serialized();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    const brep = rectangle.getBrep();
-    ```
-  </Tab>
-</Tabs>
+### toFreeform()
 
-Returns the complete BREP representation including vertices, edges, and face.
+Converts the rectangle into a freeform geometry wrapper.
 
-### getConfig
+```ts
+const freeform = rectangle.toFreeform(id?);
+```
 
-<Tabs>
-  <Tab title="TypeScript">
-    ```typescript
-    const config = rectangle.getConfig();
-    ```
-    Returns the current rectangle configuration.
-  </Tab>
-</Tabs>
+### getBrep()
 
-### discardGeometry
+Returns the parsed BRep object for the current rectangle.
 
-<Tabs>
-  <Tab title="TypeScript">
-    ```typescript
-    rectangle.discardGeometry();
-    ```
-    Disposes of the current geometry.
-  </Tab>
-</Tabs>
+```ts
+const brep = rectangle.getBrep();
+```
+
+### discardGeometry()
+
+Disposes the current Three.js geometry buffer.
+
+```ts
+rectangle.discardGeometry(): void
+```
 
 ## Properties
 
-<ResponseField name="id" type="String">
-  Unique identifier for the rectangle instance
+<ResponseField name="ogid" type="string">
+  Stable identifier for the rectangle wrapper.
 </ResponseField>
 
-<ResponseField name="center" type="Vector3">
-  Center point of the rectangle (default: origin)
-</ResponseField>
-
-<ResponseField name="width" type="f64">
-  Width along the X-axis (default: 1.0)
-</ResponseField>
-
-<ResponseField name="breadth" type="f64">
-  Breadth along the Z-axis (default: 1.0)
-</ResponseField>
-
-<ResponseField name="brep" type="Brep">
-  Internal BREP representation with 4 vertices, 4 edges, and 1 face
+<ResponseField name="options" type="IRectangleOptions">
+  Current rectangle configuration and placement state.
 </ResponseField>
 
 <ResponseField name="color" type="number">
-  Rectangle color (TypeScript only, settable)
+  Gets or sets the rectangle color.
 </ResponseField>
 
-## Code Examples
+## Examples
 
-### Creating a Basic Rectangle
+### Create a rectangle profile
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    use opengeometry::primitives::OGRectangle;
-    use openmaths::Vector3;
+```ts
+import { Polyline, Rectangle, Vector3 } from "opengeometry";
 
-    let mut rect = OGRectangle::new("rect-1".to_string());
-    rect.set_config(
-        Vector3::new(0.0, 0.0, 0.0),  // center
-        10.0,                          // width
-        5.0                            // breadth
-    );
-    rect.generate_geometry();
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    import { Rectangle, Vector3 } from "opengeometry";
+const rectangle = new Rectangle({
+  center: new Vector3(0, 0, 0),
+  width: 2.4,
+  breadth: 1.6,
+  color: 0x2563eb,
+  fatLines: true,
+  lineWidth: 8,
+});
+```
 
-    const rect = new Rectangle({
-      center: new Vector3(0, 0, 0),
-      width: 10,
-      breadth: 5,
-      color: 0x00ff00
-    });
-    ```
-  </Tab>
-</Tabs>
+### Create an inset or outset profile
 
-### Creating a Square
+```ts
+const room = new Rectangle({
+  center: new Vector3(0, 0, 0),
+  width: 6,
+  breadth: 4,
+  color: 0x0f172a,
+});
 
-<Tabs>
-  <Tab title="TypeScript">
-    ```typescript
-    const square = new Rectangle({
-      center: new Vector3(0, 0, 0),
-      width: 8,
-      breadth: 8,  // Equal to width
-      color: 0xff0000
-    });
-    ```
-  </Tab>
-</Tabs>
+const inset = room.getOffset(-0.2);
 
-### Generating Offset Rectangles
+const finishLine = new Polyline({
+  points: inset.points,
+  color: 0x2563eb,
+});
+```
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    // Generate an outward offset rectangle
-    let offset_data = rect.get_offset_serialized(2.0, 35.0, true);
-    let result: OffsetResult = serde_json::from_str(&offset_data).unwrap();
-    
-    // The result contains the offset rectangle's points
-    for point in result.points {
-        println!("Point: ({}, {}, {})", point.x, point.y, point.z);
-    }
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    // Outward offset (larger rectangle)
-    const outerRect = rect.getOffset(2.0, 35.0, true);
-    
-    // Inward offset (smaller rectangle)
-    const innerRect = rect.getOffset(-1.5, 35.0, true);
-    
-    console.log(outerRect.points);              // Vector3[]
-    console.log(outerRect.beveledVertexIndices); // number[]
-    console.log(outerRect.isClosed);            // true for rectangles
-    ```
-  </Tab>
-</Tabs>
+### Move and rotate the profile
 
-### Creating Concentric Rectangles
+```ts
+rectangle.setPlacement({
+  translation: new Vector3(0, 0, 1.2),
+  rotation: new Vector3(0, Math.PI / 6, 0),
+  scale: new Vector3(1, 1, 1),
+});
+```
 
-<Tabs>
-  <Tab title="TypeScript">
-    ```typescript
-    const baseRect = new Rectangle({
-      center: new Vector3(0, 0, 0),
-      width: 20,
-      breadth: 15,
-      color: 0x0000ff
-    });
+## Live demo
 
-    // Create multiple offset rectangles
-    const offsets = [2, 4, 6, 8];
-    const concentricRects = offsets.map(distance => 
-      baseRect.getOffset(-distance)
-    );
-    ```
-  </Tab>
-</Tabs>
-
-### Updating Rectangle Dimensions
-
-<Tabs>
-  <Tab title="TypeScript">
-    ```typescript
-    rect.setConfig({
-      center: new Vector3(5, 0, 5),
-      width: 15,
-      breadth: 10,
-      color: 0xffff00
-    });
-
-    // Change color
-    rect.color = 0xff00ff;
-    ```
-  </Tab>
-</Tabs>
-
-### Getting Rectangle Vertices
-
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    // Get the four corner points
-    let points = rect.get_raw_points();
-    // Points are ordered: bottom-left, bottom-right, top-right, top-left
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```typescript
-    const brep = rect.getBrep();
-    const vertices = brep.vertices;
-    // vertices contains the 4 corner points
-    ```
-  </Tab>
-</Tabs>
+- [Rectangle demo](https://demo.opengeometry.io/primitives/rectangle.html)

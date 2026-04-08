@@ -1,330 +1,204 @@
 ---
 title: 'Cylinder'
-description: 'Create cylindrical shapes with customizable dimensions and segments'
+description: 'Create cylindrical solids with configurable radius, height, angle, and placement'
 icon: 'database'
 ---
 
 ## Overview
 
-The `Cylinder` class creates 3D cylindrical shapes. Cylinders are created on the XZ plane and extruded along the Y-axis. They support partial angles for creating cylindrical sections and customizable segment counts for geometry resolution.
+`Cylinder` creates a cylindrical solid aligned to the Y axis. It supports configurable segment
+count, partial-angle sweeps, kernel-backed placement, freeform conversion, parsed BRep access, and
+boolean subtraction.
 
 ## Constructor
 
-```typescript
+```ts
 const cylinder = new Cylinder(options?: ICylinderOptions);
 ```
 
 ### ICylinderOptions
 
 <ParamField path="ogid" type="string" optional>
-  Unique identifier for the cylinder. Auto-generated if not provided.
+  Unique identifier for the cylinder. Auto-generated when omitted.
 </ParamField>
 
 <ParamField path="center" type="Vector3" required>
-  Center point of the cylinder in 3D space.
-  
-  ```typescript
-  center: new Vector3(0, 0, 0)
-  ```
+  Center point of the cylinder.
 </ParamField>
 
 <ParamField path="radius" type="number" required>
-  Radius of the cylinder base.
-  
-  ```typescript
-  radius: 5  // Units in scene space
-  ```
+  Cylinder radius.
 </ParamField>
 
 <ParamField path="height" type="number" required>
-  Height of the cylinder along the Y-axis.
-  
-  ```typescript
-  height: 10
-  ```
+  Cylinder height along the Y axis.
 </ParamField>
 
 <ParamField path="segments" type="number" required>
-  Number of segments around the cylinder circumference. Higher values create smoother cylinders.
-  
-  ```typescript
-  segments: 32  // Default value
-  ```
+  Number of segments around the circumference.
 </ParamField>
 
 <ParamField path="angle" type="number" required>
-  Sweep angle in radians. Use `2 * Math.PI` for a complete cylinder.
-  
-  ```typescript
-  angle: 2 * Math.PI      // Full cylinder
-  angle: Math.PI          // Half cylinder
-  angle: Math.PI / 2      // Quarter cylinder
-  ```
+  Sweep angle in radians. Use `2 * Math.PI` for a full cylinder.
 </ParamField>
 
 <ParamField path="color" type="number" required>
-  Hexadecimal color value for the cylinder.
-  
-  ```typescript
-  color: 0x00ff00  // Green
-  ```
+  Mesh color as a hex number.
 </ParamField>
 
 <ParamField path="fatOutlines" type="boolean" default="false">
-  Use wide outlines backed by Three.js `LineSegments2` (instead of thin `LineSegments`).
+  Enables wide outline rendering with `LineSegments2`.
 </ParamField>
 
 <ParamField path="outlineWidth" type="number" default="1">
-  Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
+  Outline width used when `fatOutlines` is enabled.
+</ParamField>
+
+<ParamField path="translation" type="Vector3" optional>
+  Initial placement translation.
+</ParamField>
+
+<ParamField path="rotation" type="Vector3" optional>
+  Initial placement rotation in radians.
+</ParamField>
+
+<ParamField path="scale" type="Vector3" optional>
+  Initial placement scale.
 </ParamField>
 
 ## Methods
 
-### setConfig()
+### setConfig(), getConfig()
 
-Updates the cylinder configuration and regenerates geometry.
+Updates or reads the current cylinder config.
 
-```typescript
-cylinder.setConfig(options: ICylinderOptions): void
+```ts
+cylinder.setConfig(options: CylinderConfigUpdate): void
+const config = cylinder.getConfig();
 ```
 
-**Example:**
-```typescript
-cylinder.setConfig({
-  center: new Vector3(0, 5, 0),
-  radius: 3,
-  height: 12,
-  segments: 48,
-  angle: 2 * Math.PI,
-  color: 0x3498db
-});
+### getPlacement(), getAnchor()
+
+Returns cloned placement values or the current kernel anchor.
+
+```ts
+const placement = cylinder.getPlacement();
+const anchor = cylinder.getAnchor();
+```
+
+### setPlacement(), setTransform(), setTranslation(), setRotation(), setScale()
+
+Placement helpers for moving the cylinder through the kernel transform path.
+
+```ts
+cylinder.setPlacement({ translation?, rotation?, scale? });
+```
+
+### toFreeform()
+
+Converts the cylinder into a freeform geometry wrapper.
+
+```ts
+const freeform = cylinder.toFreeform(id?);
 ```
 
 ### getBrep()
 
-Returns the B-Rep (Boundary Representation) data as a parsed JSON object.
+Returns the parsed BRep object for the current cylinder.
 
-```typescript
-cylinder.getBrep(): object
-```
-
-**Example:**
-```typescript
-const brepData = cylinder.getBrep();
-if (brepData) {
-  console.log('Vertices:', brepData.vertices.length);
-  console.log('Faces:', brepData.faces.length);
-}
+```ts
+const brep = cylinder.getBrep();
 ```
 
 ### subtract()
 
-Subtracts another boolean operand (such as an `Opening`) from this cylinder and returns a renderable result mesh.
+Subtracts another boolean operand from the cylinder and returns a renderable boolean result.
 
-```typescript
+```ts
 const result = cylinder.subtract(operand, options?);
 ```
 
-### generateGeometry()
+### generateGeometry(), discardGeometry()
 
-Regenerates the THREE.js geometry from the current configuration. Called automatically after setConfig().
+Rebuilds or disposes the current Three.js geometry.
 
-```typescript
+```ts
 cylinder.generateGeometry(): void
-```
-
-### discardGeometry()
-
-Disposes of the current geometry to free memory.
-
-```typescript
 cylinder.discardGeometry(): void
 ```
 
 ## Properties
 
 <ResponseField name="ogid" type="string">
-  Unique identifier for the cylinder instance.
+  Stable identifier for the cylinder wrapper.
 </ResponseField>
 
 <ResponseField name="options" type="ICylinderOptions">
-  Current cylinder configuration.
-  
-  ```typescript
-  const currentRadius = cylinder.options.radius;
-  const currentHeight = cylinder.options.height;
-  ```
+  Current cylinder configuration and placement state.
 </ResponseField>
 
 <ResponseField name="radius" type="number">
-  Get or set the cylinder radius. Setting triggers geometry regeneration.
-  
-  ```typescript
-  cylinder.radius = 8;  // Update radius and regenerate
-  ```
+  Sets the cylinder radius and regenerates geometry.
 </ResponseField>
 
 <ResponseField name="color" type="number">
-  Get or set the cylinder color.
-  
-  ```typescript
-  cylinder.color = 0xff0000;  // Change to red
-  ```
+  Gets or sets the render color.
 </ResponseField>
 
 <ResponseField name="outline" type="boolean">
-  Enable or disable outline rendering.
-  
-  ```typescript
-  cylinder.outline = true;   // Show edges
-  cylinder.outline = false;  // Hide edges
-  ```
+  Enables or disables outline rendering.
 </ResponseField>
 
 <ResponseField name="fatOutlines" type="boolean">
-  When enabled, outlines are rendered using a wide-line implementation (instead of thin lines).
+  Enables or disables wide outlines.
 </ResponseField>
 
 <ResponseField name="outlineWidth" type="number">
-  Outline width used for fat outlines.
+  Outline width used for wide outlines.
 </ResponseField>
 
-## Usage Examples
+## Examples
 
-### Basic Cylinder
+### Create a full cylinder
 
-```typescript
+```ts
 import { Cylinder, Vector3 } from "opengeometry";
 
 const cylinder = new Cylinder({
-  center: new Vector3(0, 0, 0),
-  radius: 5,
-  height: 10,
-  segments: 32,
+  center: new Vector3(0, 1, 0),
+  radius: 0.9,
+  height: 2,
+  segments: 48,
   angle: 2 * Math.PI,
-  color: 0x2ecc71
-});
-
-// Add to scene
-scene.add(cylinder);
-```
-
-### Half Cylinder (Partial Angle)
-
-```typescript
-import { Cylinder, Vector3 } from "opengeometry";
-
-const halfCylinder = new Cylinder({
-  center: new Vector3(0, 0, 0),
-  radius: 4,
-  height: 8,
-  segments: 32,
-  angle: Math.PI,  // 180 degrees
-  color: 0xe74c3c
-});
-
-halfCylinder.outline = true;
-```
-
-### High-Resolution Cylinder
-
-```typescript
-import { Cylinder, Vector3 } from "opengeometry";
-
-// Smooth cylinder with many segments
-const smoothCylinder = new Cylinder({
-  center: new Vector3(0, 0, 0),
-  radius: 6,
-  height: 12,
-  segments: 64,  // High segment count for smoothness
-  angle: 2 * Math.PI,
-  color: 0x3498db
+  color: 0xf97316,
 });
 ```
 
-### Updating Cylinder Dynamically
+### Create a partial cylinder
 
-```typescript
-import { Cylinder, Vector3 } from "opengeometry";
-
-const cylinder = new Cylinder({
-  center: new Vector3(0, 0, 0),
-  radius: 5,
-  height: 10,
-  segments: 32,
-  angle: 2 * Math.PI,
-  color: 0x9b59b6
-});
-
-// Animate radius change
-function animate() {
-  const time = Date.now() * 0.001;
-  cylinder.radius = 5 + Math.sin(time) * 2;
-  requestAnimationFrame(animate);
-}
-animate();
-```
-
-## Implementation Details
-
-### Geometry Generation
-
-Cylinders are generated by creating a circular base on the XZ plane and extruding it along the Y-axis. The base circle is centered at `center.y - height/2`, and the top is at `center.y + height/2`.
-
-**Rust Implementation:** `/workspace/source/main/opengeometry/src/primitives/cylinder.rs:90-134`
-
-```rust
-let half_height = self.height / 2.0;
-let mut start_angle: f64 = 0.0;
-let angle_step = self.angle / self.segments as f64;
-
-for _ in 0..segment_count {
-    let x = self.center.x + self.radius * start_angle.cos();
-    let y = self.center.y - half_height;
-    let z = self.center.z + self.radius * start_angle.sin();
-    // ...
-}
-```
-
-### Material Configuration
-
-Cylinders use MeshStandardMaterial with transparency for better visual integration:
-
-```typescript
-const material = new THREE.MeshStandardMaterial({
-  color: this.options.color,
-  transparent: true,
-  opacity: 0.6,
+```ts
+const partial = new Cylinder({
+  center: new Vector3(0, 1, 0),
+  radius: 1.4,
+  height: 2.2,
+  segments: 48,
+  angle: Math.PI * 1.25,
+  color: 0x2563eb,
 });
 ```
 
-### Partial Cylinders
+### Reconfigure and move the cylinder
 
-When `angle < 2π`, an additional center vertex is added to the base circle to properly close the cylindrical section.
+```ts
+cylinder.setConfig({
+  radius: 1.2,
+  height: 2.6,
+  segments: 64,
+});
 
-**Source:** `/workspace/source/main/opengeometry/src/primitives/cylinder.rs:108-115`
-
-## Best Practices
-
-<Tip>
-  **Segment Count:** Use 32 segments for general purposes. Increase to 64+ for close-up views or precision modeling. Reduce to 16-24 for distant objects to improve performance.
-</Tip>
-
-<Warning>
-  **Angle Range:** The angle parameter should be between 0 and `2 * Math.PI`. Values outside this range may produce unexpected results.
-</Warning>
-
-<Info>
-  **Outline Performance:** Enabling outlines adds line geometry. For scenes with many cylinders, consider toggling outlines based on selection or zoom level.
-</Info>
-
-## See Also
-
-- [Boolean operations](/api/operations/boolean-operations) - Union, intersection, and subtraction
-- [Sphere](/api/shapes/sphere) - For spherical shapes
-- [Cuboid](/api/shapes/cuboid) - For rectangular boxes
-- [Sweep](/api/shapes/sweep) - For custom profile extrusions
+cylinder.setTranslation(new Vector3(1.8, 0, 0));
+```
 
 ## Live demo
 
-Try it in the browser: [Cylinder demo](https://demo.opengeometry.io/shapes/cylinder.html).
+- [Cylinder demo](https://demo.opengeometry.io/shapes/cylinder.html)

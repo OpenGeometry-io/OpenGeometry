@@ -1,222 +1,188 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-      <title>OpenGeometry Sweep Path + Profile Example</title>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <meta name="description" content="OpenGeometry Demo" />
-      <meta name="author" content="Vishwajeet Mane" />
-    </head>
+    <title>OpenGeometry Sweep Path and Profile Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Simple OpenGeometry sweep path and profile example for Three.js."
+    />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
   <body class="og-example-page">
     <div class="og-badge-title-card">
       <a href="../index.html" class="og-badge-title-link">Back</a>
       <span class="og-badge-title">Sweep Path + Profile</span>
     </div>
-    <aside class="og-controls" data-control-panel>
-          <h3>Sweep Operation Parameters</h3>
-          <label class="og-control-row" data-control-key="pathHeight" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Path Height</span>
-              <code class="og-control-value" data-control-value>2.2</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.4" max="4" step="0.05" value="2.2" />
-              <input data-control-number type="number" min="0.4" max="4" step="0.05" value="2.2" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="profileWidth" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Profile Width</span>
-              <code class="og-control-value" data-control-value>0.7</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.1" max="1.5" step="0.05" value="0.7" />
-              <input data-control-number type="number" min="0.1" max="1.5" step="0.05" value="0.7" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="profileDepth" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Profile Depth</span>
-              <code class="og-control-value" data-control-value>0.4</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="0.1" max="1.5" step="0.05" value="0.4" />
-              <input data-control-number type="number" min="0.1" max="1.5" step="0.05" value="0.4" />
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="capStart" data-control-type="boolean">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Cap Start</span>
-            </div>
-            <div class="og-control-bool">
-              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Cap Start" checked />
-              <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="capEnd" data-control-type="boolean">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Cap End</span>
-            </div>
-            <div class="og-control-bool">
-              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Cap End" />
-              <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="outline" data-control-type="boolean">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Outline</span>
-            </div>
-            <div class="og-control-bool">
-              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
-              <span class="og-control-bool-state" data-control-bool-state>Enabled</span>
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="fatOutlines" data-control-type="boolean">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Fat Outlines</span>
-            </div>
-            <div class="og-control-bool">
-              <input data-control-toggle type="checkbox" class="og-toggle" aria-label="Fat Outlines" />
-              <span class="og-control-bool-state" data-control-bool-state>Disabled</span>
-            </div>
-          </label>
-          <label class="og-control-row" data-control-key="outlineWidth" data-control-type="number">
-            <div class="og-control-header">
-              <span class="og-control-label-chip">Outline Width</span>
-              <code class="og-control-value" data-control-value>4</code>
-            </div>
-            <div class="og-control-range">
-              <input data-control-range type="range" min="1" max="12" step="0.5" value="4" />
-              <input data-control-number type="number" min="1" max="12" step="0.5" value="4" />
-            </div>
-          </label>
-        </aside>
+
+    <aside class="og-controls">
+      <h3>Sweep Inputs</h3>
+      <p class="og-control-summary">
+        This example keeps the path and profile visible in code. The line is the path, and the
+        solid comes from sweeping the profile along it.
+      </p>
+
+      <label class="og-control-row" data-control="path-mid-x">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Path Point 3 X</span>
+          <code class="og-control-value" data-value>0.4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="-1.5" max="1.5" step="0.05" value="0.4" />
+          <input data-number type="number" min="-1.5" max="1.5" step="0.05" value="0.4" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="path-end-y">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Path End Y</span>
+          <code class="og-control-value" data-value>2.4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="1" max="4" step="0.1" value="2.4" />
+          <input data-number type="number" min="1" max="4" step="0.1" value="2.4" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="profile-width">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Profile Width</span>
+          <code class="og-control-value" data-value>0.8</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.3" max="1.8" step="0.05" value="0.8" />
+          <input data-number type="number" min="0.3" max="1.8" step="0.05" value="0.8" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="profile-depth">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Profile Depth</span>
+          <code class="og-control-value" data-value>0.5</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.2" max="1.4" step="0.05" value="0.5" />
+          <input data-number type="number" min="0.2" max="1.4" step="0.05" value="0.5" />
+        </div>
+      </label>
+    </aside>
+
     <div id="app"></div>
+
     <script type="module">
       import "../src/styles/theme.css";
       import * as THREE from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Polyline, Rectangle, Sweep, Vector3 } from "@og-three";
+      import { OpenGeometry, Polyline, Sweep, Vector3 } from "@og-three";
 
       const app = document.getElementById("app");
       if (!app) {
         throw new Error("Missing #app container");
       }
 
-      let pathPrimitive;
-      let profilePrimitive;
-      let sweep;
-      let config = {
-        pathHeight: 2.2,
-        profileWidth: 0.7,
-        profileDepth: 0.4,
-        capStart: true,
-        capEnd: false,
-        outline: true,
-        fatOutlines: false,
-        outlineWidth: 4,
+      const config = {
+        pathMidX: 0.4,
+        pathEndY: 2.4,
+        profileWidth: 0.8,
+        profileDepth: 0.5,
       };
 
-      function formatControlNumber(value) {
-        return Number(value).toFixed(3).replace(/\.?0+$/, "");
+      let pathGuide = null;
+      let sweep = null;
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
       }
 
-      function toVector3List(vertices) {
-        return vertices.map((vertex) => new Vector3(vertex.position.x, vertex.position.y, vertex.position.z));
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
       }
 
-      function buildPath(height) {
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
+
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
+        }
+
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
+          }
+
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
+
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
+      }
+
+      function buildPath() {
         return [
-          new Vector3(-2.0, 0.0, -1.0),
-          new Vector3(-1.2, height * 0.2, 0.2),
-          new Vector3(0.0, height * 0.5, 0.9),
-          new Vector3(1.1, height * 0.78, 0.3),
-          new Vector3(2.0, height, -0.8),
+          new Vector3(-1.4, 0, -1.6),
+          new Vector3(-0.5, 0.6, -0.5),
+          new Vector3(config.pathMidX, 1.3, 0.8),
+          new Vector3(1.2, config.pathEndY, 2.1),
         ];
       }
 
-      function setUIControls() {
-        const controls = document.querySelectorAll("[data-control-key]");
-
-        controls.forEach((control) => {
-          const key = control.getAttribute("data-control-key");
-          const type = control.getAttribute("data-control-type");
-
-          if (type === "number") {
-            const rangeInput = control.querySelector("[data-control-range]");
-            const numberInput = control.querySelector("[data-control-number]");
-            const valueDisplay = control.querySelector("[data-control-value]");
-
-            function setNumberValue(value) {
-              const numericValue = parseFloat(value);
-              if (!Number.isFinite(numericValue)) return;
-
-              config[key] = numericValue;
-              rangeInput.value = String(numericValue);
-              numberInput.value = String(numericValue);
-              valueDisplay.textContent = formatControlNumber(numericValue);
-              updateGeometry();
-            }
-
-            rangeInput.addEventListener("input", () => setNumberValue(rangeInput.value));
-            numberInput.addEventListener("input", () => setNumberValue(numberInput.value));
-          }
-
-          if (type === "boolean") {
-            const toggleInput = control.querySelector("[data-control-toggle]");
-            const boolStateDisplay = control.querySelector("[data-control-bool-state]");
-
-            function setBooleanValue(checked) {
-              config[key] = checked;
-              toggleInput.checked = checked;
-              boolStateDisplay.textContent = checked ? "Enabled" : "Disabled";
-              updateGeometry();
-            }
-
-            toggleInput.addEventListener("change", () => setBooleanValue(toggleInput.checked));
-          }
-
-          if (type === "select") {
-            const selectInput = control.querySelector("[data-control-select]");
-
-            function setSelectValue(value) {
-              config[key] = value;
-              selectInput.value = String(value);
-              updateGeometry();
-            }
-
-            selectInput.addEventListener("change", () => setSelectValue(selectInput.value));
-          }
-        });
+      function buildProfile() {
+        const halfWidth = config.profileWidth * 0.5;
+        const halfDepth = config.profileDepth * 0.5;
+        return [
+          new Vector3(-halfWidth, 0, -halfDepth),
+          new Vector3(halfWidth, 0, -halfDepth),
+          new Vector3(halfWidth, 0, halfDepth),
+          new Vector3(-halfWidth, 0, halfDepth),
+        ];
       }
 
-      function updateGeometry() {
-        if (!pathPrimitive || !profilePrimitive || !sweep) return;
-        pathPrimitive.setConfig({
-          points: buildPath(config.pathHeight),
-          color: 0x444444,
-        });
+      function updateSweep() {
+        if (!pathGuide || !sweep) {
+          return;
+        }
 
-        profilePrimitive.setConfig({
-          center: new Vector3(0, 0, 0),
-          width: config.profileWidth,
-          breadth: config.profileDepth,
-          color: 0x1f77b4,
-        });
+        const path = buildPath();
+        const profile = buildProfile();
 
-        const profilePoints = toVector3List(profilePrimitive.getBrep().vertices);
+        pathGuide.setConfig({
+          points: path,
+          color: 0x111827,
+        });
         sweep.setConfig({
-          path: pathPrimitive.options.points.map((point) => point.clone()),
-          profile: profilePoints,
-          color: 0x2a9d8f,
-          capStart: config.capStart,
-          capEnd: config.capEnd,
-          fatOutlines: config.fatOutlines,
-          outlineWidth: config.outlineWidth,
+          path,
+          profile,
+          capStart: true,
+          capEnd: true,
+          color: 0x3b82f6,
+          outlineWidth: 2,
         });
+        sweep.outline = true;
 
-        sweep.outline = config.outline;
+        console.groupCollapsed("[sweep-path-profile] updated");
+        console.log("Config", { ...config });
+        console.log("Path", path);
+        console.log("Profile", profile);
+        console.groupEnd();
       }
 
       async function main() {
@@ -227,83 +193,76 @@
           55,
           window.innerWidth / window.innerHeight,
           0.1,
-          4000
+          100
         );
-
-        camera.position.set(5.5, 4.2, 6.5);
+        camera.position.set(6.8, 5.2, 8.4);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
 
+        const stats = mountStats();
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(0, 0.8, 0);
+        controls.target.set(0, 1.2, 0.5);
         controls.update();
 
-        scene.add(new THREE.GridHelper(32, 32, 0x4460ff, 0xd5ddff));
-        scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+        scene.add(new THREE.GridHelper(24, 24, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.82));
 
-        const key = new THREE.DirectionalLight(0xffffff, 0.9);
-        key.position.set(6, 8, 4);
-        scene.add(key);
-
-        const fill = new THREE.DirectionalLight(0xffffff, 0.42);
-        fill.position.set(-5, 3, -6);
-        scene.add(fill);
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
 
         await OpenGeometry.create({ wasmURL: wasmUrl });
 
-        pathPrimitive = new Polyline({
-          points: buildPath(config.pathHeight),
-          color: 0x444444,
+        pathGuide = new Polyline({
+          points: buildPath(),
+          color: 0x111827,
         });
-        profilePrimitive = new Rectangle({
-          center: new Vector3(0, 0, 0),
-          width: config.profileWidth,
-          breadth: config.profileDepth,
-          color: 0x1f77b4,
-        });
-        const initialProfilePoints = toVector3List(profilePrimitive.getBrep().vertices);
         sweep = new Sweep({
-          path: pathPrimitive.options.points.map((point) => point.clone()),
-          profile: initialProfilePoints,
-          color: 0x2a9d8f,
-          capStart: config.capStart,
-          capEnd: config.capEnd,
-          fatOutlines: config.fatOutlines,
-          outlineWidth: config.outlineWidth,
+          path: buildPath(),
+          profile: buildProfile(),
+          capStart: true,
+          capEnd: true,
+          color: 0x3b82f6,
+          outlineWidth: 2,
         });
-        sweep.outline = config.outline;
 
-        pathPrimitive.position.y += 0.01;
-        profilePrimitive.position.set(-3.0, 0.0, -2.2);
+        scene.add(pathGuide);
+        scene.add(sweep);
 
-        const group = new THREE.Group();
-        group.add(pathPrimitive);
-        group.add(profilePrimitive);
-        group.add(sweep);
-        scene.add(group);
+        attachNumberControl("path-mid-x", (value) => {
+          config.pathMidX = value;
+          updateSweep();
+        });
+        attachNumberControl("path-end-y", (value) => {
+          config.pathEndY = value;
+          updateSweep();
+        });
+        attachNumberControl("profile-width", (value) => {
+          config.profileWidth = value;
+          updateSweep();
+        });
+        attachNumberControl("profile-depth", (value) => {
+          config.profileDepth = value;
+          updateSweep();
+        });
 
-        updateGeometry();
+        updateSweep();
 
-        function onResize() {
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
           camera.aspect = window.innerWidth / window.innerHeight;
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        window.addEventListener("resize", onResize);
-
-        function animate() {
-          requestAnimationFrame(animate);
-          controls.update();
-          renderer.render(scene, camera);
-        }
-
-        animate();
-        setUIControls();
+        });
       }
 
       void main();

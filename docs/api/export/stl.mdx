@@ -102,20 +102,20 @@ Example JSON payload:
 
 ### Export a wrapper shape to STL
 
-`OGSceneManager` expects a serialized B-Rep string. Wrapper shapes expose one of `getBrep()`,
-`getBrepData()`, or `getBrepSerialized()` depending on the type.
+`OGSceneManager` expects a serialized B-Rep string. For wrapper-first apps, the safest rule is:
+prefer `getBrepSerialized()` when it exists, then fall back to `getBrepData()`, then `getBrep()`.
 
 ```ts
 import { Cuboid, OGSceneManager, Vector3 } from "opengeometry";
 
 function toBrepSerialized(source: unknown) {
   const value =
-    source && typeof (source as any).getBrepSerialized === "function"
-      ? (source as any).getBrepSerialized()
-      : source && typeof (source as any).getBrepData === "function"
-        ? (source as any).getBrepData()
-        : source && typeof (source as any).getBrep === "function"
-          ? (source as any).getBrep()
+    source && typeof (source as { getBrepSerialized?: () => string }).getBrepSerialized === "function"
+      ? (source as { getBrepSerialized: () => string }).getBrepSerialized()
+      : source && typeof (source as { getBrepData?: () => unknown }).getBrepData === "function"
+        ? (source as { getBrepData: () => unknown }).getBrepData()
+        : source && typeof (source as { getBrep?: () => unknown }).getBrep === "function"
+          ? (source as { getBrep: () => unknown }).getBrep()
           : source;
 
   return typeof value === "string" ? value : JSON.stringify(value);

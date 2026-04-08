@@ -1,17 +1,17 @@
 ---
 title: 'Polygon'
-description: 'Create planar polygons with holes, outlines, booleans, and kernel-backed extrusion'
+description: 'Create planar polygon faces with holes, outlines, booleans, and kernel-backed extrusion'
 icon: 'draw-polygon'
 ---
 
 ## Overview
 
-`Polygon` is the main planar profile wrapper in the Three.js API. It creates a triangulated face on
-the XZ plane, supports holes, can participate in coplanar booleans, converts to freeform geometry,
-and can be extruded into a renderable [`Solid`](/api/shapes/solid).
+`Polygon` is the planar profile wrapper in the Three.js API. It creates a filled face on the XZ
+plane, supports holes, can participate in coplanar booleans, converts to freeform geometry, and
+extrudes into a renderable [`Solid`](/api/shapes/solid).
 
-Outer vertices should be provided in counter-clockwise order when viewed from above. Hole loops
-should be provided in clockwise order.
+Outer loops should be provided counter-clockwise when viewed from above. Hole loops should be
+provided clockwise.
 
 ## Constructor
 
@@ -26,7 +26,7 @@ const polygon = new Polygon(options?: IPolygonOptions);
 </ParamField>
 
 <ParamField path="vertices" type="Vector3[]" required>
-  Vertices for the outer loop of the polygon.
+  Vertices for the outer loop.
 </ParamField>
 
 <ParamField path="holes" type="Vector3[][]" optional>
@@ -34,97 +34,111 @@ const polygon = new Polygon(options?: IPolygonOptions);
 </ParamField>
 
 <ParamField path="color" type="number" required>
-  Fill color for the polygon face.
+  Face color as a hex number.
 </ParamField>
 
 <ParamField path="fatOutlines" type="boolean" default="false">
-  Use wide outlines backed by Three.js `LineSegments2`.
+  Enables wide outline rendering with `LineSegments2`.
 </ParamField>
 
 <ParamField path="outlineWidth" type="number" default="1">
-  Outline width for fat outlines. Values are sanitized and must be finite and greater than zero.
+  Outline width used when `fatOutlines` is enabled.
 </ParamField>
 
 <ParamField path="translation" type="Vector3" optional>
-  Initial translation for the polygon mesh.
+  Initial placement translation.
 </ParamField>
 
 <ParamField path="rotation" type="Vector3" optional>
-  Initial Euler rotation for the polygon mesh.
+  Initial placement rotation in radians.
 </ParamField>
 
 <ParamField path="scale" type="Vector3" optional>
-  Initial scale for the polygon mesh.
+  Initial placement scale.
 </ParamField>
 
 ## Methods
 
-### setConfig()
+### setConfig(), getConfig()
 
-Updates polygon geometry or styling and regenerates the face when needed.
+Updates or reads the current polygon config.
 
 ```ts
 polygon.setConfig(options: PolygonConfigUpdate): void
+const config = polygon.getConfig();
 ```
 
-### addVertices()
+### addVertices(), addHole()
 
-Replaces the outer loop with a new set of vertices.
+Convenience helpers for replacing the outer loop or appending a new hole loop.
 
 ```ts
 polygon.addVertices(vertices: Vector3[]): void
+polygon.addHole(holeVertices: Vector3[]): void
 ```
 
-### addHole()
+### getPlacement(), getAnchor(), setAnchor(), resetAnchor()
 
-Adds a new hole loop to the polygon.
+Returns cloned placement values or reads/updates the current kernel anchor.
 
 ```ts
-polygon.addHole(holeVertices: Vector3[]): void
+const placement = polygon.getPlacement();
+const anchor = polygon.getAnchor();
+polygon.setAnchor(anchor);
+polygon.resetAnchor();
+```
+
+### setPlacement(), setTransform(), setTranslation(), setRotation(), setScale()
+
+Placement helpers for moving the polygon through the kernel transform path.
+
+```ts
+polygon.setPlacement({ translation?, rotation?, scale? });
 ```
 
 ### extrude()
 
-Extrudes the polygon face through the kernel BRep-face extrusion path and returns a renderable
-[`Solid`](/api/shapes/solid).
+Extrudes the polygon face and returns a renderable [`Solid`](/api/shapes/solid).
 
 ```ts
 const solid = polygon.extrude(height);
 ```
 
 <ParamField path="height" type="number" required>
-  Finite, non-zero extrusion height along the current kernel extrusion direction.
+  Finite, non-zero extrusion height.
 </ParamField>
 
 ### toFreeform()
 
-Converts the polygon into a freeform geometry wrapper for direct editing workflows.
+Converts the polygon into a freeform geometry wrapper.
 
 ```ts
 const freeform = polygon.toFreeform(id?);
 ```
 
+### getBrepData()
+
+Returns the serialized BRep JSON string for the current polygon face.
+
+```ts
+const brepSerialized = polygon.getBrepData();
+```
+
 ### subtract()
 
-Runs a coplanar boolean subtraction against another boolean operand.
+Subtracts another boolean operand from the polygon and returns a renderable boolean result.
 
 ```ts
 const result = polygon.subtract(operand, options?);
 ```
 
-### getBrepData()
+### generateGeometry(), cleanGeometry(), dispose()
 
-Returns the serialized BRep JSON string for the polygon face.
-
-```ts
-polygon.getBrepData(): string | null
-```
-
-### dispose()
-
-Disposes geometry, materials, and outline resources owned by the polygon.
+Rebuilds the polygon mesh or clears owned Three.js resources.
 
 ```ts
+polygon.generateGeometry(): void
+polygon.cleanGeometry(): void
 polygon.dispose(): void
 ```
 
@@ -139,7 +153,7 @@ polygon.dispose(): void
 </ResponseField>
 
 <ResponseField name="color" type="number">
-  Gets or sets the polygon fill color.
+  Gets or sets the face color.
 </ResponseField>
 
 <ResponseField name="outline" type="boolean">
@@ -147,20 +161,20 @@ polygon.dispose(): void
 </ResponseField>
 
 <ResponseField name="fatOutlines" type="boolean">
-  Toggles wide outline rendering.
+  Enables or disables wide outlines.
 </ResponseField>
 
 <ResponseField name="outlineWidth" type="number">
-  Sets the width used when `fatOutlines` is enabled.
+  Outline width used for wide outlines.
 </ResponseField>
 
 <ResponseField name="outlineColor" type="number">
   Gets or sets the outline color.
 </ResponseField>
 
-## Usage Examples
+## Examples
 
-### Polygon with hole
+### Polygon with a hole
 
 ```ts
 import { Polygon, Vector3 } from "opengeometry";
@@ -184,15 +198,33 @@ const slab = new Polygon({
 slab.outline = true;
 ```
 
-### Extrude and subtract an opening
+### Build a polygon incrementally
 
 ```ts
-import * as THREE from "three";
-import { OpenGeometry, Polygon, Vector3 } from "opengeometry";
+import { Polygon, Vector3 } from "opengeometry";
 
-await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+const footprint = new Polygon({
+  vertices: [
+    new Vector3(0, 0, 0),
+    new Vector3(4, 0, 0),
+    new Vector3(4, 0, 3),
+    new Vector3(0, 0, 3),
+  ],
+  color: 0x0f172a,
+});
 
-const scene = new THREE.Scene();
+footprint.addHole([
+  new Vector3(2.8, 0, 2.2),
+  new Vector3(2.8, 0, 1.2),
+  new Vector3(1.8, 0, 1.2),
+  new Vector3(1.8, 0, 2.2),
+]);
+```
+
+### Extrude and cut an opening
+
+```ts
+import { Polygon, Vector3 } from "opengeometry";
 
 const wallProfile = new Polygon({
   vertices: [
@@ -224,28 +256,17 @@ const cut = wall.subtract(opening, {
   outlineWidth: 2,
   kernel: { mergeCoplanarFaces: true },
 });
-
-scene.add(cut);
 ```
 
-## Best Practices
+### Move or rotate the polygon profile
 
-<Tip>
-  Keep outer loops counter-clockwise and hole loops clockwise to match the kernel's face-building
-  expectations.
-</Tip>
-
-<Info>
-  Use `polygon.extrude(height)` when you want a proper renderable solid. Use `polygon.toFreeform()`
-  when you want direct topology editing instead.
-</Info>
-
-## See Also
-
-- [Solid](/api/shapes/solid)
-- [Extrude](/api/operations/extrude)
-- [Boolean operations](/api/operations/boolean-operations)
-- [Sweep](/api/shapes/sweep)
+```ts
+wallProfile.setPlacement({
+  translation: new Vector3(1.5, 0, 0),
+  rotation: new Vector3(0, Math.PI / 8, 0),
+  scale: new Vector3(1, 1, 1),
+});
+```
 
 ## Live demo
 
