@@ -8,7 +8,7 @@ import type { FreeformSource, ObjectTransformation } from "../freeform/types";
 import { extrudeBrepFace } from "../operations/extrude";
 import { getUUID } from "../utils/randomizer";
 import type {
-  ShapeSubtractOperand,
+  ShapeSubtractOperands,
   ShapeSubtractOptions,
   ShapeSubtractResult,
 } from "./boolean-subtract";
@@ -120,6 +120,8 @@ export class Solid extends THREE.Mesh {
 
   /**
    * Extrudes a face-like BRep source and wraps the result as a renderable solid.
+   *
+   * Prefer `polygon.extrude(height)` when the source is already a `Polygon`.
    */
   static extrude(
     source: FreeformSource,
@@ -236,13 +238,16 @@ export class Solid extends THREE.Mesh {
   }
 
   /**
-   * Subtracts another boolean operand from this solid.
+   * Subtracts one or more boolean operands from this solid.
+   *
+   * This is the main shape-level boolean workflow after operations like
+   * `polygon.extrude(height)` or `Solid.extrude(...)`.
    */
   subtract(
-    operand: ShapeSubtractOperand,
+    operands: ShapeSubtractOperands,
     options?: ShapeSubtractOptions
   ): ShapeSubtractResult {
-    return subtractShapeOperand(this, operand, options);
+    return subtractShapeOperand(this, operands, options);
   }
 
   /**

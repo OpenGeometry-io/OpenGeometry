@@ -35,17 +35,25 @@ impl BooleanOptions {
     /// Computes the working tolerance from the operand bounds when the caller
     /// does not supply one explicitly.
     pub fn resolve_tolerance(&self, lhs: &Brep, rhs: &Brep) -> f64 {
+        self.resolve_tolerance_many(&[lhs, rhs])
+    }
+
+    /// Computes the working tolerance from the combined bounds of multiple
+    /// operands when the caller does not supply one explicitly.
+    pub fn resolve_tolerance_many(&self, operands: &[&Brep]) -> f64 {
         self.tolerance.unwrap_or_else(|| {
             let mut min = Vector3::new(f64::INFINITY, f64::INFINITY, f64::INFINITY);
             let mut max = Vector3::new(f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
 
-            for vertex in lhs.vertices.iter().chain(rhs.vertices.iter()) {
-                min.x = min.x.min(vertex.position.x);
-                min.y = min.y.min(vertex.position.y);
-                min.z = min.z.min(vertex.position.z);
-                max.x = max.x.max(vertex.position.x);
-                max.y = max.y.max(vertex.position.y);
-                max.z = max.z.max(vertex.position.z);
+            for brep in operands {
+                for vertex in &brep.vertices {
+                    min.x = min.x.min(vertex.position.x);
+                    min.y = min.y.min(vertex.position.y);
+                    min.z = min.z.min(vertex.position.z);
+                    max.x = max.x.max(vertex.position.x);
+                    max.y = max.y.max(vertex.position.y);
+                    max.z = max.z.max(vertex.position.z);
+                }
             }
 
             if !min.x.is_finite() || !max.x.is_finite() {

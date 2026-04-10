@@ -18,7 +18,7 @@ import { createFreeformGeometry } from "../freeform";
 import { Solid } from "./solid";
 import { subtractShapeOperand } from "./boolean-subtract";
 import type {
-  ShapeSubtractOperand,
+  ShapeSubtractOperands,
   ShapeSubtractOptions,
   ShapeSubtractResult,
 } from "./boolean-subtract";
@@ -326,6 +326,9 @@ export class Polygon extends THREE.Mesh {
 
   /**
    * Builds a kernel-backed `Solid` by extruding this polygon face by `height`.
+   *
+   * This is the recommended public path when a browser CAD or AEC workflow
+   * starts from a planar profile and needs a boolean-ready solid.
    */
   extrude(height: number) {
     const config = this.getConfig();
@@ -356,13 +359,13 @@ export class Polygon extends THREE.Mesh {
   }
 
   /**
-   * Subtracts another boolean operand from this polygon.
+   * Subtracts one or more boolean operands from this polygon.
    */
   subtract(
-    operand: ShapeSubtractOperand,
+    operands: ShapeSubtractOperands,
     options?: ShapeSubtractOptions
   ): ShapeSubtractResult {
-    return subtractShapeOperand(this, operand, options);
+    return subtractShapeOperand(this, operands, options);
   }
 
   set outlineColor(color: number) {

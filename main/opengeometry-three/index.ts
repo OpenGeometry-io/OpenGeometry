@@ -1,13 +1,10 @@
 /**
- * OpenGeometry Three.js adapter entrypoint.
- * @module @opengeometry/kernel-three
+ * Public OpenGeometry JavaScript entrypoint.
  */
 import init, {
   OGSceneManager,
   Vector3,
 } from "../opengeometry/pkg/opengeometry";
-// Vector3 is also available in opengeometry package
-// import { Vector3 } from "@opengeometry/openmaths";
 import { SpotLabel } from "./src/markup/spotMarker";
 import { OPEN_GEOMETRY_THREE_VERSION, OpenGeometryOptions } from "./src/base-types";
 
@@ -69,23 +66,18 @@ export class OpenGeometry {
   constructor() {}
 
   /**
-   * Asynchronously creates and initializes an instance of OpenGeometry.
+   * Asynchronously initializes the OpenGeometry wasm runtime and returns a
+   * cached singleton instance on subsequent calls.
    *
-   * This factory method sets up the OpenGeometry engine by linking it with the
-   * rendering context and the WebAssembly module. It ensures all required
-   * options are provided and prepares the instance for 3D geometry operations.
+   * Call this before constructing `Vector3` or any kernel-backed wrapper.
    *
    * @param options - Configuration object for initializing OpenGeometry.
    * @returns A promise that resolves to a fully initialized OpenGeometry instance.
-   * @throws If any of the required options (`container`, `scene`, or `camera`) are missing.
    *
    * @example
    * ```ts
-   * const openGeometry = await OpenGeometry.create({
-   *   container: document.getElementById('myContainer')!,
-   *   scene: threeScene,
-   *   camera: threeCamera,
-   *   wasmURL: '/assets/opengeometry.wasm'
+   * await OpenGeometry.create({
+   *   wasmURL: "/opengeometry_bg.wasm",
    * });
    * ```
    */
@@ -108,11 +100,20 @@ export class OpenGeometry {
   }
 }
 
-export {
-  OGSceneManager,
-  Vector3,
-  SpotLabel,
-}
+/**
+ * Scene manager that stores serialized BRep snapshots in wasm for projection,
+ * export, and other scene-level workflows.
+ */
+export { OGSceneManager };
+
+/**
+ * Shared wasm-backed vector type used throughout the public API.
+ *
+ * Initialize `OpenGeometry.create(...)` before constructing `Vector3`.
+ */
+export { Vector3 };
+
+export { SpotLabel };
 
 /**
  * Primitive wrappers (line/polyline/arc/rectangle/curve).

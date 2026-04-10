@@ -4,7 +4,7 @@
     <title>OpenGeometry STEP Export Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Simple OpenGeometry STEP export example." />
+    <meta name="description" content="Browser CAD STEP export workflow with OpenGeometry and OGSceneManager." />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
   <body class="og-example-page">
@@ -16,7 +16,8 @@
     <aside class="og-controls">
       <h3>STEP Export</h3>
       <p class="og-control-summary">
-        Build one cuboid, then export it as a STEP file. The export report stays in the console.
+        Build one kernel-backed cuboid, then export it as a STEP file. The export report stays in
+        the console.
       </p>
 
       <label class="og-control-row" data-control="width">
@@ -66,7 +67,7 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { Cuboid, OGSceneManager, OpenGeometry, Vector3 } from "@og-three";
+      import { Cuboid, OGSceneManager, OpenGeometry, Vector3 } from "opengeometry";
 
       const app = document.getElementById("app");
       const exportButton = document.querySelector("[data-export]");

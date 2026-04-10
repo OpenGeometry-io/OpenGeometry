@@ -5,7 +5,7 @@ description: Initialize the OpenGeometry WASM module and control runtime behavio
 
 ## Overview
 
-Before you construct kernel-backed primitives and shapes, initialize OpenGeometry once:
+Before you construct `Vector3`, kernel-backed primitives, or shapes, initialize OpenGeometry once:
 
 ```ts
 import { OpenGeometry } from "opengeometry";
@@ -15,6 +15,11 @@ await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 
 `OpenGeometry.create(...)` is idempotent. It caches a singleton instance and returns it on
 subsequent calls.
+
+<Note>
+  `Vector3` is wasm-backed in this SDK, so calling `OpenGeometry.create(...)` first is part of the
+  normal runtime contract.
+</Note>
 
 ## create
 
@@ -42,4 +47,3 @@ og.enableDebug = true;
 ## Live demo
 
 Start from the hosted demo index (all demos initialize OpenGeometry): [OpenGeometry demos](https://demo.opengeometry.io/).
-

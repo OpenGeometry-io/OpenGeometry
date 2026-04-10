@@ -1,4 +1,4 @@
-import { booleanSubtraction } from "../operations/boolean";
+import { executeBooleanSubtractionMany } from "../operations/boolean";
 import type {
   BooleanExecutionOptions,
   BooleanOperand,
@@ -9,6 +9,11 @@ import type {
  * Operand types accepted by shape instance `.subtract(...)` helpers.
  */
 export type ShapeSubtractOperand = BooleanOperand;
+
+/**
+ * Array-only operand list accepted by shape instance `.subtract(...)` helpers.
+ */
+export type ShapeSubtractOperands = ShapeSubtractOperand[];
 
 /**
  * Options accepted by shape instance `.subtract(...)` helpers.
@@ -25,8 +30,14 @@ export type ShapeSubtractResult = BooleanResult;
  */
 export function subtractShapeOperand(
   host: ShapeSubtractOperand,
-  operand: ShapeSubtractOperand,
+  operands: ShapeSubtractOperands,
   options?: ShapeSubtractOptions
 ): ShapeSubtractResult {
-  return booleanSubtraction(host, operand, options);
+  if (!Array.isArray(operands)) {
+    throw new Error(
+      "shape.subtract(...) now requires an operand array. Pass shape.subtract([operand], options) even for a single cutter."
+    );
+  }
+
+  return executeBooleanSubtractionMany(host, operands, options);
 }

@@ -2,8 +2,8 @@
   "name": "opengeometry",
   "author": "Vishwajeet Vinayak Mane",
   "license": "MPL-2.0",
-  "version": "2.0.3",
-  "description": "CAD Kernel for Web with OpenGeometry",
+  "version": "2.0.4",
+  "description": "CAD kernel for the web built with Rust, WebAssembly, and Three.js for browser CAD, AEC/BIM, and geometry-heavy tools.",
   "type": "module",
   "main": "index.js",
   "scripts": {
@@ -23,16 +23,26 @@
     "url": "git+https://github.com/OpenGeometry-io/OpenGeometry.git"
   },
   "keywords": [
-    "Graphics",
-    "Kernel",
-    "Geometry",
-    "CAD",
-    "web"
+    "opengeometry",
+    "cad",
+    "cad-kernel",
+    "browser-cad",
+    "threejs",
+    "three.js",
+    "geometry",
+    "webassembly",
+    "wasm",
+    "aec",
+    "bim",
+    "ifc",
+    "step",
+    "stl",
+    "parametric-modeling"
   ],
   "bugs": {
     "url": "https://github.com/OpenGeometry-io/OpenGeometry/issues"
   },
-  "homepage": "https://github.com/OpenGeometry-io/OpenGeometry#readme",
+  "homepage": "https://docs.opengeometry.io",
   "peerDependencies": {
     "three": ">=0.168.0"
   },

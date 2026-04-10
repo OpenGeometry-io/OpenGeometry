@@ -91,6 +91,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      opengeometry: resolve(__dirname, "index.ts"),
       "@og-three": resolve(__dirname, "index.ts"),
     },
   },

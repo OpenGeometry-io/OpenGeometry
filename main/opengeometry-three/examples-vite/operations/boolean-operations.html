@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Simple OpenGeometry solid boolean example for Three.js."
+      content="Kernel-backed solid boolean operations for browser CAD and AEC workflows with OpenGeometry."
     />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
@@ -19,8 +19,8 @@
     <aside class="og-controls">
       <h3>Solid Boolean</h3>
       <p class="og-control-summary">
-        The translucent cuboid and sphere are shown on the left. The boolean result is rebuilt on
-        the right after every change.
+        This page shows the core solid boolean workflow for browser CAD tools. The source solids are
+        on the left and the rebuilt boolean result is on the right.
       </p>
 
       <label class="og-control-row" data-control="operation">
@@ -62,7 +62,7 @@
         OpenGeometry,
         Sphere,
         Vector3,
-      } from "@og-three";
+      } from "opengeometry";
 
       const app = document.getElementById("app");
       if (!app) {

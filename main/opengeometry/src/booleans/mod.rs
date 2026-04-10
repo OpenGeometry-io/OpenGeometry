@@ -10,7 +10,9 @@ use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
 use crate::booleans::error::{BooleanError, BooleanErrorKind};
-use crate::booleans::planar::{execute_planar_boolean, planar_context_from_brep};
+use crate::booleans::planar::{
+    execute_planar_boolean, planar_context_from_brep, planar_input_triangle_count,
+};
 use crate::booleans::rebuild::{build_brep_from_polygons, build_brep_from_triangle_mesh};
 use crate::booleans::solid::{brep_to_polygons, execute_solid_boolean};
 use crate::booleans::types::{
@@ -106,6 +108,90 @@ pub fn boolean_subtraction(
     execute_boolean(lhs, rhs, BooleanOperation::Subtraction, options)
 }
 
+/// Applies repeated boolean subtraction (`(((lhs - rhs1) - rhs2) - ...)`) with
+/// a left-to-right evaluation order.
+pub fn boolean_subtraction_many(
+    lhs: &Brep,
+    cutters: &[Brep],
+    options: BooleanOptions,
+) -> Result<BooleanOutput, BooleanError> {
+    if cutters.is_empty() {
+        return Err(BooleanError::new(
+            BooleanErrorKind::InvalidOperand,
+            "Boolean subtraction requires at least one cutter in the operand array",
+        ));
+    }
+
+    lhs.validate_topology().map_err(BooleanError::from)?;
+    for (index, cutter) in cutters.iter().enumerate() {
+        cutter
+            .validate_topology()
+            .map_err(BooleanError::from)
+            .map_err(|error| indexed_subtraction_error(index + 1, error))?;
+    }
+
+    let mut operands = Vec::with_capacity(cutters.len() + 1);
+    operands.push(lhs);
+    operands.extend(cutters.iter());
+
+    let working_tolerance = options.resolve_tolerance_many(&operands).max(1.0e-6);
+    let operand_kind = detect_operand_kind(lhs, working_tolerance)?;
+    let mut input_triangle_count =
+        count_operand_input_triangles(lhs, operand_kind, working_tolerance)?;
+    let input_face_count = lhs.faces.len()
+        + cutters
+            .iter()
+            .map(|cutter| cutter.faces.len())
+            .sum::<usize>();
+
+    for (index, cutter) in cutters.iter().enumerate() {
+        let cutter_kind = detect_operand_kind(cutter, working_tolerance)
+            .map_err(|error| indexed_subtraction_error(index + 1, error))?;
+        if cutter_kind != operand_kind {
+            return Err(indexed_subtraction_error(
+                index + 1,
+                BooleanError::new(
+                    BooleanErrorKind::MixedOperandKinds,
+                    "Boolean operands must both be closed solids or both be coplanar planar faces",
+                ),
+            ));
+        }
+
+        input_triangle_count +=
+            count_operand_input_triangles(cutter, operand_kind, working_tolerance)
+                .map_err(|error| indexed_subtraction_error(index + 1, error))?;
+    }
+
+    let mut current = lhs.clone();
+    for (index, cutter) in cutters.iter().enumerate() {
+        if current.faces.is_empty() {
+            break;
+        }
+
+        current = execute_boolean_with_tolerance(
+            &current,
+            cutter,
+            BooleanOperation::Subtraction,
+            working_tolerance,
+        )
+        .map(|output| output.brep)
+        .map_err(|error| indexed_subtraction_error(index + 1, error))?;
+    }
+
+    Ok(BooleanOutput {
+        report: BooleanReport {
+            operation: BooleanOperation::Subtraction,
+            operand_kind,
+            input_face_count,
+            input_triangle_count,
+            output_face_count: current.faces.len(),
+            output_shell_count: current.shells.len(),
+            empty: current.faces.is_empty(),
+        },
+        brep: current,
+    })
+}
+
 /// Wasm entry point for union.
 #[wasm_bindgen(js_name = booleanUnion)]
 pub fn boolean_union_wasm(
@@ -151,6 +237,27 @@ pub fn boolean_subtraction_wasm(
     )
 }
 
+/// Wasm entry point for array-backed repeated subtraction.
+#[wasm_bindgen(js_name = booleanSubtractionMany)]
+pub fn boolean_subtraction_many_wasm(
+    lhs_brep_serialized: String,
+    cutters_brep_serialized: String,
+    options_json: Option<String>,
+) -> Result<OGBooleanResult, JsValue> {
+    let lhs: Brep = serde_json::from_str(&lhs_brep_serialized)
+        .map_err(|error| JsValue::from_str(&format!("Invalid lhs BRep JSON payload: {}", error)))?;
+    let cutters: Vec<Brep> = serde_json::from_str(&cutters_brep_serialized).map_err(|error| {
+        JsValue::from_str(&format!(
+            "Invalid subtraction cutter BRep JSON payload: {}",
+            error
+        ))
+    })?;
+    let options = parse_options_json(options_json).map_err(|error| JsValue::from_str(&error))?;
+    let output = boolean_subtraction_many(&lhs, &cutters, options)
+        .map_err(|error| JsValue::from_str(&error.to_string()))?;
+    OGBooleanResult::from_output(output).map_err(|error| JsValue::from_str(&error))
+}
+
 fn boolean_wasm_entry(
     lhs_brep_serialized: String,
     rhs_brep_serialized: String,
@@ -180,6 +287,17 @@ fn execute_boolean(
 
     let tolerance = options.resolve_tolerance(lhs, rhs);
     let working_tolerance = tolerance.max(1.0e-6);
+    execute_boolean_with_tolerance(lhs, rhs, operation, working_tolerance)
+}
+
+/// Validates operands, routes to the solid or planar pipeline, and packages
+/// the rebuilt BRep plus operation report using a caller-supplied tolerance.
+fn execute_boolean_with_tolerance(
+    lhs: &Brep,
+    rhs: &Brep,
+    operation: BooleanOperation,
+    working_tolerance: f64,
+) -> Result<BooleanOutput, BooleanError> {
     let lhs_kind = detect_operand_kind(lhs, working_tolerance)?;
     let rhs_kind = detect_operand_kind(rhs, working_tolerance)?;
 
@@ -189,8 +307,6 @@ fn execute_boolean(
             "Boolean operands must both be closed solids or both be coplanar planar faces",
         ));
     }
-
-    let _ = options.merge_coplanar_faces;
 
     let (brep, input_triangle_count) = match lhs_kind {
         BooleanOperandKind::ClosedSolid => {
@@ -228,6 +344,26 @@ fn execute_boolean(
     };
 
     Ok(BooleanOutput { brep, report })
+}
+
+fn count_operand_input_triangles(
+    brep: &Brep,
+    operand_kind: BooleanOperandKind,
+    tolerance: f64,
+) -> Result<usize, BooleanError> {
+    match operand_kind {
+        BooleanOperandKind::ClosedSolid => {
+            brep_to_polygons(brep, tolerance).map(|(_, count)| count)
+        }
+        BooleanOperandKind::PlanarFace => planar_input_triangle_count(brep, tolerance),
+    }
+}
+
+fn indexed_subtraction_error(index: usize, error: BooleanError) -> BooleanError {
+    BooleanError::new(
+        error.kind(),
+        format!("Failed to subtract cutter #{}: {}", index, error),
+    )
 }
 
 /// Detects which boolean pipeline can legally consume the operand.
@@ -454,6 +590,28 @@ mod tests {
     }
 
     #[test]
+    fn multi_subtraction_of_solid_cutters_preserves_closed_shell() {
+        let lhs = build_cuboid(Vector3::new(0.0, 0.0, 0.0), 3.2, 2.2, 1.4);
+        let cutters = vec![
+            build_cuboid(Vector3::new(-0.55, 0.0, 0.0), 0.95, 1.4, 0.9),
+            build_cuboid(Vector3::new(0.75, 0.1, 0.0), 0.85, 1.2, 0.9),
+        ];
+
+        let output = boolean_subtraction_many(&lhs, &cutters, BooleanOptions::default())
+            .expect("multi subtraction");
+
+        assert_closed_solid(&output.brep);
+        assert_eq!(
+            output.report.input_face_count,
+            lhs.faces.len()
+                + cutters
+                    .iter()
+                    .map(|cutter| cutter.faces.len())
+                    .sum::<usize>()
+        );
+    }
+
+    #[test]
     fn union_of_face_touching_cuboids_stays_closed() {
         let lhs = build_cuboid(Vector3::new(-0.5, 0.0, 0.0), 1.0, 1.0, 1.0);
         let rhs = build_cuboid(Vector3::new(0.5, 0.0, 0.0), 1.0, 1.0, 1.0);
@@ -486,6 +644,37 @@ mod tests {
     }
 
     #[test]
+    fn multi_subtraction_of_planar_faces_returns_planar_output() {
+        let lhs = build_polygon(vec![
+            Vector3::new(-2.4, 0.0, -1.0),
+            Vector3::new(2.4, 0.0, -1.0),
+            Vector3::new(2.4, 0.0, 1.0),
+            Vector3::new(-2.4, 0.0, 1.0),
+        ]);
+        let cutters = vec![
+            build_polygon(vec![
+                Vector3::new(-1.4, 0.0, -0.45),
+                Vector3::new(-0.35, 0.0, -0.45),
+                Vector3::new(-0.35, 0.0, 0.45),
+                Vector3::new(-1.4, 0.0, 0.45),
+            ]),
+            build_polygon(vec![
+                Vector3::new(0.45, 0.0, -0.45),
+                Vector3::new(1.45, 0.0, -0.45),
+                Vector3::new(1.45, 0.0, 0.45),
+                Vector3::new(0.45, 0.0, 0.45),
+            ]),
+        ];
+
+        let output = boolean_subtraction_many(&lhs, &cutters, BooleanOptions::default())
+            .expect("planar multi subtraction");
+
+        assert!(!output.brep.faces.is_empty());
+        assert!(output.brep.shells.is_empty());
+        assert!(output.brep.validate_topology().is_ok());
+    }
+
+    #[test]
     fn mixed_dimensional_operands_are_rejected() {
         let solid = build_cuboid(Vector3::new(0.0, 0.0, 0.0), 1.0, 1.0, 1.0);
         let planar = build_polygon(vec![
@@ -500,5 +689,65 @@ mod tests {
             Err(error) => error,
         };
         assert_eq!(error.kind(), BooleanErrorKind::MixedOperandKinds);
+    }
+
+    #[test]
+    fn multi_subtraction_with_one_cutter_matches_binary_subtraction() {
+        let lhs = build_cuboid(Vector3::new(0.0, 0.0, 0.0), 2.2, 1.6, 1.2);
+        let cutter = build_cuboid(Vector3::new(0.45, 0.0, 0.0), 0.9, 1.0, 0.8);
+
+        let binary = boolean_subtraction(&lhs, &cutter, BooleanOptions::default())
+            .expect("binary subtraction");
+        let multi = boolean_subtraction_many(&lhs, &[cutter], BooleanOptions::default())
+            .expect("multi subtraction");
+
+        assert_eq!(multi.brep.faces.len(), binary.brep.faces.len());
+        assert_eq!(multi.brep.shells.len(), binary.brep.shells.len());
+        assert_eq!(
+            multi.report.output_face_count,
+            binary.report.output_face_count
+        );
+        assert_eq!(
+            multi.report.output_shell_count,
+            binary.report.output_shell_count
+        );
+        assert_eq!(multi.report.empty, binary.report.empty);
+    }
+
+    #[test]
+    fn multi_subtraction_requires_at_least_one_cutter() {
+        let lhs = build_cuboid(Vector3::new(0.0, 0.0, 0.0), 2.2, 1.6, 1.2);
+        let error = match boolean_subtraction_many(&lhs, &[], BooleanOptions::default()) {
+            Ok(_) => panic!("empty cutter list should fail"),
+            Err(error) => error,
+        };
+
+        assert_eq!(error.kind(), BooleanErrorKind::InvalidOperand);
+        assert_eq!(
+            error.to_string(),
+            "Boolean subtraction requires at least one cutter in the operand array"
+        );
+    }
+
+    #[test]
+    fn multi_subtraction_reports_later_cutter_index_on_failure() {
+        let lhs = build_cuboid(Vector3::new(0.0, 0.0, 0.0), 2.8, 1.8, 1.4);
+        let cutters = vec![
+            build_cuboid(Vector3::new(-0.5, 0.0, 0.0), 0.9, 1.1, 0.8),
+            build_polygon(vec![
+                Vector3::new(-0.3, 0.0, -0.3),
+                Vector3::new(0.8, 0.0, -0.3),
+                Vector3::new(0.8, 0.0, 0.3),
+                Vector3::new(-0.3, 0.0, 0.3),
+            ]),
+        ];
+
+        let error = match boolean_subtraction_many(&lhs, &cutters, BooleanOptions::default()) {
+            Ok(_) => panic!("mixed dimensional cutter should fail"),
+            Err(error) => error,
+        };
+
+        assert_eq!(error.kind(), BooleanErrorKind::MixedOperandKinds);
+        assert!(error.to_string().contains("cutter #2"));
     }
 }

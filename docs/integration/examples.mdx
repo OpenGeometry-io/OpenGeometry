@@ -74,15 +74,18 @@ The examples follow a simple create-once, update-with-`setConfig(...)` pattern.
 
     const app = document.getElementById("app");
     let cuboid;
+    let config;
 
-    const config = {
-      center: new Vector3(0, 0.8, 0),
-      width: 2,
-      height: 1.6,
-      depth: 1.2,
-      color: 0x0ea5e9,
-      outlineWidth: 2,
-    };
+    function createConfig() {
+      return {
+        center: new Vector3(0, 0.8, 0),
+        width: 2,
+        height: 1.6,
+        depth: 1.2,
+        color: 0x0ea5e9,
+        outlineWidth: 2,
+      };
+    }
 
     const viewState = {
       outline: true,
@@ -112,6 +115,7 @@ The examples follow a simple create-once, update-with-`setConfig(...)` pattern.
       document.body.appendChild(stats.dom);
 
       await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+      config = createConfig();
 
       cuboid = new Cuboid({
         center: config.center.clone(),
@@ -133,8 +137,8 @@ The examples follow a simple create-once, update-with-`setConfig(...)` pattern.
 
 ## Package names in local examples vs published apps
 
-In this repository, example authoring may use local Vite aliasing during development. In your own
-application, import from the published package name:
+In this repository, the example dev/build setup resolves the public package name back to the local
+SDK source. In your own application, import from the same published package name:
 
 ```ts
 import { OpenGeometry, Cuboid, Polygon, Vector3 } from "opengeometry";

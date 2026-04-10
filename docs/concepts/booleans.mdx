@@ -19,10 +19,13 @@ along with the output B-Rep and a report you can use for debugging.
 You can use either:
 
 - The standalone helpers: `booleanUnion`, `booleanIntersection`, `booleanSubtraction`
-- Shape convenience methods: `shape.subtract(...)`
-- The opening-centric workflow: `opening.subtractFrom(host)`
+- Shape convenience methods: `shape.subtract([operands], options?)`
+- The opening-centric workflow: `opening.subtractFrom(host, options?)`
 
 All of these call the same kernel entry points under the hood.
+
+The standalone `booleanSubtraction(lhs, rhs, options?)` helper stays binary. Wrapper subtraction is
+array-only, so pass `shape.subtract([operand], options?)` even when you only have one cutter.
 
 The operands can be:
 

@@ -13,9 +13,11 @@ import {
   createParametricEditCapabilities,
 } from "../editor";
 import { createFreeformGeometry } from "../freeform";
+import { booleanSubtraction } from "../operations/boolean";
 import { subtractShapeOperand } from "./boolean-subtract";
 import type {
   ShapeSubtractOperand,
+  ShapeSubtractOperands,
   ShapeSubtractOptions,
   ShapeSubtractResult,
 } from "./boolean-subtract";
@@ -316,23 +318,26 @@ export class Opening extends THREE.Mesh {
   }
 
   /**
-   * Subtracts another boolean operand from this opening volume.
+   * Subtracts one or more boolean operands from this opening volume.
    */
   subtract(
-    operand: ShapeSubtractOperand,
+    operands: ShapeSubtractOperands,
     options?: ShapeSubtractOptions
   ): ShapeSubtractResult {
-    return subtractShapeOperand(this, operand, options);
+    return subtractShapeOperand(this, operands, options);
   }
 
   /**
    * Uses this opening volume to cut a host shape.
+   *
+   * Prefer this helper for wall, slab, and other host-cutting workflows in
+   * browser-based AEC/BIM tools.
    */
   subtractFrom(
     host: ShapeSubtractOperand,
     options?: ShapeSubtractOptions
   ): ShapeSubtractResult {
-    return subtractShapeOperand(host, this, options);
+    return booleanSubtraction(host, this, options);
   }
 
   set outline(enable: boolean) {

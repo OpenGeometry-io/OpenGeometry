@@ -10,6 +10,11 @@ icon: 'door-open'
 It supports kernel-backed placement, outline rendering, freeform conversion, parsed BRep access,
 direct subtraction, and the host-oriented `subtractFrom(...)` helper.
 
+<Note>
+  Initialize `OpenGeometry.create(...)` before constructing `Vector3` or running the examples on
+  this page.
+</Note>
+
 ## Constructor
 
 ```ts
@@ -111,7 +116,7 @@ const brep = opening.getBrepData();
 Runs a boolean subtraction either with the opening as the host or as the cutting tool.
 
 ```ts
-const result = opening.subtract(operand, options?);
+const result = opening.subtract([operand], options?);
 const cutHost = opening.subtractFrom(host, options?);
 ```
 

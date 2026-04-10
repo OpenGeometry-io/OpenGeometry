@@ -78,6 +78,12 @@ type KernelBooleanFunction = (
   rhsBrepSerialized: string,
   optionsJson?: string
 ) => KernelBooleanResult;
+
+type KernelBooleanManyFunction = (
+  lhsBrepSerialized: string,
+  rhsBrepsSerialized: string,
+  optionsJson?: string
+) => KernelBooleanResult;
 /* eslint-enable no-unused-vars */
 
 const BOOLEAN_CREASE_ANGLE = Math.PI / 5;
@@ -250,6 +256,9 @@ export class BooleanResult extends THREE.Mesh {
 
 /**
  * Computes a kernel-backed boolean union and returns a renderable result mesh.
+ *
+ * Accepts wrapper objects directly, including `Solid`, `Cuboid`, `Opening`,
+ * and other shapes that expose BRep accessors.
  */
 export function booleanUnion(
   lhs: BooleanOperand,
@@ -272,6 +281,9 @@ export function booleanIntersection(
 
 /**
  * Computes a kernel-backed boolean subtraction and returns a renderable result mesh.
+ *
+ * Use this when you want a standalone helper rather than a shape-level
+ * convenience method like `opening.subtractFrom(host)`.
  */
 export function booleanSubtraction(
   lhs: BooleanOperand,
@@ -279,6 +291,35 @@ export function booleanSubtraction(
   options?: BooleanExecutionOptions
 ) {
   return executeBoolean("booleanSubtraction", lhs, rhs, options);
+}
+
+/**
+ * Computes a kernel-backed repeated subtraction using a left-to-right cutter array.
+ *
+ * This is used by the shape-level `.subtract([...])` helpers so the heavy
+ * boolean orchestration stays in the Rust/WASM layer instead of JavaScript.
+ */
+export function executeBooleanSubtractionMany(
+  lhs: BooleanOperand,
+  cutters: BooleanOperand[],
+  options?: BooleanExecutionOptions
+) {
+  const booleanExport = (OGKernel as Record<string, unknown>).booleanSubtractionMany;
+  if (typeof booleanExport !== "function") {
+    throw new Error(
+      "booleanSubtractionMany is not available in the loaded wasm package. Rebuild opengeometry wasm bindings."
+    );
+  }
+
+  const kernelFunction = booleanExport as KernelBooleanManyFunction;
+  const kernelOptions = serializeKernelOptions(options?.kernel);
+  const kernelResult = kernelFunction(
+    resolveOperandSerialized(lhs),
+    JSON.stringify(cutters.map(resolveOperandPayload)),
+    kernelOptions
+  );
+
+  return createBooleanResult(kernelResult, options);
 }
 
 /**
@@ -306,11 +347,7 @@ function executeBoolean(
     kernelOptions
   );
 
-  const result = new BooleanResult(kernelResult, options);
-  if (options?.outline ?? true) {
-    result.outline = true;
-  }
-  return result;
+  return createBooleanResult(kernelResult, options);
 }
 
 /**
@@ -338,6 +375,21 @@ function resolveOperandSerialized(operand: BooleanOperand): string {
 }
 
 /**
+ * Parses a boolean operand into a raw BRep payload so array-backed boolean
+ * calls can serialize a JSON array of BReps instead of a JSON array of strings.
+ */
+function resolveOperandPayload(operand: BooleanOperand) {
+  const serialized = resolveOperandSerialized(operand);
+  try {
+    return JSON.parse(serialized) as Record<string, unknown>;
+  } catch {
+    throw new Error(
+      "Boolean operands must resolve to valid serialized BRep JSON before array subtraction."
+    );
+  }
+}
+
+/**
  * Accepts either a parsed BRep object or an already serialized JSON payload
  * and always returns the canonical serialized form expected by the wasm API.
  */
@@ -361,6 +413,17 @@ function serializeKernelOptions(options?: BooleanKernelOptions) {
     tolerance: options.tolerance,
     merge_coplanar_faces: options.mergeCoplanarFaces,
   });
+}
+
+function createBooleanResult(
+  kernelResult: KernelBooleanResult,
+  options?: BooleanExecutionOptions
+) {
+  const result = new BooleanResult(kernelResult, options);
+  if (options?.outline ?? true) {
+    result.outline = true;
+  }
+  return result;
 }
 
 /**

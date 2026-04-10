@@ -3,8 +3,9 @@
   "author": "Vishwajeet Vinayak Mane",
   "license": "MPL-2.0",
   "version": "2.0.3",
-  "description": "OpenGeometry Kernel for Three.js",
+  "description": "Three.js adapter for OpenGeometry, a CAD kernel for the web built with Rust and WebAssembly.",
   "main": "index.js",
+  "homepage": "https://docs.opengeometry.io",
   "scripts": {
     "dev-example-three": "vite --config ./vite.examples.config.mjs",
     "build-example-three": "vite build --config ./vite.examples.config.mjs && node ./scripts/copy-wasm-assets.mjs",
@@ -14,8 +15,20 @@
   },
   "keywords": [
     "opengeometry",
-    "three",
-    "geometry"
+    "cad",
+    "cad-kernel",
+    "browser-cad",
+    "threejs",
+    "three.js",
+    "geometry",
+    "webassembly",
+    "wasm",
+    "aec",
+    "bim",
+    "ifc",
+    "step",
+    "stl",
+    "parametric-modeling"
   ],
   "dependencies": {
     "@opengeometry/openmaths": "^0.2.3"

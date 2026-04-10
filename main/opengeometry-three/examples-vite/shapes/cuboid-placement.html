@@ -76,7 +76,7 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { Cuboid, OpenGeometry, Vector3 } from "@og-three";
+      import { Cuboid, OpenGeometry, Vector3 } from "opengeometry";
 
       const app = document.getElementById("app");
       if (!app) {
@@ -211,7 +211,9 @@
           updatePlacement();
         });
         attachNumberControl("scale", (value) => {
-          config.scale.set(value, value, value);
+          config.scale.x = value;
+          config.scale.y = value;
+          config.scale.z = value;
           updatePlacement();
         });
 

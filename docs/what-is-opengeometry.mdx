@@ -1,17 +1,17 @@
 ---
 title: OpenGeometry
-description: A high-performance CAD SDK and Toolkits for the web, bringing 3D geometry operations to your browser
+description: A CAD kernel for the web built with Rust, WebAssembly, and Three.js for browser CAD and AEC/BIM workflows
 ---
 
 ## What is OpenGeometry?
 
-OpenGeometry is a high-performance CAD kernel for the web that provides 2D and 3D geometric primitives and CAD operations via WebAssembly. Written in Rust and compiled to WASM, it delivers near-native performance for complex geometric computations directly in the browser.
+OpenGeometry is a CAD kernel for the web that provides 2D and 3D geometric primitives and CAD operations via WebAssembly. Written in Rust and compiled to WASM, it delivers near-native performance for complex geometric computations directly in the browser.
 
-OpenGeometry makes it easy to build sophisticated CAD applications, 3D modeling tools, architectural visualization software, and interactive geometry editors for the web.
+OpenGeometry makes it easy to build sophisticated CAD applications, browser-based AEC/BIM tools, 3D modeling workflows, architectural visualization software, and interactive geometry editors for the web.
 
 OpenGeometry works with Three.js with plans to support other 3D libraries as well.
 
-We have a dedicated Toolkit for Architects and Interior Designers called OpenPlans, which is built on top of OpenGeometry and can be used to create floor plans and 3D models of buildings.
+OpenPlans is a dedicated toolkit/application for architects and interior designers that is built on top of OpenGeometry. It is a downstream AEC workflow layer, while OpenGeometry is the core engine.
 
 <Tip>
 Check out [OpenPlans](https://openplans.io) for more information.
@@ -28,6 +28,11 @@ Building CAD applications for the web has traditionally required complex server-
 - **Production-Ready**: Robust triangulation, extrusion, offset, and Boolean operations
 
 ## Key Features
+
+<Note>
+  The snippets below assume you import from `opengeometry` and call
+  `await OpenGeometry.create({ wasmURL })` before any `new Vector3(...)` or wrapper construction.
+</Note>
 
 ### 2D & 3D Primitives
 

@@ -3,7 +3,7 @@ title: Quickstart
 description: Create your first 3D shape with OpenGeometry in minutes
 ---
 
-This guide will walk you through creating a simple 3D scene with OpenGeometry and rendering it with Three.js.
+This guide walks through a minimal OpenGeometry + Three.js setup for browser-based CAD, AEC/BIM, and other geometry-heavy web tools.
 
 ## Prerequisites
 
@@ -100,6 +100,10 @@ Initialize the OpenGeometry WASM module once before creating shapes:
 // Initialize OpenGeometry
 await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 ```
+
+<Note>
+  Call `OpenGeometry.create(...)` before constructing `Vector3` or any wrapper.
+</Note>
 
 <Note>
   With Vite, copy `node_modules/opengeometry/opengeometry_bg.wasm` to `public/opengeometry_bg.wasm`
@@ -238,7 +242,8 @@ window.addEventListener('resize', () => {
 
 ## Try Other Shapes
 
-OpenGeometry provides many built-in shapes. Try experimenting with different primitives and shapes:
+OpenGeometry provides many built-in shapes for browser CAD and AEC/BIM workflows. The snippets
+below assume you have already initialized `OpenGeometry`.
 
 ### Cylinder Example
 

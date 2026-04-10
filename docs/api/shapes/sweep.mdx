@@ -10,6 +10,11 @@ icon: 'life-ring'
 optional start and end caps, kernel-backed placement, anchor control, freeform conversion, parsed
 BRep access, and boolean subtraction.
 
+<Note>
+  Initialize `OpenGeometry.create(...)` before constructing `Vector3` or running the examples on
+  this page.
+</Note>
+
 ## Constructor
 
 ```ts
@@ -110,10 +115,10 @@ const brep = sweep.getBrep();
 
 ### subtract()
 
-Subtracts another boolean operand from the sweep and returns a renderable boolean result.
+Subtracts one or more boolean operands from the sweep and returns a renderable boolean result.
 
 ```ts
-const result = sweep.subtract(operand, options?);
+const result = sweep.subtract([operand], options?);
 ```
 
 ### generateGeometry(), discardGeometry()

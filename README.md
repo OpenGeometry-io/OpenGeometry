@@ -32,7 +32,32 @@
 
 OpenGeometry is an **open-source CAD kernel** purpose-built for the browser. The geometry engine is written in **Rust**, compiled to **WebAssembly**, and ships with a **Three.js integration layer** — so you can build real CAD tools that run entirely on the web.
 
-Whether you're building a parametric modeler, a BIM viewer, a 3D configurator, or any geometry-heavy web app, OpenGeometry gives you the primitives and operations you need without leaving JavaScript.
+OpenGeometry is best suited for **browser-based CAD, AEC/BIM, configurators, and geometry-heavy web tools**. Whether you're building a parametric modeler, a wall/opening workflow, a BIM viewer, or a custom Three.js modeling tool, OpenGeometry gives you kernel-backed primitives and operations without leaving JavaScript.
+
+OpenPlans is an application/toolkit built on top of OpenGeometry for AEC workflows. In this repository, OpenGeometry is the engine.
+
+## When to use OpenGeometry
+
+Use OpenGeometry when you need:
+
+- browser-based parametric modeling with Rust + WebAssembly performance
+- wall/opening subtraction and other solid boolean workflows
+- polygon extrusion into solids for CAD or AEC modeling
+- IFC, STEP, STL, and PDF-style export/projection in web apps
+- a Three.js-friendly CAD kernel instead of ad hoc mesh math
+
+## AI and Coding Agent Entrypoints
+
+If you are using ChatGPT, Claude, Gemini, Copilot, or other coding agents on this repository, start here:
+
+- [llms.txt](./llms.txt)
+- [llms-full.txt](./llms-full.txt)
+- [llm.txt](./llm.txt)
+- [AGENTS.md](./AGENTS.md)
+- [Quickstart](https://docs.opengeometry.io/quickstart)
+- [Three.js integration](https://docs.opengeometry.io/integration/threejs)
+- [Boolean operations](https://docs.opengeometry.io/api/operations/boolean-operations)
+- [Extrude](https://docs.opengeometry.io/api/operations/extrude)
 
 ### What you can do today
 
@@ -70,6 +95,7 @@ await OpenGeometry.create({
   ).href,
 });
 
+// Initialize once before constructing Vector3 or any wrapper.
 const cuboid = new Cuboid({
   center: new Vector3(0, 0, 0),
   width: 2,

@@ -138,6 +138,26 @@ pub(crate) fn execute_planar_boolean(
     Ok((projected, triangle_count))
 }
 
+/// Counts the triangle inputs that would be generated while preparing a planar
+/// boolean operand. This matches the report accounting used by the boolean API.
+pub(crate) fn planar_input_triangle_count(
+    brep: &Brep,
+    tolerance: f64,
+) -> Result<usize, BooleanError> {
+    let _ = planar_context_from_brep(brep, tolerance)?;
+    let mut triangle_count = 0;
+
+    for face in &brep.faces {
+        let (outer, holes) = brep.get_vertices_and_holes_by_face_id(face.id);
+        if outer.len() < 3 {
+            continue;
+        }
+        triangle_count += triangulate_polygon_with_holes(&outer, &holes).len();
+    }
+
+    Ok(triangle_count)
+}
+
 /// Extrudes each planar face into a thin watertight shell so the shared solid
 /// boolean engine can process it.
 fn thin_solid_polygons_from_planar_brep(

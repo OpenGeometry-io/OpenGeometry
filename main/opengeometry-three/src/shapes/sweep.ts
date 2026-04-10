@@ -16,7 +16,7 @@ import {
 import { createFreeformGeometry } from "../freeform";
 import { subtractShapeOperand } from "./boolean-subtract";
 import type {
-  ShapeSubtractOperand,
+  ShapeSubtractOperands,
   ShapeSubtractOptions,
   ShapeSubtractResult,
 } from "./boolean-subtract";
@@ -351,13 +351,13 @@ export class Sweep extends THREE.Mesh {
   }
 
   /**
-   * Subtracts another boolean operand, such as an Opening, from this sweep.
+   * Subtracts one or more boolean operands, such as Opening volumes, from this sweep.
    */
   subtract(
-    operand: ShapeSubtractOperand,
+    operands: ShapeSubtractOperands,
     options?: ShapeSubtractOptions
   ): ShapeSubtractResult {
-    return subtractShapeOperand(this, operand, options);
+    return subtractShapeOperand(this, operands, options);
   }
 
   set outline(enable: boolean) {

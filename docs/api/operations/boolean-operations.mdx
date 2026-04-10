@@ -9,7 +9,8 @@ icon: "shapes"
 OpenGeometry exposes kernel-backed boolean operations that work on B-Rep payloads. The helpers accept
 multiple operand formats (wrapper objects, raw B-Rep objects, or serialized JSON) and return a
 renderable `BooleanResult` mesh with access to the output B-Rep, a structured report, and freeform
-conversion helpers.
+conversion helpers. These boolean paths are central to browser CAD and AEC/BIM workflows such as
+wall/opening subtraction and solid-to-solid modeling.
 
 To learn how booleans work and what to expect from them, read [Booleans](/concepts/booleans).
 
@@ -49,6 +50,21 @@ import { booleanSubtraction } from "opengeometry";
 const result = booleanSubtraction(lhs, rhs, options);
 ```
 
+`booleanSubtraction(lhs, rhs, options?)` stays a binary helper. Use the wrapper-level
+`shape.subtract([operands], options?)` API when you want to cut a host with multiple cutters in one
+call.
+
+### shape.subtract([...])
+
+Shape wrappers expose an array-only subtract convenience method:
+
+```ts
+const result = wall.subtract([doorOpening, windowOpening], options);
+```
+
+Pass `[operand]` even when you only have one cutter. `Opening.subtractFrom(host, options?)`
+remains binary so the opening stays the cutting tool.
+
 ### BooleanOperand
 
 Each boolean helper accepts a `BooleanOperand` in any of these forms:
@@ -60,8 +76,8 @@ Each boolean helper accepts a `BooleanOperand` in any of these forms:
   - `getBrepData(): unknown`
   - `getBrep(): unknown`
 
-This means you can pass OpenGeometry shape wrappers (like `Cuboid` and `Opening`) directly.
-`Solid` also works directly here, which makes `polygon.extrude(height)` a first-class boolean input.
+This means you can pass OpenGeometry shape wrappers (like `Cuboid`, `Opening`, and `Solid`) directly.
+That makes `polygon.extrude(height)` a first-class boolean input for browser CAD and AEC workflows.
 
 ### BooleanExecutionOptions
 
@@ -164,6 +180,53 @@ const opening = new Opening({
 });
 
 const cutWall = opening.subtractFrom(wall, {
+  color: 0x10b981,
+  outline: true,
+  fatOutlines: true,
+  outlineWidth: 2,
+  kernel: { tolerance: 1e-6, mergeCoplanarFaces: true },
+});
+
+scene.add(cutWall);
+```
+
+### Cut a wall with two openings
+
+Use the array-only wrapper subtraction when the host owns multiple cutters:
+
+```ts
+import * as THREE from "three";
+import { OpenGeometry, Cuboid, Opening, Vector3 } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+
+const scene = new THREE.Scene();
+
+const wall = new Cuboid({
+  center: new Vector3(0, 1.5, 0),
+  width: 6,
+  height: 3,
+  depth: 0.3,
+  color: 0x9ca3af,
+});
+
+const doorOpening = new Opening({
+  center: new Vector3(-1.2, 1.0, 0),
+  width: 1.1,
+  height: 2.0,
+  depth: 0.4,
+  color: 0xffffff,
+});
+
+const windowOpening = new Opening({
+  center: new Vector3(1.35, 1.75, 0),
+  width: 1.3,
+  height: 1.1,
+  depth: 0.4,
+  color: 0xffffff,
+});
+
+const cutWall = wall.subtract([doorOpening, windowOpening], {
   color: 0x10b981,
   outline: true,
   fatOutlines: true,

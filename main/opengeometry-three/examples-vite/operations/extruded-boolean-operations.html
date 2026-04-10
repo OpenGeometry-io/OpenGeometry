@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Simple OpenGeometry extruded boolean example for Three.js."
+      content="Wall-minus-openings workflow built from polygon.extrude(height) and array-backed solid subtraction."
     />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
@@ -17,10 +17,10 @@
     </div>
 
     <aside class="og-controls">
-      <h3>Wall Minus Opening</h3>
+      <h3>Wall Minus Openings</h3>
       <p class="og-control-summary">
         This page shows the production-style flow: build two polygons, call
-        <code>polygon.extrude(height)</code>, then subtract the opening from the wall.
+        <code>polygon.extrude(height)</code>, then subtract an array of openings from the wall.
       </p>
 
       <label class="og-control-row" data-control="wall-height">
@@ -76,7 +76,7 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Polygon, Vector3 } from "@og-three";
+      import { OpenGeometry, Polygon, Vector3 } from "opengeometry";
 
       const app = document.getElementById("app");
       if (!app) {
@@ -181,13 +181,24 @@
         const wall = wallProfile.extrude(config.wallHeight);
         wall.outline = true;
 
-        const opening = openingProfile.extrude(config.openingHeight);
-        opening.outline = true;
-        opening.setPlacement({
-          translation: new Vector3(0, config.sillHeight, 0),
+        const openingOffset = Math.max(
+          0.45,
+          Math.min(1.05, 2.2 - config.openingWidth * 0.5 - 0.15)
+        );
+
+        const leftOpening = openingProfile.extrude(config.openingHeight);
+        leftOpening.outline = true;
+        leftOpening.setPlacement({
+          translation: new Vector3(-openingOffset, config.sillHeight, 0),
         });
 
-        const result = wall.subtract(opening, {
+        const rightOpening = openingProfile.extrude(config.openingHeight);
+        rightOpening.outline = true;
+        rightOpening.setPlacement({
+          translation: new Vector3(openingOffset, config.sillHeight, 0),
+        });
+
+        const result = wall.subtract([leftOpening, rightOpening], {
           outline: true,
           outlineWidth: 2,
           kernel: {
@@ -196,12 +207,14 @@
         });
 
         wall.position.x = -4;
-        opening.position.x = -4;
+        leftOpening.position.x = -4;
+        rightOpening.position.x = -4;
         result.position.x = 4;
 
         currentGroup = new THREE.Group();
         currentGroup.add(wall);
-        currentGroup.add(opening);
+        currentGroup.add(leftOpening);
+        currentGroup.add(rightOpening);
         currentGroup.add(result);
         scene.add(currentGroup);
 

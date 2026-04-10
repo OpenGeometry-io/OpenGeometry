@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install OpenGeometry and set up your development environment
+description: Install OpenGeometry and set up the runtime for browser CAD, AEC/BIM, and geometry-heavy web applications
 ---
 
 ## Install OpenGeometry
@@ -70,7 +70,7 @@ OpenGeometry includes built-in TypeScript definitions, so no additional types ar
 OpenGeometry uses WebAssembly for high-performance geometry. You need to do two things:
 
 1. Serve the `.wasm` file so your app can fetch it.
-2. Call `await OpenGeometry.create({ wasmURL })` once before you create primitives or shapes.
+2. Call `await OpenGeometry.create({ wasmURL })` once before you create `Vector3`, primitives, or shapes.
 
 ### Where the WASM file lives
 
@@ -105,7 +105,7 @@ Create a simple test file to verify your installation:
 import { OpenGeometry, Cuboid, Vector3 } from 'opengeometry';
 import * as THREE from 'three';
 
-// Initialize the WASM module once before creating shapes
+// Initialize the WASM module once before creating Vector3 or shapes
 await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' });
 
 // Create a simple test cuboid
@@ -122,7 +122,8 @@ console.log('OGID:', cuboid.ogid);
 ```
 
 <Note>
-  Call `await OpenGeometry.create(...)` once before constructing kernel-backed primitives and shapes.
+  Call `await OpenGeometry.create(...)` once before constructing `Vector3`, kernel-backed primitives,
+  and shapes.
 </Note>
 
 ## Next Steps

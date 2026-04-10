@@ -1,9 +1,10 @@
 ---
 title: Three.js Integration
-description: How to use OpenGeometry primitives, shapes, solids, and booleans with Three.js
+description: How to use OpenGeometry primitives, shapes, solids, and booleans with Three.js for browser CAD and AEC/BIM workflows
 ---
 
-OpenGeometry exposes kernel-backed Three.js wrappers from the public `opengeometry` package.
+OpenGeometry exposes kernel-backed Three.js wrappers from the public `opengeometry` package. This is
+the main browser-side integration layer for web CAD, AEC/BIM, and geometry-heavy Three.js tools.
 
 ## Installation
 
@@ -29,7 +30,7 @@ import {
 
 ## Initialization
 
-Initialize the OpenGeometry runtime once before you construct wrappers:
+Initialize the OpenGeometry runtime once before you construct `Vector3` values or wrappers:
 
 ```ts
 await OpenGeometry.create({
@@ -184,7 +185,8 @@ const sweep = new Sweep({
 
 ## Booleans
 
-You can use either the standalone boolean helpers or the shape-level convenience methods.
+You can use either the standalone boolean helpers or the shape-level convenience methods. For AEC
+workflows, `Opening.subtractFrom(...)` is usually the clearest host-cutting path.
 
 ```ts
 const opening = new Opening({
