@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Window Frame Sweep</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Closed-path window frame sweep regression verifier for OpenGeometry."
+    />
+    <meta name="author" content="Vishwajeet Mane" />
+    <style>
+      .og-legend,
+      .og-metrics {
+        display: grid;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .og-legend-row,
+      .og-metric-row {
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+        border: 1px solid var(--og-line);
+        border-radius: var(--og-radius-soft);
+        background: var(--og-panel-soft);
+      }
+
+      .og-legend-row {
+        grid-template-columns: 14px 1fr;
+        align-items: center;
+      }
+
+      .og-legend-chip {
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        box-shadow: inset 0 0 0 1px rgba(24, 32, 61, 0.12);
+      }
+
+      .og-metric-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .og-metric-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--og-muted);
+      }
+
+      .og-metric-status {
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .og-metric-status[data-state="ok"] {
+        background: rgba(22, 163, 74, 0.14);
+        color: #166534;
+      }
+
+      .og-metric-status[data-state="drift"] {
+        background: rgba(220, 38, 38, 0.14);
+        color: #991b1b;
+      }
+
+      .og-metric-values {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .og-metric-value {
+        display: grid;
+        gap: 4px;
+      }
+
+      .og-metric-value span {
+        color: var(--og-muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .og-metric-value code {
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Window Frame Sweep</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>Window Frame Sweep</h3>
+      <p class="og-control-summary">
+        Dedicated regression verifier for the closed rectangular frame sweep used by OpenPlans
+        windows. The dark loop is the centerline path, the green loop is the expected outer frame,
+        and the amber loop is the expected inner opening.
+      </p>
+
+      <div class="og-legend">
+        <div class="og-legend-row">
+          <span class="og-legend-chip" style="background: #111827"></span>
+          <span>Centerline path fed into <code>Sweep</code></span>
+        </div>
+        <div class="og-legend-row">
+          <span class="og-legend-chip" style="background: #16a34a"></span>
+          <span>Expected outer frame bounds</span>
+        </div>
+        <div class="og-legend-row">
+          <span class="og-legend-chip" style="background: #d97706"></span>
+          <span>Expected inner opening bounds</span>
+        </div>
+      </div>
+
+      <label class="og-control-row" data-control="opening-width">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Opening Width</span>
+          <code class="og-control-value" data-value>1.20</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.6" max="3.5" step="0.02" value="1.2" />
+          <input data-number type="number" min="0.6" max="3.5" step="0.02" value="1.2" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="frame-height">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Frame Height</span>
+          <code class="og-control-value" data-value>1.00</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="3.0" step="0.02" value="1.0" />
+          <input data-number type="number" min="0.5" max="3.0" step="0.02" value="1.0" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="frame-width">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Frame Width</span>
+          <code class="og-control-value" data-value>0.12</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.04" max="0.4" step="0.01" value="0.12" />
+          <input data-number type="number" min="0.04" max="0.4" step="0.01" value="0.12" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="frame-depth">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Frame Depth</span>
+          <code class="og-control-value" data-value>0.12</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.04" max="0.5" step="0.01" value="0.12" />
+          <input data-number type="number" min="0.04" max="0.5" step="0.01" value="0.12" />
+        </div>
+      </label>
+
+      <div class="og-metrics" id="metrics"></div>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { OpenGeometry, Polyline, Sweep, Vector3 } from "opengeometry";
+
+      const app = document.getElementById("app");
+      const metricsRoot = document.getElementById("metrics");
+      if (!app || !metricsRoot) {
+        throw new Error("Missing required page containers");
+      }
+
+      const state = {
+        openingWidth: 1.2,
+        frameHeight: 1.0,
+        frameWidth: 0.12,
+        frameDepth: 0.12,
+        sillHeight: 0.95,
+      };
+
+      const epsilon = 1.0e-6;
+      const metricFields = [
+        { key: "outerWidth", label: "Outer Width" },
+        { key: "innerWidth", label: "Inner Width" },
+        { key: "outerHeight", label: "Outer Height" },
+        { key: "innerHeight", label: "Inner Height" },
+      ];
+
+      let frameSweep = null;
+      let centerlineGuide = null;
+      let outerGuide = null;
+      let innerGuide = null;
+      let openingPlane = null;
+
+      function formatNumber(value) {
+        return Number(value).toFixed(4).replace(/\.?0+$/, "");
+      }
+
+      function clonePoints(points) {
+        return points.map((point) => point.clone());
+      }
+
+      function createClosedLoop(width, height, baseHeight, zOffset = 0) {
+        return [
+          new Vector3(-width * 0.5, baseHeight, zOffset),
+          new Vector3(-width * 0.5, baseHeight + height, zOffset),
+          new Vector3(width * 0.5, baseHeight + height, zOffset),
+          new Vector3(width * 0.5, baseHeight, zOffset),
+          new Vector3(-width * 0.5, baseHeight, zOffset),
+        ];
+      }
+
+      function createWindowFramePath() {
+        const halfOpeningWidth = state.openingWidth * 0.5;
+        const halfFrameWidth = state.frameWidth * 0.5;
+        const x = halfOpeningWidth + halfFrameWidth;
+        const bottom = state.sillHeight - halfFrameWidth;
+        const top = state.sillHeight + state.frameHeight + halfFrameWidth;
+
+        return [
+          new Vector3(-x, bottom, 0),
+          new Vector3(-x, top, 0),
+          new Vector3(x, top, 0),
+          new Vector3(x, bottom, 0),
+          new Vector3(-x, bottom, 0),
+        ];
+      }
+
+      function createFrameProfile() {
+        const halfFrameWidth = state.frameWidth * 0.5;
+        const halfFrameDepth = state.frameDepth * 0.5;
+        return [
+          new Vector3(-halfFrameWidth, 0, -halfFrameDepth),
+          new Vector3(-halfFrameWidth, 0, halfFrameDepth),
+          new Vector3(halfFrameWidth, 0, halfFrameDepth),
+          new Vector3(halfFrameWidth, 0, -halfFrameDepth),
+          new Vector3(-halfFrameWidth, 0, -halfFrameDepth),
+        ];
+      }
+
+      function expectedDimensions() {
+        return {
+          outerWidth: state.openingWidth + state.frameWidth * 2,
+          innerWidth: state.openingWidth,
+          outerHeight: state.frameHeight + state.frameWidth * 2,
+          innerHeight: state.frameHeight,
+        };
+      }
+
+      function uniqueSorted(values) {
+        const ordered = [...values].sort((lhs, rhs) => lhs - rhs);
+        const unique = [];
+        ordered.forEach((value) => {
+          const last = unique[unique.length - 1];
+          if (last !== undefined && Math.abs(value - last) <= epsilon) {
+            return;
+          }
+          unique.push(value);
+        });
+        return unique;
+      }
+
+      function observedDimensions() {
+        const brep = frameSweep.getBrep();
+        const xs = uniqueSorted(brep.vertices.map((vertex) => vertex.position.x));
+        const ys = uniqueSorted(brep.vertices.map((vertex) => vertex.position.y));
+
+        if (xs.length < 4 || ys.length < 4) {
+          throw new Error("Window frame sweep should expose four x bands and four y bands.");
+        }
+
+        return {
+          outerWidth: xs[xs.length - 1] - xs[0],
+          innerWidth: xs[xs.length - 2] - xs[1],
+          outerHeight: ys[ys.length - 1] - ys[0],
+          innerHeight: ys[ys.length - 2] - ys[1],
+        };
+      }
+
+      function ensureMetricRows() {
+        if (metricsRoot.children.length > 0) {
+          return;
+        }
+
+        metricFields.forEach(({ key, label }) => {
+          const row = document.createElement("div");
+          row.className = "og-metric-row";
+          row.dataset.metric = key;
+          row.innerHTML = `
+            <div class="og-metric-head">
+              <span class="og-metric-label">${label}</span>
+              <span class="og-metric-status" data-state>Aligned</span>
+            </div>
+            <div class="og-metric-values">
+              <div class="og-metric-value">
+                <span>Expected</span>
+                <code data-expected>0</code>
+              </div>
+              <div class="og-metric-value">
+                <span>Observed</span>
+                <code data-observed>0</code>
+              </div>
+              <div class="og-metric-value">
+                <span>Delta</span>
+                <code data-delta>0</code>
+              </div>
+            </div>
+          `;
+          metricsRoot.appendChild(row);
+        });
+      }
+
+      function updateMetrics() {
+        ensureMetricRows();
+        const expected = expectedDimensions();
+        const observed = observedDimensions();
+
+        metricFields.forEach(({ key }) => {
+          const row = metricsRoot.querySelector(`[data-metric="${key}"]`);
+          if (!row) {
+            return;
+          }
+
+          const delta = observed[key] - expected[key];
+          const status = row.querySelector("[data-state]");
+          const expectedNode = row.querySelector("[data-expected]");
+          const observedNode = row.querySelector("[data-observed]");
+          const deltaNode = row.querySelector("[data-delta]");
+
+          expectedNode.textContent = formatNumber(expected[key]);
+          observedNode.textContent = formatNumber(observed[key]);
+          deltaNode.textContent = formatNumber(delta);
+
+          const withinTolerance = Math.abs(delta) <= epsilon * 20;
+          status.textContent = withinTolerance ? "Aligned" : "Drift";
+          status.dataset.state = withinTolerance ? "ok" : "drift";
+        });
+      }
+
+      function createGuide(points, color) {
+        return new Polyline({
+          points: clonePoints(points),
+          color,
+        });
+      }
+
+      function updateOpeningPlane(expected) {
+        const zOffset = -state.frameDepth * 0.35;
+        if (!openingPlane) {
+          openingPlane = new THREE.Mesh(
+            new THREE.PlaneGeometry(expected.innerWidth, expected.innerHeight),
+            new THREE.MeshStandardMaterial({
+              color: 0x8ecae6,
+              transparent: true,
+              opacity: 0.18,
+              side: THREE.DoubleSide,
+            })
+          );
+          openingPlane.renderOrder = 0;
+          scene.add(openingPlane);
+        } else {
+          openingPlane.geometry.dispose();
+          openingPlane.geometry = new THREE.PlaneGeometry(expected.innerWidth, expected.innerHeight);
+        }
+
+        openingPlane.position.set(0, state.sillHeight + state.frameHeight * 0.5, zOffset);
+      }
+
+      function updateGeometry() {
+        const framePath = createWindowFramePath();
+        const frameProfile = createFrameProfile();
+        const expected = expectedDimensions();
+        const guideZ = state.frameDepth * 0.68 + 0.02;
+        const outerGuidePoints = createClosedLoop(
+          expected.outerWidth,
+          expected.outerHeight,
+          state.sillHeight - state.frameWidth,
+          guideZ
+        );
+        const innerGuidePoints = createClosedLoop(
+          expected.innerWidth,
+          expected.innerHeight,
+          state.sillHeight,
+          guideZ
+        );
+
+        frameSweep.setConfig({
+          path: clonePoints(framePath),
+          profile: clonePoints(frameProfile),
+          color: 0x2f2f2f,
+          outlineWidth: 2,
+        });
+        frameSweep.outline = true;
+
+        centerlineGuide.setConfig({
+          points: clonePoints(framePath),
+          color: 0x111827,
+        });
+        outerGuide.setConfig({
+          points: clonePoints(outerGuidePoints),
+          color: 0x16a34a,
+        });
+        innerGuide.setConfig({
+          points: clonePoints(innerGuidePoints),
+          color: 0xd97706,
+        });
+
+        updateOpeningPlane(expected);
+        updateMetrics();
+
+        console.groupCollapsed("[window-frame-sweep] updated");
+        console.log("Path", framePath);
+        console.log("Profile", frameProfile);
+        console.log("Expected", expected);
+        console.log("Observed", observedDimensions());
+        console.groupEnd();
+      }
+
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
+
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
+        }
+
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
+          }
+
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
+
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
+      }
+
+      let scene;
+
+      async function main() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+
+        const camera = new THREE.PerspectiveCamera(
+          52,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        camera.position.set(0.8, 2.6, 9.2);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 1.55, 0);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(16, 16, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.82));
+
+        const light = new THREE.DirectionalLight(0xffffff, 1.14);
+        light.position.set(6, 8, 5);
+        scene.add(light);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        frameSweep = new Sweep({
+          path: clonePoints(createWindowFramePath()),
+          profile: clonePoints(createFrameProfile()),
+          color: 0x2f2f2f,
+          outlineWidth: 2,
+        });
+        frameSweep.outline = true;
+        scene.add(frameSweep);
+
+        centerlineGuide = createGuide(createWindowFramePath(), 0x111827);
+        outerGuide = createGuide(createClosedLoop(1, 1, 0), 0x16a34a);
+        innerGuide = createGuide(createClosedLoop(1, 1, 0), 0xd97706);
+        scene.add(centerlineGuide);
+        scene.add(outerGuide);
+        scene.add(innerGuide);
+
+        attachNumberControl("opening-width", (value) => {
+          state.openingWidth = value;
+          updateGeometry();
+        });
+        attachNumberControl("frame-height", (value) => {
+          state.frameHeight = value;
+          updateGeometry();
+        });
+        attachNumberControl("frame-width", (value) => {
+          state.frameWidth = value;
+          updateGeometry();
+        });
+        attachNumberControl("frame-depth", (value) => {
+          state.frameDepth = value;
+          updateGeometry();
+        });
+
+        updateGeometry();
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      void main();
+    </script>
+  </body>
+</html>

@@ -8,7 +8,6 @@ use uuid::Uuid;
 
 const EPSILON: f64 = 1.0e-9;
 const PLANAR_TOLERANCE_FACTOR: f64 = 1.0e-7;
-const CLOSURE_TOLERANCE_FACTOR: f64 = 1.0e-6;
 
 #[derive(Clone, Copy)]
 pub struct SweepOptions {
@@ -145,6 +144,7 @@ impl Vec3f {
         }
     }
 
+    #[cfg(test)]
     fn distance(self, other: Vec3f) -> f64 {
         self.sub(other).norm()
     }
@@ -502,6 +502,10 @@ fn build_sections(
     profile: &ProfileData,
     is_closed: bool,
 ) -> Result<Vec<Vec<Vec3f>>, SweepError> {
+    if is_closed {
+        return build_closed_planar_sections(path, segment_dirs, section_planes, profile);
+    }
+
     let mut sections = vec![Vec::new(); path.len()];
     sections[0] = build_initial_section(profile, &section_planes[0]);
 
@@ -519,19 +523,81 @@ fn build_sections(
         )?;
     }
 
-    if is_closed {
-        let wrapped = project_section_to_plane(
-            &sections[path.len() - 1],
-            segment_dirs[path.len() - 1],
-            &section_planes[0],
-            projection_tolerance,
-        )?;
+    Ok(sections)
+}
 
-        let closure_tolerance = tolerance_for_scale(
-            point_set_scale_vec3(path).max(profile.scale),
-            CLOSURE_TOLERANCE_FACTOR,
-        );
-        assert_sections_close(&wrapped, &sections[0], closure_tolerance)?;
+fn build_closed_planar_sections(
+    path: &[Vec3f],
+    segment_dirs: &[Vec3f],
+    section_planes: &[SectionPlane],
+    profile: &ProfileData,
+) -> Result<Vec<Vec<Vec3f>>, SweepError> {
+    let Some(path_normal) = compute_polygon_normal(path) else {
+        return Err(SweepError::new(
+            SweepErrorKind::NonPlanarClosedPath,
+            "Closed sweep paths must define a planar loop with non-zero area.",
+        ));
+    };
+
+    let rotated_hint = rotate_between_normals(
+        profile.u_axis,
+        profile.normal,
+        section_planes[0].normal,
+        profile.u_axis,
+    );
+    let (axis_u, axis_v) = build_plane_basis(section_planes[0].normal, rotated_hint);
+    let lateral_axis =
+        select_closed_path_lateral_axis(axis_u, axis_v, path_normal, section_planes[0].normal);
+
+    let projection_tolerance = tolerance_for_scale(
+        point_set_scale_vec3(path).max(profile.scale),
+        PLANAR_TOLERANCE_FACTOR,
+    );
+
+    let first_corner_probe = offset_corner_point(
+        path[0],
+        segment_dirs[segment_dirs.len() - 1],
+        segment_dirs[0],
+        1.0,
+        path_normal,
+        1.0,
+        projection_tolerance,
+    )?;
+    let lateral_normal_sign = if first_corner_probe.sub(path[0]).dot(lateral_axis) >= 0.0 {
+        1.0
+    } else {
+        -1.0
+    };
+
+    let profile_offsets: Vec<(f64, f64)> = profile
+        .local_points
+        .iter()
+        .map(|point| {
+            let delta = axis_u.scale(point.x).add(axis_v.scale(point.y));
+            (delta.dot(lateral_axis), delta.dot(path_normal))
+        })
+        .collect();
+
+    let mut sections = Vec::with_capacity(path.len());
+    for index in 0..path.len() {
+        let prev_dir = segment_dirs[(index + path.len() - 1) % path.len()];
+        let next_dir = segment_dirs[index];
+        let mut section = Vec::with_capacity(profile_offsets.len());
+
+        for (lateral_offset, depth_offset) in &profile_offsets {
+            let offset_corner = offset_corner_point(
+                path[index],
+                prev_dir,
+                next_dir,
+                *lateral_offset,
+                path_normal,
+                lateral_normal_sign,
+                projection_tolerance,
+            )?;
+            section.push(offset_corner.add(path_normal.scale(*depth_offset)));
+        }
+
+        sections.push(section);
     }
 
     Ok(sections)
@@ -552,6 +618,54 @@ fn build_initial_section(profile: &ProfileData, plane: &SectionPlane) -> Vec<Vec
                 .add(v_axis.scale(point.y))
         })
         .collect()
+}
+
+fn select_closed_path_lateral_axis(
+    axis_u: Vec3f,
+    axis_v: Vec3f,
+    path_normal: Vec3f,
+    section_normal: Vec3f,
+) -> Vec3f {
+    let projected_u = axis_u.sub(path_normal.scale(axis_u.dot(path_normal)));
+    let projected_v = axis_v.sub(path_normal.scale(axis_v.dot(path_normal)));
+
+    if projected_u.norm_sq() >= projected_v.norm_sq() {
+        if let Some(axis) = projected_u.normalized() {
+            return axis;
+        }
+    } else if let Some(axis) = projected_v.normalized() {
+        return axis;
+    }
+
+    path_normal
+        .cross(section_normal)
+        .normalized()
+        .or_else(|| section_normal.cross(path_normal).normalized())
+        .unwrap_or_else(|| any_orthogonal(path_normal))
+}
+
+fn offset_corner_point(
+    origin: Vec3f,
+    prev_dir: Vec3f,
+    next_dir: Vec3f,
+    offset: f64,
+    path_normal: Vec3f,
+    lateral_normal_sign: f64,
+    tolerance: f64,
+) -> Result<Vec3f, SweepError> {
+    let prev_normal = path_normal.cross(prev_dir).scale(lateral_normal_sign);
+    let next_normal = path_normal.cross(next_dir).scale(lateral_normal_sign);
+    let prev_point = origin.add(prev_normal.scale(offset));
+    let next_point = origin.add(next_normal.scale(offset));
+    let denominator = prev_dir.cross(next_dir).dot(path_normal);
+
+    if denominator.abs() <= tolerance {
+        return Ok(prev_point.add(next_point).scale(0.5));
+    }
+
+    let delta = next_point.sub(prev_point);
+    let t = delta.cross(next_dir).dot(path_normal) / denominator;
+    Ok(prev_point.add(prev_dir.scale(t)))
 }
 
 fn project_section_to_plane(
@@ -634,34 +748,6 @@ fn orient_side_face_indices(
     }
 
     face_indices
-}
-
-fn assert_sections_close(
-    expected: &[Vec3f],
-    actual: &[Vec3f],
-    tolerance: f64,
-) -> Result<(), SweepError> {
-    if expected.len() != actual.len() {
-        return Err(SweepError::new(
-            SweepErrorKind::ProjectionFailure,
-            "Closed sweep section counts do not match at wraparound.",
-        ));
-    }
-
-    for (index, (lhs, rhs)) in expected.iter().zip(actual.iter()).enumerate() {
-        let error = lhs.distance(*rhs);
-        if error > tolerance {
-            return Err(SweepError::new(
-                SweepErrorKind::ProjectionFailure,
-                format!(
-                    "Closed sweep does not wrap consistently; section vertex {} mismatches by {:.3e}.",
-                    index, error
-                ),
-            ));
-        }
-    }
-
-    Ok(())
 }
 
 fn remove_consecutive_duplicates(points: &[Vector3]) -> Vec<Vec3f> {
@@ -812,6 +898,7 @@ mod tests {
         sweep_profile_along_path, PreparedSweep, SectionPlane, SweepErrorKind, SweepOptions, Vec3f,
         EPSILON,
     };
+    use crate::brep::Brep;
     use openmaths::Vector3;
 
     fn rectangle_profile(width: f64, depth: f64) -> Vec<Vector3> {
@@ -963,6 +1050,84 @@ mod tests {
         }
     }
 
+    fn unique_sorted_values(values: impl IntoIterator<Item = f64>, tolerance: f64) -> Vec<f64> {
+        let mut ordered: Vec<f64> = values.into_iter().collect();
+        ordered.sort_by(|lhs, rhs| lhs.partial_cmp(rhs).unwrap());
+
+        let mut unique: Vec<f64> = Vec::new();
+        for value in ordered {
+            if unique
+                .last()
+                .map(|existing| (value - *existing).abs() <= tolerance)
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            unique.push(value);
+        }
+
+        unique
+    }
+
+    fn assert_window_frame_dimensions(
+        brep: &Brep,
+        expected_outer_width: f64,
+        expected_inner_width: f64,
+        expected_outer_height: f64,
+        expected_inner_height: f64,
+    ) {
+        let tolerance = 1.0e-6;
+        let xs = unique_sorted_values(
+            brep.vertices.iter().map(|vertex| vertex.position.x),
+            tolerance,
+        );
+        let ys = unique_sorted_values(
+            brep.vertices.iter().map(|vertex| vertex.position.y),
+            tolerance,
+        );
+
+        assert_eq!(
+            xs.len(),
+            4,
+            "window frame should have four distinct x bands"
+        );
+        assert_eq!(
+            ys.len(),
+            4,
+            "window frame should have four distinct y bands"
+        );
+
+        let observed_outer_width = xs[xs.len() - 1] - xs[0];
+        let observed_inner_width = xs[xs.len() - 2] - xs[1];
+        let observed_outer_height = ys[ys.len() - 1] - ys[0];
+        let observed_inner_height = ys[ys.len() - 2] - ys[1];
+
+        assert!(
+            (observed_outer_width - expected_outer_width).abs() <= tolerance,
+            "outer width mismatch: actual={:.9} expected={:.9}",
+            observed_outer_width,
+            expected_outer_width
+        );
+        assert!(
+            (observed_inner_width - expected_inner_width).abs() <= tolerance,
+            "inner width mismatch: actual={:.9} expected={:.9}",
+            observed_inner_width,
+            expected_inner_width
+        );
+        assert!(
+            (observed_outer_height - expected_outer_height).abs() <= tolerance,
+            "outer height mismatch: actual={:.9} expected={:.9}",
+            observed_outer_height,
+            expected_outer_height
+        );
+        assert!(
+            (observed_inner_height - expected_inner_height).abs() <= tolerance,
+            "inner height mismatch: actual={:.9} expected={:.9}",
+            observed_inner_height,
+            expected_inner_height
+        );
+    }
+
     #[test]
     fn open_sweep_with_caps_has_expected_topology() {
         let path = vec![Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 2.0, 0.0)];
@@ -1089,6 +1254,168 @@ mod tests {
 
         assert_section_edges_axis_aligned(&prepared.sections[0]);
         assert_section_edges_axis_aligned(&prepared.sections[1]);
+    }
+
+    #[test]
+    fn closed_window_frame_loop_preserves_expected_dimensions() {
+        let window_width = 1.2;
+        let frame_width = 0.12;
+        let frame_depth = 0.12;
+        let window_height = 1.0;
+        let sill_height = 1.05;
+        let half_window_width = window_width * 0.5;
+        let half_frame_width = frame_width * 0.5;
+
+        let path = vec![
+            Vector3::new(
+                -(half_window_width + half_frame_width),
+                sill_height - half_frame_width,
+                0.0,
+            ),
+            Vector3::new(
+                -(half_window_width + half_frame_width),
+                sill_height + window_height + half_frame_width,
+                0.0,
+            ),
+            Vector3::new(
+                half_window_width + half_frame_width,
+                sill_height + window_height + half_frame_width,
+                0.0,
+            ),
+            Vector3::new(
+                half_window_width + half_frame_width,
+                sill_height - half_frame_width,
+                0.0,
+            ),
+            Vector3::new(
+                -(half_window_width + half_frame_width),
+                sill_height - half_frame_width,
+                0.0,
+            ),
+        ];
+        let profile = rectangle_profile(frame_width, frame_depth);
+
+        let brep = sweep_profile_along_path(&path, &profile, SweepOptions::default())
+            .expect("closed window frame sweep should succeed");
+        brep.validate_topology()
+            .expect("closed window frame topology should validate");
+
+        assert_window_frame_dimensions(
+            &brep,
+            window_width + frame_width * 2.0,
+            window_width,
+            window_height + frame_width * 2.0,
+            window_height,
+        );
+    }
+
+    #[test]
+    fn larger_closed_window_frame_loop_preserves_expected_dimensions() {
+        let window_width = 1.6;
+        let frame_width = 0.14;
+        let frame_depth = 0.2;
+        let window_height = 1.2;
+        let sill_height = 1.0;
+        let half_window_width = window_width * 0.5;
+        let half_frame_width = frame_width * 0.5;
+
+        let path = vec![
+            Vector3::new(
+                -(half_window_width + half_frame_width),
+                sill_height - half_frame_width,
+                0.0,
+            ),
+            Vector3::new(
+                -(half_window_width + half_frame_width),
+                sill_height + window_height + half_frame_width,
+                0.0,
+            ),
+            Vector3::new(
+                half_window_width + half_frame_width,
+                sill_height + window_height + half_frame_width,
+                0.0,
+            ),
+            Vector3::new(
+                half_window_width + half_frame_width,
+                sill_height - half_frame_width,
+                0.0,
+            ),
+            Vector3::new(
+                -(half_window_width + half_frame_width),
+                sill_height - half_frame_width,
+                0.0,
+            ),
+        ];
+        let profile = rectangle_profile(frame_width, frame_depth);
+
+        let brep = sweep_profile_along_path(&path, &profile, SweepOptions::default())
+            .expect("larger closed window frame sweep should succeed");
+        brep.validate_topology()
+            .expect("larger closed window frame topology should validate");
+
+        assert_window_frame_dimensions(
+            &brep,
+            window_width + frame_width * 2.0,
+            window_width,
+            window_height + frame_width * 2.0,
+            window_height,
+        );
+    }
+
+    #[test]
+    fn open_door_frame_path_keeps_requested_widths() {
+        let panel_width = 1.0;
+        let frame_width = 0.2;
+        let frame_depth = 0.3;
+        let door_height = 2.1;
+        let half_panel_width = panel_width * 0.5;
+        let half_frame_width = frame_width * 0.5;
+
+        let path = vec![
+            Vector3::new(-(half_panel_width + half_frame_width), 0.0, 0.0),
+            Vector3::new(
+                -(half_panel_width + half_frame_width),
+                door_height + half_frame_width,
+                0.0,
+            ),
+            Vector3::new(
+                half_panel_width + half_frame_width,
+                door_height + half_frame_width,
+                0.0,
+            ),
+            Vector3::new(half_panel_width + half_frame_width, 0.0, 0.0),
+        ];
+        let profile = rectangle_profile(frame_width, frame_depth);
+
+        let brep = sweep_profile_along_path(&path, &profile, SweepOptions::default())
+            .expect("open door frame sweep should succeed");
+        brep.validate_topology()
+            .expect("open door frame topology should validate");
+
+        let tolerance = 1.0e-6;
+        let xs = unique_sorted_values(
+            brep.vertices.iter().map(|vertex| vertex.position.x),
+            tolerance,
+        );
+        let ys = unique_sorted_values(
+            brep.vertices.iter().map(|vertex| vertex.position.y),
+            tolerance,
+        );
+
+        assert_eq!(xs.len(), 4, "door frame should preserve four x bands");
+        assert_eq!(ys.len(), 3, "door frame should preserve three y bands");
+        assert!(
+            ((xs[xs.len() - 1] - xs[0]) - (panel_width + frame_width * 2.0)).abs() <= tolerance,
+            "door frame outer width changed unexpectedly"
+        );
+        assert!(
+            ((xs[xs.len() - 2] - xs[1]) - panel_width).abs() <= tolerance,
+            "door frame inner width changed unexpectedly"
+        );
+        assert!(
+            ((ys[ys.len() - 1] - ys[0]) - (door_height + frame_width)).abs() <= tolerance,
+            "door frame outer height changed unexpectedly"
+        );
     }
 
     #[test]
