@@ -274,9 +274,10 @@ fn append_offset_corner(
     let is_outer_corner = turn_sign > EPSILON;
     let is_inner_corner = turn_sign < -EPSILON;
 
-    // For open paths, the inner side of a turn should be clipped between the
-    // two segment offsets; mitering this case creates long spikes/triangles.
-    if !is_closed_path && is_inner_corner {
+    // Open-path inner corners only need clipping once they become acute enough
+    // to create oversized miters. Broader turns should keep a clean miter so
+    // they do not look like an unexpected bevel.
+    if !is_closed_path && is_inner_corner && interior_angle <= threshold {
         push_unique(
             &mut result.points,
             Vector3::new(prev_offset_anchor.x, point.y, prev_offset_anchor.z),
@@ -457,7 +458,57 @@ mod tests {
     }
 
     #[test]
-    fn open_path_inner_corner_is_clipped() {
+    fn open_path_inner_corner_is_mitered_when_above_threshold() {
+        let input = vec![
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(1.0, 0.0, 1.0),
+        ];
+
+        let result = offset_path(
+            &input,
+            -0.2,
+            Some(false),
+            OffsetOptions {
+                bevel: false,
+                acute_threshold_degrees: 35.0,
+            },
+        );
+
+        assert_eq!(result.points.len(), 3);
+        assert!(result.beveled_vertex_indices.is_empty());
+        assert!(approx_eq(result.points[1].x, 1.2));
+        assert!(approx_eq(result.points[1].z, -0.2));
+    }
+
+    #[test]
+    fn open_path_inner_corner_is_clipped_when_at_or_below_threshold() {
+        let input = vec![
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(1.0, 0.0, 1.0),
+        ];
+
+        let result = offset_path(
+            &input,
+            -0.2,
+            Some(false),
+            OffsetOptions {
+                bevel: false,
+                acute_threshold_degrees: 90.0,
+            },
+        );
+
+        assert_eq!(result.points.len(), 4);
+        assert!(result.beveled_vertex_indices.is_empty());
+        assert!(approx_eq(result.points[1].x, 1.0));
+        assert!(approx_eq(result.points[1].z, -0.2));
+        assert!(approx_eq(result.points[2].x, 1.2));
+        assert!(approx_eq(result.points[2].z, 0.0));
+    }
+
+    #[test]
+    fn acute_open_path_inner_corner_is_clipped() {
         let input = vec![
             Vector3::new(0.0, 0.0, 0.0),
             Vector3::new(2.0, 0.0, 0.0),
@@ -471,7 +522,7 @@ mod tests {
             Some(false),
             OffsetOptions {
                 bevel: false,
-                acute_threshold_degrees: 1.0,
+                acute_threshold_degrees: 90.0,
             },
         );
 

@@ -56,7 +56,7 @@ pub struct OffsetOptions {
 </ParamField>
 
 <ParamField path="acute_threshold_degrees" type="f64" default="35.0">
-  The interior angle threshold (in degrees) below which outer corners will be beveled. Valid range: 1.0 to 179.0 degrees. Lower values bevel more aggressively.
+  The interior angle threshold (in degrees) for sharp-corner fallback. Outer corners bevel when `bevel` is enabled and the angle is at or below the threshold. Open-path inner corners clip instead of mitering when the angle is at or below the threshold. Valid range: 1.0 to 179.0 degrees. Higher values apply beveling and clipping more aggressively.
 </ParamField>
 
 ### Default Options
@@ -85,7 +85,7 @@ pub struct OffsetResult {
 </ResponseField>
 
 <ResponseField name="beveled_vertex_indices" type="Vec<u32>">
-  Indices of vertices in the original path where beveling was applied. Useful for post-processing or visualization.
+  Indices of vertices in the original path where outer-corner beveling was applied. Open-path inner-corner clipping can also add points, but those vertices are not included here because they are not bevels.
 </ResponseField>
 
 <ResponseField name="is_closed" type="bool">
@@ -99,7 +99,7 @@ pub struct OffsetResult {
 3. **Corner Processing**:
    - **Straight segments**: Simple perpendicular offset
    - **Outer corners**: Mitered intersection or beveled based on angle threshold
-   - **Inner corners** (open paths): Clipped to prevent spikes
+   - **Inner corners** (open paths): Mitered for broader turns, clipped below the threshold to prevent spikes
    - **Collinear segments**: Merged smoothly
 4. **Path Closing**: For closed paths, ensures first and last points match exactly
 
@@ -233,7 +233,8 @@ Closed Path with Beveled Corner:
 ### Inner Corners
 
 - **Closed paths**: Mitered to intersection point
-- **Open paths**: Clipped with two vertices to prevent long spikes
+- **Open paths, angle > threshold**: Mitered to intersection point
+- **Open paths, angle ≤ threshold**: Clipped with two vertices to prevent long spikes
 
 ## Implementation Details
 

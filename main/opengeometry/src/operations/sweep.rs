@@ -202,12 +202,16 @@ pub fn sweep_profile_along_path(
 
         for profile_index in 0..ring_size {
             let next_profile = (profile_index + 1) % ring_size;
-            let face = [
-                section_vertex_ids[section_index][profile_index],
-                section_vertex_ids[section_index][next_profile],
-                section_vertex_ids[next_section][next_profile],
-                section_vertex_ids[next_section][profile_index],
-            ];
+            let face = orient_side_face_indices(
+                &prepared.sections[section_index],
+                &prepared.sections[next_section],
+                &section_vertex_ids[section_index],
+                &section_vertex_ids[next_section],
+                prepared.path[section_index],
+                prepared.path[next_section],
+                profile_index,
+                next_profile,
+            );
             builder.add_face(&face, &[])?;
         }
     }
@@ -594,6 +598,44 @@ fn orient_cap_indices(section: &[Vec3f], indices: Vec<u32>, desired_normal: Vec3
     }
 }
 
+fn orient_side_face_indices(
+    current_section: &[Vec3f],
+    next_section: &[Vec3f],
+    current_indices: &[u32],
+    next_indices: &[u32],
+    segment_start: Vec3f,
+    segment_end: Vec3f,
+    profile_index: usize,
+    next_profile: usize,
+) -> Vec<u32> {
+    let face_points = [
+        current_section[profile_index],
+        current_section[next_profile],
+        next_section[next_profile],
+        next_section[profile_index],
+    ];
+    let mut face_indices = vec![
+        current_indices[profile_index],
+        current_indices[next_profile],
+        next_indices[next_profile],
+        next_indices[profile_index],
+    ];
+
+    let Some(face_normal) = compute_polygon_normal(&face_points) else {
+        return face_indices;
+    };
+
+    let face_centroid = centroid_vec3f(&face_points);
+    let segment_midpoint = segment_start.add(segment_end).scale(0.5);
+    let radial_reference = face_centroid.sub(segment_midpoint);
+
+    if radial_reference.norm_sq() > EPSILON * EPSILON && face_normal.dot(radial_reference) < 0.0 {
+        face_indices.reverse();
+    }
+
+    face_indices
+}
+
 fn assert_sections_close(
     expected: &[Vec3f],
     actual: &[Vec3f],
@@ -713,6 +755,18 @@ fn compute_polygon_normal(points: &[Vec3f]) -> Option<Vec3f> {
     accumulated.normalized()
 }
 
+fn centroid_vec3f(points: &[Vec3f]) -> Vec3f {
+    if points.is_empty() {
+        return Vec3f::new(0.0, 0.0, 0.0);
+    }
+
+    points
+        .iter()
+        .copied()
+        .fold(Vec3f::new(0.0, 0.0, 0.0), |sum, point| sum.add(point))
+        .scale(1.0 / points.len() as f64)
+}
+
 fn signed_area_2d(points: &[Vec2f]) -> f64 {
     let mut area = 0.0;
     for index in 0..points.len() {
@@ -754,8 +808,9 @@ fn tolerance_for_scale(scale: f64, factor: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_prepared_sweep, compute_polygon_normal, project_section_to_plane,
+        build_prepared_sweep, centroid_vec3f, compute_polygon_normal, project_section_to_plane,
         sweep_profile_along_path, PreparedSweep, SectionPlane, SweepErrorKind, SweepOptions, Vec3f,
+        EPSILON,
     };
     use openmaths::Vector3;
 
@@ -860,6 +915,54 @@ mod tests {
         assert_edge_lengths(&outgoing_projection, &[width, depth, width, depth]);
     }
 
+    fn assert_closed_side_faces_point_outward(path: &[Vector3], profile: &[Vector3]) {
+        let prepared = build_prepared_sweep(path, profile).expect("prepared sweep should succeed");
+        assert!(prepared.is_closed, "test path must be closed");
+
+        let brep = sweep_profile_along_path(path, profile, SweepOptions::default())
+            .expect("closed sweep should succeed");
+        brep.validate_topology()
+            .expect("closed sweep topology should validate");
+
+        let ring_size = prepared.sections[0].len();
+        let side_face_count = prepared.sections.len() * ring_size;
+        assert_eq!(
+            brep.faces.len(),
+            side_face_count,
+            "closed sweeps should only emit side faces"
+        );
+
+        for section_index in 0..prepared.sections.len() {
+            let next_section = (section_index + 1) % prepared.sections.len();
+            let segment_midpoint = prepared.path[section_index]
+                .add(prepared.path[next_section])
+                .scale(0.5);
+
+            for profile_index in 0..ring_size {
+                let face_id = (section_index * ring_size + profile_index) as u32;
+                let vertices = brep.get_vertices_by_face_id(face_id);
+                let face_points: Vec<Vec3f> = vertices.iter().map(Vec3f::from_vector3).collect();
+                let face_normal =
+                    compute_polygon_normal(&face_points).expect("side face should have a normal");
+                let face_centroid = centroid_vec3f(&face_points);
+                let radial_reference = face_centroid.sub(segment_midpoint);
+                let alignment = face_normal.dot(radial_reference);
+
+                assert!(
+                    radial_reference.norm_sq() > EPSILON * EPSILON,
+                    "side face {} centroid should not lie on the path midpoint",
+                    face_id
+                );
+                assert!(
+                    alignment > 1.0e-9,
+                    "side face {} points inward: alignment={:.3e}",
+                    face_id,
+                    alignment
+                );
+            }
+        }
+    }
+
     #[test]
     fn open_sweep_with_caps_has_expected_topology() {
         let path = vec![Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 2.0, 0.0)];
@@ -918,6 +1021,34 @@ mod tests {
         assert_eq!(brep.faces.len(), 16);
         assert_eq!(brep.shells.len(), 1);
         assert!(brep.shells[0].is_closed);
+    }
+
+    #[test]
+    fn closed_rectangular_loop_side_faces_point_outward() {
+        let path = vec![
+            Vector3::new(-2.2, 0.0, -1.4),
+            Vector3::new(2.4, 0.0, -1.4),
+            Vector3::new(2.4, 0.0, 1.7),
+            Vector3::new(-2.2, 0.0, 1.7),
+            Vector3::new(-2.2, 0.0, -1.4),
+        ];
+        let profile = rectangle_profile(0.45, 0.28);
+
+        assert_closed_side_faces_point_outward(&path, &profile);
+    }
+
+    #[test]
+    fn closed_trapezoid_loop_side_faces_point_outward() {
+        let path = vec![
+            Vector3::new(-2.1, 0.0, -1.8),
+            Vector3::new(1.8, 0.0, -1.5),
+            Vector3::new(1.2, 0.0, 1.4),
+            Vector3::new(-1.6, 0.0, 1.0),
+            Vector3::new(-2.1, 0.0, -1.8),
+        ];
+        let profile = rectangle_profile(0.52, 0.24);
+
+        assert_closed_side_faces_point_outward(&path, &profile);
     }
 
     #[test]

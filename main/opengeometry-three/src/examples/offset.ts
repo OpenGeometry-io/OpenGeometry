@@ -52,7 +52,7 @@ export function createOffsetExample(scene: THREE.Scene) {
     color: 0x0f172a,
   });
 
-  const polylineOffset = basePolyline.getOffset(0.45, 90.0, true);
+  const polylineOffset = basePolyline.getOffset(0.45, 35.0, true);
   const polylineOffsetPrimitive = new Polyline({
     points: polylineOffset.points,
     color: 0xdc2626,

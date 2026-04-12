@@ -16,50 +16,52 @@
     <aside class="og-controls">
       <h3>Sweep</h3>
       <p class="og-control-summary">
-        A sweep uses two arrays: `path` and `profile`. The dark line is the current path.
+        This page now shows three closed four-sided sweep frames: an adjustable skewed opening in
+        blue, a door-like frame in amber, and a window-like frame in teal. The dark polylines are
+        the sweep paths so you can inspect corner closure directly.
       </p>
 
-      <label class="og-control-row" data-control="path-4-y">
+      <label class="og-control-row" data-control="top-right-y">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Path 4 Y</span>
-          <code class="og-control-value" data-value>2.4</code>
+          <span class="og-control-label-chip">Top Right Y</span>
+          <code class="og-control-value" data-value>2.3</code>
         </div>
         <div class="og-control-range">
-          <input data-range type="range" min="1" max="4" step="0.1" value="2.4" />
-          <input data-number type="number" min="1" max="4" step="0.1" value="2.4" />
+          <input data-range type="range" min="1.4" max="3.2" step="0.05" value="2.3" />
+          <input data-number type="number" min="1.4" max="3.2" step="0.05" value="2.3" />
         </div>
       </label>
 
-      <label class="og-control-row" data-control="path-3-x">
+      <label class="og-control-row" data-control="top-left-x">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Path 3 X</span>
-          <code class="og-control-value" data-value>0.4</code>
+          <span class="og-control-label-chip">Top Left X</span>
+          <code class="og-control-value" data-value>-1.25</code>
         </div>
         <div class="og-control-range">
-          <input data-range type="range" min="-1.2" max="1.2" step="0.05" value="0.4" />
-          <input data-number type="number" min="-1.2" max="1.2" step="0.05" value="0.4" />
+          <input data-range type="range" min="-1.8" max="-0.4" step="0.05" value="-1.25" />
+          <input data-number type="number" min="-1.8" max="-0.4" step="0.05" value="-1.25" />
         </div>
       </label>
 
-      <label class="og-control-row" data-control="profile-2-x">
+      <label class="og-control-row" data-control="frame-width">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Profile 2 X</span>
-          <code class="og-control-value" data-value>0.4</code>
+          <span class="og-control-label-chip">Frame Width</span>
+          <code class="og-control-value" data-value>0.24</code>
         </div>
         <div class="og-control-range">
-          <input data-range type="range" min="0.2" max="1.4" step="0.05" value="0.4" />
-          <input data-number type="number" min="0.2" max="1.4" step="0.05" value="0.4" />
+          <input data-range type="range" min="0.12" max="0.5" step="0.02" value="0.24" />
+          <input data-number type="number" min="0.12" max="0.5" step="0.02" value="0.24" />
         </div>
       </label>
 
-      <label class="og-control-row" data-control="profile-3-z">
+      <label class="og-control-row" data-control="frame-depth">
         <div class="og-control-header">
-          <span class="og-control-label-chip">Profile 3 Z</span>
-          <code class="og-control-value" data-value>0.25</code>
+          <span class="og-control-label-chip">Frame Depth</span>
+          <code class="og-control-value" data-value>0.22</code>
         </div>
         <div class="og-control-range">
-          <input data-range type="range" min="0.1" max="1" step="0.05" value="0.25" />
-          <input data-number type="number" min="0.1" max="1" step="0.05" value="0.25" />
+          <input data-range type="range" min="0.1" max="0.45" step="0.02" value="0.22" />
+          <input data-number type="number" min="0.1" max="0.45" step="0.02" value="0.22" />
         </div>
       </label>
     </aside>
@@ -84,17 +86,13 @@
       function createConfig() {
         return {
           path: [
-            new Vector3(-1.4, 0, -1.6),
-            new Vector3(-0.5, 0.6, -0.5),
-            new Vector3(0.4, 1.3, 0.8),
-            new Vector3(1.2, 2.4, 2.1),
+            new Vector3(-1.6, 0.1, 0),
+            new Vector3(1.6, 0.1, 0),
+            new Vector3(1.15, 2.3, 0),
+            new Vector3(-1.25, 1.95, 0),
+            new Vector3(-1.6, 0.1, 0),
           ],
-          profile: [
-            new Vector3(-0.4, 0, -0.25),
-            new Vector3(0.4, 0, -0.25),
-            new Vector3(0.4, 0, 0.25),
-            new Vector3(-0.4, 0, 0.25),
-          ],
+          profile: createFrameProfile(0.24, 0.22),
           capStart: true,
           capEnd: true,
           color: 0x3b82f6,
@@ -102,11 +100,122 @@
         };
       }
 
-      let pathGuide = null;
-      let sweep = null;
+      let primaryPathGuide = null;
+      let primarySweep = null;
+      let primaryBackdrop = null;
 
       function formatNumber(value) {
         return Number(value).toFixed(2).replace(/\.?0+$/, "");
+      }
+
+      function clonePoints(points) {
+        return points.map((point) => point.clone());
+      }
+
+      function createFrameProfile(frameWidth, frameDepth) {
+        const halfWidth = frameWidth * 0.5;
+        const halfDepth = frameDepth * 0.5;
+        return [
+          new Vector3(0, -halfWidth, -halfDepth),
+          new Vector3(0, halfWidth, -halfDepth),
+          new Vector3(0, halfWidth, halfDepth),
+          new Vector3(0, -halfWidth, halfDepth),
+        ];
+      }
+
+      function isClosedPath(points) {
+        if (points.length < 2) {
+          return false;
+        }
+
+        const first = points[0];
+        const last = points[points.length - 1];
+        const dx = first.x - last.x;
+        const dy = first.y - last.y;
+        const dz = first.z - last.z;
+        return dx * dx + dy * dy + dz * dz <= 1.0e-9;
+      }
+
+      function getPathBounds(points) {
+        const source =
+          isClosedPath(points) && points.length > 2 ? points.slice(0, -1) : points;
+
+        let minX = source[0].x;
+        let maxX = source[0].x;
+        let minY = source[0].y;
+        let maxY = source[0].y;
+        let avgZ = 0;
+
+        source.forEach((point) => {
+          minX = Math.min(minX, point.x);
+          maxX = Math.max(maxX, point.x);
+          minY = Math.min(minY, point.y);
+          maxY = Math.max(maxY, point.y);
+          avgZ += point.z;
+        });
+
+        return {
+          centerX: (minX + maxX) * 0.5,
+          centerY: (minY + maxY) * 0.5,
+          centerZ: avgZ / source.length,
+          width: Math.max(maxX - minX, 0.25),
+          height: Math.max(maxY - minY, 0.25),
+        };
+      }
+
+      function createBackdropPanel(path, color, opacity, zOffset = -0.16) {
+        const bounds = getPathBounds(path);
+        const panel = new THREE.Mesh(
+          new THREE.PlaneGeometry(bounds.width * 1.14, bounds.height * 1.14),
+          new THREE.MeshStandardMaterial({
+            color,
+            transparent: true,
+            opacity,
+            roughness: 0.78,
+            metalness: 0.04,
+            side: THREE.DoubleSide,
+          })
+        );
+        panel.position.set(bounds.centerX, bounds.centerY, bounds.centerZ + zOffset);
+        return panel;
+      }
+
+      function updateBackdropPanel(panel, path, zOffset = -0.16) {
+        const bounds = getPathBounds(path);
+        panel.geometry.dispose();
+        panel.geometry = new THREE.PlaneGeometry(bounds.width * 1.14, bounds.height * 1.14);
+        panel.position.set(bounds.centerX, bounds.centerY, bounds.centerZ + zOffset);
+      }
+
+      function createFrameExample({
+        path,
+        profile,
+        frameColor,
+        guideColor,
+        panelColor,
+        panelOpacity,
+      }) {
+        const group = new THREE.Group();
+        const backdrop = createBackdropPanel(path, panelColor, panelOpacity);
+        const guide = new Polyline({
+          points: clonePoints(path),
+          color: guideColor,
+        });
+        const frame = new Sweep({
+          path: clonePoints(path),
+          profile: clonePoints(profile),
+          color: frameColor,
+          capStart: true,
+          capEnd: true,
+          outlineWidth: 2,
+        });
+        frame.outline = true;
+
+        group.add(backdrop);
+        group.add(guide);
+        group.add(frame);
+
+        return group;
       }
 
       function mountStats() {
@@ -149,24 +258,25 @@
       }
 
       function updateSweep() {
-        if (!pathGuide || !sweep) {
+        if (!primaryPathGuide || !primarySweep || !primaryBackdrop) {
           return;
         }
 
-        pathGuide.setConfig({
-          points: config.path.map((point) => point.clone()),
+        primaryPathGuide.setConfig({
+          points: clonePoints(config.path),
           color: 0x111827,
         });
 
-        sweep.setConfig({
-          path: config.path.map((point) => point.clone()),
-          profile: config.profile.map((point) => point.clone()),
+        primarySweep.setConfig({
+          path: clonePoints(config.path),
+          profile: clonePoints(config.profile),
           capStart: config.capStart,
           capEnd: config.capEnd,
           color: config.color,
           outlineWidth: config.outlineWidth,
         });
-        sweep.outline = true;
+        primarySweep.outline = true;
+        updateBackdropPanel(primaryBackdrop, config.path);
 
         console.groupCollapsed("[sweep] updated");
         console.log("Config", config);
@@ -183,7 +293,7 @@
           0.1,
           100
         );
-        camera.position.set(6.8, 5.2, 8.4);
+        camera.position.set(0.6, 2.6, 11.8);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -193,7 +303,7 @@
         const stats = mountStats();
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(0, 1.2, 0.5);
+        controls.target.set(0, 1.45, -0.1);
         controls.update();
 
         scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
@@ -206,38 +316,73 @@
         await OpenGeometry.create({ wasmURL: wasmUrl });
         config = createConfig();
 
-        pathGuide = new Polyline({
-          points: config.path.map((point) => point.clone()),
+        primaryBackdrop = createBackdropPanel(config.path, 0xe2e8f0, 0.4);
+        scene.add(primaryBackdrop);
+
+        primaryPathGuide = new Polyline({
+          points: clonePoints(config.path),
           color: 0x111827,
         });
-        scene.add(pathGuide);
+        scene.add(primaryPathGuide);
 
-        sweep = new Sweep({
-          path: config.path.map((point) => point.clone()),
-          profile: config.profile.map((point) => point.clone()),
+        primarySweep = new Sweep({
+          path: clonePoints(config.path),
+          profile: clonePoints(config.profile),
           color: config.color,
           capStart: config.capStart,
           capEnd: config.capEnd,
           outlineWidth: config.outlineWidth,
         });
-        scene.add(sweep);
+        primarySweep.outline = true;
+        scene.add(primarySweep);
 
-        attachNumberControl("path-4-y", (value) => {
-          config.path[3].y = value;
+        scene.add(
+          createFrameExample({
+            path: [
+              new Vector3(-6.2, 0.0, 0),
+              new Vector3(-4.5, 0.0, 0),
+              new Vector3(-4.5, 2.75, 0),
+              new Vector3(-6.2, 2.75, 0),
+              new Vector3(-6.2, 0.0, 0),
+            ],
+            profile: createFrameProfile(0.2, 0.18),
+            frameColor: 0xd97706,
+            guideColor: 0x7c2d12,
+            panelColor: 0xf9e1b0,
+            panelOpacity: 0.33,
+          })
+        );
+        scene.add(
+          createFrameExample({
+            path: [
+              new Vector3(3.7, 0.8, 0),
+              new Vector3(6.5, 0.8, 0),
+              new Vector3(6.1, 2.25, 0),
+              new Vector3(4.0, 2.05, 0),
+              new Vector3(3.7, 0.8, 0),
+            ],
+            profile: createFrameProfile(0.18, 0.16),
+            frameColor: 0x0f766e,
+            guideColor: 0x134e4a,
+            panelColor: 0xbfe9f5,
+            panelOpacity: 0.38,
+          })
+        );
+
+        attachNumberControl("top-right-y", (value) => {
+          config.path[2].y = value;
           updateSweep();
         });
-        attachNumberControl("path-3-x", (value) => {
-          config.path[2].x = value;
+        attachNumberControl("top-left-x", (value) => {
+          config.path[3].x = value;
           updateSweep();
         });
-        attachNumberControl("profile-2-x", (value) => {
-          config.profile[1].x = value;
-          config.profile[2].x = value;
+        attachNumberControl("frame-width", (value) => {
+          config.profile = createFrameProfile(value, config.profile[2].z - config.profile[1].z);
           updateSweep();
         });
-        attachNumberControl("profile-3-z", (value) => {
-          config.profile[2].z = value;
-          config.profile[3].z = value;
+        attachNumberControl("frame-depth", (value) => {
+          config.profile = createFrameProfile(config.profile[1].y - config.profile[0].y, value);
           updateSweep();
         });
 

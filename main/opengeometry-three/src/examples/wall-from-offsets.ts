@@ -43,7 +43,7 @@ export function createWallFromOffsetsExample(scene: THREE.Scene) {
 
   const wallThickness = 0.45;
   const half = wallThickness * 0.5;
-  const acuteThreshold = 90.0;
+  const acuteThreshold = 35.0;
   const bevel = true;
 
   const leftOffset = centerline.getOffset(half, acuteThreshold, bevel);
