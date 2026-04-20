@@ -11,7 +11,7 @@ pub fn triangulate_polygon_with_holes(
     // --- 1. Projection to 2D ---
     // First, determine the best 2D plane to project onto by finding the
     // dominant axis of the face's normal.
-    let normal = calculate_normal(face_vertices);
+    let normal = compute_polygon_normal(face_vertices).unwrap_or(Vector3::new(0.0, 0.0, 1.0));
 
     let (axis_u, axis_v) = if normal.z.abs() > normal.x.abs() && normal.z.abs() > normal.y.abs() {
         // Project to XY plane
@@ -116,10 +116,11 @@ pub fn triangulate_polygon_with_holes(
  * Calculates the average normal of a polygon.
  * This is used to determine the best projection plane.
  */
-fn calculate_normal(vertices: &[Vector3]) -> Vector3 {
+pub(crate) fn compute_polygon_normal(vertices: &[Vector3]) -> Option<Vector3> {
     if vertices.len() < 3 {
-        return Vector3::new(0.0, 0.0, 1.0); // Default to Z-axis
+        return None;
     }
+
     let mut normal = Vector3::new(0.0, 0.0, 0.0);
     for i in 0..vertices.len() {
         let p1 = &vertices[i];
@@ -128,6 +129,16 @@ fn calculate_normal(vertices: &[Vector3]) -> Vector3 {
         normal.y += (p1.z - p2.z) * (p1.x + p2.x);
         normal.z += (p1.x - p2.x) * (p1.y + p2.y);
     }
-    normal.normalize();
-    normal
+
+    let length_sq = normal.dot(&normal);
+    if length_sq <= 1.0e-18 {
+        return None;
+    }
+
+    let inv_length = length_sq.sqrt().recip();
+    Some(Vector3::new(
+        normal.x * inv_length,
+        normal.y * inv_length,
+        normal.z * inv_length,
+    ))
 }

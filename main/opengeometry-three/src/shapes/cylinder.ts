@@ -254,8 +254,8 @@ export class Cylinder extends THREE.Mesh {
 
     if (this.material instanceof THREE.MeshStandardMaterial) {
       this.material.color.set(this.options.color);
-      this.material.transparent = true;
-      this.material.opacity = 0.6;
+      // this.material.transparent = true;
+      // this.material.opacity = 0.6;
     } else {
       if (Array.isArray(this.material)) {
         this.material.forEach((material) => material.dispose());
@@ -265,8 +265,8 @@ export class Cylinder extends THREE.Mesh {
 
       this.material = new THREE.MeshStandardMaterial({
         color: this.options.color,
-        transparent: true,
-        opacity: 0.6,
+        // transparent: true,
+        // opacity: 0.6,
       });
     }
 

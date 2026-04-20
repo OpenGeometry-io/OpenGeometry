@@ -1,5 +1,6 @@
 use super::windingsort;
 use crate::brep::{Brep, BrepBuilder};
+use crate::operations::triangulate::compute_polygon_normal;
 use openmaths::Vector3;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
@@ -27,7 +28,7 @@ pub fn extrude_profile_loops(
         .filter(|hole| hole.len() >= 3)
         .collect();
 
-    let Some(profile_normal) = compute_loop_normal(&outer) else {
+    let Some(profile_normal) = compute_polygon_normal(&outer) else {
         return Err("Failed to compute a stable normal from the extrusion profile".to_string());
     };
 
@@ -175,30 +176,6 @@ fn sanitize_loop_points(points: &[Vector3]) -> Vec<Vector3> {
     cleaned
 }
 
-fn compute_loop_normal(points: &[Vector3]) -> Option<Vector3> {
-    if points.len() < 3 {
-        return None;
-    }
-
-    let origin = points[0];
-    for index in 1..(points.len() - 1) {
-        let edge_a = vector_difference(points[index], origin);
-        let edge_b = vector_difference(points[index + 1], origin);
-        let cross = edge_a.cross(&edge_b);
-        let length_sq = cross.dot(&cross);
-        if length_sq > EXTRUDE_EPSILON * EXTRUDE_EPSILON {
-            let inv_length = length_sq.sqrt().recip();
-            return Some(Vector3::new(
-                cross.x * inv_length,
-                cross.y * inv_length,
-                cross.z * inv_length,
-            ));
-        }
-    }
-
-    None
-}
-
 fn range_indices(start: u32, count: usize) -> Vec<u32> {
     (0..count as u32).map(|offset| start + offset).collect()
 }
@@ -280,6 +257,23 @@ mod tests {
         ]
     }
 
+    fn wall_outline_with_reflex_start() -> Vec<Vector3> {
+        vec![
+            Vector3::new(-2.721670458045537, 0.0, -1.7107348430402753),
+            Vector3::new(-1.3465727086811485, 0.0, -0.826743432734597),
+            Vector3::new(-0.3093165466574247, 0.0, 0.3142383454914993),
+            Vector3::new(0.2836567956860831, 0.0, 0.38012427241855573),
+            Vector3::new(-0.2561533171082996, 0.0, 1.0998710894777328),
+            Vector3::new(2.5164370978203268, 0.0, 2.2089072554491835),
+            Vector3::new(2.6835629021796734, 0.0, 1.7910927445508167),
+            Vector3::new(0.45615331710829965, 0.0, 0.9001289105222672),
+            Vector3::new(1.1163432043139168, 0.0, 0.01987572758144427),
+            Vector3::new(-0.09068345334257541, 0.0, -0.11423834549149932),
+            Vector3::new(-1.0534272913188514, 0.0, -1.173256567265403),
+            Vector3::new(-2.478329541954463, 0.0, -2.0892651569597245),
+        ]
+    }
+
     #[test]
     fn extrude_profile_loops_preserves_holes() {
         let outer = rectangle(0.0, 0.0, 6.0, 4.0);
@@ -323,6 +317,19 @@ mod tests {
             .expect("concave extrusion topology");
         assert_eq!(brep.shells.len(), 1);
         assert_eq!(brep.faces.len(), concave.len() + 2);
+    }
+
+    #[test]
+    fn extrude_profile_loops_uses_global_winding_for_reflex_first_corner() {
+        let wall_outline = wall_outline_with_reflex_start();
+
+        let brep = extrude_profile_loops(Uuid::new_v4(), &wall_outline, &[], 2.6)
+            .expect("wall extrusion should succeed");
+
+        brep.validate_topology().expect("wall extrusion topology");
+        assert_eq!(brep.faces.len(), wall_outline.len() + 2);
+        assert!(brep.faces[0].normal.y < -0.999);
+        assert!(brep.faces[1].normal.y > 0.999);
     }
 
     #[test]

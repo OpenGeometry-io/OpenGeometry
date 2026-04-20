@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use openmaths::Vector3;
 use uuid::Uuid;
 
+use crate::operations::triangulate::compute_polygon_normal;
+
 use super::error::{BrepError, BrepErrorKind};
 use super::{Brep, Edge, Face, HalfEdge, Loop, Shell, Vertex, Wire};
-
-const EPSILON: f64 = 1.0e-9;
 
 #[derive(Clone)]
 pub struct BrepBuilder {
@@ -378,31 +378,28 @@ impl BrepBuilder {
             ));
         }
 
-        let p0 = self.brep.vertices[loop_indices[0] as usize].position;
-        for index in 1..(loop_indices.len() - 1) {
-            let p1 = self.brep.vertices[loop_indices[index] as usize].position;
-            let p2 = self.brep.vertices[loop_indices[index + 1] as usize].position;
-
-            let v1 = [p1.x - p0.x, p1.y - p0.y, p1.z - p0.z];
-            let v2 = [p2.x - p0.x, p2.y - p0.y, p2.z - p0.z];
-
-            let cross = [
-                v1[1] * v2[2] - v1[2] * v2[1],
-                v1[2] * v2[0] - v1[0] * v2[2],
-                v1[0] * v2[1] - v1[1] * v2[0],
-            ];
-            let length_sq = cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2];
-
-            if length_sq > EPSILON * EPSILON {
-                let inv = length_sq.sqrt().recip();
-                return Ok(Vector3::new(cross[0] * inv, cross[1] * inv, cross[2] * inv));
-            }
+        let mut points = Vec::with_capacity(loop_indices.len());
+        for vertex_id in loop_indices {
+            let position = self
+                .brep
+                .vertices
+                .get(*vertex_id as usize)
+                .ok_or_else(|| {
+                    BrepError::new(
+                        BrepErrorKind::InvalidVertex,
+                        format!("Vertex {} does not exist", vertex_id),
+                    )
+                })?
+                .position;
+            points.push(position);
         }
 
-        Err(BrepError::new(
-            BrepErrorKind::DegenerateLoop,
-            "Failed to compute a stable face normal from loop vertices",
-        ))
+        compute_polygon_normal(&points).ok_or_else(|| {
+            BrepError::new(
+                BrepErrorKind::DegenerateLoop,
+                "Failed to compute a stable face normal from loop vertices",
+            )
+        })
     }
 }
 

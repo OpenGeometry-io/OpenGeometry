@@ -2,7 +2,7 @@
   "name": "opengeometry",
   "author": "Vishwajeet Vinayak Mane",
   "license": "MPL-2.0",
-  "version": "2.0.6",
+  "version": "2.0.7",
   "description": "CAD kernel for the web built with Rust, WebAssembly, and Three.js for browser CAD, AEC/BIM, and geometry-heavy tools.",
   "type": "module",
   "main": "index.js",

@@ -17,7 +17,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    operations::triangulate::triangulate_polygon_with_holes, spatial::placement::Placement3D,
+    operations::triangulate::{compute_polygon_normal, triangulate_polygon_with_holes},
+    spatial::placement::Placement3D,
 };
 
 pub use builder::BrepBuilder;
@@ -1091,29 +1092,10 @@ fn compute_loop_normal(brep: &Brep, loop_indices: &[u32]) -> Option<Vector3> {
         return None;
     }
 
-    let p0 = brep.vertices.get(loop_indices[0] as usize)?.position;
-    for index in 1..(loop_indices.len() - 1) {
-        let p1 = brep.vertices.get(loop_indices[index] as usize)?.position;
-        let p2 = brep
-            .vertices
-            .get(loop_indices[index + 1] as usize)?
-            .position;
-
-        let v1 = [p1.x - p0.x, p1.y - p0.y, p1.z - p0.z];
-        let v2 = [p2.x - p0.x, p2.y - p0.y, p2.z - p0.z];
-
-        let cross = [
-            v1[1] * v2[2] - v1[2] * v2[1],
-            v1[2] * v2[0] - v1[0] * v2[2],
-            v1[0] * v2[1] - v1[1] * v2[0],
-        ];
-        let length_sq = cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2];
-
-        if length_sq > 1.0e-18 {
-            let inv = length_sq.sqrt().recip();
-            return Some(Vector3::new(cross[0] * inv, cross[1] * inv, cross[2] * inv));
-        }
+    let mut points = Vec::with_capacity(loop_indices.len());
+    for vertex_id in loop_indices {
+        points.push(brep.vertices.get(*vertex_id as usize)?.position);
     }
 
-    None
+    compute_polygon_normal(&points)
 }

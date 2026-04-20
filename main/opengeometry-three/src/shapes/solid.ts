@@ -257,10 +257,9 @@ export class Solid extends THREE.Mesh {
     const bufferData = this.solid.getGeometryBuffer();
     this.writePositionsToGeometry(this.geometry, bufferData);
 
+    let material: THREE.MeshStandardMaterial;
     if (this.material instanceof THREE.MeshStandardMaterial) {
-      this.material.color.set(this.options.color);
-      this.material.transparent = true;
-      this.material.opacity = 0.6;
+      material = this.material;
     } else {
       if (Array.isArray(this.material)) {
         this.material.forEach((material) => material.dispose());
@@ -268,12 +267,22 @@ export class Solid extends THREE.Mesh {
         this.material.dispose();
       }
 
-      this.material = new THREE.MeshStandardMaterial({
+      material = new THREE.MeshStandardMaterial({
         color: this.options.color,
-        transparent: true,
-        opacity: 0.6,
+        transparent: false,
+        opacity: 1,
+        depthWrite: true,
+        side: THREE.FrontSide,
       });
+      this.material = material;
     }
+
+    material.color.set(this.options.color);
+    material.transparent = false;
+    material.opacity = 1;
+    material.depthWrite = true;
+    material.side = THREE.FrontSide;
+    material.needsUpdate = true;
 
     if (bufferData.length > 0) {
       this.geometry.computeVertexNormals();
