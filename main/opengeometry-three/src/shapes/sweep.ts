@@ -59,7 +59,7 @@ export type SweepConfigUpdate = Partial<
  */
 export type SweepPlacementUpdate = SweepPlacementOptions;
 
-/* eslint-disable no-unused-vars */
+
 interface ISweepKernelInstance {
   set_config_with_caps: (
     ..._args: [Vector3[], Vector3[], boolean, boolean]
@@ -75,7 +75,7 @@ interface ISweepKernelInstance {
 }
 
 type SweepKernelConstructor = new (..._args: [string]) => ISweepKernelInstance;
-/* eslint-enable no-unused-vars */
+
 
 /**
  * Sweep wrapper backed by the kernel sweep primitive.

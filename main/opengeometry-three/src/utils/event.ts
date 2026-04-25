@@ -25,7 +25,7 @@ export class Event<T> {
   trigger = (data?: T) => {
     const handlers = this.handlers.slice(0);
     for (const handler of handlers) {
-      handler(data as any);
+      (handler as (data?: T) => void)(data);
     }
   };
 

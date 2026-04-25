@@ -172,6 +172,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint TypeScript
+        run: npm run lint:check
+
       - name: Run build
         run: npm run build
 
