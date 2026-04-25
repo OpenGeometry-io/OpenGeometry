@@ -1,1 +1,0 @@
-See `llms.txt` for the concise OpenGeometry guide and `llms-full.txt` for the expanded guide.

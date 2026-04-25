@@ -59,7 +59,7 @@ export type SphereConfigUpdate = Partial<
  */
 export type SpherePlacementUpdate = SpherePlacementOptions;
 
-/* eslint-disable no-unused-vars */
+
 interface ISphereKernelInstance {
   set_config: (
     ..._args: [Vector3, number, number, number]
@@ -73,7 +73,7 @@ interface ISphereKernelInstance {
 }
 
 type SphereKernelConstructor = new (..._args: [string]) => ISphereKernelInstance;
-/* eslint-enable no-unused-vars */
+
 
 /**
  * Sphere wrapper backed by the kernel sphere primitive.

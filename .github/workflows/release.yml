@@ -172,6 +172,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint TypeScript
+        run: npm run lint:check
+
       - name: Run build
         run: npm run build
 
@@ -188,9 +191,8 @@ jobs:
             exit 1
           fi
 
-      - name: Run tests (if available)
+      - name: Run tests
         run: npm test
-        continue-on-error: true
 
       - name: Final NPM existence check
         id: final-npm-check

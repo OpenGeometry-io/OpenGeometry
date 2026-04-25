@@ -72,7 +72,7 @@ interface KernelBooleanResult {
   reportJson: string;
 }
 
-/* eslint-disable no-unused-vars */
+
 type KernelBooleanFunction = (
   lhsBrepSerialized: string,
   rhsBrepSerialized: string,
@@ -84,7 +84,7 @@ type KernelBooleanManyFunction = (
   rhsBrepsSerialized: string,
   optionsJson?: string
 ) => KernelBooleanResult;
-/* eslint-enable no-unused-vars */
+
 
 const BOOLEAN_CREASE_ANGLE = Math.PI / 5;
 const BOOLEAN_OUTLINE_THRESHOLD_DEGREES = 26;

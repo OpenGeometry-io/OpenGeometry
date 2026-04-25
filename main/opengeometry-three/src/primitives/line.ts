@@ -61,13 +61,13 @@ type OffsetKernelOutput = {
   is_closed: boolean;
 };
 
-/* eslint-disable no-unused-vars */
+
 type OffsetKernelFn = (
   distance: number,
   acuteThresholdDegrees: number,
   bevel: boolean
 ) => string;
-/* eslint-enable no-unused-vars */
+
 
 /**
  * Simple Line defined by Two Points

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'CHANGED=$(git -C \"$CLAUDE_PROJECT_DIR\" diff --name-only HEAD 2>/dev/null; git -C \"$CLAUDE_PROJECT_DIR\" diff --name-only --cached 2>/dev/null) && echo \"$CHANGED\" | grep -qE \"^main/opengeometry(-three)?/(src|examples-vite|tests)/\" || exit 0; cd \"$CLAUDE_PROJECT_DIR\" && echo \"[hook] running cargo fmt --check\" && cargo fmt --check --manifest-path main/opengeometry/Cargo.toml && echo \"[hook] running cargo check\" && cargo check --manifest-path main/opengeometry/Cargo.toml --quiet && echo \"[hook] running npm run lint:check\" && npm run --silent lint:check && echo \"[hook] gates passed\"'"
+          }
+        ]
+      }
+    ]
+  }
+}

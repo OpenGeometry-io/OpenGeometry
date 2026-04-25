@@ -32,10 +32,16 @@ main/opengeometry/pkg/
 .DS_Store
 .vscode/
 settings.json
+# Track .claude/settings.json (team hook config); keep .claude/settings.local.json ignored.
+!.claude/settings.json
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # AI and documentation files
 .requests/*.md
 .github/*.md
+# Track Copilot's instruction file (redirect to AGENTS.md).
+!.github/copilot-instructions.md
 
 # CAD export artifacts
 *.pdf

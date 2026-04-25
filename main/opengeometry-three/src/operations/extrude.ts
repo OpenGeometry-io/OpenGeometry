@@ -2,9 +2,9 @@ import * as OGKernel from "../../../opengeometry/pkg/opengeometry";
 
 import type { FreeformSource } from "../freeform";
 
-/* eslint-disable no-unused-vars */
+
 type KernelExtrudeBrepFace = (...args: [string, number]) => string;
-/* eslint-enable no-unused-vars */
+
 
 /**
  * Sources accepted by the BRep-face extrusion helper.

@@ -55,13 +55,13 @@ type OffsetKernelOutput = {
   is_closed: boolean;
 };
 
-/* eslint-disable no-unused-vars */
+
 type OffsetKernelFn = (
   distance: number,
   acuteThresholdDegrees: number,
   bevel: boolean
 ) => string;
-/* eslint-enable no-unused-vars */
+
 
 /**
  * Curve wrapper backed by the kernel OGCurve primitive.
