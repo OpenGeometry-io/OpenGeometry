@@ -1,43 +1,58 @@
 # Developer Documentation
 
-### Project Structure
-- `main/opengeometry`: Core Rust project that compiles to WebAssembly.
-- `main/opengeometry-three`: Three.js wrapper around the core WebAssembly package.
-- `dist`: Distribution folder containing the built packages.
+Contributor-facing notes. For agent guidance see [AGENTS.md](./AGENTS.md). For end-user
+docs see [README.md](./README.md) and [docs.opengeometry.io](https://docs.opengeometry.io).
 
-Rust is used for performance-critical geometry computations, while Three.js is used for rendering in web applications. 
-We use `wasm-pack` to compile the Rust code to WebAssembly and generate JavaScript bindings.
-- Install `wasm-pack` using `brew install wasm-pack` (macOS).
+## Prerequisites
 
-Primitives and Shapes are created using Rust and exposed to JavaScript via WebAssembly.
+- Node.js (CI uses 18; any LTS is fine locally)
+- Rust toolchain (stable)
+- `wasm-pack` — `brew install wasm-pack` on macOS, or `cargo install wasm-pack`
 
-### Local Development
+## Project layout
 
-#### Building Cargo Project
-- Run `npm run build-core` to build the Rust project and generate WebAssembly bindings.
+- `main/opengeometry/` — Rust core compiled to WebAssembly
+- `main/opengeometry-three/` — Three.js wrapper (the published TypeScript SDK)
+- `main/opengeometry-{webgl,babylon,ios,export-io,export-schema}/` — empty scaffolds
+- `dist/` — generated NPM bundle (do not edit)
 
-#### Building Three.js Package
-The Three.js package depends on the core WebAssembly package. Therefore, ensure to build the core package first.
-1. Run `npm run build` to produce the root distribution bundle in `dist/`.
-2. Run `npm run build-example-three` to build the standalone example catalog in `main/opengeometry-three/examples-dist/`.
+## Local build
 
-#### Testing Examples
-1. After building the examples, open `main/opengeometry-three/examples-dist/index.html` through a static file server or use the Vite preview command from `main/opengeometry-three`.
-2. Use the catalog pages directly for validation instead of copying artifacts into sibling local repositories.
-
-**Project Structure**
-
-```
-OpenGeometry/
-├── dist/
-├── main/
-│   ├── opengeometry/
-│   └── opengeometry-three/
-└── main/opengeometry-three/examples-dist/
+```bash
+npm install
+npm run build              # Full pipeline: Rust → WASM → TS bundle → dist/
+npm test                   # Cargo unit + integration tests (no TypeScript tests yet)
 ```
 
-### Release Process
-1. Update the version in `package.json` and `main/opengeometry/Cargo.toml`.
-2. Push the changes to the `main` branch.
-3. Pushing to `main` will trigger a GitHub Action that builds the project and creates a release on GitHub.
-4. Github action handles publishing to npm and crate.
+`npm run build` runs `build-core` (wasm-pack + cargo release), `build-three` (Rollup),
+and `prepare-dist` in order. Running them out of order produces stale `pkg/` and bundle
+mismatches — see `.claude/skills/wasm-build-flow.md` if you hit that.
+
+## Running the example app
+
+```bash
+npm --prefix main/opengeometry-three run dev-example-three      # Vite dev server
+npm --prefix main/opengeometry-three run build-example-three    # Static build
+npm --prefix main/opengeometry-three run preview-example-three  # Preview the build
+```
+
+The example catalog lives at `main/opengeometry-three/examples-vite/`. Use it (rather
+than copying the build into a sibling repo) for local validation.
+
+## Release process
+
+1. Bump `version` in both `package.json` and `main/opengeometry/Cargo.toml` so they
+   match.
+2. Run the full build + test locally:
+   ```bash
+   npm run build
+   npm test
+   ```
+3. Push to `main`. The GitHub Action at `.github/workflows/release.yml` detects the
+   version bump, rebuilds, runs tests (now required to pass), and publishes to NPM if
+   the version is not already on the registry.
+4. The action also creates a GitHub release tagged `v<version>`.
+
+If the publish step fails for an environmental reason but the version was already
+bumped, re-running the workflow will re-attempt publish (the action checks NPM and only
+publishes if the version is missing).

@@ -75,11 +75,8 @@ Good examples include:
 
 If you are using ChatGPT, Claude, Gemini, Copilot, or other coding agents on this repository, start here:
 
+- [AGENTS.md](./AGENTS.md) - single source of truth for all coding agents (architecture, commands, gotchas, behavioral rules)
 - [README.md](./README.md) - product overview, positioning, and quick start
-- [llms.txt](./llms.txt) - concise repo and API guide for coding agents
-- [llms-full.txt](./llms-full.txt) - expanded agent guide with workflows and examples
-- [llm.txt](./llm.txt) - redirect for tools that look for a single LLM entrypoint
-- [AGENTS.md](./AGENTS.md) - repository workflow rules and validation expectations
 - [Quickstart](https://docs.opengeometry.io/quickstart)
 - [Three.js integration](https://docs.opengeometry.io/integration/threejs)
 - [Boolean operations](https://docs.opengeometry.io/api/operations/boolean-operations)
@@ -92,7 +89,7 @@ If you are using ChatGPT, Claude, Gemini, Copilot, or other coding agents on thi
 | **Primitives** | Lines, arcs, curves, polylines, rectangles |
 | **Shapes** | Polygons, solids, cuboids, cylinders, spheres, wedges, sweeps, openings |
 | **Operations** | Triangulation, extrusion, sweep, offset, boolean operations |
-| **Exports** | STL, STEP, IFC, PDF projection |
+| **Exports** | STL, STEP, IFC, PDF projection (PDF is currently native/Node-only — browser PDF is on the roadmap) |
 | **Integration** | Three.js scene management, WebAssembly-powered performance |
 
 ## Demos
@@ -212,14 +209,12 @@ OpenGeometry is open source under the [MPL-2.0 license](./LICENSE.md). Contribut
 
 ## AI Agent Docs Policy
 
-- Repository-level AI agent instructions are in [AGENTS.md](./AGENTS.md).
-- LLM-friendly repo entrypoints are [llms.txt](./llms.txt), [llms-full.txt](./llms-full.txt), and
-  [llm.txt](./llm.txt).
-- In the current workflow, [`AI-DOCs/`](./AI-DOCs/) is used for AI-generated handoffs, runbooks,
-  testing notes, and temporary implementation context.
-- The maintained user-facing docs live in [`docs/`](./docs/), and stable architecture/domain notes
-  are tracked in [`knowledge/`](./knowledge/).
-- AI-generated docs should not be added under app/code folders unless explicitly requested.
+- All AI coding agent instructions live in a single file: [AGENTS.md](./AGENTS.md).
+  `CLAUDE.md` and `.github/copilot-instructions.md` are thin redirects to it.
+- Stable architecture and domain notes are tracked in [`knowledge/`](./knowledge/).
+- User-facing docs live in [`docs/`](./docs/) (Mintlify source).
+- Agents should not create planning, handoff, or runbook files during a task. The
+  conversation, the diff, and the commit message are the handoff.
 
 ---
 
