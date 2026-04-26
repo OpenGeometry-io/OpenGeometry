@@ -46,3 +46,6 @@ settings.json
 # CAD export artifacts
 *.pdf
 *.dxf
+
+# Spec and Tech Debt tracking
+.spec/*

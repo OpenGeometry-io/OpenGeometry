@@ -20,7 +20,8 @@
       <h3>Solid Boolean</h3>
       <p class="og-control-summary">
         This page shows the core solid boolean workflow for browser CAD tools. The source solids are
-        on the left and the rebuilt boolean result is on the right.
+        on the left and the rebuilt boolean result is on the right. The result inherits the host
+        cuboid's material — color, transparency, and side mode — unless an override is supplied.
       </p>
 
       <label class="og-control-row" data-control="operation">
@@ -30,7 +31,8 @@
         <select class="og-control-select" data-select aria-label="Operation">
           <option value="union">Union</option>
           <option value="intersection">Intersection</option>
-          <option value="subtraction" selected>Subtraction</option>
+          <option value="subtraction" selected>Subtraction (inherit host)</option>
+          <option value="subtraction-override">Subtraction (override green)</option>
         </select>
       </label>
 
@@ -154,9 +156,18 @@
             return booleanUnion;
           case "intersection":
             return booleanIntersection;
+          case "subtraction-override":
+            return booleanSubtraction;
           default:
             return booleanSubtraction;
         }
+      }
+
+      function getRenderOverrides() {
+        if (config.operation === "subtraction-override") {
+          return { color: 0x22c55e, opacity: 0.6, transparent: true };
+        }
+        return {};
       }
 
       function rebuildExample() {
@@ -174,7 +185,7 @@
           width: 2.4,
           height: 1.5,
           depth: 1.6,
-          color: 0x60a5fa,
+          color: 0xdc2626,
           outlineWidth: 2,
         });
         cuboid.outline = true;
@@ -195,6 +206,7 @@
         const result = getExecutor()(cuboid, sphere, {
           outline: true,
           outlineWidth: 2,
+          ...getRenderOverrides(),
         });
 
         cuboid.position.x = -4;

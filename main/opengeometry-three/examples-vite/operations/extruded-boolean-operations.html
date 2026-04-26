@@ -20,7 +20,9 @@
       <h3>Wall Minus Openings</h3>
       <p class="og-control-summary">
         This page shows the production-style flow: build two polygons, call
-        <code>polygon.extrude(height)</code>, then subtract an array of openings from the wall.
+        <code>polygon.extrude(height)</code>, then subtract an array of openings from the wall. The
+        boolean result inherits the host wall's material — color, transparency, and side mode —
+        across multi-cutter subtraction.
       </p>
 
       <label class="og-control-row" data-control="wall-height">
@@ -164,7 +166,7 @@
             new Vector3(2.2, 0, 0.18),
             new Vector3(-2.2, 0, 0.18),
           ],
-          color: 0x60a5fa,
+          color: 0xdc2626,
           outlineWidth: 2,
         });
         const openingProfile = new Polygon({
@@ -180,6 +182,9 @@
 
         const wall = wallProfile.extrude(config.wallHeight);
         wall.outline = true;
+        wall.material.transparent = true;
+        wall.material.opacity = 0.6;
+        wall.material.needsUpdate = true;
 
         const openingOffset = Math.max(
           0.45,

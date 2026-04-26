@@ -37,9 +37,16 @@ export interface BooleanKernelOptions {
 
 /**
  * Rendering options applied to the boolean result mesh.
+ *
+ * `color`, `opacity`, `transparent`, and `side` override the corresponding
+ * fields on the host (LHS) operand's cloned material. Omit them to inherit
+ * the host's appearance unchanged.
  */
 export interface BooleanRenderOptions {
   color?: number;
+  opacity?: number;
+  transparent?: boolean;
+  side?: THREE.Side;
   outline?: boolean;
   fatOutlines?: boolean;
   outlineWidth?: number;
@@ -106,13 +113,14 @@ export class BooleanResult extends THREE.Mesh {
 
   constructor(
     kernelResult: KernelBooleanResult,
-    options?: BooleanRenderOptions
+    options?: BooleanRenderOptions,
+    sourceMaterial: THREE.Material | null = null
   ) {
     super();
     this.ogid = getUUID();
     this._fatOutlines = options?.fatOutlines ?? false;
     this._outlineWidth = sanitizeOutlineWidth(options?.outlineWidth);
-    this.applyKernelResult(kernelResult, options?.color ?? 0x2563eb);
+    this.applyKernelResult(kernelResult, options, sourceMaterial);
 
     if (options?.outline ?? false) {
       this.outline = true;
@@ -122,7 +130,11 @@ export class BooleanResult extends THREE.Mesh {
   /**
    * Rebuilds the mesh, cached BRep payload, and outline geometry from the kernel output.
    */
-  applyKernelResult(kernelResult: KernelBooleanResult, color: number = 0x2563eb) {
+  applyKernelResult(
+    kernelResult: KernelBooleanResult,
+    options?: BooleanRenderOptions,
+    sourceMaterial: THREE.Material | null = null
+  ) {
     this.disposeGeometry();
 
     this.brepSerialized = kernelResult.brepSerialized;
@@ -142,15 +154,7 @@ export class BooleanResult extends THREE.Mesh {
       kernelResult.outlineGeometrySerialized
     );
 
-    const material = new THREE.MeshStandardMaterial({
-      color,
-      transparent: true,
-      opacity: 0.82,
-      side: THREE.FrontSide,
-      polygonOffset: true,
-      polygonOffsetFactor: 1,
-      polygonOffsetUnits: 1,
-    });
+    const material = buildResultMaterial(sourceMaterial, options);
 
     this.geometry = geometry;
     this.material = material;
@@ -319,7 +323,7 @@ export function executeBooleanSubtractionMany(
     kernelOptions
   );
 
-  return createBooleanResult(kernelResult, options);
+  return createBooleanResult(kernelResult, options, resolveOperandMaterial(lhs));
 }
 
 /**
@@ -347,7 +351,7 @@ function executeBoolean(
     kernelOptions
   );
 
-  return createBooleanResult(kernelResult, options);
+  return createBooleanResult(kernelResult, options, resolveOperandMaterial(lhs));
 }
 
 /**
@@ -417,13 +421,80 @@ function serializeKernelOptions(options?: BooleanKernelOptions) {
 
 function createBooleanResult(
   kernelResult: KernelBooleanResult,
-  options?: BooleanExecutionOptions
+  options?: BooleanExecutionOptions,
+  sourceMaterial: THREE.Material | null = null
 ) {
-  const result = new BooleanResult(kernelResult, options);
+  const result = new BooleanResult(kernelResult, options, sourceMaterial);
   if (options?.outline ?? true) {
     result.outline = true;
   }
   return result;
+}
+
+/**
+ * Returns a clonable `THREE.Material` from the operand when it is a Three mesh
+ * subclass (Solid, Polygon, Cuboid, Opening, BooleanResult, etc.). Returns
+ * `null` for serialized JSON, parsed BRep objects, or anything else without a
+ * reachable material so the boolean result can fall back to the legacy default.
+ */
+function resolveOperandMaterial(operand: BooleanOperand): THREE.Material | null {
+  if (typeof operand !== "object" || operand === null) {
+    return null;
+  }
+
+  if (!(operand instanceof THREE.Mesh)) {
+    return null;
+  }
+
+  const material = (operand as THREE.Mesh).material;
+  if (Array.isArray(material)) {
+    return material[0] ?? null;
+  }
+
+  return material instanceof THREE.Material ? material : null;
+}
+
+/**
+ * Builds the boolean result mesh's material by cloning the host (LHS) material
+ * when available so the result inherits the host's color, transparency, and
+ * side mode. Caller-provided overrides on `BooleanRenderOptions` win, and the
+ * polygon-offset settings that prevent z-fighting with the result outline are
+ * always reapplied after cloning.
+ */
+function buildResultMaterial(
+  sourceMaterial: THREE.Material | null,
+  options?: BooleanRenderOptions
+): THREE.Material {
+  const material = sourceMaterial
+    ? sourceMaterial.clone()
+    : new THREE.MeshStandardMaterial({
+        color: 0x2563eb,
+        transparent: true,
+        opacity: 0.82,
+        side: THREE.FrontSide,
+      });
+
+  if (options?.color !== undefined && "color" in material) {
+    (material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial).color.set(
+      options.color
+    );
+  }
+  if (options?.opacity !== undefined) {
+    material.opacity = options.opacity;
+    material.transparent = options.opacity < 1 || material.transparent;
+  }
+  if (options?.transparent !== undefined) {
+    material.transparent = options.transparent;
+  }
+  if (options?.side !== undefined) {
+    material.side = options.side;
+  }
+
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = 1;
+  material.polygonOffsetUnits = 1;
+  material.needsUpdate = true;
+  return material;
 }
 
 /**
