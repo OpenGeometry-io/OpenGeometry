@@ -16,9 +16,30 @@ pub enum BooleanOperandKind {
     PlanarFace,
 }
 
+/// Tunable parameters for the boolean pipeline.
+///
+/// `tolerance` is in **model units** (typically meters in OpenGeometry-using
+/// apps). When `None`, the kernel auto-scales it to `operands_diagonal * 1e-8`
+/// (clamped to `1e-9` floor) and clamped further to `1e-6` inside
+/// `boolean_subtraction_many`. This value drives the kernel-side polygon /
+/// face math (vertex welding in `solid::weld_position`, plane coincidence in
+/// `detect_coincident_faces`, AABB enforcement in
+/// `enforce_host_bounds_for_subtraction`).
+///
+/// **Important: this tolerance does NOT control boolmesh's internal welding
+/// snap window.** Boolmesh has its own snap that treats faces within ~1 mm
+/// (in some configurations) as coincident. If your cutter's face is between
+/// roughly 0.001 m and 0.01 m offset from a host face, you may hit the
+/// `BooleanErrorKind::DegenerateTriangle` / `CoincidentFaces` error path
+/// regardless of what `tolerance` you pass. See
+/// `knowledge/boolean-tolerance-guide.md` for the empirical thresholds and
+/// the recommended cutter-overshoot formula.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BooleanOptions {
+    /// Caller-supplied tolerance in model units. `None` → auto-scale.
     pub tolerance: Option<f64>,
+    /// Whether the planar pipeline merges coplanar adjacent faces in its
+    /// output. Defaults to `true`.
     pub merge_coplanar_faces: bool,
 }
 

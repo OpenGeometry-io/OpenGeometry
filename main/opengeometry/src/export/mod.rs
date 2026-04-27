@@ -13,8 +13,8 @@ pub use ifc::{
     IfcExportReport, IfcSchemaVersion,
 };
 pub use projection::{
-    project_brep_to_scene, CameraParameters, HlrOptions, Line2D, Path2D, ProjectionMode, Scene2D,
-    Scene2DLines, Segment2D, Vec2,
+    project_brep_to_scene, CameraParameters, ClassifiedSegment, EdgeClass, HlrOptions, Line2D,
+    Path2D, ProjectionMode, Scene2D, Scene2DLines, Segment2D, Vec2,
 };
 pub use step::{
     export_brep_to_step_text, export_breps_to_step_text, StepErrorPolicy, StepExportConfig,

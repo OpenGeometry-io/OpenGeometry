@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use boolmesh::compute_boolean;
 use boolmesh::prelude::{Manifold, OpType};
 
-use crate::booleans::error::{BooleanError, BooleanErrorKind};
+use crate::booleans::error::{BooleanError, BooleanErrorKind, BooleanErrorPhase};
 use crate::booleans::types::BooleanOperation;
 use crate::brep::Brep;
 use crate::operations::triangulate::triangulate_polygon_with_holes;
@@ -217,6 +217,14 @@ pub(crate) fn brep_to_polygons(
 
 /// Executes the solid boolean against already triangulated polygon soups and
 /// returns the watertight triangle mesh emitted by boolmesh.
+///
+/// On failure, when boolmesh reports a degenerate triangle output (the `#6a`
+/// symptom — typically caused by cutter / host faces that fall within
+/// boolmesh's internal snap window), this runs a post-mortem
+/// coincident-face check and enriches the error with the offending face
+/// indices and the snap-window magnitude. Apps that catch the typed
+/// `BooleanErrorKind::DegenerateTriangle` get an actionable diagnostic
+/// instead of "Boolean kernel produced a degenerate result triangle".
 pub(crate) fn execute_solid_boolean(
     lhs: Vec<Polygon3>,
     rhs: Vec<Polygon3>,
@@ -225,7 +233,134 @@ pub(crate) fn execute_solid_boolean(
 ) -> Result<TriangleMesh, BooleanError> {
     let lhs_mesh = triangle_mesh_from_polygon_soup(&lhs, epsilon)?;
     let rhs_mesh = triangle_mesh_from_polygon_soup(&rhs, epsilon)?;
-    execute_triangle_mesh_boolean(&lhs_mesh, &rhs_mesh, operation, epsilon)
+    match execute_triangle_mesh_boolean(&lhs_mesh, &rhs_mesh, operation, epsilon) {
+        Ok(mesh) => Ok(mesh),
+        Err(error) => Err(maybe_enrich_with_coincident_faces(
+            error, &lhs, &rhs, epsilon,
+        )),
+    }
+}
+
+/// If the kernel failure is consistent with the `#6a` snap-tolerance class
+/// (degenerate output triangle or non-manifold output triangulation) AND
+/// detection finds an actually-coincident pair of faces, replaces the error's
+/// kind with `CoincidentFaces` and appends the offending pair to `details`.
+/// Otherwise returns the error unchanged.
+fn maybe_enrich_with_coincident_faces(
+    error: BooleanError,
+    lhs: &[Polygon3],
+    rhs: &[Polygon3],
+    epsilon: f64,
+) -> BooleanError {
+    let degenerate_kind = matches!(
+        error.kind(),
+        BooleanErrorKind::DegenerateTriangle | BooleanErrorKind::NonManifoldEdges
+    );
+    if !degenerate_kind {
+        return error;
+    }
+
+    let Some(diagnostic) = detect_coincident_faces(lhs, rhs, epsilon) else {
+        return error;
+    };
+
+    let combined = match error.details() {
+        Some(existing) => format!("{}; {}", existing, diagnostic),
+        None => diagnostic,
+    };
+    BooleanError::new(
+        BooleanErrorKind::CoincidentFaces,
+        format!("{} (coincident-face diagnostic available)", error),
+    )
+    .with_phase(error.phase())
+    .with_details(combined)
+}
+
+/// Detects whether any cutter face is coplanar with any host face within the
+/// snap window AND their footprints overlap when projected onto the shared
+/// plane. Returns `Some(details)` describing the offending pair, or `None` if
+/// no problematic pair is found.
+///
+/// The snap window is `epsilon * 1000` — wide enough to catch the boolmesh
+/// internal welding tolerance that triggers the "degenerate result triangle"
+/// failure on cutters within ~1 mm of host faces (the `#6a` symptom on
+/// PolyWall extrusions).
+fn detect_coincident_faces(lhs: &[Polygon3], rhs: &[Polygon3], epsilon: f64) -> Option<String> {
+    if lhs.is_empty() || rhs.is_empty() {
+        return None;
+    }
+    let snap_window = (epsilon * 1000.0).max(1.0e-4);
+    let parallel_threshold = 1.0 - 1.0e-6;
+
+    for (l_idx, lhs_polygon) in lhs.iter().enumerate() {
+        for (r_idx, rhs_polygon) in rhs.iter().enumerate() {
+            let dot = lhs_polygon.plane.normal.dot(rhs_polygon.plane.normal);
+            if dot.abs() < parallel_threshold {
+                continue;
+            }
+
+            // Coplanar candidate: planes are parallel. Check coincidence by
+            // distance between any vertex of one polygon to the other's plane.
+            let lhs_origin = lhs_polygon.vertices[0].position;
+            let signed_distance = rhs_polygon.plane.normal.dot(lhs_origin) - rhs_polygon.plane.w;
+            if signed_distance.abs() > snap_window {
+                continue;
+            }
+
+            // Coincident candidate: footprints might overlap. Use AABB
+            // overlap on the projected vertices as a sufficient cheap test.
+            if !polygons_overlap_in_shared_plane(lhs_polygon, rhs_polygon, epsilon) {
+                continue;
+            }
+
+            return Some(format!(
+                "lhs face #{} coplanar with rhs face #{} within {:.3e} (snap window {:.3e})",
+                l_idx,
+                r_idx,
+                signed_distance.abs(),
+                snap_window
+            ));
+        }
+    }
+
+    None
+}
+
+/// Cheap 3D AABB-based overlap test for two coplanar polygons. False
+/// positives are acceptable (they trigger an extra coincident-face error
+/// that's still better than the generic "degenerate triangle" message);
+/// false negatives are not — but in 3D, two truly overlapping polygons must
+/// have overlapping AABBs, so this direction is sound.
+fn polygons_overlap_in_shared_plane(a: &Polygon3, b: &Polygon3, epsilon: f64) -> bool {
+    let mut a_min = a.vertices[0].position;
+    let mut a_max = a.vertices[0].position;
+    for v in &a.vertices[1..] {
+        let p = v.position;
+        a_min.x = a_min.x.min(p.x);
+        a_min.y = a_min.y.min(p.y);
+        a_min.z = a_min.z.min(p.z);
+        a_max.x = a_max.x.max(p.x);
+        a_max.y = a_max.y.max(p.y);
+        a_max.z = a_max.z.max(p.z);
+    }
+    let mut b_min = b.vertices[0].position;
+    let mut b_max = b.vertices[0].position;
+    for v in &b.vertices[1..] {
+        let p = v.position;
+        b_min.x = b_min.x.min(p.x);
+        b_min.y = b_min.y.min(p.y);
+        b_min.z = b_min.z.min(p.z);
+        b_max.x = b_max.x.max(p.x);
+        b_max.y = b_max.y.max(p.y);
+        b_max.z = b_max.z.max(p.z);
+    }
+    let slack = epsilon.max(1.0e-9);
+    !(a_max.x < b_min.x - slack
+        || a_min.x > b_max.x + slack
+        || a_max.y < b_min.y - slack
+        || a_min.y > b_max.y + slack
+        || a_max.z < b_min.z - slack
+        || a_min.z > b_max.z + slack)
 }
 
 /// Runs the solid kernel and converts the resulting manifold triangle mesh back
@@ -341,10 +476,32 @@ fn execute_triangle_mesh_boolean(
         },
     )
     .map_err(|error| {
+        let lower = error.to_string().to_lowercase();
+        // Remap boolmesh's "degenerate" output errors to the structured
+        // `DegenerateTriangle` variant (`#6a` Phase 2). Everything else
+        // surfaces as the generic `KernelFailure` so legacy detection
+        // still works.
+        let kind = if lower.contains("degenerate") {
+            BooleanErrorKind::DegenerateTriangle
+        } else if lower.contains("non-manifold") || lower.contains("non manifold") {
+            BooleanErrorKind::NonManifoldEdges
+        } else {
+            BooleanErrorKind::KernelFailure
+        };
+        let phase = if matches!(
+            kind,
+            BooleanErrorKind::DegenerateTriangle | BooleanErrorKind::NonManifoldEdges
+        ) {
+            BooleanErrorPhase::OutputValidation
+        } else {
+            BooleanErrorPhase::InputValidation
+        };
         BooleanError::new(
-            BooleanErrorKind::KernelFailure,
+            kind,
             format!("Robust solid boolean kernel failed: {}", error),
         )
+        .with_phase(phase)
+        .with_details(error.to_string())
     })?;
 
     let positions = result
@@ -602,6 +759,11 @@ fn orient_triangle_mesh_consistently(mesh: &mut TriangleMesh) -> Result<(), Bool
 
 /// Verifies that every undirected edge is used by exactly two triangles after
 /// orientation normalization so the downstream solid kernel receives a closed mesh.
+///
+/// On failure, the returned error carries up to 8 sample non-manifold edges
+/// (`edge_samples`) and a `details` string summarizing the open / over-shared
+/// edge counts so app-side debugging can locate the problem geometry without
+/// re-running the validation.
 fn validate_triangle_mesh_closed(mesh: &TriangleMesh) -> Result<(), BooleanError> {
     let mut edge_counts: HashMap<(usize, usize), usize> = HashMap::new();
 
@@ -617,13 +779,41 @@ fn validate_triangle_mesh_closed(mesh: &TriangleMesh) -> Result<(), BooleanError
     }
 
     if edge_counts.values().all(|count| *count == 2) {
-        Ok(())
-    } else {
-        Err(BooleanError::new(
-            BooleanErrorKind::InvalidOperand,
-            "Triangle mesh is not closed or contains non-manifold edges",
-        ))
+        return Ok(());
     }
+
+    let mut open_edges = 0usize;
+    let mut over_shared_edges = 0usize;
+    let mut samples: Vec<[Vector3; 2]> = Vec::with_capacity(8);
+    for ((start, end), count) in &edge_counts {
+        if *count == 2 {
+            continue;
+        }
+        if *count < 2 {
+            open_edges += 1;
+        } else {
+            over_shared_edges += 1;
+        }
+        if samples.len() < 8 {
+            if let (Some(a), Some(b)) = (mesh.positions.get(*start), mesh.positions.get(*end)) {
+                samples.push([a.to_vector3(), b.to_vector3()]);
+            }
+        }
+    }
+
+    let details = format!(
+        "open_edges={}, over_shared_edges={}, sampled={}",
+        open_edges,
+        over_shared_edges,
+        samples.len()
+    );
+
+    Err(BooleanError::output_validation(
+        BooleanErrorKind::NonManifoldEdges,
+        "Triangle mesh is not closed or contains non-manifold edges",
+    )
+    .with_details(details)
+    .with_edge_samples(samples))
 }
 
 /// Combines disjoint triangle meshes into a single multi-shell result without

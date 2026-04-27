@@ -60,11 +60,61 @@ impl Vec2 {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Segment2D {
-    Line { start: Vec2, end: Vec2 },
+/// ISO 128 edge classification. Drives line weight and line type in export.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EdgeClass {
+    /// Silhouette: front-face edge adjacent to a back-facing face. Continuous 0.50 mm.
+    VisibleOutline,
+    /// Hard crease: two front-facing faces whose normals diverge (cos < 0.9995). Continuous 0.25 mm.
+    VisibleCrease,
+    /// Smooth interior edge between co-planar front faces. Hidden by default (opt-in).
+    VisibleSmooth,
+    /// Occluded by front-facing geometry. Dashed 0.18 mm when shown.
+    Hidden,
+    /// Intersects a section plane. Chain thick 0.70 mm.
+    SectionCut,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Segment2D {
+    Line {
+        start: Vec2,
+        end: Vec2,
+    },
+    Arc {
+        center: Vec2,
+        radius: f64,
+        start_angle: f64,
+        end_angle: f64,
+    },
+    Ellipse {
+        center: Vec2,
+        rx: f64,
+        ry: f64,
+        rotation: f64,
+        start_angle: f64,
+        end_angle: f64,
+    },
+    CubicBezier {
+        p0: Vec2,
+        p1: Vec2,
+        p2: Vec2,
+        p3: Vec2,
+    },
+}
+
+/// One classified output segment from the HLR projection.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ClassifiedSegment {
+    pub geometry: Segment2D,
+    pub class: EdgeClass,
+    /// AIA/NCS layer code (e.g. "A-WALL"). Populated by OGEntityRegistry in Phase 2.
+    pub layer: Option<String>,
+    /// BRep UUID of the originating entity.
+    pub source_entity_id: Option<String>,
+}
+
+/// Backward-compat path type. Retained for callers that rely on Path2D structure.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Path2D {
     pub segments: Vec<Segment2D>,
@@ -96,15 +146,19 @@ impl Path2D {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Scene2D {
     pub name: Option<String>,
-    pub paths: Vec<Path2D>,
+    pub segments: Vec<ClassifiedSegment>,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+/// Flat line representation used by the existing WASM `projectTo2DLines` API.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Line2D {
     pub start: Vec2,
     pub end: Vec2,
     pub stroke_width: Option<f64>,
     pub stroke_color: Option<(f64, f64, f64)>,
+    /// ISO 128 edge class serialised as a string (e.g. "VisibleOutline").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub class: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -126,23 +180,39 @@ impl Scene2D {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.paths.iter().all(Path2D::is_empty)
+        self.segments.is_empty()
     }
 
+    pub fn add_segment(&mut self, seg: ClassifiedSegment) {
+        self.segments.push(seg);
+    }
+
+    /// Backward-compat: convert Path2D into classified segments (class = VisibleCrease).
     pub fn add_path(&mut self, path: Path2D) {
-        if !path.is_empty() {
-            self.paths.push(path);
+        for geom in path.segments {
+            self.segments.push(ClassifiedSegment {
+                geometry: geom,
+                class: EdgeClass::VisibleCrease,
+                layer: None,
+                source_entity_id: None,
+            });
         }
     }
 
-    pub fn paths(&self) -> &[Path2D] {
-        &self.paths
+    pub fn segments(&self) -> &[ClassifiedSegment] {
+        &self.segments
+    }
+
+    /// Backward-compat: materialise a Vec<Path2D> from classified segments.
+    pub fn paths(&self) -> Vec<Path2D> {
+        self.segments
+            .iter()
+            .map(|seg| Path2D::with_segments(vec![seg.geometry.clone()]))
+            .collect()
     }
 
     pub fn extend(&mut self, other: Scene2D) {
-        for path in other.paths {
-            self.add_path(path);
-        }
+        self.segments.extend(other.segments);
     }
 
     pub fn bounding_box(&self) -> Option<(Vec2, Vec2)> {
@@ -152,18 +222,15 @@ impl Scene2D {
         let mut max_y = f64::NEG_INFINITY;
         let mut has_data = false;
 
-        for path in &self.paths {
-            for segment in &path.segments {
-                match segment {
-                    Segment2D::Line { start, end } => {
-                        min_x = min_x.min(start.x).min(end.x);
-                        min_y = min_y.min(start.y).min(end.y);
-                        max_x = max_x.max(start.x).max(end.x);
-                        max_y = max_y.max(start.y).max(end.y);
-                        has_data = true;
-                    }
-                }
-            }
+        for seg in &self.segments {
+            let Some((lo, hi)) = segment_bounds(&seg.geometry) else {
+                continue;
+            };
+            min_x = min_x.min(lo.x);
+            min_y = min_y.min(lo.y);
+            max_x = max_x.max(hi.x);
+            max_y = max_y.max(hi.y);
+            has_data = true;
         }
 
         if has_data {
@@ -173,27 +240,101 @@ impl Scene2D {
         }
     }
 
+    /// Flatten to Line2D for the existing `projectTo2DLines` WASM path.
     pub fn to_lines(&self) -> Scene2DLines {
         let mut lines = Vec::new();
-
-        for path in &self.paths {
-            for segment in &path.segments {
-                match segment {
-                    Segment2D::Line { start, end } => lines.push(Line2D {
-                        start: *start,
-                        end: *end,
-                        stroke_width: path.stroke_width,
-                        stroke_color: path.stroke_color,
-                    }),
-                }
+        for seg in &self.segments {
+            if let Segment2D::Line { start, end } = seg.geometry {
+                lines.push(Line2D {
+                    start,
+                    end,
+                    stroke_width: None,
+                    stroke_color: None,
+                    class: Some(edge_class_str(seg.class).to_string()),
+                });
             }
         }
-
         Scene2DLines {
             name: self.name.clone(),
             lines,
         }
     }
+}
+
+fn edge_class_str(class: EdgeClass) -> &'static str {
+    match class {
+        EdgeClass::VisibleOutline => "VisibleOutline",
+        EdgeClass::VisibleCrease => "VisibleCrease",
+        EdgeClass::VisibleSmooth => "VisibleSmooth",
+        EdgeClass::Hidden => "Hidden",
+        EdgeClass::SectionCut => "SectionCut",
+    }
+}
+
+fn segment_bounds(seg: &Segment2D) -> Option<(Vec2, Vec2)> {
+    match seg {
+        Segment2D::Line { start, end } => Some((
+            Vec2::new(start.x.min(end.x), start.y.min(end.y)),
+            Vec2::new(start.x.max(end.x), start.y.max(end.y)),
+        )),
+        Segment2D::Arc {
+            center,
+            radius,
+            start_angle,
+            end_angle,
+        } => {
+            let pts = [
+                Vec2::new(
+                    center.x + radius * start_angle.cos(),
+                    center.y + radius * start_angle.sin(),
+                ),
+                Vec2::new(
+                    center.x + radius * end_angle.cos(),
+                    center.y + radius * end_angle.sin(),
+                ),
+            ];
+            points_bounds(&pts)
+        }
+        Segment2D::Ellipse {
+            center,
+            rx,
+            ry,
+            rotation,
+            start_angle,
+            end_angle,
+        } => {
+            let cos_r = rotation.cos();
+            let sin_r = rotation.sin();
+            let ellipse_pt = |a: f64| {
+                let ex = rx * a.cos();
+                let ey = ry * a.sin();
+                Vec2::new(
+                    center.x + ex * cos_r - ey * sin_r,
+                    center.y + ex * sin_r + ey * cos_r,
+                )
+            };
+            let pts = [ellipse_pt(*start_angle), ellipse_pt(*end_angle)];
+            points_bounds(&pts)
+        }
+        Segment2D::CubicBezier { p0, p1, p2, p3 } => points_bounds(&[*p0, *p1, *p2, *p3]),
+    }
+}
+
+fn points_bounds(pts: &[Vec2]) -> Option<(Vec2, Vec2)> {
+    if pts.is_empty() {
+        return None;
+    }
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for p in pts {
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
+    }
+    Some((Vec2::new(min_x, min_y), Vec2::new(max_x, max_y)))
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -256,14 +397,20 @@ pub fn project_brep_to_scene(brep: &Brep, camera: &CameraParameters, hlr: &HlrOp
     let face_info = compute_face_info(brep, &frame);
     let adjacency = build_edge_adjacency(brep);
     let candidates = collect_candidate_edges(brep);
+    let source_id = brep.id.to_string();
 
-    let mut path = Path2D::new();
     for edge in candidates {
         if !is_edge_vertex_index_valid(edge.a, edge.b, brep.vertices.len()) {
             continue;
         }
 
-        if hlr.hide_hidden_edges && !is_edge_visible(edge.id, &adjacency, &face_info) {
+        let class = classify_edge(edge.id, &adjacency, &face_info);
+        let should_emit = match class {
+            EdgeClass::VisibleSmooth => false,
+            EdgeClass::Hidden => !hlr.hide_hidden_edges,
+            _ => true,
+        };
+        if !should_emit {
             continue;
         }
 
@@ -289,14 +436,50 @@ pub fn project_brep_to_scene(brep: &Brep, camera: &CameraParameters, hlr: &HlrOp
             continue;
         }
 
-        path.push_segment(Segment2D::Line {
-            start: start_2d,
-            end: end_2d,
+        scene.add_segment(ClassifiedSegment {
+            geometry: Segment2D::Line {
+                start: start_2d,
+                end: end_2d,
+            },
+            class,
+            layer: None,
+            source_entity_id: Some(source_id.clone()),
         });
     }
 
-    scene.add_path(path);
     scene
+}
+
+fn classify_edge(
+    edge_id: u32,
+    adjacency: &HashMap<u32, Vec<usize>>,
+    face_info: &[FaceInfo],
+) -> EdgeClass {
+    let adjacent_faces = adjacency.get(&edge_id).cloned().unwrap_or_default();
+
+    if adjacent_faces.is_empty() {
+        return EdgeClass::VisibleCrease;
+    }
+
+    let front_faces: Vec<FaceInfo> = adjacent_faces
+        .iter()
+        .filter_map(|&fi| face_info.get(fi).copied())
+        .filter(|f| f.front_facing)
+        .collect();
+
+    if front_faces.is_empty() {
+        return EdgeClass::Hidden;
+    }
+
+    if front_faces.len() < adjacent_faces.len() {
+        return EdgeClass::VisibleOutline;
+    }
+
+    if has_crease(&front_faces) {
+        EdgeClass::VisibleCrease
+    } else {
+        EdgeClass::VisibleSmooth
+    }
 }
 
 fn build_camera_frame(camera: &CameraParameters) -> Option<CameraFrame> {
@@ -500,36 +683,6 @@ fn compute_face_normal_and_center(
     None
 }
 
-fn is_edge_visible(
-    edge_id: u32,
-    adjacency: &HashMap<u32, Vec<usize>>,
-    face_info: &[FaceInfo],
-) -> bool {
-    let adjacent_faces = adjacency.get(&edge_id).cloned().unwrap_or_default();
-    if adjacent_faces.is_empty() {
-        return true;
-    }
-
-    let mut front_faces = Vec::new();
-    for face_index in adjacent_faces {
-        if let Some(face) = face_info.get(face_index) {
-            if face.front_facing {
-                front_faces.push(*face);
-            }
-        }
-    }
-
-    if front_faces.is_empty() {
-        return false;
-    }
-
-    if front_faces.len() == 1 {
-        return true;
-    }
-
-    has_crease(&front_faces)
-}
-
 fn has_crease(front_faces: &[FaceInfo]) -> bool {
     for i in 0..front_faces.len() {
         for j in (i + 1)..front_faces.len() {
@@ -656,5 +809,53 @@ mod tests {
 
         let line_scene = scene.to_lines();
         assert_eq!(line_scene.lines.len(), 1);
+    }
+
+    #[test]
+    fn classify_edge_returns_visible_crease_for_standalone_wire() {
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0)]);
+        builder.add_wire(&[0, 1], false).unwrap();
+        let brep: Brep = builder.build().unwrap();
+
+        let camera = CameraParameters::default();
+        let frame = build_camera_frame(&camera).unwrap();
+        let face_info = compute_face_info(&brep, &frame);
+        let adjacency = build_edge_adjacency(&brep);
+
+        for edge in &brep.edges {
+            let class = classify_edge(edge.id, &adjacency, &face_info);
+            assert_eq!(class, EdgeClass::VisibleCrease);
+        }
+    }
+
+    #[test]
+    fn classified_segments_carry_source_entity_id() {
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[Vector3::new(-1.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0)]);
+        builder.add_wire(&[0, 1], false).unwrap();
+        let brep: Brep = builder.build().unwrap();
+        let expected_id = brep.id.to_string();
+
+        let scene =
+            project_brep_to_scene(&brep, &CameraParameters::default(), &HlrOptions::default());
+        assert!(!scene.segments.is_empty());
+        for seg in &scene.segments {
+            assert_eq!(seg.source_entity_id.as_deref(), Some(expected_id.as_str()));
+        }
+    }
+
+    #[test]
+    fn to_lines_carries_edge_class_string() {
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[Vector3::new(-1.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0)]);
+        builder.add_wire(&[0, 1], false).unwrap();
+        let brep: Brep = builder.build().unwrap();
+
+        let scene =
+            project_brep_to_scene(&brep, &CameraParameters::default(), &HlrOptions::default());
+        let lines = scene.to_lines();
+        assert!(!lines.lines.is_empty());
+        assert!(lines.lines[0].class.is_some());
     }
 }

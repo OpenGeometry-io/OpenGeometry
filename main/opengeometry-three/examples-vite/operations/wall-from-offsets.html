@@ -65,6 +65,42 @@
           <span class="og-control-bool-state" data-state>Enabled</span>
         </div>
       </label>
+
+      <label class="og-control-row" data-control="cut-doors">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Cut Doors</span>
+        </div>
+        <div class="og-control-bool">
+          <input data-toggle type="checkbox" class="og-toggle" aria-label="Cut Doors" />
+          <span class="og-control-bool-state" data-state>Disabled</span>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="overshoot-mm">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Cutter Overshoot (mm)</span>
+          <code class="og-control-value" data-value>1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.1" max="50" step="0.1" value="1" />
+          <input data-number type="number" min="0.1" max="50" step="0.1" value="1" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="door-count">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Door Count</span>
+          <code class="og-control-value" data-value>3</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="1" max="5" step="1" value="3" />
+          <input data-number type="number" min="1" max="5" step="1" value="3" />
+        </div>
+      </label>
+
+      <div id="cut-status" class="og-control-row" style="display: block; padding: 8px; border-radius: 6px; background: #f3f4f6; font-size: 12px; line-height: 1.4;">
+        <strong>Status:</strong> <span id="cut-status-text">Toggle "Cut Doors" to subtract doors from the wall.</span>
+      </div>
     </aside>
 
     <div id="app"></div>
@@ -75,7 +111,18 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Polygon, Polyline, Vector3 } from "opengeometry";
+      import {
+        BooleanError,
+        Cuboid,
+        CutterExceedsHostError,
+        CoincidentFacesError,
+        NonManifoldOutputError,
+        OpenGeometry,
+        OverlappingCuttersError,
+        Polygon,
+        Polyline,
+        Vector3,
+      } from "opengeometry";
 
       const app = document.getElementById("app");
       if (!app) {
@@ -87,6 +134,9 @@
         acute: 35,
         point4X: 0.7,
         bevel: true,
+        cutDoors: false,
+        overshootMm: 1,
+        doorCount: 3,
       };
 
       let scene = null;
@@ -182,6 +232,73 @@
         );
       }
 
+      function midpoint(a, b) {
+        return new Vector3((a.x + b.x) * 0.5, (a.y + b.y) * 0.5, (a.z + b.z) * 0.5);
+      }
+
+      function buildDoorCutters(centerlinePoints, count, overshoot) {
+        const cutters = [];
+        const wallDepth = config.thickness + 2 * overshoot;
+        const doorWidth = 0.6;
+        const doorHeight = 2.1;
+
+        // Place doors at evenly distributed segment midpoints along the centerline.
+        // Each door cuts straight through the wall thickness (the across-wall
+        // direction varies per segment so we orient cutters axis-aligned and
+        // size them generously to cover the rotated wall section).
+        const segments = centerlinePoints.length - 1;
+        const stride = Math.max(1, Math.floor(segments / count));
+
+        for (let doorIdx = 0; doorIdx < count; doorIdx++) {
+          const segmentIdx = Math.min(segments - 1, doorIdx * stride);
+          const a = centerlinePoints[segmentIdx];
+          const b = centerlinePoints[segmentIdx + 1];
+          const mid = midpoint(a, b);
+
+          const cutter = new Cuboid({
+            width: doorWidth,
+            height: doorHeight,
+            depth: wallDepth,
+            center: new Vector3(0, 0, 0),
+            translation: new Vector3(mid.x, doorHeight * 0.5 + 0.001, mid.z),
+            color: 0xef4444,
+          });
+          cutters.push(cutter);
+        }
+
+        return cutters;
+      }
+
+      function setStatus(message, color) {
+        const el = document.getElementById("cut-status-text");
+        if (!el) return;
+        el.textContent = message;
+        const wrapper = document.getElementById("cut-status");
+        if (wrapper) {
+          wrapper.style.background = color || "#f3f4f6";
+        }
+      }
+
+      function describeBooleanError(error) {
+        if (error instanceof OverlappingCuttersError) {
+          return `OverlappingCuttersError @ cutter #${error.cutterIndex} (other #${error.otherIndex}): ${error.details ?? error.message}`;
+        }
+        if (error instanceof CutterExceedsHostError) {
+          return `CutterExceedsHostError: cutter overshoots ${error.axis} by ${error.overshoot.toExponential(3)}`;
+        }
+        if (error instanceof CoincidentFacesError) {
+          return `CoincidentFacesError: ${error.details ?? error.message}`;
+        }
+        if (error instanceof NonManifoldOutputError) {
+          const samples = error.edgeSamples?.length ?? 0;
+          return `NonManifoldOutputError: ${samples} non-manifold edges sampled — ${error.details ?? error.message}`;
+        }
+        if (error instanceof BooleanError) {
+          return `BooleanError (${error.reason}, phase ${error.phase}): ${error.message}`;
+        }
+        return `Untyped error: ${error?.message ?? error}`;
+      }
+
       function rebuildExample() {
         if (!scene) {
           return;
@@ -230,7 +347,42 @@
         currentGroup.add(centerline);
         currentGroup.add(leftGuide);
         currentGroup.add(rightGuide);
-        currentGroup.add(wall);
+
+        if (config.cutDoors) {
+          const overshoot = config.overshootMm * 0.001; // mm → m
+          const cutters = buildDoorCutters(buildCenterline(), config.doorCount, overshoot);
+          try {
+            const cutWall = wall.subtract(cutters, {
+              color: 0x3b82f6,
+              transparent: false,
+              opacity: 1,
+              outline: true,
+            });
+            currentGroup.add(cutWall);
+            // Render cutter outlines for visual reference (semi-transparent so the cut is visible).
+            for (const cutter of cutters) {
+              cutter.material.transparent = true;
+              cutter.material.opacity = 0.18;
+              currentGroup.add(cutter);
+            }
+            setStatus(
+              `OK — wall - ${cutters.length} doors @ ${config.overshootMm}mm overshoot. Manifold: ${
+                cutWall.geometry?.attributes?.position?.count ?? "n/a"
+              } verts.`,
+              "#dcfce7"
+            );
+          } catch (error) {
+            // Render the unmodified wall when cutting fails so the scene
+            // stays usable, and surface the typed error in the status panel.
+            currentGroup.add(wall);
+            setStatus(describeBooleanError(error), "#fee2e2");
+            console.error("[wall-from-offsets] subtract failed", error);
+          }
+        } else {
+          currentGroup.add(wall);
+          setStatus("Toggle \"Cut Doors\" to subtract doors from the wall.", "#f3f4f6");
+        }
+
         scene.add(currentGroup);
 
         console.groupCollapsed("[wall-from-offsets] rebuilt");
@@ -286,6 +438,18 @@
         });
         attachBooleanControl("bevel", (value) => {
           config.bevel = value;
+          rebuildExample();
+        });
+        attachBooleanControl("cut-doors", (value) => {
+          config.cutDoors = value;
+          rebuildExample();
+        });
+        attachNumberControl("overshoot-mm", (value) => {
+          config.overshootMm = value;
+          rebuildExample();
+        });
+        attachNumberControl("door-count", (value) => {
+          config.doorCount = Math.round(value);
           rebuildExample();
         });
 

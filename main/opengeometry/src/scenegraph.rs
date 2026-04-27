@@ -1208,6 +1208,140 @@ impl OGSceneManager {
     }
 }
 
+// ---------------------------------------------------------------------------
+// OGEntityRegistry — flat entity store with batched multi-view projection
+// ---------------------------------------------------------------------------
+
+/// Optional section plane for cutting views.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SectionPlane {
+    pub origin: [f64; 3],
+    pub normal: [f64; 3],
+}
+
+/// One viewport description passed to `projectCurrentToViews`.
+#[derive(Deserialize)]
+struct ViewRequest {
+    id: String,
+    camera: CameraParameters,
+    #[serde(default)]
+    hlr: HlrOptions,
+    section_plane: Option<SectionPlane>,
+}
+
+/// Map `OGEntityKind` strings to AIA/NCS layer codes (AIA CAD Layer Guidelines).
+fn aia_layer(kind: &str) -> Option<&'static str> {
+    match kind.to_lowercase().trim() {
+        "wall" => Some("A-WALL"),
+        "door" => Some("A-DOOR"),
+        "window" | "glazing" | "glaz" => Some("A-GLAZ"),
+        "slab" | "floor" | "ceiling" => Some("A-FLOR"),
+        "stair" | "stairs" => Some("A-FLOR-STRS"),
+        "column" | "col" => Some("A-COLS"),
+        "beam" => Some("S-BEAM"),
+        "roof" => Some("A-ROOF"),
+        _ => None,
+    }
+}
+
+/// Flat entity registry with a batched multi-view projection API.
+/// Replaces the scene-centric OGSceneManager pattern for export use cases.
+#[wasm_bindgen]
+pub struct OGEntityRegistry {
+    entities: HashMap<String, SceneEntity>,
+}
+
+impl Default for OGEntityRegistry {
+    fn default() -> Self {
+        Self {
+            entities: HashMap::new(),
+        }
+    }
+}
+
+impl OGEntityRegistry {
+    fn project_view(&self, view: &ViewRequest) -> Scene2D {
+        let mut out = Scene2D::with_name(view.id.clone());
+        for entity in self.entities.values() {
+            let mut entity_scene = project_brep_to_scene(&entity.brep, &view.camera, &view.hlr);
+            let layer = aia_layer(&entity.kind).map(str::to_string);
+            for seg in &mut entity_scene.segments {
+                seg.layer = layer.clone();
+                seg.source_entity_id = Some(entity.id.clone());
+            }
+            out.extend(entity_scene);
+        }
+        // Section-plane intersection is wired up here in Phase 3+.
+        // `view.section_plane` field is available for future use.
+        let _ = &view.section_plane;
+        out
+    }
+}
+
+#[wasm_bindgen]
+impl OGEntityRegistry {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register (or replace) an entity. `kind` must be an OGEntityKind string.
+    #[wasm_bindgen(js_name = registerEntity)]
+    pub fn register_entity(
+        &mut self,
+        id: String,
+        kind: String,
+        brep_json: String,
+    ) -> Result<(), JsValue> {
+        let brep: Brep = serde_json::from_str(&brep_json)
+            .map_err(|e| JsValue::from_str(&format!("Failed to deserialize BRep: {}", e)))?;
+
+        brep.validate_topology().map_err(|e| {
+            JsValue::from_str(&format!("Invalid BRep topology for '{}': {}", id, e))
+        })?;
+
+        self.entities
+            .insert(id.clone(), SceneEntity { id, kind, brep });
+        Ok(())
+    }
+
+    /// Remove a previously registered entity.
+    #[wasm_bindgen(js_name = unregisterEntity)]
+    pub fn unregister_entity(&mut self, id: String) -> bool {
+        self.entities.remove(&id).is_some()
+    }
+
+    /// Remove all registered entities.
+    #[wasm_bindgen(js_name = clearEntities)]
+    pub fn clear_entities(&mut self) {
+        self.entities.clear();
+    }
+
+    /// Batched multi-view projection.
+    ///
+    /// Input:  JSON array of `{ id, camera, hlr?, section_plane? }` (ViewRequest).
+    /// Output: JSON map of `{ viewportId: Scene2D }`.
+    ///
+    /// All viewports are projected in a single WASM call, amortising
+    /// serialisation overhead and keeping BRep data in WASM memory.
+    #[wasm_bindgen(js_name = projectCurrentToViews)]
+    pub fn project_current_to_views(&self, views_json: String) -> Result<String, JsValue> {
+        let views: Vec<ViewRequest> = serde_json::from_str(&views_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid views JSON: {}", e)))?;
+
+        let mut result: HashMap<String, Scene2D> = HashMap::with_capacity(views.len());
+        for view in &views {
+            result.insert(view.id.clone(), self.project_view(view));
+        }
+
+        serde_json::to_string(&result).map_err(|e| {
+            JsValue::from_str(&format!("Failed to serialize projection result: {}", e))
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1494,5 +1628,98 @@ mod tests {
         assert!(text.contains("IFCPROJECT("));
         assert!(text.contains("IFCTRIANGULATEDFACESET("));
         assert_eq!(report.exported_elements, 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // OGEntityRegistry tests
+    // -----------------------------------------------------------------------
+
+    fn wire_brep() -> Brep {
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[Vector3::new(-1.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0)]);
+        builder.add_wire(&[0, 1], false).unwrap();
+        builder.build().unwrap()
+    }
+
+    #[test]
+    fn registry_register_and_project_assigns_aia_layer() {
+        let mut registry = OGEntityRegistry::new();
+        let brep_json = serde_json::to_string(&wire_brep()).unwrap();
+        registry
+            .register_entity("wall-1".to_string(), "wall".to_string(), brep_json)
+            .unwrap();
+
+        let camera_json = serde_json::to_string(&CameraParameters::default()).unwrap();
+        let views_json = format!(r#"[{{"id":"plan","camera":{}}}]"#, camera_json);
+
+        let result_json = registry.project_current_to_views(views_json).unwrap();
+        let result: HashMap<String, Scene2D> = serde_json::from_str(&result_json).unwrap();
+
+        let plan = result.get("plan").expect("plan viewport missing");
+        assert!(!plan.segments.is_empty(), "expected non-empty projection");
+        for seg in &plan.segments {
+            assert_eq!(
+                seg.layer.as_deref(),
+                Some("A-WALL"),
+                "layer should be A-WALL"
+            );
+            assert_eq!(seg.source_entity_id.as_deref(), Some("wall-1"));
+        }
+    }
+
+    #[test]
+    fn registry_multi_view_returns_all_viewports() {
+        let mut registry = OGEntityRegistry::new();
+        let brep_json = serde_json::to_string(&wire_brep()).unwrap();
+        registry
+            .register_entity("e1".to_string(), "generic".to_string(), brep_json)
+            .unwrap();
+
+        let camera_json = serde_json::to_string(&CameraParameters::default()).unwrap();
+        let views_json = format!(
+            r#"[{{"id":"plan","camera":{cam}}},{{"id":"elev","camera":{cam}}}]"#,
+            cam = camera_json
+        );
+
+        let result_json = registry.project_current_to_views(views_json).unwrap();
+        let result: HashMap<String, Scene2D> = serde_json::from_str(&result_json).unwrap();
+
+        assert_eq!(result.len(), 2, "expected 2 viewports");
+        assert!(result.contains_key("plan"));
+        assert!(result.contains_key("elev"));
+    }
+
+    #[test]
+    fn registry_unregister_removes_entity_from_projection() {
+        let mut registry = OGEntityRegistry::new();
+        let brep_json = serde_json::to_string(&wire_brep()).unwrap();
+        registry
+            .register_entity("e1".to_string(), "wall".to_string(), brep_json)
+            .unwrap();
+
+        let removed = registry.unregister_entity("e1".to_string());
+        assert!(removed);
+
+        let camera_json = serde_json::to_string(&CameraParameters::default()).unwrap();
+        let views_json = format!(r#"[{{"id":"plan","camera":{}}}]"#, camera_json);
+        let result_json = registry.project_current_to_views(views_json).unwrap();
+        let result: HashMap<String, Scene2D> = serde_json::from_str(&result_json).unwrap();
+
+        let plan = result.get("plan").unwrap();
+        assert!(
+            plan.segments.is_empty(),
+            "segments should be empty after unregister"
+        );
+    }
+
+    #[test]
+    fn aia_layer_maps_known_kinds() {
+        assert_eq!(aia_layer("wall"), Some("A-WALL"));
+        assert_eq!(aia_layer("door"), Some("A-DOOR"));
+        assert_eq!(aia_layer("window"), Some("A-GLAZ"));
+        assert_eq!(aia_layer("slab"), Some("A-FLOR"));
+        assert_eq!(aia_layer("stair"), Some("A-FLOR-STRS"));
+        assert_eq!(aia_layer("column"), Some("A-COLS"));
+        assert_eq!(aia_layer("unknown"), None);
     }
 }

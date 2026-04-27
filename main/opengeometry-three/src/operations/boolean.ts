@@ -14,6 +14,7 @@ import {
   sanitizeOutlineWidth,
   ShapeOutlineMesh,
 } from "../shapes/outline-utils";
+import { parseBooleanError } from "./boolean-errors";
 
 /**
  * Accepted operand formats for boolean helpers.
@@ -29,6 +30,23 @@ export type BooleanOperand =
 
 /**
  * Kernel-side boolean tuning options.
+ *
+ * `tolerance` is in **model units** (meters by convention). When omitted, the
+ * kernel auto-scales it to `operandsDiagonal * 1e-8` (clamped to a `1e-6`
+ * floor in many-subtract). This drives the kernel-side polygon / face math
+ * (vertex welding, plane coincidence, AABB enforcement).
+ *
+ * **NOTE: this tolerance does NOT control boolmesh's internal snap window.**
+ * Boolmesh has its own welding tolerance that may treat faces within ~1mm
+ * of each other as coincident, regardless of what `tolerance` you pass. If
+ * your cutter face sits within about 0.001 m – 0.01 m of a host face you
+ * may still hit a `DegenerateTriangle` / `CoincidentFaces` error path.
+ *
+ * **Recommended cutter overshoot for through-cuts:** `max(hostThickness *
+ * 0.05, 0.01)` in model units. See `knowledge/boolean-tolerance-guide.md`.
+ *
+ * `mergeCoplanarFaces` (default `true`) controls whether the planar pipeline
+ * merges coplanar adjacent faces in its output.
  */
 export interface BooleanKernelOptions {
   tolerance?: number;
@@ -43,13 +61,23 @@ export interface BooleanKernelOptions {
  * the host's appearance unchanged.
  */
 export interface BooleanRenderOptions {
-  color?: number;
+  color?: THREE.ColorRepresentation;
   opacity?: number;
   transparent?: boolean;
   side?: THREE.Side;
   outline?: boolean;
   fatOutlines?: boolean;
   outlineWidth?: number;
+}
+
+/**
+ * Metadata copied from the host (LHS) operand onto the boolean result so the
+ * result can drop into a scene graph without per-call plumbing.
+ */
+interface BooleanHostMetadata {
+  material: THREE.Material | null;
+  name: string;
+  userData: Record<string, unknown> | null;
 }
 
 /**
@@ -114,17 +142,56 @@ export class BooleanResult extends THREE.Mesh {
   constructor(
     kernelResult: KernelBooleanResult,
     options?: BooleanRenderOptions,
-    sourceMaterial: THREE.Material | null = null
+    host: BooleanOperand | null = null
   ) {
     super();
     this.ogid = getUUID();
     this._fatOutlines = options?.fatOutlines ?? false;
     this._outlineWidth = sanitizeOutlineWidth(options?.outlineWidth);
-    this.applyKernelResult(kernelResult, options, sourceMaterial);
+
+    const metadata = resolveOperandMetadata(host);
+    if (metadata.name) {
+      this.name = metadata.name;
+    }
+    if (metadata.userData) {
+      this.userData = { ...metadata.userData };
+    }
+
+    this.applyKernelResult(kernelResult, options, metadata.material);
 
     if (options?.outline ?? false) {
       this.outline = true;
     }
+  }
+
+  /**
+   * Updates the result mesh's color in place without re-running the boolean
+   * pipeline. Accepts any value Three.js accepts (`number`, hex string, css
+   * color name, or `THREE.Color`). No-op for materials without a `color` field.
+   */
+  set color(value: THREE.ColorRepresentation) {
+    const apply = (material: THREE.Material) => {
+      if ("color" in material) {
+        (material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial).color.set(
+          value
+        );
+      }
+      material.needsUpdate = true;
+    };
+
+    if (Array.isArray(this.material)) {
+      this.material.forEach(apply);
+      return;
+    }
+    apply(this.material);
+  }
+
+  get color(): THREE.Color | null {
+    const material = Array.isArray(this.material) ? this.material[0] : this.material;
+    if (!material || !("color" in material)) {
+      return null;
+    }
+    return (material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial).color;
   }
 
   /**
@@ -317,18 +384,26 @@ export function executeBooleanSubtractionMany(
 
   const kernelFunction = booleanExport as KernelBooleanManyFunction;
   const kernelOptions = serializeKernelOptions(options?.kernel);
-  const kernelResult = kernelFunction(
-    resolveOperandSerialized(lhs),
-    JSON.stringify(cutters.map(resolveOperandPayload)),
-    kernelOptions
-  );
+  let kernelResult: KernelBooleanResult;
+  try {
+    kernelResult = kernelFunction(
+      resolveOperandSerialized(lhs),
+      JSON.stringify(cutters.map(resolveOperandPayload)),
+      kernelOptions
+    );
+  } catch (error) {
+    throw parseBooleanError(error);
+  }
 
-  return createBooleanResult(kernelResult, options, resolveOperandMaterial(lhs));
+  return createBooleanResult(kernelResult, options, lhs);
 }
 
 /**
  * Normalizes mixed wrapper/raw operands, invokes the wasm boolean export, and
  * returns the renderable result wrapper.
+ *
+ * @throws {BooleanError} (or a subclass) when the kernel rejects the operation.
+ *   See `boolean-errors.ts` for the typed hierarchy.
  */
 function executeBoolean(
   exportName: "booleanUnion" | "booleanIntersection" | "booleanSubtraction",
@@ -345,13 +420,18 @@ function executeBoolean(
 
   const kernelFunction = booleanExport as KernelBooleanFunction;
   const kernelOptions = serializeKernelOptions(options?.kernel);
-  const kernelResult = kernelFunction(
-    resolveOperandSerialized(lhs),
-    resolveOperandSerialized(rhs),
-    kernelOptions
-  );
+  let kernelResult: KernelBooleanResult;
+  try {
+    kernelResult = kernelFunction(
+      resolveOperandSerialized(lhs),
+      resolveOperandSerialized(rhs),
+      kernelOptions
+    );
+  } catch (error) {
+    throw parseBooleanError(error);
+  }
 
-  return createBooleanResult(kernelResult, options, resolveOperandMaterial(lhs));
+  return createBooleanResult(kernelResult, options, lhs);
 }
 
 /**
@@ -422,9 +502,9 @@ function serializeKernelOptions(options?: BooleanKernelOptions) {
 function createBooleanResult(
   kernelResult: KernelBooleanResult,
   options?: BooleanExecutionOptions,
-  sourceMaterial: THREE.Material | null = null
+  host: BooleanOperand | null = null
 ) {
-  const result = new BooleanResult(kernelResult, options, sourceMaterial);
+  const result = new BooleanResult(kernelResult, options, host);
   if (options?.outline ?? true) {
     result.outline = true;
   }
@@ -432,26 +512,34 @@ function createBooleanResult(
 }
 
 /**
- * Returns a clonable `THREE.Material` from the operand when it is a Three mesh
- * subclass (Solid, Polygon, Cuboid, Opening, BooleanResult, etc.). Returns
- * `null` for serialized JSON, parsed BRep objects, or anything else without a
- * reachable material so the boolean result can fall back to the legacy default.
+ * Returns the material, name, and userData carried on the operand when it is
+ * a Three mesh subclass (Solid, Polygon, Cuboid, Opening, BooleanResult,
+ * etc.) so the result mesh can drop into a scene graph as-is. Falls back to
+ * empty metadata for serialized JSON, parsed BRep objects, or anything else
+ * without a reachable host mesh.
  */
-function resolveOperandMaterial(operand: BooleanOperand): THREE.Material | null {
-  if (typeof operand !== "object" || operand === null) {
-    return null;
+function resolveOperandMetadata(
+  operand: BooleanOperand | null
+): BooleanHostMetadata {
+  const empty: BooleanHostMetadata = { material: null, name: "", userData: null };
+
+  if (operand === null || typeof operand !== "object" || !(operand instanceof THREE.Mesh)) {
+    return empty;
   }
 
-  if (!(operand instanceof THREE.Mesh)) {
-    return null;
+  const rawMaterial = (operand as THREE.Mesh).material;
+  let material: THREE.Material | null = null;
+  if (Array.isArray(rawMaterial)) {
+    material = rawMaterial[0] ?? null;
+  } else if (rawMaterial instanceof THREE.Material) {
+    material = rawMaterial;
   }
 
-  const material = (operand as THREE.Mesh).material;
-  if (Array.isArray(material)) {
-    return material[0] ?? null;
-  }
-
-  return material instanceof THREE.Material ? material : null;
+  return {
+    material,
+    name: operand.name ?? "",
+    userData: operand.userData ?? null,
+  };
 }
 
 /**
@@ -469,8 +557,8 @@ function buildResultMaterial(
     ? sourceMaterial.clone()
     : new THREE.MeshStandardMaterial({
         color: 0x2563eb,
-        transparent: true,
-        opacity: 0.82,
+        transparent: false,
+        opacity: 1,
         side: THREE.FrontSide,
       });
 
