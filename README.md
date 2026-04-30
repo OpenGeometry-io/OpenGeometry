@@ -13,7 +13,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/opengeometry"><img src="https://img.shields.io/npm/v/opengeometry?style=flat-square&color=4460FF&label=npm" alt="npm version" /></a>
   <a href="https://github.com/OpenGeometry-io/OpenGeometry/blob/main/LICENSE.md"><img src="https://img.shields.io/github/license/opengeometry-io/opengeometry?style=flat-square" alt="License" /></a>
-  <a href="https://discord.com/invite/cZY2Vm6E"><img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://discord.gg/9wJpbfgGGA"><img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
   <a href="https://x.com/openGeometry"><img src="https://img.shields.io/badge/Twitter-Follow-1DA1F2?style=flat-square&logo=x&logoColor=white" alt="Twitter" /></a>
   <a href="https://linkedin.com/company/openGeometry"><img src="https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=flat-square&logo=linkedin&logoColor=white" alt="LinkedIn" /></a>
 </p>
@@ -165,7 +165,7 @@ docs/                      Documentation source (Mintlify)
 
 ## Building from Source
 
-**Prerequisites:** Node.js, npm, Rust toolchain, `wasm-pack`
+**Prerequisites:** Node.js, npm, Rust 1.89.0+ with `wasm32-unknown-unknown`, `wasm-pack`
 
 ```bash
 # Install dependencies
