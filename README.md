@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://opengeometry.io">
+  <a href="https://opengeometry.io?utm_source=github">
     <img src="https://raw.githubusercontent.com/OpenGeometry-io/.github/main/profile/opengeometryTextLogo.png" alt="OpenGeometry" />
   </a>
 </p>
@@ -7,7 +7,7 @@
 <h1 align="center">OpenGeometry</h1>
 
 <p align="center">
-  <strong>Browser-native CAD kernel built with Rust, WebAssembly, and Three.js.</strong>
+  <strong>Browser-native CAD kernel for Web Apps and AI CAD built with Rust, WebAssembly, and Three.js.</strong>
 </p>
 
 <p align="center">
@@ -19,12 +19,12 @@
 </p>
 
 <p align="center">
-  <a href="https://opengeometry.io">Website</a> · <a href="https://docs.opengeometry.io">Documentation</a> · <a href="https://demo.opengeometry.io">Live Demos</a> · <a href="https://opengeometry.io/blog">Blog</a> · <a href="https://www.npmjs.com/package/opengeometry">npm</a>
+  <a href="https://opengeometry.io?utm_source=github">Website</a> · <a href="https://docs.opengeometry.io/OpenGeometry?utm_source=github">Documentation</a> · <a href="https://demos.opengeometry.io?utm_source=github">Live Demos</a> · <a href="https://blog.opengeometry.io?utm_source=github">Blog</a> · <a href="https://www.npmjs.com/package/opengeometry">npm</a>
 </p>
 
 ---
 
-> **Actively maintained and growing.** We're building OpenGeometry in the open. APIs, examples, and package structure are evolving, we are actively improving and expanding the project. Star the repo to follow along. If you have questions or want to get involved, join the [Discord](https://discord.com/invite/cZY2Vm6E) or check out the [issues](https://github.com/OpenGeometry-io/OpenGeometry/issues)
+> **Actively maintained and growing.** We're building OpenGeometry in the open. APIs, examples, and package structure are evolving, we are actively improving and expanding the project. Star the repo to follow along. If you have questions or want to get involved, join the [Discord](https://discord.com/invite/9wJpbfgGGA) or check out the [issues](https://github.com/OpenGeometry-io/OpenGeometry/issues)
 
 ---
 
@@ -55,15 +55,15 @@ Good examples include:
 
 - AI copilots that translate user intent into concrete modeling operations
 - prompt-to-geometry or agent-driven editing flows inside browser CAD tools
-- AI-assisted design interfaces that still need reliable extrusion, boolean, projection, and export workflows
+- AI first design interfaces that still need reliable extrusion, boolean, projection, and export workflows
 
 ## Good fit / Not the right fit
 
 **Good fit**
 
-- browser CAD, AEC/BIM, and geometry-heavy web applications
+- browser CAD, AEC/BIM, Mechanical, and geometry-heavy web applications
 - Three.js-based modeling tools that need a real kernel behind them
-- AI-assisted CAD frontends that need deterministic geometry execution in the browser
+- AI first CAD frontends that need deterministic geometry execution in the browser
 
 **Not the default fit**
 
@@ -77,10 +77,10 @@ If you are using ChatGPT, Claude, Gemini, Copilot, or other coding agents on thi
 
 - [AGENTS.md](./AGENTS.md) - single source of truth for all coding agents (architecture, commands, gotchas, behavioral rules)
 - [README.md](./README.md) - product overview, positioning, and quick start
-- [Quickstart](https://docs.opengeometry.io/quickstart)
-- [Three.js integration](https://docs.opengeometry.io/integration/threejs)
-- [Boolean operations](https://docs.opengeometry.io/api/operations/boolean-operations)
-- [Extrude](https://docs.opengeometry.io/api/operations/extrude)
+- [Quickstart](https://docs.opengeometry.io/OpenGeometry/quickstart)
+- [Installation](https://docs.opengeometry.io/OpenGeometry/installation)
+- [Boolean operations](https://docs.opengeometry.io/OpenGeometry/concepts/booleans)
+- [Extrude](https://docs.opengeometry.io/OpenGeometry/api/operations/extrude)
 
 ### What you can do today
 
@@ -96,7 +96,7 @@ If you are using ChatGPT, Claude, Gemini, Copilot, or other coding agents on thi
 
 See OpenGeometry in action — interactive, browser-based demos showcasing the kernel's capabilities:
 
-**[demo.opengeometry.io](https://demo.opengeometry.io)**
+**[demos.opengeometry.io](https://demos.opengeometry.io)**
 
 Demos include primitives rendering, shape generation, sweep operations, boolean operations, file exports, and more. All running client-side via WebAssembly.
 
@@ -139,7 +139,7 @@ cuboid.setPlacement({
 
 Scenegraph behavior is snapshot-based: `add*ToScene` captures geometry at insert time. If you change placement/config later, push updates explicitly via `replaceBrepEntityInScene` or `refreshBrepEntityInScene`.
 
-For a complete walkthrough, see the [Quick Start guide](https://docs.opengeometry.io/quickstart) or clone the [quickstart-js](https://github.com/OpenGeometry-io/quickstart-js) repo.
+For a complete walkthrough, see the [Quick Start guide](https://docs.opengeometry.io/OpenGeometry/quickstart) or clone the [quickstart-js](https://github.com/OpenGeometry-io/quickstart-js) repo.
 
 ## Documentation
 
@@ -148,10 +148,10 @@ Full API reference, guides, and concepts are available at:
 **[docs.opengeometry.io](https://docs.opengeometry.io)**
 
 Key pages:
-- [Installation](https://docs.opengeometry.io/installation)
-- [Quick Start](https://docs.opengeometry.io/quickstart)
-- [Architecture & Concepts](https://docs.opengeometry.io/concepts/architecture)
-- [API Reference](https://docs.opengeometry.io/api)
+- [Installation](https://docs.opengeometry.io/OpenGeometry/installation)
+- [Quick Start](https://docs.opengeometry.io/OpenGeometry/quickstart)
+- [Architecture & Concepts](https://docs.opengeometry.io/OpenGeometry/concepts/architecture)
+- [API Reference](https://docs.opengeometry.io/OpenGeometry/api/)
 
 ## Repository Structure
 
@@ -191,28 +191,25 @@ npm test
 - Contributors interested in the **Rust → WASM geometry pipeline**
 - Anyone exploring **open-source CAD kernel internals**
 
-If you just want a quick look, start with the [hosted demos](https://demo.opengeometry.io) or the [quickstart repo](https://github.com/OpenGeometry-io/quickstart-js).
+If you just want a quick look, start with the [hosted demos](https://demos.opengeometry.io) or the [quickstart repo](https://github.com/OpenGeometry-io/quickstart-js).
 
 ## Community
 
 We'd love to have you involved — whether you're using OpenGeometry, building on it, or just curious.
 
-- **[Discord](https://discord.com/invite/cZY2Vm6E)** — Chat with the team and community
+- **[Discord](https://discord.com/invite/9wJpbfgGGA)** — Chat with the team and community
 - **[Twitter / X](https://x.com/openGeometry)** — Updates and announcements
 - **[LinkedIn](https://linkedin.com/company/openGeometry)** — Company updates
 - **[GitHub Issues](https://github.com/OpenGeometry-io/OpenGeometry/issues)** — Bug reports and feature requests
-- **[Blog](https://opengeometry.io/blog)** — Deep dives and release notes
+- **[Blog](https://blog.opengeometry.io?utm_source=github)** — Deep dives and release notes
 
 ## Contributing
 
-OpenGeometry is open source under the [MPL-2.0 license](./LICENSE.md). Contributions are welcome — check the [issues](https://github.com/OpenGeometry-io/OpenGeometry/issues) for good starting points or open a discussion on [Discord](https://discord.com/invite/cZY2Vm6E).
+OpenGeometry is open source under the [MPL-2.0 license](./LICENSE.md). Contributions are welcome — check the [issues](https://github.com/OpenGeometry-io/OpenGeometry/issues) for good starting points or open a discussion on [Discord](https://discord.com/invite/9wJpbfgGGA).
 
 ## AI Agent Docs Policy
 
-- All AI coding agent instructions live in a single file: [AGENTS.md](./AGENTS.md).
-  `CLAUDE.md` and `.github/copilot-instructions.md` are thin redirects to it.
-- Stable architecture and domain notes are tracked in [`knowledge/`](./knowledge/).
-- User-facing docs live in [`docs/`](./docs/) (Mintlify source).
+- If you're an AI agent, start with [AGENTS.md](./AGENTS.md) for architecture, commands, and behavioral rules.
 - Agents should not create planning, handoff, or runbook files during a task. The
   conversation, the diff, and the commit message are the handoff.
 
