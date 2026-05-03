@@ -1,81 +1,31 @@
+use krilla::geom::{Path, PathBuilder, Point};
+use krilla::num::NormalizedF32;
+use krilla::page::PageSettings;
+use krilla::paint::{LineCap, LineJoin, Stroke, StrokeDash};
+use krilla::text::{Font, TextDirection};
+use krilla::{Data, Document};
+
 use crate::brep::Brep;
-use crate::export::projection::{
-    project_brep_to_scene, CameraParameters, ClassifiedSegment, EdgeClass, HlrOptions, Scene2D,
-    Segment2D, Vec2,
+use crate::export::drawing::{
+    DrawingDocument, DrawingExportConfig, DrawingGeometry, DrawingPrimitive, DrawingStyle,
 };
-use printpdf::*;
-use std::fs::File;
-use std::io::BufWriter;
+use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
 
-const METERS_TO_MM: f64 = 1000.0;
-const DEFAULT_MARGIN_MM: f64 = 10.0;
+#[cfg(not(target_arch = "wasm32"))]
+use std::fs;
 
-/// ISO 128 line weight in mm per edge class.
-fn iso128_line_width_mm(class: EdgeClass) -> f64 {
-    match class {
-        EdgeClass::VisibleOutline => 0.50,
-        EdgeClass::VisibleCrease => 0.25,
-        EdgeClass::VisibleSmooth => 0.18,
-        EdgeClass::Hidden => 0.18,
-        EdgeClass::SectionCut => 0.70,
-    }
-}
+const PT_PER_MM: f64 = 72.0 / 25.4;
+const CURVE_STEPS: usize = 32;
+const DEFAULT_TITLE_FONT_BYTES: &[u8] = include_bytes!("assets/Roboto-Regular.ttf");
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PdfExportConfig {
-    pub page_width_mm: f64,
-    pub page_height_mm: f64,
-    pub margin_mm: f64,
-    /// Ignored — line widths are now determined by ISO 128 edge class.
-    #[deprecated(note = "Line width is now set per-class via ISO 128. Use EdgeClass instead.")]
-    pub line_width_mm: f64,
-    pub auto_fit: bool,
-    pub title: Option<String>,
-}
-
-#[allow(deprecated)]
-impl Default for PdfExportConfig {
-    fn default() -> Self {
-        Self {
-            page_width_mm: 297.0,
-            page_height_mm: 210.0,
-            margin_mm: DEFAULT_MARGIN_MM,
-            line_width_mm: 0.25,
-            auto_fit: true,
-            title: None,
-        }
-    }
-}
-
-#[allow(deprecated)]
-impl PdfExportConfig {
-    pub fn a4_portrait() -> Self {
-        Self {
-            page_width_mm: 210.0,
-            page_height_mm: 297.0,
-            ..Default::default()
-        }
-    }
-
-    pub fn a4_landscape() -> Self {
-        Self::default()
-    }
-
-    pub fn a3_landscape() -> Self {
-        Self {
-            page_width_mm: 420.0,
-            page_height_mm: 297.0,
-            ..Default::default()
-        }
-    }
-
-    pub fn custom(width_mm: f64, height_mm: f64) -> Self {
-        Self {
-            page_width_mm: width_mm,
-            page_height_mm: height_mm,
-            ..Default::default()
-        }
-    }
+    pub drawing: DrawingExportConfig,
+    /// Optional bundled font bytes for title block / view labels.
+    ///
+    /// OpenGeometry never loads system fonts. Text is omitted when no valid
+    /// font bytes are supplied.
+    pub title_font_bytes: Option<Vec<u8>>,
 }
 
 pub type PdfExportResult<T> = Result<T, PdfExportError>;
@@ -116,147 +66,266 @@ pub fn export_brep_to_pdf_with_camera(
     export_scene_to_pdf_with_config(&scene, file_path, config)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn export_scene_to_pdf_with_config(
     scene: &Scene2D,
     file_path: &str,
     config: &PdfExportConfig,
 ) -> PdfExportResult<()> {
-    let (doc, page1, layer1, scale, offset_x, offset_y) = build_pdf_document(scene, config)?;
+    let bytes = export_scene_to_pdf_bytes(scene, config)?;
+    fs::write(file_path, bytes).map_err(|e| PdfExportError::FileWrite(e.to_string()))
+}
 
-    let layer = doc.get_page(page1).get_layer(layer1);
-    draw_classified_segments(&layer, scene.segments(), scale, offset_x, offset_y);
-
-    let file = File::create(file_path).map_err(|e| PdfExportError::FileWrite(e.to_string()))?;
-    let mut writer = BufWriter::new(file);
-    doc.save(&mut writer)
-        .map_err(|e| PdfExportError::FileWrite(e.to_string()))?;
-
-    Ok(())
+#[cfg(target_arch = "wasm32")]
+pub fn export_scene_to_pdf_with_config(
+    _scene: &Scene2D,
+    _file_path: &str,
+    _config: &PdfExportConfig,
+) -> PdfExportResult<()> {
+    Err(PdfExportError::FileWrite(
+        "Filesystem PDF export is unavailable on wasm32; use byte export".to_string(),
+    ))
 }
 
 pub fn export_scene_to_pdf_bytes(
     scene: &Scene2D,
     config: &PdfExportConfig,
 ) -> PdfExportResult<Vec<u8>> {
-    let (doc, page1, layer1, scale, offset_x, offset_y) = build_pdf_document(scene, config)?;
-
-    let layer = doc.get_page(page1).get_layer(layer1);
-    draw_classified_segments(&layer, scene.segments(), scale, offset_x, offset_y);
-
-    doc.save_to_bytes()
-        .map_err(|e| PdfExportError::DocumentCreation(e.to_string()))
-}
-
-#[allow(clippy::type_complexity)]
-fn build_pdf_document(
-    scene: &Scene2D,
-    config: &PdfExportConfig,
-) -> PdfExportResult<(
-    PdfDocumentReference,
-    PdfPageIndex,
-    PdfLayerIndex,
-    f64,
-    f64,
-    f64,
-)> {
     if scene.is_empty() {
         return Err(PdfExportError::EmptyScene);
     }
 
-    let drawable_width_mm = config.page_width_mm - 2.0 * config.margin_mm;
-    let drawable_height_mm = config.page_height_mm - 2.0 * config.margin_mm;
-
-    if drawable_width_mm <= 0.0 || drawable_height_mm <= 0.0 {
-        return Err(PdfExportError::InvalidConfig(
-            "Margins too large for page size".to_string(),
-        ));
-    }
-
-    let scene_bounds = scene.bounding_box().ok_or(PdfExportError::EmptyScene)?;
-    let scene_width = scene_bounds.1.x - scene_bounds.0.x;
-    let scene_height = scene_bounds.1.y - scene_bounds.0.y;
-
-    let scale = if config.auto_fit && (scene_width > 0.0 || scene_height > 0.0) {
-        let scale_x = if scene_width > 0.0 {
-            drawable_width_mm / (scene_width * METERS_TO_MM)
-        } else {
-            1.0
-        };
-        let scale_y = if scene_height > 0.0 {
-            drawable_height_mm / (scene_height * METERS_TO_MM)
-        } else {
-            1.0
-        };
-        scale_x.min(scale_y)
-    } else {
-        1.0
-    };
-
-    let scaled_width = scene_width * METERS_TO_MM * scale;
-    let scaled_height = scene_height * METERS_TO_MM * scale;
-    let offset_x = config.margin_mm + (drawable_width_mm - scaled_width) / 2.0
-        - scene_bounds.0.x * METERS_TO_MM * scale;
-    let offset_y = config.margin_mm + (drawable_height_mm - scaled_height) / 2.0
-        - scene_bounds.0.y * METERS_TO_MM * scale;
-
-    let title = config
-        .title
-        .clone()
-        .or_else(|| scene.name.clone())
-        .unwrap_or_else(|| "OpenGeometry Export".to_string());
-
-    let (doc, page1, layer1) = PdfDocument::new(
-        &title,
-        Mm(config.page_width_mm),
-        Mm(config.page_height_mm),
-        "Layer 1",
-    );
-
-    Ok((doc, page1, layer1, scale, offset_x, offset_y))
+    let drawing = DrawingDocument::from_scene(scene, &config.drawing)
+        .map_err(|err| PdfExportError::InvalidConfig(err.to_string()))?;
+    export_pdf_bytes(&drawing, config.title_font_bytes.as_deref())
 }
 
-fn draw_classified_segments(
-    layer: &PdfLayerReference,
-    segments: &[ClassifiedSegment],
-    scale: f64,
-    offset_x: f64,
-    offset_y: f64,
-) {
-    layer.set_outline_color(Color::Rgb(Rgb::new(0.0, 0.0, 0.0, None)));
+pub fn export_pdf_bytes(
+    drawing: &DrawingDocument,
+    title_font_bytes: Option<&[u8]>,
+) -> PdfExportResult<Vec<u8>> {
+    if drawing.views.is_empty() {
+        return Err(PdfExportError::EmptyScene);
+    }
 
-    for seg in segments {
-        let line_width = iso128_line_width_mm(seg.class);
-        layer.set_outline_thickness(line_width);
+    let mut document = Document::new();
+    let mut page = document.start_page_with(
+        PageSettings::from_wh(
+            mm_to_pt(drawing.page_width_mm),
+            mm_to_pt(drawing.page_height_mm),
+        )
+        .ok_or_else(|| PdfExportError::InvalidConfig("Invalid PDF page dimensions".to_string()))?,
+    );
 
-        match &seg.geometry {
-            Segment2D::Line { start, end } => {
-                let start_mm = transform_point(start, scale, offset_x, offset_y);
-                let end_mm = transform_point(end, scale, offset_x, offset_y);
+    {
+        let mut surface = page.surface();
+        surface.set_fill(None);
 
-                let line = Line {
-                    points: vec![
-                        (Point::new(Mm(start_mm.0), Mm(start_mm.1)), false),
-                        (Point::new(Mm(end_mm.0), Mm(end_mm.1)), false),
-                    ],
-                    is_closed: false,
-                    has_fill: false,
-                    has_stroke: true,
-                    is_clipping_path: false,
-                };
-
-                layer.add_shape(line);
+        for view in &drawing.views {
+            for primitive in &view.primitives {
+                draw_primitive(&mut surface, primitive)?;
             }
-            // Arc, Ellipse, CubicBezier segments are produced in Phase 2+.
-            _ => {}
+        }
+
+        if let Some(font) = load_font(title_font_bytes) {
+            for text in &drawing.text {
+                surface.draw_text(
+                    Point::from_xy(mm_to_pt(text.position_mm.x), mm_to_pt(text.position_mm.y)),
+                    font.clone(),
+                    mm_to_pt(text.size_mm),
+                    &text.text,
+                    false,
+                    TextDirection::Auto,
+                );
+            }
+        }
+
+        surface.finish();
+    }
+
+    page.finish();
+    document
+        .finish()
+        .map_err(|err| PdfExportError::DocumentCreation(format!("{err:?}")))
+}
+
+pub fn export_krilla_probe_pdf_bytes(title_font_bytes: Option<&[u8]>) -> PdfExportResult<Vec<u8>> {
+    let scene = krilla_probe_scene();
+    let drawing = DrawingDocument::from_scene(&scene, &DrawingExportConfig::default())
+        .map_err(|err| PdfExportError::InvalidConfig(err.to_string()))?;
+    export_pdf_bytes(&drawing, title_font_bytes)
+}
+
+fn draw_primitive(
+    surface: &mut krilla::surface::Surface<'_>,
+    primitive: &DrawingPrimitive,
+) -> PdfExportResult<()> {
+    let Some(path) = path_for_geometry(&primitive.geometry) else {
+        return Ok(());
+    };
+
+    surface.set_stroke(Some(stroke_for_style(&primitive.style)));
+    surface.draw_path(&path);
+    Ok(())
+}
+
+fn path_for_geometry(geometry: &DrawingGeometry) -> Option<Path> {
+    let mut pb = PathBuilder::new();
+    match geometry {
+        DrawingGeometry::Line { start, end } => {
+            pb.move_to(mm_to_pt(start.x), mm_to_pt(start.y));
+            pb.line_to(mm_to_pt(end.x), mm_to_pt(end.y));
+        }
+        DrawingGeometry::Arc {
+            center,
+            radius_mm,
+            start_angle,
+            end_angle,
+        } => {
+            append_arc_polyline(
+                &mut pb,
+                center.x,
+                center.y,
+                *radius_mm,
+                *start_angle,
+                *end_angle,
+            );
+        }
+        DrawingGeometry::Ellipse {
+            center,
+            rx_mm,
+            ry_mm,
+            rotation,
+            start_angle,
+            end_angle,
+        } => {
+            append_ellipse_polyline(
+                &mut pb,
+                center.x,
+                center.y,
+                *rx_mm,
+                *ry_mm,
+                *rotation,
+                *start_angle,
+                *end_angle,
+            );
+        }
+        DrawingGeometry::CubicBezier { p0, p1, p2, p3 } => {
+            pb.move_to(mm_to_pt(p0.x), mm_to_pt(p0.y));
+            pb.cubic_to(
+                mm_to_pt(p1.x),
+                mm_to_pt(p1.y),
+                mm_to_pt(p2.x),
+                mm_to_pt(p2.y),
+                mm_to_pt(p3.x),
+                mm_to_pt(p3.y),
+            );
+        }
+    }
+    pb.finish()
+}
+
+fn append_arc_polyline(
+    pb: &mut PathBuilder,
+    cx: f64,
+    cy: f64,
+    radius: f64,
+    start_angle: f64,
+    end_angle: f64,
+) {
+    for i in 0..=CURVE_STEPS {
+        let t = i as f64 / CURVE_STEPS as f64;
+        let angle = start_angle + (end_angle - start_angle) * t;
+        let x = cx + radius * angle.cos();
+        let y = cy + radius * angle.sin();
+        if i == 0 {
+            pb.move_to(mm_to_pt(x), mm_to_pt(y));
+        } else {
+            pb.line_to(mm_to_pt(x), mm_to_pt(y));
         }
     }
 }
 
-fn transform_point(point: &Vec2, scale: f64, offset_x: f64, offset_y: f64) -> (f64, f64) {
-    (
-        point.x * METERS_TO_MM * scale + offset_x,
-        point.y * METERS_TO_MM * scale + offset_y,
-    )
+fn append_ellipse_polyline(
+    pb: &mut PathBuilder,
+    cx: f64,
+    cy: f64,
+    rx: f64,
+    ry: f64,
+    rotation: f64,
+    start_angle: f64,
+    end_angle: f64,
+) {
+    let cos_r = rotation.cos();
+    let sin_r = rotation.sin();
+    for i in 0..=CURVE_STEPS {
+        let t = i as f64 / CURVE_STEPS as f64;
+        let angle = start_angle + (end_angle - start_angle) * t;
+        let local_x = rx * angle.cos();
+        let local_y = ry * angle.sin();
+        let x = cx + local_x * cos_r - local_y * sin_r;
+        let y = cy + local_x * sin_r + local_y * cos_r;
+        if i == 0 {
+            pb.move_to(mm_to_pt(x), mm_to_pt(y));
+        } else {
+            pb.line_to(mm_to_pt(x), mm_to_pt(y));
+        }
+    }
+}
+
+fn stroke_for_style(style: &DrawingStyle) -> Stroke {
+    Stroke {
+        width: mm_to_pt(style.stroke_width_mm),
+        line_cap: LineCap::Butt,
+        line_join: LineJoin::Miter,
+        opacity: NormalizedF32::ONE,
+        dash: if style.dash_pattern_mm.is_empty() {
+            None
+        } else {
+            Some(StrokeDash {
+                array: style
+                    .dash_pattern_mm
+                    .iter()
+                    .map(|value| mm_to_pt(*value))
+                    .collect(),
+                offset: 0.0,
+            })
+        },
+        ..Default::default()
+    }
+}
+
+fn load_font(bytes: Option<&[u8]>) -> Option<Font> {
+    let font_bytes = bytes.unwrap_or(DEFAULT_TITLE_FONT_BYTES);
+    Font::new(Data::from(font_bytes.to_vec()), 0)
+}
+
+fn mm_to_pt(value: f64) -> f32 {
+    (value * PT_PER_MM) as f32
+}
+
+fn krilla_probe_scene() -> Scene2D {
+    use crate::export::projection::{ClassifiedSegment, EdgeClass, Segment2D, Vec2};
+
+    let mut scene = Scene2D::with_name("krilla-proof");
+    let cases = [
+        (EdgeClass::VisibleOutline, 0.0),
+        (EdgeClass::VisibleCrease, 0.25),
+        (EdgeClass::Hidden, 0.50),
+        (EdgeClass::SectionCut, 0.75),
+    ];
+    for (class, y) in cases {
+        scene.add_segment(ClassifiedSegment {
+            geometry: Segment2D::Line {
+                start: Vec2::new(0.0, y),
+                end: Vec2::new(1.0, y),
+            },
+            class,
+            layer: None,
+            source_entity_id: None,
+        });
+    }
+    scene
 }
 
 #[cfg(test)]
@@ -264,31 +333,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_transform_point() {
-        let point = Vec2::new(1.0, 2.0);
-        let result = transform_point(&point, 1.0, 10.0, 20.0);
-        assert!((result.0 - 1010.0).abs() < 0.001);
-        assert!((result.1 - 2020.0).abs() < 0.001);
+    fn krilla_probe_generates_pdf_bytes() {
+        let bytes = export_krilla_probe_pdf_bytes(None).expect("krilla PDF export should pass");
+        assert!(bytes.starts_with(b"%PDF-"));
+        assert!(bytes.len() > 100);
     }
 
     #[test]
-    fn test_config_defaults() {
-        #[allow(deprecated)]
-        let config = PdfExportConfig::default();
-        assert_eq!(config.page_width_mm, 297.0);
-        assert_eq!(config.page_height_mm, 210.0);
+    fn bundled_title_font_loads_without_system_fonts() {
+        assert!(load_font(None).is_some());
     }
 
     #[test]
-    fn iso128_line_widths_are_within_standard() {
-        let widths = [
-            iso128_line_width_mm(EdgeClass::VisibleOutline),
-            iso128_line_width_mm(EdgeClass::VisibleCrease),
-            iso128_line_width_mm(EdgeClass::Hidden),
-            iso128_line_width_mm(EdgeClass::SectionCut),
-        ];
-        for w in widths {
-            assert!(w >= 0.13 && w <= 2.0, "width {w} outside ISO 128 range");
-        }
+    fn krilla_probe_includes_dash_operator_for_hidden_lines() {
+        let bytes = export_krilla_probe_pdf_bytes(None).expect("krilla PDF export should pass");
+        let pdf = String::from_utf8_lossy(&bytes);
+        assert!(
+            pdf.contains(" d") || pdf.contains("]"),
+            "expected dashed stroke data in PDF output"
+        );
     }
 }

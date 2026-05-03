@@ -1,16 +1,27 @@
+pub mod drawing;
+pub mod dxf;
 pub mod ifc;
 pub mod part21;
+pub mod pdf;
 pub mod projection;
 pub mod step;
 pub mod stl;
 
-#[cfg(not(target_arch = "wasm32"))]
-pub mod pdf;
-
+pub use drawing::{
+    DrawingDocument, DrawingExportConfig, DrawingGeometry, DrawingPrimitive, DrawingStyle,
+    DrawingText, DrawingView,
+};
+pub use dxf::{
+    export_dxf_string, export_scene_to_dxf_string, DxfExportConfig, DxfExportError, DxfExportResult,
+};
 pub use ifc::{
     export_brep_to_ifc_text, export_breps_to_ifc_text, export_scene_entities_to_ifc_text,
     IfcEntityInput, IfcEntitySemantics, IfcErrorPolicy, IfcExportConfig, IfcExportError,
     IfcExportReport, IfcSchemaVersion,
+};
+pub use pdf::{
+    export_krilla_probe_pdf_bytes, export_pdf_bytes, export_scene_to_pdf_bytes,
+    export_scene_to_pdf_with_config, PdfExportConfig, PdfExportError, PdfExportResult,
 };
 pub use projection::{
     project_brep_to_scene, CameraParameters, ClassifiedSegment, EdgeClass, HlrOptions, Line2D,

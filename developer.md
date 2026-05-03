@@ -6,7 +6,7 @@ docs see [README.md](./README.md) and [docs.opengeometry.io](https://docs.openge
 ## Prerequisites
 
 - Node.js (CI uses 18; any LTS is fine locally)
-- Rust toolchain (stable)
+- Rust toolchain 1.89.0 or newer with `wasm32-unknown-unknown`
 - `wasm-pack` — `brew install wasm-pack` on macOS, or `cargo install wasm-pack`
 
 ## Project layout

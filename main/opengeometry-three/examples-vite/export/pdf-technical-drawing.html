@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry PDF Technical Drawing Export</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Kernel-side krilla PDF export with multiple projected views."
+    />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">PDF Technical Drawing</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>Kernel PDF</h3>
+      <p class="og-control-summary">
+        Exports a cuboid wall with an opening as front, top, right, and isometric views.
+      </p>
+
+      <button id="export-pdf" type="button" class="og-button">Export PDF</button>
+      <button id="export-dxf" type="button" class="og-button">Export DXF</button>
+
+      <div class="og-control-row">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Status</span>
+        </div>
+        <code id="export-status" class="og-control-value">Waiting</code>
+      </div>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import {
+        Cuboid,
+        OGEntityRegistry,
+        Opening,
+        OpenGeometry,
+        Vector3,
+      } from "opengeometry";
+
+      const app = document.getElementById("app");
+      const exportPdfButton = document.getElementById("export-pdf");
+      const exportDxfButton = document.getElementById("export-dxf");
+      const status = document.getElementById("export-status");
+
+      if (!app || !exportPdfButton || !exportDxfButton || !status) {
+        throw new Error("Missing export example DOM nodes");
+      }
+
+      let wall = null;
+      let opening = null;
+      let openedWall = null;
+
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
+      }
+
+      function downloadBytes(bytes, filename, type) {
+        const blob = new Blob([bytes], { type });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function downloadText(text, filename, type) {
+        downloadBytes(new TextEncoder().encode(text), filename, type);
+      }
+
+      function camera(position, target = { x: 0, y: 1.5, z: 0 }) {
+        return {
+          position,
+          target,
+          up: { x: 0, y: 1, z: 0 },
+          near: 0.01,
+          projection_mode: "Orthographic",
+        };
+      }
+
+      function drawingViews() {
+        const hlr = { hide_hidden_edges: false };
+        return [
+          { id: "front", camera: camera({ x: 0, y: 1.5, z: 6 }), hlr },
+          { id: "top", camera: camera({ x: 0, y: 7, z: 0 }, { x: 0, y: 0, z: 0 }), hlr },
+          { id: "right", camera: camera({ x: 6, y: 1.5, z: 0 }), hlr },
+          { id: "isometric", camera: camera({ x: 5, y: 4, z: 5 }), hlr },
+        ];
+      }
+
+      function drawingConfig() {
+        return {
+          page_width_mm: 420,
+          page_height_mm: 297,
+          margin_mm: 14,
+          view_gap_mm: 12,
+          title: "OpenGeometry Krilla PDF Export",
+          show_view_labels: true,
+        };
+      }
+
+      function buildRegistry() {
+        if (!openedWall) {
+          throw new Error("Opening subtraction did not produce a result");
+        }
+
+        const registry = new OGEntityRegistry();
+        registry.registerEntity("opened-wall", "Wall", openedWall.getBrepSerialized());
+        return registry;
+      }
+
+      function exportPdf() {
+        const registry = buildRegistry();
+        const result = registry.exportCurrentToPdfBytes(
+          JSON.stringify(drawingViews()),
+          JSON.stringify(drawingConfig()),
+          new Uint8Array()
+        );
+        downloadBytes(result.bytes, "opengeometry-technical-drawing.pdf", "application/pdf");
+        status.textContent = `${result.bytes.length} PDF bytes`;
+      }
+
+      function exportDxf() {
+        const registry = buildRegistry();
+        const result = registry.exportCurrentToDxf(
+          JSON.stringify(drawingViews()),
+          JSON.stringify(drawingConfig())
+        );
+        downloadText(result.text, "opengeometry-technical-drawing.dxf", "application/dxf");
+        status.textContent = `${result.text.length} DXF chars`;
+      }
+
+      async function main() {
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf8fafc);
+
+        const camera3d = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        camera3d.position.set(5.8, 4.2, 6.8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const stats = mountStats();
+        const controls = new OrbitControls(camera3d, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 1.5, 0);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(20, 20, 0x64748b, 0xdbe4ee));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        wall = new Cuboid({
+          center: new Vector3(0, 1.5, 0),
+          width: 4,
+          height: 3,
+          depth: 0.35,
+          color: 0x94a3b8,
+          outlineWidth: 2,
+        });
+        wall.outline = true;
+
+        opening = new Opening({
+          center: new Vector3(0, 1.45, 0),
+          width: 1.25,
+          height: 1.75,
+          depth: 0.6,
+          color: 0xf97316,
+          outlineWidth: 2,
+        });
+
+        openedWall = opening.subtractFrom(wall, { outline: true });
+        openedWall.material = new THREE.MeshStandardMaterial({
+          color: 0x0ea5e9,
+          roughness: 0.72,
+        });
+        scene.add(openedWall);
+
+        opening.material = new THREE.MeshStandardMaterial({
+          color: 0xf97316,
+          opacity: 0.28,
+          transparent: true,
+        });
+        opening.outline = true;
+        scene.add(opening);
+
+        exportPdfButton.addEventListener("click", exportPdf);
+        exportDxfButton.addEventListener("click", exportDxf);
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera3d);
+        });
+
+        window.addEventListener("resize", () => {
+          camera3d.aspect = window.innerWidth / window.innerHeight;
+          camera3d.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      void main();
+    </script>
+  </body>
+</html>

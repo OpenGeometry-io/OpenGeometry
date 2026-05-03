@@ -2,6 +2,7 @@
  * Public OpenGeometry JavaScript entrypoint.
  */
 import init, {
+  OGEntityRegistry,
   OGSceneManager,
   Vector3,
 } from "../opengeometry/pkg/opengeometry";
@@ -104,7 +105,7 @@ export class OpenGeometry {
  * Scene manager that stores serialized BRep snapshots in wasm for projection,
  * export, and other scene-level workflows.
  */
-export { OGSceneManager };
+export { OGEntityRegistry, OGSceneManager };
 
 /**
  * Shared wasm-backed vector type used throughout the public API.

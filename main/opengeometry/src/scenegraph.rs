@@ -5,10 +5,13 @@ use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
 use crate::brep::Brep;
+use crate::export::drawing::{DrawingDocument, DrawingExportConfig};
+use crate::export::dxf::export_dxf_string;
 use crate::export::ifc::{
     export_brep_to_ifc_text, export_scene_entities_to_ifc_text, IfcEntityInput, IfcExportConfig,
     IfcExportReport,
 };
+use crate::export::pdf::export_pdf_bytes;
 use crate::export::projection::{
     project_brep_to_scene, CameraParameters, HlrOptions, Scene2D, Scene2DLines,
 };
@@ -175,6 +178,32 @@ impl OGIfcExportResult {
     #[wasm_bindgen(getter, js_name = reportJson)]
     pub fn report_json(&self) -> String {
         self.report_json.clone()
+    }
+}
+
+#[wasm_bindgen]
+pub struct OGPdfExportResult {
+    bytes: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl OGPdfExportResult {
+    #[wasm_bindgen(getter)]
+    pub fn bytes(&self) -> Vec<u8> {
+        self.bytes.clone()
+    }
+}
+
+#[wasm_bindgen]
+pub struct OGDxfExportResult {
+    text: String,
+}
+
+#[wasm_bindgen]
+impl OGDxfExportResult {
+    #[wasm_bindgen(getter)]
+    pub fn text(&self) -> String {
+        self.text.clone()
     }
 }
 
@@ -1260,6 +1289,16 @@ impl Default for OGEntityRegistry {
 }
 
 impl OGEntityRegistry {
+    fn parse_drawing_config_json(
+        config_json: Option<String>,
+    ) -> Result<DrawingExportConfig, String> {
+        match config_json {
+            Some(payload) if !payload.trim().is_empty() => serde_json::from_str(&payload)
+                .map_err(|err| format!("Invalid drawing export config JSON payload: {}", err)),
+            _ => Ok(DrawingExportConfig::default()),
+        }
+    }
+
     fn project_view(&self, view: &ViewRequest) -> Scene2D {
         let mut out = Scene2D::with_name(view.id.clone());
         for entity in self.entities.values() {
@@ -1275,6 +1314,25 @@ impl OGEntityRegistry {
         // `view.section_plane` field is available for future use.
         let _ = &view.section_plane;
         out
+    }
+
+    fn drawing_from_views_json(
+        &self,
+        views_json: &str,
+        config: &DrawingExportConfig,
+    ) -> Result<DrawingDocument, String> {
+        let views: Vec<ViewRequest> =
+            serde_json::from_str(views_json).map_err(|e| format!("Invalid views JSON: {}", e))?;
+        if views.is_empty() {
+            return Err("At least one drawing view is required".to_string());
+        }
+
+        let mut scenes = Vec::with_capacity(views.len());
+        for view in &views {
+            scenes.push((view.id.clone(), self.project_view(view)));
+        }
+
+        DrawingDocument::from_scenes(&scenes, config).map_err(|err| err.to_string())
     }
 }
 
@@ -1337,6 +1395,49 @@ impl OGEntityRegistry {
         serde_json::to_string(&result).map_err(|e| {
             JsValue::from_str(&format!("Failed to serialize projection result: {}", e))
         })
+    }
+
+    /// Export the current registry contents to a multi-view PDF using the Rust krilla backend.
+    ///
+    /// `title_font_bytes` may be empty; in that case linework is still exported and text labels are
+    /// omitted. JavaScript should only create a Blob from the returned bytes.
+    #[wasm_bindgen(js_name = exportCurrentToPdfBytes)]
+    pub fn export_current_to_pdf_bytes(
+        &self,
+        views_json: String,
+        config_json: Option<String>,
+        title_font_bytes: Vec<u8>,
+    ) -> Result<OGPdfExportResult, JsValue> {
+        let config =
+            Self::parse_drawing_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
+        let drawing = self
+            .drawing_from_views_json(&views_json, &config)
+            .map_err(|err| JsValue::from_str(&err))?;
+        let font = if title_font_bytes.is_empty() {
+            None
+        } else {
+            Some(title_font_bytes.as_slice())
+        };
+        let bytes =
+            export_pdf_bytes(&drawing, font).map_err(|err| JsValue::from_str(&err.to_string()))?;
+        Ok(OGPdfExportResult { bytes })
+    }
+
+    /// Export the current registry contents to a multi-view DXF string.
+    #[wasm_bindgen(js_name = exportCurrentToDxf)]
+    pub fn export_current_to_dxf(
+        &self,
+        views_json: String,
+        config_json: Option<String>,
+    ) -> Result<OGDxfExportResult, JsValue> {
+        let config =
+            Self::parse_drawing_config_json(config_json).map_err(|err| JsValue::from_str(&err))?;
+        let drawing = self
+            .drawing_from_views_json(&views_json, &config)
+            .map_err(|err| JsValue::from_str(&err))?;
+        let text =
+            export_dxf_string(&drawing).map_err(|err| JsValue::from_str(&err.to_string()))?;
+        Ok(OGDxfExportResult { text })
     }
 }
 
