@@ -1,5 +1,18 @@
 {
   "rust-analyzer.linkedProjects": [
-      "./main/opengeometry/Cargo.toml"
-  ]
+    "./main/opengeometry/Cargo.toml"
+  ],
+
+  // "rust-analyzer.server.extraEnv": {
+  //   "RA_MAX_MEMORY": "1536"
+  // },
+
+  // "rust-analyzer.cargo.allFeatures": false,
+  // "rust-analyzer.cargo.loadOutDirsFromCheck": false,
+  // "rust-analyzer.cargo.buildScripts.enable": false,
+
+  // "rust-analyzer.procMacro.enable": false,
+
+  // "rust-analyzer.checkOnSave": true,
+  // "rust-analyzer.checkOnSave.command": "check",
 }

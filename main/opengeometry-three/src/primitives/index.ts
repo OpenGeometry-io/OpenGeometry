@@ -6,3 +6,4 @@ export * from './polyline';
 export * from './arc';
 export * from './rectangle';
 export * from './curve';
+export * from "./elliptical_arc";
