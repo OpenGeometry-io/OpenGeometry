@@ -20,6 +20,7 @@ pub mod primitives {
     pub mod cuboid;
     pub mod curve;
     pub mod cylinder;
+    pub mod elliptical_arc;
     pub mod line;
     pub mod polygon;
     pub mod polyline;
