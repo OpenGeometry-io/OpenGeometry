@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Elliptical Arc Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Simple OpenGeometry elliptical arc example for Three.js." />
+    <meta name="author" content="Mubin" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Elliptical Arc</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>Elliptical Arc</h3>
+      <p class="og-control-summary">
+        An elliptical arc defined by `center`, `radiusX`, `radiusZ`, `startAngle`,
+        `endAngle`, and `segments`. When radiusX equals radiusZ it becomes a circle.
+      </p>
+
+      <label class="og-control-row" data-control="radiusX">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Radius X</span>
+          <code class="og-control-value" data-value>2.2</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="4" step="0.1" value="2.2" />
+          <input data-number type="number" min="0.5" max="4" step="0.1" value="2.2" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="radiusZ">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Radius Z</span>
+          <code class="og-control-value" data-value>1.1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="4" step="0.1" value="1.1" />
+          <input data-number type="number" min="0.5" max="4" step="0.1" value="1.1" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="start">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Start (deg)</span>
+          <code class="og-control-value" data-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0" max="360" step="1" value="0" />
+          <input data-number type="number" min="0" max="360" step="1" value="0" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="end">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">End (deg)</span>
+          <code class="og-control-value" data-value>270</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="1" max="360" step="1" value="270" />
+          <input data-number type="number" min="1" max="360" step="1" value="270" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="segments">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Segments</span>
+          <code class="og-control-value" data-value>64</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="8" max="96" step="1" value="64" />
+          <input data-number type="number" min="8" max="96" step="1" value="64" />
+        </div>
+      </label>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { EllipticalArc, OpenGeometry, Vector3 } from "opengeometry";
+
+      const app = document.getElementById("app");
+      if (!app) {
+        throw new Error("Missing #app container");
+      }
+
+      let config = null;
+
+      function createConfig() {
+        return {
+          center: new Vector3(0, 0, 0),
+          radiusX: 2.2,
+          radiusZ: 1.1,
+          startAngle: 0,
+          endAngle: (270 * Math.PI) / 180,
+          segments: 64,
+          color: 0x2563eb,
+        };
+      }
+
+      let ellipticalArc = null;
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
+      }
+
+      function degToRad(value) {
+        return (value * Math.PI) / 180;
+      }
+
+      function radToDeg(value) {
+        return (value * 180) / Math.PI;
+      }
+
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
+      }
+
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
+
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
+        }
+
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
+          }
+
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
+
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
+      }
+
+      function updateEllipticalArc() {
+        if (!ellipticalArc) {
+          return;
+        }
+
+        ellipticalArc.setConfig({
+          center: config.center.clone(),
+          radiusX: config.radiusX,
+          radiusZ: config.radiusZ,
+          startAngle: config.startAngle,
+          endAngle: config.endAngle,
+          segments: Math.round(config.segments),
+          color: config.color,
+        });
+
+        console.groupCollapsed("[elliptical-arc] updated");
+        console.log("Config", config);
+        console.log("Angles (deg)", {
+          startAngle: radToDeg(config.startAngle),
+          endAngle: radToDeg(config.endAngle),
+        });
+        console.groupEnd();
+      }
+
+      async function main() {
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        camera.position.set(5.5, 4, 6.5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const stats = mountStats();
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 0.2, 0);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+        config = createConfig();
+
+        ellipticalArc = new EllipticalArc({
+          center: config.center.clone(),
+          radiusX: config.radiusX,
+          radiusZ: config.radiusZ,
+          startAngle: config.startAngle,
+          endAngle: config.endAngle,
+          segments: Math.round(config.segments),
+          color: config.color,
+        });
+        scene.add(ellipticalArc);
+
+        attachNumberControl("radiusX", (value) => {
+          config.radiusX = value;
+          updateEllipticalArc();
+        });
+        attachNumberControl("radiusZ", (value) => {
+          config.radiusZ = value;
+          updateEllipticalArc();
+        });
+        attachNumberControl("start", (value) => {
+          config.startAngle = degToRad(value);
+          updateEllipticalArc();
+        });
+        attachNumberControl("end", (value) => {
+          config.endAngle = degToRad(value);
+          updateEllipticalArc();
+        });
+        attachNumberControl("segments", (value) => {
+          config.segments = value;
+          updateEllipticalArc();
+        });
+
+        updateEllipticalArc();
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      void main();
+    </script>
+  </body>
+</html>
