@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use boolmesh::compute_boolean;
 use boolmesh::prelude::{Manifold, OpType};
@@ -692,7 +692,9 @@ fn quantize_point(position: Vec3f, epsilon: f64) -> QuantizedPoint {
 /// Reorients adjacent triangles so every shared edge is traversed in opposite
 /// directions before the mesh is handed to the manifold kernel.
 fn orient_triangle_mesh_consistently(mesh: &mut TriangleMesh) -> Result<(), BooleanError> {
-    let mut edge_map: HashMap<(usize, usize), Vec<(usize, usize, usize)>> = HashMap::new();
+    // BTreeMap (not HashMap): iteration order below must be deterministic so the
+    // adjacency graph — and thus the mesh orientation — is a pure function of input.
+    let mut edge_map: BTreeMap<(usize, usize), Vec<(usize, usize, usize)>> = BTreeMap::new();
 
     for (triangle_index, triangle) in mesh.triangles.iter().copied().enumerate() {
         for (start, end) in triangle_edges(triangle) {
@@ -765,7 +767,8 @@ fn orient_triangle_mesh_consistently(mesh: &mut TriangleMesh) -> Result<(), Bool
 /// edge counts so app-side debugging can locate the problem geometry without
 /// re-running the validation.
 fn validate_triangle_mesh_closed(mesh: &TriangleMesh) -> Result<(), BooleanError> {
-    let mut edge_counts: HashMap<(usize, usize), usize> = HashMap::new();
+    // BTreeMap: the iteration below samples error-diagnostic edges; keep it deterministic.
+    let mut edge_counts: BTreeMap<(usize, usize), usize> = BTreeMap::new();
 
     for triangle in &mesh.triangles {
         for (start, end) in triangle_edges(*triangle) {

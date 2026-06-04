@@ -227,6 +227,88 @@ pub fn boolean_subtraction_many(
     })
 }
 
+/// Unions a whole array of compatible BReps in one call, folding them as a
+/// balanced binary tree (≈O(N log N)). This is the kernel-side equivalent of the
+/// OpenPlans `treeReduceUnion` JS loop, and reduces in the **same order** — pairs
+/// `(0,1),(2,3),…` each level, an odd trailing operand carried up untouched — so
+/// the result matches N separate `booleanUnion` calls, but WITHOUT crossing the
+/// wasm boundary (and re-serializing BReps to JSON) between every pair. That
+/// per-pair JSON round-trip, not the CSG itself, dominates multi-segment wall
+/// regeneration, so folding in Rust is the win.
+///
+/// Each pair is unioned via `boolean_union`, which resolves tolerance per pair
+/// exactly as the JS path did. A single operand is returned unchanged; an empty
+/// array is an error.
+pub fn batch_union(
+    operands: &[Brep],
+    options: BooleanOptions,
+    strict: bool,
+) -> Result<BooleanOutput, BooleanError> {
+    if operands.is_empty() {
+        return Err(BooleanError::new(
+            BooleanErrorKind::InvalidOperand,
+            "Boolean union requires at least one operand in the array",
+        ));
+    }
+
+    let input_face_count: usize = operands.iter().map(|operand| operand.faces.len()).sum();
+
+    let mut level: Vec<Brep> = operands.to_vec();
+    while level.len() > 1 {
+        let mut next: Vec<Brep> = Vec::with_capacity(level.len().div_ceil(2));
+        let mut index = 0;
+        while index < level.len() {
+            if index + 1 >= level.len() {
+                next.push(level[index].clone());
+                index += 1;
+                continue;
+            }
+            match boolean_union(&level[index], &level[index + 1], options.clone()) {
+                Ok(output) => next.push(output.brep),
+                Err(error) => {
+                    if strict {
+                        return Err(error);
+                    }
+                    // Tolerant fold (matches OpenPlans `treeReduceUnion` strict:false):
+                    // a pair the kernel can't union (near-coincident / degenerate
+                    // overlap) — keep the LARGER operand (by face count) and drop the
+                    // smaller; its neighbours overlap it anyway, so no gap. Never fails.
+                    let keep = if level[index].faces.len() >= level[index + 1].faces.len() {
+                        level[index].clone()
+                    } else {
+                        level[index + 1].clone()
+                    };
+                    next.push(keep);
+                }
+            }
+            index += 2;
+        }
+        level = next;
+    }
+
+    let brep = level
+        .into_iter()
+        .next()
+        .expect("a non-empty operand list reduces to exactly one BRep");
+    let operand_kind =
+        detect_operand_kind(&brep, 1.0e-6).unwrap_or(BooleanOperandKind::ClosedSolid);
+
+    Ok(BooleanOutput {
+        report: BooleanReport {
+            operation: BooleanOperation::Union,
+            operand_kind,
+            input_face_count,
+            // Aggregate input-triangle count is diagnostic-only and not summed
+            // across the fold; the per-pair reports are not retained.
+            input_triangle_count: 0,
+            output_face_count: brep.faces.len(),
+            output_shell_count: brep.shells.len(),
+            empty: brep.faces.is_empty(),
+        },
+        brep,
+    })
+}
+
 /// Wasm entry point for union.
 #[wasm_bindgen(js_name = booleanUnion)]
 pub fn boolean_union_wasm(
@@ -289,6 +371,22 @@ pub fn boolean_subtraction_many_wasm(
     })?;
     let options = parse_options_json(options_json).map_err(|error| JsValue::from_str(&error))?;
     let output = boolean_subtraction_many(&lhs, &cutters, options)
+        .map_err(|error| JsValue::from_str(&error.to_wasm_json()))?;
+    OGBooleanResult::from_output(output).map_err(|error| JsValue::from_str(&error))
+}
+
+/// Wasm entry point for array-backed batched union. Accepts a JSON array of
+/// serialized BReps and folds them with `batch_union` in one boundary crossing.
+#[wasm_bindgen(js_name = batchUnion)]
+pub fn batch_union_wasm(
+    operands_brep_serialized: String,
+    options_json: Option<String>,
+) -> Result<OGBooleanResult, JsValue> {
+    let operands: Vec<Brep> = serde_json::from_str(&operands_brep_serialized).map_err(|error| {
+        JsValue::from_str(&format!("Invalid union operand BRep JSON payload: {}", error))
+    })?;
+    let options = parse_options_json(options_json).map_err(|error| JsValue::from_str(&error))?;
+    let output = batch_union(&operands, options, true)
         .map_err(|error| JsValue::from_str(&error.to_wasm_json()))?;
     OGBooleanResult::from_output(output).map_err(|error| JsValue::from_str(&error))
 }
@@ -885,6 +983,81 @@ mod tests {
             .brep
             .get_feature_outline_vertex_buffer(FEATURE_OUTLINE_CREASE_COS_THRESHOLD)
             .is_empty());
+    }
+
+    #[test]
+    fn boolean_union_is_deterministic_across_runs() {
+        // Same operands → byte-identical serialized BRep on every run. Guards the
+        // BTreeMap/BTreeSet swaps in solid.rs (orientation adjacency) and rebuild.rs
+        // (boundary-loop tracing, shell assignment): the boolean output must be a pure
+        // function of the input, not of HashMap iteration order. Within one process
+        // this is a regression guard; the real guarantee is structural (ordered maps).
+        // Compare the emitted triangle GEOMETRY, not the serialized BRep (which carries
+        // a random per-result UUID `id`). The triangle buffer is the actual output the
+        // orientation/shell ordering affects.
+        let lhs = build_cuboid(Vector3::new(-0.1, 0.0, 0.0), 1.8, 1.2, 1.4);
+        let rhs = build_sphere(Vector3::new(0.35, 0.1, 0.15), 0.75);
+        let geometry = || {
+            boolean_union(&lhs, &rhs, BooleanOptions::default())
+                .expect("union")
+                .brep
+                .get_triangle_vertex_buffer()
+        };
+        let baseline = geometry();
+        for _ in 0..6 {
+            assert_eq!(baseline, geometry(), "boolean geometry must be identical across runs");
+        }
+    }
+
+    #[test]
+    fn batch_union_empty_operands_is_error() {
+        assert!(batch_union(&[], BooleanOptions::default(), true).is_err());
+    }
+
+    #[test]
+    fn batch_union_single_operand_returns_unchanged() {
+        let solid = build_cuboid(Vector3::new(0.0, 0.0, 0.0), 1.0, 1.0, 1.0);
+        let output = batch_union(std::slice::from_ref(&solid), BooleanOptions::default(), true)
+            .expect("batch union of one operand");
+        assert_eq!(
+            output.brep.get_triangle_vertex_buffer(),
+            solid.get_triangle_vertex_buffer(),
+            "a single operand must be returned unchanged"
+        );
+    }
+
+    #[test]
+    fn batch_union_matches_balanced_pairwise_fold() {
+        // Four cuboids in a row, each overlapping its neighbour.
+        let a = build_cuboid(Vector3::new(0.0, 0.0, 0.0), 1.0, 1.0, 1.0);
+        let b = build_cuboid(Vector3::new(0.6, 0.0, 0.0), 1.0, 1.0, 1.0);
+        let c = build_cuboid(Vector3::new(1.2, 0.0, 0.0), 1.0, 1.0, 1.0);
+        let d = build_cuboid(Vector3::new(1.8, 0.0, 0.0), 1.0, 1.0, 1.0);
+
+        let batched = batch_union(
+            &[a.clone(), b.clone(), c.clone(), d.clone()],
+            BooleanOptions::default(),
+            true,
+        )
+        .expect("batch union");
+        assert_closed_solid(&batched.brep);
+
+        // Manual balanced fold in the SAME order batch_union uses: u(u(a,b), u(c,d)).
+        let ab = boolean_union(&a, &b, BooleanOptions::default())
+            .expect("u(a,b)")
+            .brep;
+        let cd = boolean_union(&c, &d, BooleanOptions::default())
+            .expect("u(c,d)")
+            .brep;
+        let abcd = boolean_union(&ab, &cd, BooleanOptions::default())
+            .expect("u(ab,cd)")
+            .brep;
+
+        assert_eq!(
+            batched.brep.get_triangle_vertex_buffer(),
+            abcd.get_triangle_vertex_buffer(),
+            "batchUnion must equal the balanced pairwise fold, just without the wasm round-trips"
+        );
     }
 
     #[test]

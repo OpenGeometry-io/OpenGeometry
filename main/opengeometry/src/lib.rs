@@ -1,5 +1,9 @@
 pub mod geometry {
+    pub mod boolean2d;
     pub mod geometrybuffer;
+    pub mod offset2d;
+    pub mod offset_regions;
+    pub mod poly2d;
     pub mod triangle;
 }
 

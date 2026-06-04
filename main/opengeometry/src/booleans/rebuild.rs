@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use uuid::Uuid;
 
@@ -289,8 +289,11 @@ fn merge_coplanar_group(
     };
 
     let mut point_map: HashMap<QuantizedPoint2, Vec2f> = HashMap::new();
-    let mut edge_map: HashMap<(QuantizedPoint2, QuantizedPoint2), Vec<BoundaryEdge>> =
-        HashMap::new();
+    // BTreeMap (not HashMap): `.into_values()` below feeds `trace_boundary_loops`, so
+    // its order decides which loop (outer vs. an inner hole) is traced first. Must be
+    // deterministic — this is the closed-loop "donut" non-determinism root cause.
+    let mut edge_map: BTreeMap<(QuantizedPoint2, QuantizedPoint2), Vec<BoundaryEdge>> =
+        BTreeMap::new();
 
     for polygon in polygons {
         let mut positions = sanitize_positions(
@@ -459,7 +462,9 @@ fn assign_shells_by_connectivity(brep: &mut Brep) {
         }
     }
 
-    let mut face_adjacency: HashMap<u32, HashSet<u32>> = HashMap::new();
+    // BTreeMap<_, BTreeSet>: the DFS below iterates these adjacency sets, so their
+    // order determines shell-component face ordering. Must be deterministic.
+    let mut face_adjacency: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
     for faces in edge_to_faces.values() {
         if faces.len() < 2 {
             continue;

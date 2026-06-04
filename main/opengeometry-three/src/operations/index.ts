@@ -4,3 +4,4 @@
 export * from "./boolean";
 export * from "./boolean-errors";
 export * from "./extrude";
+export * from "./offset-regions";

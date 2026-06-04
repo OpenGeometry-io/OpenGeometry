@@ -136,6 +136,6 @@ export * from "./src/freeform/index";
  */
 export * from "./src/editor/index";
 /**
- * Kernel-backed modeling operations.
+ * Kernel-backed modeling operations (incl. analytic polyline offset → regions).
  */
 export * from "./src/operations/index";
