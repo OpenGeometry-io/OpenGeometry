@@ -219,6 +219,7 @@ export type ParametricEntityType =
   | "polyline"
   | "arc"
   | "curve"
+  | "elliptical_arc"
   | "rectangle"
   | "polygon"
   | "cuboid"
