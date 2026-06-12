@@ -83,6 +83,19 @@ pub struct IfcExportConfig {
     pub validate_topology: bool,
     pub require_closed_shell: bool,
     pub semantics: Option<HashMap<String, IfcEntitySemantics>>,
+    /// Length unit emitted in the IFC unit assignment (D8).
+    #[serde(default)]
+    pub length_unit: crate::units::LengthUnit,
+    /// D9: emit analytic `IFCADVANCEDBREP` (IFCPLANE / IFCCYLINDRICALSURFACE with
+    /// IFCLINE / IFCCIRCLE edges) for entities whose faces carry analytic
+    /// surfaces, instead of an `IFCTRIANGULATEDFACESET`. Falls back to
+    /// tessellation when a brep has no analytic geometry.
+    #[serde(default = "default_true_ifc")]
+    pub analytic_surfaces: bool,
+}
+
+fn default_true_ifc() -> bool {
+    true
 }
 
 impl Default for IfcExportConfig {
@@ -98,8 +111,18 @@ impl Default for IfcExportConfig {
             validate_topology: true,
             require_closed_shell: true,
             semantics: None,
+            length_unit: crate::units::LengthUnit::default(),
+            analytic_surfaces: true,
         }
     }
+}
+
+/// IFC SI prefix token (e.g. `.MILLI.`) for the length unit, or `$` for the
+/// base metre. Non-SI units fall back to metre (IFC conversion-based units are
+/// a follow-on).
+fn ifc_length_unit_entity(unit: crate::units::LengthUnit) -> String {
+    let prefix = unit.step_si_prefix().unwrap_or("$");
+    format!("IFCSIUNIT(*,.LENGTHUNIT.,{},.METRE.)", prefix)
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -293,7 +316,7 @@ fn export_owned_entities_to_ifc_text<'a>(
         Part21Writer::reference(world_axis)
     ));
 
-    let length_unit = writer.add_entity("IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.)");
+    let length_unit = writer.add_entity(ifc_length_unit_entity(config.length_unit));
     let area_unit = writer.add_entity("IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.)");
     let volume_unit = writer.add_entity("IFCSIUNIT(*,.VOLUMEUNIT.,$,.CUBIC_METRE.)");
     let angle_unit = writer.add_entity("IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.)");
@@ -441,22 +464,39 @@ fn export_owned_entities_to_ifc_text<'a>(
 
         let class_name = resolve_ifc_class(&entity.entity_id, semantics, config, &mut report)?;
 
-        let mesh_point_list = writer.add_entity(format!(
-            "IFCCARTESIANPOINTLIST3D({})",
-            format_ifc_coord_list(&mesh.points)
-        ));
+        // D9: prefer an analytic IFCADVANCEDBREP when the brep carries analytic
+        // surfaces; otherwise fall back to the tessellated face set.
+        let analytic_rep =
+            if config.analytic_surfaces && brep.faces.iter().any(|f| f.surface.is_some()) {
+                emit_ifc_advanced_brep(&mut writer, brep, scale, geom_context)
+            } else {
+                None
+            };
 
-        let mesh_faceset = writer.add_entity(format!(
-            "IFCTRIANGULATEDFACESET({},$,.T.,{},$)",
-            Part21Writer::reference(mesh_point_list),
-            format_ifc_face_index_list(&mesh.faces)
-        ));
+        let shape_representation = if let Some((rep, face_count)) = analytic_rep {
+            report.exported_faces += face_count;
+            rep
+        } else {
+            let mesh_point_list = writer.add_entity(format!(
+                "IFCCARTESIANPOINTLIST3D({})",
+                format_ifc_coord_list(&mesh.points)
+            ));
 
-        let shape_representation = writer.add_entity(format!(
-            "IFCSHAPEREPRESENTATION({},'Body','Tessellation',({}))",
-            Part21Writer::reference(geom_context),
-            Part21Writer::reference(mesh_faceset)
-        ));
+            let mesh_faceset = writer.add_entity(format!(
+                "IFCTRIANGULATEDFACESET({},$,.T.,{},$)",
+                Part21Writer::reference(mesh_point_list),
+                format_ifc_face_index_list(&mesh.faces)
+            ));
+
+            report.exported_triangles += mesh.faces.len();
+            report.exported_faces += mesh.faces.len();
+
+            writer.add_entity(format!(
+                "IFCSHAPEREPRESENTATION({},'Body','Tessellation',({}))",
+                Part21Writer::reference(geom_context),
+                Part21Writer::reference(mesh_faceset)
+            ))
+        };
 
         let definition_shape = writer.add_entity(format!(
             "IFCPRODUCTDEFINITIONSHAPE($,$,({}))",
@@ -520,8 +560,6 @@ fn export_owned_entities_to_ifc_text<'a>(
         }
 
         report.exported_elements += 1;
-        report.exported_triangles += mesh.faces.len();
-        report.exported_faces += mesh.faces.len();
     }
 
     if element_ids.is_empty() {
@@ -539,6 +577,368 @@ fn export_owned_entities_to_ifc_text<'a>(
 
     let text = writer.build().map_err(IfcExportError::Serialization)?;
     Ok((text, report))
+}
+
+/// D9: emits an analytic `IFCADVANCEDBREP` shape representation for a brep whose
+/// faces carry analytic surfaces (D1) — IFCPLANE / IFCCYLINDRICALSURFACE faces
+/// with IFCLINE / IFCCIRCLE edge curves. Returns the IFCSHAPEREPRESENTATION ref
+/// and the analytic face count, or `None` if no advanced face could be built.
+fn emit_ifc_advanced_brep(
+    writer: &mut Part21Writer,
+    brep: &Brep,
+    scale: f64,
+    geom_context: usize,
+) -> Option<(usize, usize)> {
+    use crate::brep::SurfaceGeometry;
+
+    let mut edge_curves: HashMap<u32, usize> = HashMap::new();
+    let mut vertex_points: HashMap<u32, usize> = HashMap::new();
+    let mut surfaces: HashMap<String, usize> = HashMap::new();
+    let mut face_ids = Vec::new();
+
+    let scaled = |v: Vector3| Vector3::new(v.x * scale, v.y * scale, v.z * scale);
+
+    for face in &brep.faces {
+        let Some(surface) = face.surface.as_ref() else {
+            return None; // mixed analytic/non-analytic — fall back to tessellation
+        };
+
+        let surface_ref = {
+            let key = ifc_surface_key(surface, scale);
+            if let Some(existing) = surfaces.get(&key) {
+                *existing
+            } else {
+                let id = match surface {
+                    SurfaceGeometry::Plane { origin, normal } => {
+                        let placement = ifc_axis_placement(
+                            writer,
+                            scaled(*origin),
+                            *normal,
+                            ifc_any_perpendicular(*normal),
+                        );
+                        writer
+                            .add_entity(format!("IFCPLANE({})", Part21Writer::reference(placement)))
+                    }
+                    SurfaceGeometry::Cylinder {
+                        origin,
+                        axis,
+                        ref_direction,
+                        radius,
+                        ..
+                    } => {
+                        let placement =
+                            ifc_axis_placement(writer, scaled(*origin), *axis, *ref_direction);
+                        writer.add_entity(format!(
+                            "IFCCYLINDRICALSURFACE({},{})",
+                            Part21Writer::reference(placement),
+                            format_ifc_real(radius * scale)
+                        ))
+                    }
+                };
+                surfaces.insert(key, id);
+                id
+            }
+        };
+
+        let mut bounds = Vec::new();
+        let outer = ifc_edge_loop_bound(
+            writer,
+            brep,
+            face.outer_loop,
+            scale,
+            true,
+            &mut edge_curves,
+            &mut vertex_points,
+        )?;
+        bounds.push(outer);
+        for inner in &face.inner_loops {
+            if let Some(b) = ifc_edge_loop_bound(
+                writer,
+                brep,
+                *inner,
+                scale,
+                false,
+                &mut edge_curves,
+                &mut vertex_points,
+            ) {
+                bounds.push(b);
+            }
+        }
+
+        face_ids.push(writer.add_entity(format!(
+            "IFCADVANCEDFACE({},{},.T.)",
+            format_ifc_ref_list(&bounds),
+            Part21Writer::reference(surface_ref)
+        )));
+    }
+
+    if face_ids.is_empty() {
+        return None;
+    }
+
+    let shell = writer.add_entity(format!(
+        "IFCCLOSEDSHELL({})",
+        format_ifc_ref_list(&face_ids)
+    ));
+    let advanced_brep = writer.add_entity(format!(
+        "IFCADVANCEDBREP({})",
+        Part21Writer::reference(shell)
+    ));
+    let rep = writer.add_entity(format!(
+        "IFCSHAPEREPRESENTATION({},'Body','AdvancedBrep',({}))",
+        Part21Writer::reference(geom_context),
+        Part21Writer::reference(advanced_brep)
+    ));
+    Some((rep, face_ids.len()))
+}
+
+fn ifc_edge_loop_bound(
+    writer: &mut Part21Writer,
+    brep: &Brep,
+    loop_id: u32,
+    scale: f64,
+    is_outer: bool,
+    edge_curves: &mut HashMap<u32, usize>,
+    vertex_points: &mut HashMap<u32, usize>,
+) -> Option<usize> {
+    let halfedges = brep.get_loop_halfedges(loop_id).ok()?;
+    if halfedges.len() < 3 {
+        return None;
+    }
+    let mut oriented = Vec::with_capacity(halfedges.len());
+    for he_id in halfedges {
+        let he = brep.halfedges.get(he_id as usize)?;
+        let edge_curve = ifc_edge_curve(writer, brep, he.edge, scale, edge_curves, vertex_points)?;
+        oriented.push(writer.add_entity(format!(
+            "IFCORIENTEDEDGE(*,*,{},.T.)",
+            Part21Writer::reference(edge_curve)
+        )));
+    }
+    let edge_loop = writer.add_entity(format!("IFCEDGELOOP({})", format_ifc_ref_list(&oriented)));
+    let kind = if is_outer {
+        "IFCFACEOUTERBOUND"
+    } else {
+        "IFCFACEBOUND"
+    };
+    Some(writer.add_entity(format!(
+        "{}({},.T.)",
+        kind,
+        Part21Writer::reference(edge_loop)
+    )))
+}
+
+fn ifc_edge_curve(
+    writer: &mut Part21Writer,
+    brep: &Brep,
+    edge_id: u32,
+    scale: f64,
+    edge_curves: &mut HashMap<u32, usize>,
+    vertex_points: &mut HashMap<u32, usize>,
+) -> Option<usize> {
+    use crate::brep::CurveGeometry;
+    if let Some(existing) = edge_curves.get(&edge_id) {
+        return Some(*existing);
+    }
+    let (from_id, to_id) = brep.get_edge_endpoints(edge_id)?;
+    let from_pos = scaled_v(brep.vertices.get(from_id as usize)?.position, scale);
+    let to_pos = scaled_v(brep.vertices.get(to_id as usize)?.position, scale);
+    let v_from = ifc_vertex_point(writer, from_id, from_pos, vertex_points);
+    let v_to = ifc_vertex_point(writer, to_id, to_pos, vertex_points);
+
+    let edge = brep.edges.iter().find(|e| e.id == edge_id);
+    let curve_ref = match edge.and_then(|e| e.curve.as_ref()) {
+        Some(CurveGeometry::Circle {
+            center,
+            normal,
+            x_axis,
+            radius,
+            ..
+        }) => {
+            let placement = ifc_axis_placement(writer, scaled_v(*center, scale), *normal, *x_axis);
+            writer.add_entity(format!(
+                "IFCCIRCLE({},{})",
+                Part21Writer::reference(placement),
+                format_ifc_real(radius * scale)
+            ))
+        }
+        _ => {
+            let dir = ifc_direction_between(from_pos, to_pos);
+            let d = writer.add_entity(format!(
+                "IFCDIRECTION(({},{},{}))",
+                format_ifc_real(dir.x),
+                format_ifc_real(dir.y),
+                format_ifc_real(dir.z)
+            ));
+            let vector = writer.add_entity(format!(
+                "IFCVECTOR({},{})",
+                Part21Writer::reference(d),
+                format_ifc_real(ifc_distance(from_pos, to_pos).max(1.0))
+            ));
+            let point = writer.add_entity(format!(
+                "IFCCARTESIANPOINT(({},{},{}))",
+                format_ifc_real(from_pos.x),
+                format_ifc_real(from_pos.y),
+                format_ifc_real(from_pos.z)
+            ));
+            writer.add_entity(format!(
+                "IFCLINE({},{})",
+                Part21Writer::reference(point),
+                Part21Writer::reference(vector)
+            ))
+        }
+    };
+
+    let edge_curve = writer.add_entity(format!(
+        "IFCEDGECURVE({},{},{},.T.)",
+        Part21Writer::reference(v_from),
+        Part21Writer::reference(v_to),
+        Part21Writer::reference(curve_ref)
+    ));
+    edge_curves.insert(edge_id, edge_curve);
+    Some(edge_curve)
+}
+
+fn ifc_vertex_point(
+    writer: &mut Part21Writer,
+    vertex_id: u32,
+    position: Vector3,
+    cache: &mut HashMap<u32, usize>,
+) -> usize {
+    if let Some(existing) = cache.get(&vertex_id) {
+        return *existing;
+    }
+    let point = writer.add_entity(format!(
+        "IFCCARTESIANPOINT(({},{},{}))",
+        format_ifc_real(position.x),
+        format_ifc_real(position.y),
+        format_ifc_real(position.z)
+    ));
+    let vp = writer.add_entity(format!(
+        "IFCVERTEXPOINT({})",
+        Part21Writer::reference(point)
+    ));
+    cache.insert(vertex_id, vp);
+    vp
+}
+
+fn ifc_axis_placement(
+    writer: &mut Part21Writer,
+    location: Vector3,
+    axis: Vector3,
+    ref_direction: Vector3,
+) -> usize {
+    let point = writer.add_entity(format!(
+        "IFCCARTESIANPOINT(({},{},{}))",
+        format_ifc_real(location.x),
+        format_ifc_real(location.y),
+        format_ifc_real(location.z)
+    ));
+    let axis = ifc_normalize(axis);
+    let refd = ifc_normalize(ref_direction);
+    let axis_dir = writer.add_entity(format!(
+        "IFCDIRECTION(({},{},{}))",
+        format_ifc_real(axis.x),
+        format_ifc_real(axis.y),
+        format_ifc_real(axis.z)
+    ));
+    let ref_dir = writer.add_entity(format!(
+        "IFCDIRECTION(({},{},{}))",
+        format_ifc_real(refd.x),
+        format_ifc_real(refd.y),
+        format_ifc_real(refd.z)
+    ));
+    writer.add_entity(format!(
+        "IFCAXIS2PLACEMENT3D({},{},{})",
+        Part21Writer::reference(point),
+        Part21Writer::reference(axis_dir),
+        Part21Writer::reference(ref_dir)
+    ))
+}
+
+fn scaled_v(v: Vector3, scale: f64) -> Vector3 {
+    Vector3::new(v.x * scale, v.y * scale, v.z * scale)
+}
+
+fn ifc_direction_between(from: Vector3, to: Vector3) -> Vector3 {
+    ifc_normalize(Vector3::new(to.x - from.x, to.y - from.y, to.z - from.z))
+}
+
+fn ifc_distance(a: Vector3, b: Vector3) -> f64 {
+    let dx = a.x - b.x;
+    let dy = a.y - b.y;
+    let dz = a.z - b.z;
+    (dx * dx + dy * dy + dz * dz).sqrt()
+}
+
+fn ifc_normalize(v: Vector3) -> Vector3 {
+    let len = (v.x * v.x + v.y * v.y + v.z * v.z).sqrt();
+    if len <= IFC_LENGTH_EPSILON {
+        Vector3::new(0.0, 0.0, 1.0)
+    } else {
+        Vector3::new(v.x / len, v.y / len, v.z / len)
+    }
+}
+
+fn ifc_any_perpendicular(n: Vector3) -> Vector3 {
+    let n = ifc_normalize(n);
+    if n.x.abs() <= n.y.abs() && n.x.abs() <= n.z.abs() {
+        ifc_normalize(Vector3::new(0.0, -n.z, n.y))
+    } else if n.y.abs() <= n.z.abs() {
+        ifc_normalize(Vector3::new(-n.z, 0.0, n.x))
+    } else {
+        ifc_normalize(Vector3::new(-n.y, n.x, 0.0))
+    }
+}
+
+fn ifc_surface_key(surface: &crate::brep::SurfaceGeometry, scale: f64) -> String {
+    use crate::brep::SurfaceGeometry;
+    match surface {
+        SurfaceGeometry::Plane { origin, normal } => format!(
+            "P|{:.6}|{:.6}|{:.6}|{:.6}|{:.6}|{:.6}",
+            origin.x * scale,
+            origin.y * scale,
+            origin.z * scale,
+            normal.x,
+            normal.y,
+            normal.z
+        ),
+        SurfaceGeometry::Cylinder {
+            origin,
+            axis,
+            radius,
+            ..
+        } => format!(
+            "C|{:.6}|{:.6}|{:.6}|{:.6}|{:.6}|{:.6}|{:.6}",
+            origin.x * scale,
+            origin.y * scale,
+            origin.z * scale,
+            axis.x,
+            axis.y,
+            axis.z,
+            radius * scale
+        ),
+    }
+}
+
+fn format_ifc_ref_list(ids: &[usize]) -> String {
+    format!(
+        "({})",
+        ids.iter()
+            .map(|id| Part21Writer::reference(*id))
+            .collect::<Vec<_>>()
+            .join(",")
+    )
+}
+
+fn format_ifc_real(value: f64) -> String {
+    let mut out = format!("{:.9}", value);
+    while out.contains('.') && out.ends_with('0') {
+        out.pop();
+    }
+    if out.ends_with('.') {
+        out.push('0');
+    }
+    out
 }
 
 fn validate_config(config: &IfcExportConfig) -> Result<f64, IfcExportError> {
@@ -930,6 +1330,33 @@ mod tests {
         assert!(text.contains("IFCTRIANGULATEDFACESET("));
         assert!(report.exported_elements >= 1);
         assert!(report.exported_triangles >= 4);
+    }
+
+    #[test]
+    fn cylinder_exports_analytic_ifc_advanced_brep() {
+        // D9: a cylinder (analytic surfaces present) exports as an
+        // IFCADVANCEDBREP with one IFCCYLINDRICALSURFACE + circle edges, not a
+        // triangulated face set.
+        use crate::primitives::cylinder::OGCylinder;
+        let mut cyl = OGCylinder::new("ifc-cyl".into());
+        cyl.set_config(
+            Vector3::new(0.0, 0.0, 0.0),
+            1.0,
+            2.0,
+            2.0 * std::f64::consts::PI,
+            24,
+        )
+        .unwrap();
+        let brep = cyl.world_brep();
+
+        let (text, _) =
+            export_brep_to_ifc_text(&brep, &IfcExportConfig::default()).expect("ifc export");
+
+        assert!(text.contains("IFCADVANCEDBREP("));
+        assert_eq!(text.matches("IFCCYLINDRICALSURFACE(").count(), 1);
+        assert!(text.contains("IFCCIRCLE("));
+        assert!(text.contains("IFCPLANE("));
+        assert!(!text.contains("IFCTRIANGULATEDFACESET("));
     }
 
     #[test]

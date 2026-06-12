@@ -168,8 +168,70 @@ impl OGCylinder {
         })?;
 
         self.brep = extrude_brep_face(base_brep, self.height);
+        self.tag_analytic_geometry(full_circle);
 
         Ok(())
+    }
+
+    /// D1: attach exact analytic surfaces/curves to the tessellated cylinder so
+    /// inspection and STEP export (D9) can recover a single cylindrical surface
+    /// and circular edges instead of a facet fan. Local space: axis = +Y, base
+    /// centred at `(0, -h/2, 0)`. Only tagged for a full revolution; partial
+    /// wedges have planar radial faces and keep the default interpretation.
+    fn tag_analytic_geometry(&mut self, full_circle: bool) {
+        if !full_circle {
+            return;
+        }
+        use crate::brep::{CurveGeometry, SurfaceGeometry};
+        let half_height = self.height / 2.0;
+        let radius = self.radius;
+
+        let cylinder = SurfaceGeometry::Cylinder {
+            origin: Vector3::new(0.0, -half_height, 0.0),
+            axis: Vector3::new(0.0, 1.0, 0.0),
+            ref_direction: Vector3::new(1.0, 0.0, 0.0),
+            radius,
+            height: self.height,
+        };
+
+        for face in &mut self.brep.faces {
+            if face.normal.y.abs() > 0.9 {
+                let y = if face.normal.y >= 0.0 {
+                    half_height
+                } else {
+                    -half_height
+                };
+                face.surface = Some(SurfaceGeometry::Plane {
+                    origin: Vector3::new(0.0, y, 0.0),
+                    normal: face.normal,
+                });
+            } else {
+                face.surface = Some(cylinder.clone());
+            }
+        }
+
+        let on_ring = |p: &Vector3| -> bool {
+            ((p.x * p.x + p.z * p.z).sqrt() - radius).abs() < radius * 1.0e-6 + 1.0e-9
+        };
+        for index in 0..self.brep.edges.len() {
+            let he = self.brep.edges[index].halfedge as usize;
+            let (from, to) = {
+                let h = &self.brep.halfedges[he];
+                (h.from as usize, h.to as usize)
+            };
+            let a = self.brep.vertices[from].position;
+            let b = self.brep.vertices[to].position;
+            if on_ring(&a) && on_ring(&b) && (a.y - b.y).abs() < 1.0e-9 {
+                self.brep.edges[index].curve = Some(CurveGeometry::Circle {
+                    center: Vector3::new(0.0, a.y, 0.0),
+                    normal: Vector3::new(0.0, 1.0, 0.0),
+                    x_axis: Vector3::new(1.0, 0.0, 0.0),
+                    radius,
+                    start_angle: 0.0,
+                    end_angle: 2.0 * std::f64::consts::PI,
+                });
+            }
+        }
     }
 
     #[wasm_bindgen]

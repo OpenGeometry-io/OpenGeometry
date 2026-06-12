@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry B-rep Validity Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="B-rep validity checking and healing workflow with OpenGeometry." />
+    <meta name="author" content="Vishwajeet Mane" />
+    <style>
+      .og-readout {
+        margin-top: 0.6rem;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(24, 32, 61, 0.06);
+        border: 1px solid rgba(68, 96, 255, 0.18);
+        font: 500 12px/1.5 var(--og-font, ui-monospace, monospace);
+        color: #18203d;
+        max-height: 280px;
+        overflow-y: auto;
+      }
+      .og-readout-title {
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .og-readout-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .og-readout-ok {
+        color: #16a34a;
+        font-weight: 700;
+      }
+      .og-readout-bad {
+        color: #e11d48;
+        font-weight: 700;
+      }
+      .og-readout-issues {
+        margin: 6px 0 0;
+        padding-left: 16px;
+      }
+      .og-readout-issues li {
+        color: #b45309;
+      }
+      .og-readout-muted {
+        color: #475569;
+      }
+    </style>
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">B-rep Validity</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>B-rep Validity &amp; Healing</h3>
+      <p class="og-control-summary">
+        Build a kernel cylinder, check its B-rep validity, corrupt it with a duplicate vertex,
+        then heal it by welding coincident vertices.
+      </p>
+
+      <label class="og-control-row" data-control="radius">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Radius</span>
+          <code class="og-control-value" data-value>0.9</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.3" max="2" step="0.05" value="0.9" />
+          <input data-number type="number" min="0.3" max="2" step="0.05" value="0.9" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="height">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Height</span>
+          <code class="og-control-value" data-value>2</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="4" step="0.1" value="2" />
+          <input data-number type="number" min="0.5" max="4" step="0.1" value="2" />
+        </div>
+      </label>
+
+      <button type="button" class="og-control-action og-control-action-cyan" data-check>
+        Check validity
+      </button>
+      <button type="button" class="og-control-action og-control-action-amber" data-corrupt>
+        Corrupt geometry
+      </button>
+      <button type="button" class="og-control-action og-control-action-rose" data-heal>
+        Heal
+      </button>
+
+      <div class="og-readout" data-readout>
+        <div class="og-readout-muted">Run a check to see the validity report.</div>
+      </div>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { Cylinder, OpenGeometry, Vector3 } from "opengeometry";
+      import { checkBrepValidity, healBrep } from "../../../opengeometry/pkg/opengeometry";
+
+      const app = document.getElementById("app");
+      const checkButton = document.querySelector("[data-check]");
+      const corruptButton = document.querySelector("[data-corrupt]");
+      const healButton = document.querySelector("[data-heal]");
+      const readout = document.querySelector("[data-readout]");
+
+      if (!app || !checkButton || !corruptButton || !healButton || !readout) {
+        throw new Error("Missing B-rep validity page nodes");
+      }
+
+      let config = null;
+      let cylinder = null;
+      // Holds the JSON string of a deliberately corrupted brep, set by "Corrupt geometry".
+      let corruptedBrepJson = null;
+
+      function createConfig() {
+        return {
+          center: new Vector3(0, 1, 0),
+          radius: 0.9,
+          height: 2,
+          segments: 48,
+          angle: Math.PI * 2,
+          color: 0xf97316,
+          outlineWidth: 2,
+        };
+      }
+
+      const VALIDITY_FIELDS = [
+        "topology_ok",
+        "closed_shell",
+        "manifold_edges",
+        "consistent_orientation",
+        "finite_geometry",
+        "no_degenerate_faces",
+      ];
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
+      }
+
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
+
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
+        }
+
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
+          }
+
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
+
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
+      }
+
+      function renderValidityReport(title, report) {
+        const rows = VALIDITY_FIELDS.map((field) => {
+          const ok = Boolean(report?.[field]);
+          const mark = ok
+            ? '<span class="og-readout-ok">&#10003;</span>'
+            : '<span class="og-readout-bad">&#10007;</span>';
+          return `<div class="og-readout-row"><span>${field}</span>${mark}</div>`;
+        }).join("");
+
+        const valid = VALIDITY_FIELDS.every((field) => Boolean(report?.[field]));
+        const verdict = valid
+          ? '<span class="og-readout-ok">VALID</span>'
+          : '<span class="og-readout-bad">INVALID</span>';
+
+        const issues = Array.isArray(report?.issues) ? report.issues : [];
+        const issuesHtml = issues.length
+          ? `<ul class="og-readout-issues">${issues
+              .map((issue) => `<li>${escapeHtml(issue)}</li>`)
+              .join("")}</ul>`
+          : '<div class="og-readout-muted">No issues reported.</div>';
+
+        readout.innerHTML = `
+          <div class="og-readout-title">${escapeHtml(title)} &middot; ${verdict}</div>
+          ${rows}
+          ${issuesHtml}
+        `;
+      }
+
+      function renderHealReport(report) {
+        const welded = report?.welded_vertices ?? 0;
+        const recomputed = Boolean(report?.recomputed_normals);
+        const actions = Array.isArray(report?.actions) ? report.actions : [];
+        const actionsHtml = actions.length
+          ? `<ul class="og-readout-issues">${actions
+              .map((action) => `<li>${escapeHtml(action)}</li>`)
+              .join("")}</ul>`
+          : '<div class="og-readout-muted">No actions taken.</div>';
+
+        readout.innerHTML = `
+          <div class="og-readout-title">Heal report</div>
+          <div class="og-readout-row"><span>welded_vertices</span><span class="og-readout-ok">${escapeHtml(
+            welded
+          )}</span></div>
+          <div class="og-readout-row"><span>recomputed_normals</span><span>${
+            recomputed
+              ? '<span class="og-readout-ok">&#10003;</span>'
+              : '<span class="og-readout-bad">&#10007;</span>'
+          }</span></div>
+          <div class="og-readout-title" style="margin-top:6px;">Actions</div>
+          ${actionsHtml}
+        `;
+      }
+
+      function renderError(message) {
+        readout.innerHTML = `<div class="og-readout-bad">${escapeHtml(message)}</div>`;
+      }
+
+      function updateCylinder() {
+        if (!cylinder) {
+          return;
+        }
+
+        cylinder.setConfig({
+          center: config.center.clone(),
+          radius: config.radius,
+          height: config.height,
+          segments: config.segments,
+          angle: config.angle,
+          color: config.color,
+          outlineWidth: config.outlineWidth,
+        });
+        cylinder.outline = true;
+
+        // Geometry changed, so any previously corrupted brep no longer applies.
+        corruptedBrepJson = null;
+      }
+
+      async function main() {
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        camera.position.set(5.6, 4.4, 6.8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const stats = mountStats();
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 1, 0);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+        config = createConfig();
+
+        cylinder = new Cylinder({
+          center: config.center.clone(),
+          radius: config.radius,
+          height: config.height,
+          segments: config.segments,
+          angle: config.angle,
+          color: config.color,
+          outlineWidth: config.outlineWidth,
+        });
+        scene.add(cylinder);
+
+        attachNumberControl("radius", (value) => {
+          config.radius = value;
+          updateCylinder();
+        });
+        attachNumberControl("height", (value) => {
+          config.height = value;
+          config.center.y = value * 0.5;
+          updateCylinder();
+        });
+
+        updateCylinder();
+
+        checkButton.addEventListener("click", () => {
+          try {
+            const brep = cylinder.getBrep();
+            const reportJson = checkBrepValidity(JSON.stringify(brep));
+            const report = JSON.parse(reportJson);
+            renderValidityReport("Cylinder B-rep", report);
+
+            console.groupCollapsed("[brep-validity] check");
+            console.log("Report", report);
+            console.groupEnd();
+          } catch (error) {
+            console.error("[brep-validity] check failed", error);
+            renderError(`Check failed: ${error?.message ?? error}`);
+          }
+        });
+
+        corruptButton.addEventListener("click", () => {
+          try {
+            const brep = cylinder.getBrep();
+
+            if (!Array.isArray(brep?.vertices) || brep.vertices.length === 0) {
+              throw new Error("Brep has no vertices to corrupt.");
+            }
+
+            // Introduce a defect: a duplicate vertex with a tiny positional offset.
+            const first = brep.vertices[0];
+            brep.vertices.push({
+              id: brep.vertices.length,
+              position: {
+                x: first.position.x + 1e-7,
+                y: first.position.y,
+                z: first.position.z,
+              },
+              outgoing_halfedge: null,
+            });
+
+            corruptedBrepJson = JSON.stringify(brep);
+
+            const report = JSON.parse(checkBrepValidity(corruptedBrepJson));
+            renderValidityReport("Corrupted B-rep", report);
+
+            console.groupCollapsed("[brep-validity] corrupt");
+            console.log("Vertices after corruption", brep.vertices.length);
+            console.log("Report", report);
+            console.groupEnd();
+          } catch (error) {
+            console.error("[brep-validity] corrupt failed", error);
+            renderError(`Corrupt failed: ${error?.message ?? error}`);
+          }
+        });
+
+        healButton.addEventListener("click", () => {
+          try {
+            if (!corruptedBrepJson) {
+              renderError("Run \"Corrupt geometry\" first to produce a brep to heal.");
+              return;
+            }
+
+            const result = JSON.parse(healBrep(corruptedBrepJson, 1e-6));
+            renderHealReport(result?.report ?? {});
+
+            console.groupCollapsed("[brep-validity] heal");
+            console.log("Heal report", result?.report);
+            console.groupEnd();
+          } catch (error) {
+            console.error("[brep-validity] heal failed", error);
+            renderError(`Heal failed: ${error?.message ?? error}`);
+          }
+        });
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      void main();
+    </script>
+  </body>
+</html>

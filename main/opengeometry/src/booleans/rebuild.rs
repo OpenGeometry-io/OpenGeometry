@@ -156,7 +156,33 @@ pub(crate) fn build_brep_from_polygons(
         })?;
     }
 
+    tag_planar_surfaces(&mut brep);
     Ok(brep)
+}
+
+/// D4/D1: every face emerging from the boolean engine is planar (merged
+/// coplanar polygons or triangles). Re-attach an analytic `Plane` surface so
+/// boolean results also export as analytic planes (D9) rather than bare facets.
+/// Re-detecting curved surfaces (cylinders) from the facet soup is a follow-on.
+fn tag_planar_surfaces(brep: &mut Brep) {
+    use crate::brep::SurfaceGeometry;
+    // Compute a per-face origin (a loop vertex) under an immutable borrow first,
+    // then attach the analytic plane under a mutable borrow.
+    let origins: Vec<Option<openmaths::Vector3>> = brep
+        .faces
+        .iter()
+        .map(|face| brep.get_vertices_by_face_id(face.id).first().copied())
+        .collect();
+    for (face, origin) in brep.faces.iter_mut().zip(origins) {
+        if face.surface.is_none() {
+            if let Some(origin) = origin {
+                face.surface = Some(SurfaceGeometry::Plane {
+                    origin,
+                    normal: face.normal,
+                });
+            }
+        }
+    }
 }
 
 /// Rebuilds a BRep directly from a manifold triangle mesh so watertight solid
@@ -223,6 +249,7 @@ pub(crate) fn build_brep_from_triangle_mesh(
         })?;
     }
 
+    tag_planar_surfaces(&mut brep);
     Ok(brep)
 }
 

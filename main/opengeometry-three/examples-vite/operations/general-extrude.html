@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry General Extrude Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="General directional extrude with arbitrary direction and extent type using OpenGeometry." />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">General Extrude</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>General Extrude</h3>
+      <p class="og-control-summary">
+        Extrude a flat square profile along an arbitrary direction. Choose the extent type to
+        offset the sweep one-sided, symmetric, or two-sided about the profile plane.
+      </p>
+
+      <label class="og-control-row" data-control="dirX">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Direction X</span>
+          <code class="og-control-value" data-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="-1" max="1" step="0.05" value="0" />
+          <input data-number type="number" min="-1" max="1" step="0.05" value="0" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="dirY">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Direction Y</span>
+          <code class="og-control-value" data-value>1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="-1" max="1" step="0.05" value="1" />
+          <input data-number type="number" min="-1" max="1" step="0.05" value="1" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="dirZ">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Direction Z</span>
+          <code class="og-control-value" data-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="-1" max="1" step="0.05" value="0" />
+          <input data-number type="number" min="-1" max="1" step="0.05" value="0" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="kind">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Extent Type</span>
+        </div>
+        <div class="og-control-range">
+          <select data-select class="og-control-value" style="width: 100%;">
+            <option value="one_sided">one_sided</option>
+            <option value="symmetric">symmetric</option>
+            <option value="two_sided">two_sided</option>
+          </select>
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="dPlus">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Distance +</span>
+          <code class="og-control-value" data-value>2</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.2" max="4" step="0.1" value="2" />
+          <input data-number type="number" min="0.2" max="4" step="0.1" value="2" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="dMinus">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Distance - (two_sided)</span>
+          <code class="og-control-value" data-value>1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0" max="4" step="0.1" value="1" />
+          <input data-number type="number" min="0" max="4" step="0.1" value="1" />
+        </div>
+      </label>
+
+      <pre class="og-control-summary" data-readout style="white-space: pre-wrap; margin-top: 12px;">Building…</pre>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { OpenGeometry, Polygon, Vector3 } from "opengeometry";
+      import { extrudeBrepFaceDirectional } from "../../../opengeometry/pkg/opengeometry";
+
+      const app = document.getElementById("app");
+      const readout = document.querySelector("[data-readout]");
+      if (!app || !readout) {
+        throw new Error("Missing general-extrude page nodes");
+      }
+
+      const config = {
+        dirX: 0,
+        dirY: 1,
+        dirZ: 0,
+        kind: "one_sided",
+        dPlus: 2,
+        dMinus: 1,
+      };
+
+      // Serialized BRep of the flat square profile (XZ plane), set once on init.
+      let profileBrepJson = null;
+
+      let wireframe = null;
+      let points = null;
+      let sceneRef = null;
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
+      }
+
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
+      }
+
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
+
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
+        }
+
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
+          }
+
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
+
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
+      }
+
+      function attachSelectControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const select = row?.querySelector("[data-select]");
+
+        if (!row || !select) {
+          throw new Error(`Missing select control: ${name}`);
+        }
+
+        select.addEventListener("change", () => onChange(select.value));
+        onChange(select.value);
+      }
+
+      function disposeObject(object) {
+        if (!object) {
+          return;
+        }
+        if (sceneRef) {
+          sceneRef.remove(object);
+        }
+        object.geometry?.dispose();
+        object.material?.dispose();
+      }
+
+      function buildProfileBrepJson() {
+        // Flat square profile in the XZ plane.
+        const profile = new Polygon({
+          vertices: [
+            new Vector3(-1, 0, -1),
+            new Vector3(1, 0, -1),
+            new Vector3(1, 0, 1),
+            new Vector3(-1, 0, 1),
+          ],
+          holes: [],
+          color: 0x22c55e,
+          outlineWidth: 2,
+        });
+        // getBrepData() returns the serialized BRep JSON string for the profile face.
+        return profile.getBrepData();
+      }
+
+      function updateExtrude() {
+        if (!profileBrepJson || !sceneRef) {
+          return;
+        }
+
+        const direction = [config.dirX, config.dirY, config.dirZ];
+        let parsed = null;
+        try {
+          const resultJson = extrudeBrepFaceDirectional(
+            profileBrepJson,
+            new Float64Array(direction),
+            config.kind,
+            config.dPlus,
+            config.dMinus
+          );
+          parsed = JSON.parse(resultJson);
+        } catch (error) {
+          disposeObject(wireframe);
+          disposeObject(points);
+          wireframe = null;
+          points = null;
+          readout.textContent = `Extrude error:\n${String(error?.message ?? error)}`;
+          return;
+        }
+
+        const vertices = parsed.vertices ?? [];
+        const halfedges = parsed.halfedges ?? [];
+        const edges = parsed.edges ?? [];
+        const faces = parsed.faces ?? [];
+
+        // Build wireframe line segments from each edge's halfedge endpoints.
+        const linePositions = [];
+        for (const edge of edges) {
+          const he = halfedges[edge.halfedge];
+          if (!he) {
+            continue;
+          }
+          const from = vertices[he.from]?.position;
+          const to = vertices[he.to]?.position;
+          if (!from || !to) {
+            continue;
+          }
+          linePositions.push(from.x, from.y, from.z, to.x, to.y, to.z);
+        }
+
+        disposeObject(wireframe);
+        disposeObject(points);
+        wireframe = null;
+        points = null;
+
+        const lineGeometry = new THREE.BufferGeometry();
+        lineGeometry.setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(linePositions, 3)
+        );
+        wireframe = new THREE.LineSegments(
+          lineGeometry,
+          new THREE.LineBasicMaterial({ color: 0x0ea5e9 })
+        );
+        sceneRef.add(wireframe);
+
+        // Render vertices as points.
+        const pointPositions = [];
+        let minY = Infinity;
+        let maxY = -Infinity;
+        for (const vertex of vertices) {
+          const p = vertex.position;
+          pointPositions.push(p.x, p.y, p.z);
+          minY = Math.min(minY, p.y);
+          maxY = Math.max(maxY, p.y);
+        }
+        const pointGeometry = new THREE.BufferGeometry();
+        pointGeometry.setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(pointPositions, 3)
+        );
+        points = new THREE.Points(
+          pointGeometry,
+          new THREE.PointsMaterial({ color: 0xf97316, size: 0.12 })
+        );
+        sceneRef.add(points);
+
+        const spanY = vertices.length
+          ? `${formatNumber(minY)} … ${formatNumber(maxY)}`
+          : "n/a";
+
+        readout.textContent =
+          `direction : [${direction.map(formatNumber).join(", ")}]\n` +
+          `extent    : ${config.kind}\n` +
+          `d+ / d-   : ${formatNumber(config.dPlus)} / ${formatNumber(config.dMinus)}\n` +
+          `vertices  : ${vertices.length}\n` +
+          `edges     : ${edges.length}\n` +
+          `faces     : ${faces.length}\n` +
+          `Y span    : ${spanY}`;
+
+        console.groupCollapsed("[general-extrude] updated");
+        console.log("Config", { ...config });
+        console.log("Result", { vertices: vertices.length, edges: edges.length, faces: faces.length });
+        console.groupEnd();
+      }
+
+      async function main() {
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+        sceneRef = scene;
+
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        camera.position.set(5.8, 4.5, 6.8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const stats = mountStats();
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 0.9, 0);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        profileBrepJson = buildProfileBrepJson();
+
+        attachNumberControl("dirX", (value) => {
+          config.dirX = value;
+          updateExtrude();
+        });
+        attachNumberControl("dirY", (value) => {
+          config.dirY = value;
+          updateExtrude();
+        });
+        attachNumberControl("dirZ", (value) => {
+          config.dirZ = value;
+          updateExtrude();
+        });
+        attachSelectControl("kind", (value) => {
+          config.kind = value;
+          updateExtrude();
+        });
+        attachNumberControl("dPlus", (value) => {
+          config.dPlus = value;
+          updateExtrude();
+        });
+        attachNumberControl("dMinus", (value) => {
+          config.dMinus = value;
+          updateExtrude();
+        });
+
+        updateExtrude();
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      void main();
+    </script>
+  </body>
+</html>

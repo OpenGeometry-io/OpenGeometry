@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-use crate::brep::{Brep, BrepBuilder};
+use crate::brep::{Brep, BrepBuilder, SurfaceGeometry};
 use crate::export::projection::{project_brep_to_scene, CameraParameters, HlrOptions, Scene2D};
+use crate::operations::profile::analyze_profile;
 use crate::spatial::placement::{
     bounds_center_from_point_sets, points_relative_to_anchor, Placement3D,
 };
@@ -134,7 +135,20 @@ impl OGPolygon {
         let mut builder = BrepBuilder::new(self.brep.id);
 
         let anchor = self.placement.anchor;
-        let local_points = points_relative_to_anchor(&self.points, anchor);
+        let raw_local = points_relative_to_anchor(&self.points, anchor);
+
+        // D7: validate and repair the outer profile before face creation —
+        // remove duplicates, auto-correct winding to CCW-outer, and reject
+        // self-intersecting / degenerate loops with a diagnostic instead of
+        // silently emitting a garbage face.
+        let (report, local_points) = analyze_profile(&raw_local);
+        if !report.is_valid {
+            return Err(JsValue::from_str(&format!(
+                "Invalid polygon profile: {}",
+                report.diagnostics.join("; ")
+            )));
+        }
+
         let mut all_vertices = local_points.clone();
         let mut hole_index_sets: Vec<Vec<u32>> = Vec::new();
 
@@ -143,25 +157,39 @@ impl OGPolygon {
                 continue;
             }
 
-            let start = all_vertices.len() as u32;
             let local_hole = points_relative_to_anchor(hole, anchor);
-            all_vertices.extend(local_hole);
-            let indices: Vec<u32> = (0..hole.len() as u32)
-                .map(|offset| start + offset)
-                .collect();
+            // Clean hole loops too; skip any that are degenerate/self-intersecting.
+            let (hole_report, cleaned_hole) = analyze_profile(&local_hole);
+            if !hole_report.is_valid {
+                continue;
+            }
+            let start = all_vertices.len() as u32;
+            let count = cleaned_hole.len() as u32;
+            all_vertices.extend(cleaned_hole);
+            let indices: Vec<u32> = (0..count).map(|offset| start + offset).collect();
             hole_index_sets.push(indices);
         }
 
         builder.add_vertices(&all_vertices);
         let outer_indices: Vec<u32> = (0..local_points.len() as u32).collect();
 
-        builder
+        let face_id = builder
             .add_face(&outer_indices, &hole_index_sets)
             .map_err(|err| JsValue::from_str(&format!("Failed to build polygon face: {}", err)))?;
 
         self.brep = builder.build().map_err(|err| {
             JsValue::from_str(&format!("Failed to finalize polygon BREP: {}", err))
         })?;
+
+        // D1: a polygon is a planar face — record its exact plane so analytic
+        // export (D9) emits a PLANE rather than inferring one from facets.
+        if let Some(face) = self.brep.faces.get_mut(face_id as usize) {
+            let normal = face.normal;
+            face.surface = Some(SurfaceGeometry::Plane {
+                origin: local_points[0],
+                normal,
+            });
+        }
 
         Ok(())
     }

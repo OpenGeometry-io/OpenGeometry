@@ -1,7 +1,7 @@
 use openmaths::Vector3;
 use serde::{Deserialize, Serialize};
 
-const EPSILON: f64 = 1.0e-9;
+const EPSILON: f64 = crate::tolerance::MODELING_TOLERANCE_FLOOR;
 
 #[derive(Clone, Copy)]
 pub struct OffsetOptions {

@@ -107,6 +107,15 @@ impl OGLine {
             .build()
             .map_err(|err| JsValue::from_str(&format!("Failed to finalize line BREP: {}", err)))?;
 
+        // D1: a line edge carries an exact straight-curve geometry.
+        if let (Some(edge), Some(start), Some(end)) = (
+            self.brep.edges.first_mut(),
+            local_points.first().copied(),
+            local_points.get(1).copied(),
+        ) {
+            edge.curve = Some(crate::brep::CurveGeometry::Line { start, end });
+        }
+
         Ok(())
     }
 

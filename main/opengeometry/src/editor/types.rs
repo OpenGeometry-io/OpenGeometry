@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::freeform::ObjectTransformation;
 
-pub const GEOMETRY_EPSILON: f64 = 1.0e-9;
+pub const GEOMETRY_EPSILON: f64 = crate::tolerance::MODELING_TOLERANCE_FLOOR;
 pub const FACE_AREA_EPSILON: f64 = 1.0e-12;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

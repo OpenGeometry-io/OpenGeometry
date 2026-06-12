@@ -144,6 +144,21 @@ impl OGArc {
             .build()
             .map_err(|err| JsValue::from_str(&format!("Failed to finalize arc BREP: {}", err)))?;
 
+        // D1: preserve the exact circle the (tessellated) wire approximates.
+        // Stored in local space (centred at the origin, in the XZ plane); the
+        // placement anchor/transform carries it to world.
+        let circle = crate::brep::CurveGeometry::Circle {
+            center: Vector3::new(0.0, 0.0, 0.0),
+            normal: Vector3::new(0.0, 1.0, 0.0),
+            x_axis: Vector3::new(1.0, 0.0, 0.0),
+            radius: self.radius,
+            start_angle: self.start_angle,
+            end_angle: self.end_angle,
+        };
+        for edge in &mut self.brep.edges {
+            edge.curve = Some(circle.clone());
+        }
+
         Ok(())
     }
 

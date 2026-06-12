@@ -383,7 +383,10 @@ pub fn batch_union_wasm(
     options_json: Option<String>,
 ) -> Result<OGBooleanResult, JsValue> {
     let operands: Vec<Brep> = serde_json::from_str(&operands_brep_serialized).map_err(|error| {
-        JsValue::from_str(&format!("Invalid union operand BRep JSON payload: {}", error))
+        JsValue::from_str(&format!(
+            "Invalid union operand BRep JSON payload: {}",
+            error
+        ))
     })?;
     let options = parse_options_json(options_json).map_err(|error| JsValue::from_str(&error))?;
     let output = batch_union(&operands, options, true)
@@ -502,6 +505,12 @@ fn execute_boolean_with_tolerance(
         }
     };
 
+    // D4/D1: re-detect curved faces. The mesh boolean tags every output face as
+    // planar; faces that actually lie on an input cylinder are retagged so a
+    // drilled/unioned cylinder survives as analytic geometry through export.
+    let mut brep = brep;
+    propagate_cylinder_surfaces(&mut brep, &[lhs, rhs_for_dispatch], working_tolerance);
+
     // Report uses the *original* operands' face counts so callers see
     // pre-clip metrics.
     let report = BooleanReport {
@@ -515,6 +524,75 @@ fn execute_boolean_with_tolerance(
     };
 
     Ok(BooleanOutput { brep, report })
+}
+
+/// Re-attaches cylindrical surfaces to boolean-output faces whose every vertex
+/// lies on a cylinder carried by one of the input operands (within tolerance).
+/// This recovers analytic curved faces the mesh boolean would otherwise flatten
+/// to planar facets. Planar faces keep the plane the rebuild assigned.
+fn propagate_cylinder_surfaces(brep: &mut Brep, inputs: &[&Brep], tolerance: f64) {
+    use crate::brep::SurfaceGeometry;
+
+    let cylinders: Vec<SurfaceGeometry> = inputs
+        .iter()
+        .flat_map(|b| b.faces.iter())
+        .filter_map(|f| match &f.surface {
+            Some(c @ SurfaceGeometry::Cylinder { .. }) => Some(c.clone()),
+            _ => None,
+        })
+        .collect();
+    if cylinders.is_empty() {
+        return;
+    }
+
+    let face_ids: Vec<u32> = brep.faces.iter().map(|f| f.id).collect();
+    for face_id in face_ids {
+        let verts = brep.get_vertices_by_face_id(face_id);
+        if verts.len() < 3 {
+            continue;
+        }
+        for cyl in &cylinders {
+            if let SurfaceGeometry::Cylinder {
+                origin,
+                axis,
+                radius,
+                ..
+            } = cyl
+            {
+                let tol = tolerance.max(radius.abs() * 1.0e-4);
+                if verts
+                    .iter()
+                    .all(|p| point_on_cylinder(*p, *origin, *axis, *radius, tol))
+                {
+                    if let Some(face) = brep.faces.iter_mut().find(|f| f.id == face_id) {
+                        face.surface = Some(cyl.clone());
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
+
+/// Whether a point's radial distance from a cylinder axis equals the radius
+/// within `tol` (the point lies on the lateral surface).
+fn point_on_cylinder(
+    p: openmaths::Vector3,
+    origin: openmaths::Vector3,
+    axis: openmaths::Vector3,
+    radius: f64,
+    tol: f64,
+) -> bool {
+    let ax_len = (axis.x * axis.x + axis.y * axis.y + axis.z * axis.z).sqrt();
+    if ax_len <= 1.0e-12 {
+        return false;
+    }
+    let ax = openmaths::Vector3::new(axis.x / ax_len, axis.y / ax_len, axis.z / ax_len);
+    let d = openmaths::Vector3::new(p.x - origin.x, p.y - origin.y, p.z - origin.z);
+    let axial = d.x * ax.x + d.y * ax.y + d.z * ax.z;
+    let radial_sq = (d.x * d.x + d.y * d.y + d.z * d.z) - axial * axial;
+    let radial = radial_sq.max(0.0).sqrt();
+    (radial - radius).abs() <= tol
 }
 
 fn count_operand_input_triangles(
@@ -856,7 +934,9 @@ mod tests {
         let bevel = true;
 
         let mut polyline = OGPolyline::new("wall-centerline".to_string());
-        polyline.set_config(centerline_points).expect("polyline config");
+        polyline
+            .set_config(centerline_points)
+            .expect("polyline config");
 
         let left = polyline.get_offset_points(half, acute_threshold, bevel);
         let right = polyline.get_offset_points(-half, acute_threshold, bevel);
@@ -879,8 +959,7 @@ mod tests {
         }
 
         let polygon_brep = build_polygon(outline);
-        try_extrude_brep_face(polygon_brep, height)
-            .expect("offset wall polygon should extrude")
+        try_extrude_brep_face(polygon_brep, height).expect("offset wall polygon should extrude")
     }
 
     /// Original simple U-shape PolyWall (8 vertices, hand-constructed).
@@ -890,14 +969,14 @@ mod tests {
         // Outer ring: traversed counter-clockwise when viewed from +Y.
         // The U opens toward +z.
         let outer = [
-            Vector3::new(-arm_length, 0.0, -arm_length),                 // outer back-left
-            Vector3::new(arm_length, 0.0, -arm_length),                  // outer back-right
-            Vector3::new(arm_length, 0.0, 0.0),                          // outer right-inner-corner-top
-            Vector3::new(arm_length - thickness, 0.0, 0.0),              // inner right-inner-corner-top
+            Vector3::new(-arm_length, 0.0, -arm_length), // outer back-left
+            Vector3::new(arm_length, 0.0, -arm_length),  // outer back-right
+            Vector3::new(arm_length, 0.0, 0.0),          // outer right-inner-corner-top
+            Vector3::new(arm_length - thickness, 0.0, 0.0), // inner right-inner-corner-top
             Vector3::new(arm_length - thickness, 0.0, -arm_length + thickness), // inner back-right
             Vector3::new(-arm_length + thickness, 0.0, -arm_length + thickness), // inner back-left
-            Vector3::new(-arm_length + thickness, 0.0, 0.0),             // inner left-inner-corner-top
-            Vector3::new(-arm_length, 0.0, 0.0),                         // outer left-inner-corner-top
+            Vector3::new(-arm_length + thickness, 0.0, 0.0), // inner left-inner-corner-top
+            Vector3::new(-arm_length, 0.0, 0.0),         // outer left-inner-corner-top
         ];
 
         let polygon_brep = build_polygon(outer.to_vec());
@@ -1005,7 +1084,11 @@ mod tests {
         };
         let baseline = geometry();
         for _ in 0..6 {
-            assert_eq!(baseline, geometry(), "boolean geometry must be identical across runs");
+            assert_eq!(
+                baseline,
+                geometry(),
+                "boolean geometry must be identical across runs"
+            );
         }
     }
 
@@ -1017,8 +1100,12 @@ mod tests {
     #[test]
     fn batch_union_single_operand_returns_unchanged() {
         let solid = build_cuboid(Vector3::new(0.0, 0.0, 0.0), 1.0, 1.0, 1.0);
-        let output = batch_union(std::slice::from_ref(&solid), BooleanOptions::default(), true)
-            .expect("batch union of one operand");
+        let output = batch_union(
+            std::slice::from_ref(&solid),
+            BooleanOptions::default(),
+            true,
+        )
+        .expect("batch union of one operand");
         assert_eq!(
             output.brep.get_triangle_vertex_buffer(),
             solid.get_triangle_vertex_buffer(),
@@ -1744,11 +1831,8 @@ mod tests {
             Vector3::new(1.0, 1.0, 1.0),
         );
 
-        let result = boolean_subtraction_many(
-            &wall,
-            &[door_a, door_b, door_c],
-            BooleanOptions::default(),
-        );
+        let result =
+            boolean_subtraction_many(&wall, &[door_a, door_b, door_c], BooleanOptions::default());
 
         let output = result.expect(
             "wall-from-offsets + 3 doors must succeed (the actual #6b debt-sheet reproducer)",
@@ -1836,18 +1920,18 @@ mod tests {
 
         let left_door = build_placed_cuboid(
             Vector3::new(0.0, 0.0, 0.0),
-            door_depth,                                    // along x (perpendicular to left wall)
-            door_height,                                   // along y (vertical)
-            door_width,                                    // along z (along the arm)
+            door_depth,  // along x (perpendicular to left wall)
+            door_height, // along y (vertical)
+            door_width,  // along z (along the arm)
             Vector3::new(-half, door_height * 0.5, -arm_length * 0.5),
             Vector3::new(0.0, 0.0, 0.0),
             Vector3::new(1.0, 1.0, 1.0),
         );
         let back_door = build_placed_cuboid(
             Vector3::new(0.0, 0.0, 0.0),
-            door_width,                                    // along x (along back wall)
-            door_height,                                   // along y
-            door_depth,                                    // along z (perpendicular to back wall)
+            door_width,  // along x (along back wall)
+            door_height, // along y
+            door_depth,  // along z (perpendicular to back wall)
             Vector3::new(0.0, door_height * 0.5, -arm_length + thickness * 0.5),
             Vector3::new(0.0, 0.0, 0.0),
             Vector3::new(1.0, 1.0, 1.0),

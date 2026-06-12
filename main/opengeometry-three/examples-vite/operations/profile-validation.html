@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Profile Robustness Analyzer Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Analyze profile loops for validity, winding, self-intersection and degeneracy with OpenGeometry." />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Profile Validation</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>Profile Robustness Analyzer</h3>
+      <p class="og-control-summary">
+        Pick a profile loop preset. The kernel analyzes it for validity, winding, self-intersection,
+        degeneracy and duplicate points, and draws the loop in the scene.
+      </p>
+
+      <button type="button" class="og-control-action" data-preset="clean">
+        Clean CCW square
+      </button>
+      <button type="button" class="og-control-action" data-preset="cw">
+        Clockwise square (winding-corrected)
+      </button>
+      <button type="button" class="og-control-action" data-preset="bowtie">
+        Bowtie (self-intersecting)
+      </button>
+      <button type="button" class="og-control-action" data-preset="duplicate">
+        Duplicate point
+      </button>
+      <button type="button" class="og-control-action" data-preset="collinear">
+        Collinear (degenerate)
+      </button>
+
+      <div class="og-control-readout" data-readout>
+        <p class="og-control-summary">Select a preset to run the analyzer.</p>
+      </div>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { OpenGeometry, Vector3 } from "opengeometry";
+      import { analyzeProfile } from "../../../opengeometry/pkg/opengeometry";
+
+      const app = document.getElementById("app");
+      const readout = document.querySelector("[data-readout]");
+
+      if (!app || !readout) {
+        throw new Error("Missing profile validation page nodes");
+      }
+
+      // All loops lie in the XZ plane (y = 0), stored as flat [x0,y0,z0, x1,y1,z1, ...].
+      const PRESETS = {
+        clean: {
+          label: "Clean CCW square",
+          points: [0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1],
+        },
+        cw: {
+          label: "Clockwise square",
+          points: [0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0],
+        },
+        bowtie: {
+          label: "Bowtie (self-intersecting)",
+          points: [0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1],
+        },
+        duplicate: {
+          label: "Duplicate point",
+          points: [0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1],
+        },
+        collinear: {
+          label: "Collinear (degenerate)",
+          points: [0, 0, 0, 1, 0, 0, 2, 0, 0],
+        },
+      };
+
+      let lineLoop = null;
+      let sceneRef = null;
+
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
+      }
+
+      function boolRow(label, value, badIsTrue) {
+        const flagged = badIsTrue ? value : !value;
+        const color = flagged ? "#dc2626" : "#16a34a";
+        return `<li><strong>${label}:</strong> <span style="color:${color}">${value}</span></li>`;
+      }
+
+      function renderReport(label, report) {
+        const verdictColor = report.is_valid ? "#16a34a" : "#dc2626";
+        const verdictText = report.is_valid ? "VALID" : "INVALID";
+
+        const diagnostics =
+          Array.isArray(report.diagnostics) && report.diagnostics.length
+            ? `<ul class="og-control-diagnostics">${report.diagnostics
+                .map((line) => `<li>${line}</li>`)
+                .join("")}</ul>`
+            : `<p class="og-control-summary">No diagnostics.</p>`;
+
+        readout.innerHTML = `
+          <p class="og-control-summary"><strong>${label}</strong></p>
+          <p style="font-weight:700;font-size:1.05rem;color:${verdictColor};margin:0.25rem 0;">
+            ${verdictText}
+          </p>
+          <ul class="og-control-flags">
+            ${boolRow("is_valid", report.is_valid, false)}
+            ${boolRow("winding_corrected", report.winding_corrected, true)}
+            ${boolRow("self_intersecting", report.self_intersecting, true)}
+            ${boolRow("degenerate", report.degenerate, true)}
+            <li><strong>removed_duplicates:</strong> ${report.removed_duplicates}</li>
+          </ul>
+          <p class="og-control-summary"><strong>Diagnostics</strong></p>
+          ${diagnostics}
+        `;
+      }
+
+      function drawLoop(points) {
+        if (!sceneRef) {
+          return;
+        }
+
+        if (lineLoop) {
+          sceneRef.remove(lineLoop);
+          lineLoop.geometry.dispose();
+          lineLoop.material.dispose();
+          lineLoop = null;
+        }
+
+        const positions = new Float32Array(points);
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+        const material = new THREE.LineBasicMaterial({ color: 0x0ea5e9 });
+        lineLoop = new THREE.LineLoop(geometry, material);
+        sceneRef.add(lineLoop);
+      }
+
+      function runPreset(key) {
+        const preset = PRESETS[key];
+        if (!preset) {
+          return;
+        }
+
+        const result = analyzeProfile(preset.points);
+        const report = JSON.parse(result);
+
+        renderReport(preset.label, report);
+        drawLoop(preset.points);
+
+        console.groupCollapsed(`[profile-validation] ${preset.label}`);
+        console.log("Flat points", preset.points);
+        console.log("Report", report);
+        console.groupEnd();
+      }
+
+      async function main() {
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+        sceneRef = scene;
+
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        camera.position.set(3.2, 3.4, 3.6);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const stats = mountStats();
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0.5, 0, 0.5);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        document.querySelectorAll("[data-preset]").forEach((button) => {
+          button.addEventListener("click", () => {
+            runPreset(button.getAttribute("data-preset"));
+          });
+        });
+
+        // Show the clean square by default once the kernel is ready.
+        runPreset("clean");
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      void main();
+    </script>
+  </body>
+</html>

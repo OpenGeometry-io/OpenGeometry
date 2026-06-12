@@ -9,7 +9,7 @@ use crate::brep::Brep;
 use crate::operations::triangulate::triangulate_polygon_with_holes;
 use openmaths::Vector3;
 
-const EPSILON_FALLBACK: f64 = 1.0e-9;
+const EPSILON_FALLBACK: f64 = crate::tolerance::MODELING_TOLERANCE_FLOOR;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Vec3f {

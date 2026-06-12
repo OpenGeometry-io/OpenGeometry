@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry WorkPlane Sketch Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Lift a fixed 2D sketch into 3D using an OpenGeometry WorkPlane frame." />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">WorkPlane Sketch</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>WorkPlane Sketch</h3>
+      <p class="og-control-summary">
+        A fixed 2D unit square sketch in (u, v) is lifted to 3D purely by the work-plane frame.
+        Tilt the plane normal and the square follows, with no hand-written transforms.
+      </p>
+
+      <label class="og-control-row" data-control="normalX">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Normal X</span>
+          <code class="og-control-value" data-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="-1" max="1" step="0.05" value="0" />
+          <input data-number type="number" min="-1" max="1" step="0.05" value="0" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="normalY">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Normal Y</span>
+          <code class="og-control-value" data-value>1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="-1" max="1" step="0.05" value="1" />
+          <input data-number type="number" min="-1" max="1" step="0.05" value="1" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="normalZ">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Normal Z</span>
+          <code class="og-control-value" data-value>0</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="-1" max="1" step="0.05" value="0" />
+          <input data-number type="number" min="-1" max="1" step="0.05" value="0" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="originY">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Origin Y</span>
+          <code class="og-control-value" data-value>1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0" max="3" step="0.05" value="1" />
+          <input data-number type="number" min="0" max="3" step="0.05" value="1" />
+        </div>
+      </label>
+
+      <div class="og-control-summary" data-readout style="white-space: pre-line; font-family: monospace;">
+        Lifted corners appear here.
+      </div>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { OpenGeometry, Vector3 } from "opengeometry";
+      import { WorkPlane } from "../../../opengeometry/pkg/opengeometry";
+
+      const app = document.getElementById("app");
+      const readout = document.querySelector("[data-readout]");
+
+      if (!app || !readout) {
+        throw new Error("Missing WorkPlane sketch page nodes");
+      }
+
+      // Fixed 2D unit square sketch defined purely in plane coordinates (u, v).
+      const SKETCH_UV = [
+        [-0.7, -0.7],
+        [0.7, -0.7],
+        [0.7, 0.7],
+        [-0.7, 0.7],
+      ];
+
+      const config = {
+        normalX: 0,
+        normalY: 1,
+        normalZ: 0,
+        originY: 1,
+      };
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
+      }
+
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
+      }
+
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
+
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
+        }
+
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
+          }
+
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
+
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
+      }
+
+      async function main() {
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        camera.position.set(5.8, 4.5, 6.8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const stats = mountStats();
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 1, 0);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        // Group that holds the recreated sketch objects each update.
+        const sketchGroup = new THREE.Group();
+        scene.add(sketchGroup);
+
+        const cornerMaterial = new THREE.MeshStandardMaterial({ color: 0xf97316 });
+        const cornerGeometry = new THREE.SphereGeometry(0.06, 16, 16);
+
+        function clearSketchGroup() {
+          for (let i = sketchGroup.children.length - 1; i >= 0; i--) {
+            const child = sketchGroup.children[i];
+            sketchGroup.remove(child);
+            if (child.geometry && child.geometry !== cornerGeometry) {
+              child.geometry.dispose();
+            }
+            if (child.material && child.material !== cornerMaterial) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach((m) => m.dispose());
+              } else {
+                child.material.dispose();
+              }
+            }
+            if (child.dispose) {
+              child.dispose();
+            }
+          }
+        }
+
+        function updateSketch() {
+          clearSketchGroup();
+
+          const nx = config.normalX;
+          const ny = config.normalY;
+          const nz = config.normalZ;
+
+          // Guard against a degenerate (zero-length) normal.
+          if (nx === 0 && ny === 0 && nz === 0) {
+            readout.textContent = "Normal is zero-length; pick a non-zero direction.";
+            return;
+          }
+
+          const origin = new Vector3(0, config.originY, 0);
+          const normal = new Vector3(nx, ny, nz);
+          const plane = WorkPlane.fromOriginNormal(origin, normal);
+
+          // Lift the fixed 2D sketch into 3D world space via the frame only.
+          const positions = [];
+          const liftedCorners = [];
+          for (const [u, v] of SKETCH_UV) {
+            const p = plane.liftPoint(u, v);
+            positions.push(p.x, p.y, p.z);
+            liftedCorners.push({ u, v, x: p.x, y: p.y, z: p.z });
+          }
+
+          // Lifted square as a closed line loop.
+          const loopGeometry = new THREE.BufferGeometry();
+          loopGeometry.setAttribute(
+            "position",
+            new THREE.Float32BufferAttribute(positions, 3)
+          );
+          const loopMaterial = new THREE.LineBasicMaterial({ color: 0x0ea5e9 });
+          const lineLoop = new THREE.LineLoop(loopGeometry, loopMaterial);
+          sketchGroup.add(lineLoop);
+
+          // Small sphere at each lifted corner.
+          for (const c of liftedCorners) {
+            const sphere = new THREE.Mesh(cornerGeometry, cornerMaterial);
+            sphere.position.set(c.x, c.y, c.z);
+            sketchGroup.add(sphere);
+          }
+
+          // Arrow for the plane normal, anchored at the plane origin.
+          const planeOrigin = plane.origin;
+          const planeNormal = plane.normal;
+          const arrowDir = new THREE.Vector3(
+            planeNormal.x,
+            planeNormal.y,
+            planeNormal.z
+          ).normalize();
+          const arrowOrigin = new THREE.Vector3(
+            planeOrigin.x,
+            planeOrigin.y,
+            planeOrigin.z
+          );
+          const arrow = new THREE.ArrowHelper(arrowDir, arrowOrigin, 1.2, 0x16a34a, 0.3, 0.18);
+          sketchGroup.add(arrow);
+
+          // On-screen readout of the 2D -> 3D mapping.
+          const lines = liftedCorners.map(
+            (c) =>
+              `(u ${formatNumber(c.u)}, v ${formatNumber(c.v)})  ->  ` +
+              `(${formatNumber(c.x)}, ${formatNumber(c.y)}, ${formatNumber(c.z)})`
+          );
+          readout.textContent =
+            `normal (${formatNumber(arrowDir.x)}, ${formatNumber(arrowDir.y)}, ${formatNumber(arrowDir.z)})\n` +
+            lines.join("\n");
+
+          console.groupCollapsed("[work-plane-sketch] sketch lifted");
+          console.log("Config", { ...config });
+          console.log("Lifted corners", liftedCorners);
+          console.groupEnd();
+        }
+
+        attachNumberControl("normalX", (value) => {
+          config.normalX = value;
+          updateSketch();
+        });
+        attachNumberControl("normalY", (value) => {
+          config.normalY = value;
+          updateSketch();
+        });
+        attachNumberControl("normalZ", (value) => {
+          config.normalZ = value;
+          updateSketch();
+        });
+        attachNumberControl("originY", (value) => {
+          config.originY = value;
+          updateSketch();
+        });
+
+        updateSketch();
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      void main();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Units STEP Export Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Browser CAD STEP export with selectable length units using OpenGeometry and OGSceneManager." />
+    <meta name="author" content="Vishwajeet Mane" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Units STEP Export</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>Units STEP Export</h3>
+      <p class="og-control-summary">
+        Build one kernel-backed cuboid, pick a length unit, then export it as a STEP file. The
+        emitted unit context is shown below.
+      </p>
+
+      <label class="og-control-row" data-control="width">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Width</span>
+          <code class="og-control-value" data-value>1.8</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="4" step="0.1" value="1.8" />
+          <input data-number type="number" min="0.5" max="4" step="0.1" value="1.8" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="height">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Height</span>
+          <code class="og-control-value" data-value>1.4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="4" step="0.1" value="1.4" />
+          <input data-number type="number" min="0.5" max="4" step="0.1" value="1.4" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="depth">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Depth</span>
+          <code class="og-control-value" data-value>1.1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="4" step="0.1" value="1.1" />
+          <input data-number type="number" min="0.5" max="4" step="0.1" value="1.1" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="unit">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Length Unit</span>
+        </div>
+        <select data-unit>
+          <option value="Millimetre">Millimetre</option>
+          <option value="Centimetre">Centimetre</option>
+          <option value="Metre" selected>Metre</option>
+          <option value="Inch">Inch</option>
+          <option value="Foot">Foot</option>
+        </select>
+      </label>
+
+      <button type="button" class="og-control-action og-control-action-amber" data-export>
+        Export STEP
+      </button>
+      <a hidden data-download></a>
+
+      <div class="og-control-readout" data-readout>Unit context: (export to see)</div>
+    </aside>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import "../src/styles/theme.css";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import Stats from "three/examples/jsm/libs/stats.module.js";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import { Cuboid, OGSceneManager, OpenGeometry, Vector3 } from "opengeometry";
+
+      const app = document.getElementById("app");
+      const exportButton = document.querySelector("[data-export]");
+      const downloadLink = document.querySelector("[data-download]");
+      const unitSelect = document.querySelector("[data-unit]");
+      const readout = document.querySelector("[data-readout]");
+
+      if (!app || !exportButton || !downloadLink || !unitSelect || !readout) {
+        throw new Error("Missing units STEP export page nodes");
+      }
+
+      const config = {
+        width: 1.8,
+        height: 1.4,
+        depth: 1.1,
+      };
+
+      let cuboid = null;
+
+      function formatNumber(value) {
+        return Number(value).toFixed(2).replace(/\.?0+$/, "");
+      }
+
+      function mountStats() {
+        const stats = new Stats();
+        stats.showPanel(0);
+        stats.dom.style.position = "fixed";
+        stats.dom.style.left = "12px";
+        stats.dom.style.bottom = "12px";
+        stats.dom.style.top = "auto";
+        stats.dom.style.zIndex = "1000";
+        document.body.appendChild(stats.dom);
+        return stats;
+      }
+
+      function attachNumberControl(name, onChange) {
+        const row = document.querySelector(`[data-control="${name}"]`);
+        const range = row?.querySelector("[data-range]");
+        const number = row?.querySelector("[data-number]");
+        const value = row?.querySelector("[data-value]");
+
+        if (!row || !range || !number || !value) {
+          throw new Error(`Missing number control: ${name}`);
+        }
+
+        const commit = (nextValue) => {
+          const parsed = Number(nextValue);
+          if (!Number.isFinite(parsed)) {
+            return;
+          }
+
+          range.value = String(parsed);
+          number.value = String(parsed);
+          value.textContent = formatNumber(parsed);
+          onChange(parsed);
+        };
+
+        range.addEventListener("input", () => commit(range.value));
+        number.addEventListener("input", () => commit(number.value));
+        commit(range.value);
+      }
+
+      function downloadText(text, filename) {
+        const blob = new Blob([text], { type: "application/step" });
+        const url = URL.createObjectURL(blob);
+        downloadLink.href = url;
+        downloadLink.download = filename;
+        downloadLink.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function extractUnitContext(text) {
+        const lines = String(text).split(/\r?\n/);
+        const match = lines.find(
+          (line) => line.includes("SI_UNIT") || line.includes("CONVERSION_BASED_UNIT")
+        );
+        return match ? match.trim() : null;
+      }
+
+      function updateCuboid() {
+        if (!cuboid) {
+          return;
+        }
+
+        cuboid.setConfig({
+          center: new Vector3(0, config.height * 0.5, 0),
+          width: config.width,
+          height: config.height,
+          depth: config.depth,
+          color: 0x0ea5e9,
+          outlineWidth: 2,
+        });
+        cuboid.outline = true;
+
+        console.groupCollapsed("[units-step-export] shape updated");
+        console.log("Config", { ...config });
+        console.groupEnd();
+      }
+
+      async function main() {
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+
+        const camera = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        camera.position.set(5.8, 4.5, 6.8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        app.replaceChildren(renderer.domElement);
+
+        const stats = mountStats();
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 0.9, 0);
+        controls.update();
+
+        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+        const light = new THREE.DirectionalLight(0xffffff, 1.1);
+        light.position.set(6, 8, 4);
+        scene.add(light);
+
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        cuboid = new Cuboid({
+          center: new Vector3(0, config.height * 0.5, 0),
+          width: config.width,
+          height: config.height,
+          depth: config.depth,
+          color: 0x0ea5e9,
+          outlineWidth: 2,
+        });
+        scene.add(cuboid);
+
+        attachNumberControl("width", (value) => {
+          config.width = value;
+          updateCuboid();
+        });
+        attachNumberControl("height", (value) => {
+          config.height = value;
+          updateCuboid();
+        });
+        attachNumberControl("depth", (value) => {
+          config.depth = value;
+          updateCuboid();
+        });
+
+        updateCuboid();
+
+        exportButton.addEventListener("click", () => {
+          const lengthUnit = unitSelect.value;
+
+          const manager = new OGSceneManager();
+          const sceneId = manager.createScene("units-step-export-scene");
+          manager.addBrepEntityToScene(
+            sceneId,
+            "step-cuboid",
+            "OGCuboid",
+            JSON.stringify(cuboid.getBrepData())
+          );
+
+          const result = manager.exportSceneToStep(sceneId, JSON.stringify({
+            schema: "AutomotiveDesign",
+            product_name: "OpenGeometry Units Export",
+            scale: 1,
+            error_policy: "BestEffort",
+            validate_topology: true,
+            require_closed_shell: true,
+            length_unit: lengthUnit,
+          }));
+
+          const report = JSON.parse(result.reportJson);
+          const unitContext = extractUnitContext(result.text);
+          readout.textContent = unitContext
+            ? `Unit context: ${unitContext}`
+            : `Unit context: (not found for ${lengthUnit})`;
+
+          downloadText(result.text, "opengeometry-cuboid-units.step");
+
+          console.groupCollapsed("[units-step-export] export complete");
+          console.log("Length unit", lengthUnit);
+          console.log("Unit context", unitContext);
+          console.log("Config", { ...config });
+          console.log("Report", report);
+          console.groupEnd();
+        });
+
+        renderer.setAnimationLoop(() => {
+          stats.update();
+          controls.update();
+          renderer.render(scene, camera);
+        });
+
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+      }
+
+      void main();
+    </script>
+  </body>
+</html>

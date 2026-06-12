@@ -10,6 +10,7 @@ pub mod geometry {
 pub mod operations {
     pub mod extrude;
     pub mod offset;
+    pub mod profile;
     pub mod sweep;
     pub mod triangulate;
     pub mod windingsort;
@@ -36,10 +37,13 @@ pub mod primitives {
 
 pub mod spatial {
     pub mod placement;
+    pub mod workplane;
 }
 
 pub mod booleans;
 pub mod brep;
+pub mod tolerance;
+pub mod units;
 pub mod editor;
 pub mod export;
 pub mod freeform;

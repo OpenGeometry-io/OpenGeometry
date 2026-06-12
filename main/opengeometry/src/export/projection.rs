@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::brep::Brep;
 
-const EPSILON: f64 = 1.0e-9;
+const EPSILON: f64 = crate::tolerance::MODELING_TOLERANCE_FLOOR;
 const CREASE_COS_THRESHOLD: f64 = 0.9995;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

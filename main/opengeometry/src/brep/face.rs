@@ -1,6 +1,8 @@
 use openmaths::Vector3;
 use serde::{Deserialize, Serialize};
 
+use super::geometry::SurfaceGeometry;
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Face {
     pub id: u32,
@@ -8,6 +10,10 @@ pub struct Face {
     pub outer_loop: u32,
     pub inner_loops: Vec<u32>,
     pub shell_ref: Option<u32>,
+    /// Exact analytic surface of this face (D1). `None` ⇒ a general planar
+    /// polygon whose plane is implied by its loop. Defaulted for v1 back-compat.
+    #[serde(default)]
+    pub surface: Option<SurfaceGeometry>,
 }
 
 impl Face {
@@ -24,10 +30,15 @@ impl Face {
             outer_loop,
             inner_loops,
             shell_ref,
+            surface: None,
         }
     }
 
     pub fn set_normal(&mut self, normal: Vector3) {
         self.normal = normal;
+    }
+
+    pub fn set_surface(&mut self, surface: SurfaceGeometry) {
+        self.surface = Some(surface);
     }
 }

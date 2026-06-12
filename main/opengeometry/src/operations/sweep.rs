@@ -6,7 +6,7 @@ use crate::brep::{Brep, BrepBuilder, BrepError};
 use openmaths::Vector3;
 use uuid::Uuid;
 
-const EPSILON: f64 = 1.0e-9;
+const EPSILON: f64 = crate::tolerance::MODELING_TOLERANCE_FLOOR;
 const PLANAR_TOLERANCE_FACTOR: f64 = 1.0e-7;
 
 #[derive(Clone, Copy)]

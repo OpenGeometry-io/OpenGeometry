@@ -2,9 +2,11 @@ pub mod builder;
 pub mod edge;
 pub mod error;
 pub mod face;
+pub mod geometry;
 pub mod halfedge;
 pub mod r#loop;
 pub mod shell;
+pub mod validity;
 pub mod vertex;
 pub mod wire;
 
@@ -25,6 +27,7 @@ pub use builder::BrepBuilder;
 pub use edge::Edge;
 pub use error::{BrepError, BrepErrorKind};
 pub use face::Face;
+pub use geometry::{CurveGeometry, SurfaceGeometry};
 pub use halfedge::HalfEdge;
 pub use r#loop::Loop;
 pub use shell::Shell;
@@ -124,6 +127,28 @@ impl Brep {
         let placement_matrix = placement.world_matrix();
         for vertex in &mut self.vertices {
             vertex.position.apply_matrix4(placement_matrix.clone());
+        }
+
+        let has_analytic_geometry = self.edges.iter().any(|edge| edge.curve.is_some())
+            || self.faces.iter().any(|face| face.surface.is_some());
+        if has_analytic_geometry {
+            let matrix = placement_matrix.clone();
+            let transform_point = |v: Vector3| {
+                let mut p = v;
+                p.apply_matrix4(matrix.clone());
+                p
+            };
+            let scale = placement.scale().x;
+            for edge in &mut self.edges {
+                if let Some(curve) = &edge.curve {
+                    edge.curve = Some(curve.transformed_with(&transform_point, scale));
+                }
+            }
+            for face in &mut self.faces {
+                if let Some(surface) = &face.surface {
+                    face.surface = Some(surface.transformed_with(&transform_point, scale));
+                }
+            }
         }
 
         if !self.faces.is_empty() {

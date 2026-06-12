@@ -85,7 +85,7 @@ impl BooleanOptions {
             let dy = max.y - min.y;
             let dz = max.z - min.z;
             let diagonal = (dx * dx + dy * dy + dz * dz).sqrt();
-            (diagonal * 1.0e-8).max(1.0e-9)
+            crate::tolerance::ToleranceContext::derived_modeling_for_diagonal(diagonal)
         })
     }
 }

@@ -25,7 +25,11 @@ impl OGFreeformGeometry {
             face_id,
             centroid: compute_face_centroid(&brep, face).unwrap_or(Vector3::new(0.0, 0.0, 0.0)),
             normal: face.normal,
-            surface_type: "planar".to_string(),
+            surface_type: face
+                .surface
+                .as_ref()
+                .map(|surface| surface.kind().to_string())
+                .unwrap_or_else(|| "planar".to_string()),
             loop_ids,
             edge_ids,
             vertex_ids,
@@ -53,9 +57,17 @@ impl OGFreeformGeometry {
             .map(|vertex| vertex.position)
             .ok_or_else(|| JsValue::from_str(&format!("Edge {} end vertex is missing", edge_id)))?;
 
+        let curve_type = brep
+            .edges
+            .iter()
+            .find(|edge| edge.id == edge_id)
+            .and_then(|edge| edge.curve.as_ref())
+            .map(|curve| curve.kind().to_string())
+            .unwrap_or_else(|| "line".to_string());
+
         Ok(EdgeInfo {
             edge_id,
-            curve_type: "line".to_string(),
+            curve_type,
             start_vertex_id: start_id,
             end_vertex_id: end_id,
             start,
