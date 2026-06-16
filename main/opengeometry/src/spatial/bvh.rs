@@ -436,6 +436,16 @@ impl OGSpatialIndex {
         })
     }
 
+    #[wasm_bindgen(js_name = fromFlatArrays)]
+    pub fn from_flat_arrays(ids: Vec<u32>, bounds: Vec<f64>) -> Result<OGSpatialIndex, JsValue> {
+        let primitives =
+            primitives_from_flat_arrays(&ids, &bounds).map_err(|err| JsValue::from_str(&err))?;
+
+        Ok(Self {
+            bvh: Bvh3::build(primitives),
+        })
+    }
+
     #[wasm_bindgen(js_name = primitiveCount)]
     pub fn primitive_count(&self) -> usize {
         self.bvh.primitive_count()
@@ -461,10 +471,31 @@ impl OGSpatialIndex {
         serialize_ids(self.bvh.query_aabb(&bounds))
     }
 
+    #[wasm_bindgen(js_name = queryAabbIds)]
+    pub fn query_aabb_ids(
+        &self,
+        min_x: f64,
+        min_y: f64,
+        min_z: f64,
+        max_x: f64,
+        max_y: f64,
+        max_z: f64,
+    ) -> Result<Vec<u32>, JsValue> {
+        let bounds = Aabb3::from_coords(min_x, min_y, min_z, max_x, max_y, max_z)
+            .map_err(|err| JsValue::from_str(&err))?;
+        Ok(self.bvh.query_aabb(&bounds))
+    }
+
     #[wasm_bindgen(js_name = queryFrustum)]
     pub fn query_frustum(&self, planes_json: String) -> Result<String, JsValue> {
         let frustum = parse_frustum_json(&planes_json).map_err(|err| JsValue::from_str(&err))?;
         serialize_ids(self.bvh.query_frustum(&frustum))
+    }
+
+    #[wasm_bindgen(js_name = queryFrustumIds)]
+    pub fn query_frustum_ids(&self, planes_json: String) -> Result<Vec<u32>, JsValue> {
+        let frustum = parse_frustum_json(&planes_json).map_err(|err| JsValue::from_str(&err))?;
+        Ok(self.bvh.query_frustum(&frustum))
     }
 
     #[wasm_bindgen(js_name = raycastFirst)]
@@ -593,6 +624,33 @@ fn parse_frustum_json(planes_json: &str) -> Result<Frustum3, String> {
         .collect::<Result<Vec<_>, _>>()?;
 
     Frustum3::new(planes)
+}
+
+fn primitives_from_flat_arrays(ids: &[u32], bounds: &[f64]) -> Result<Vec<BvhPrimitive>, String> {
+    if bounds.len() != ids.len() * 6 {
+        return Err(format!(
+            "Invalid spatial index arrays: expected {} bounds values for {} ids, got {}.",
+            ids.len() * 6,
+            ids.len(),
+            bounds.len()
+        ));
+    }
+
+    ids.iter()
+        .enumerate()
+        .map(|(index, id)| {
+            let offset = index * 6;
+            Aabb3::from_coords(
+                bounds[offset],
+                bounds[offset + 1],
+                bounds[offset + 2],
+                bounds[offset + 3],
+                bounds[offset + 4],
+                bounds[offset + 5],
+            )
+            .map(|bounds| BvhPrimitive::new(*id, bounds))
+        })
+        .collect()
 }
 
 fn serialize_ids(ids: Vec<u32>) -> Result<String, JsValue> {
@@ -772,5 +830,24 @@ mod tests {
             .raycast_first(0.0, 2.5, 2.5, 1.0, 0.0, 0.0, 100.0)
             .expect("raycast hit");
         assert_eq!(ray_hit, r#"{"id":2,"distance":2.0}"#);
+    }
+
+    #[test]
+    fn wasm_spatial_index_builds_from_flat_arrays_and_returns_ids() {
+        let index = OGSpatialIndex::from_flat_arrays(
+            vec![11, 22, 33],
+            vec![
+                -2.0, 0.0, 0.0, -1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 6.0, 0.0, 0.0, 7.0,
+                1.0, 1.0,
+            ],
+        )
+        .expect("valid flat-array index");
+
+        let ids = index
+            .query_aabb_ids(0.0, 0.0, 0.0, 4.0, 4.0, 4.0)
+            .expect("typed aabb query ids");
+        assert_eq!(ids, vec![22]);
+
+        assert!(primitives_from_flat_arrays(&[1], &[0.0, 0.0, 0.0]).is_err());
     }
 }
