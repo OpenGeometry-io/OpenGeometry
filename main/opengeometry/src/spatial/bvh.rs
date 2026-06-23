@@ -848,6 +848,39 @@ mod tests {
     }
 
     #[test]
+    fn raycast_handles_parallel_slabs_and_max_distance_edges() {
+        let bvh = Bvh3::build(vec![box_primitive(20, (1.0, -1.0, -1.0), (2.0, 1.0, 1.0))]);
+
+        let parallel_outside = Ray3::new(
+            Vector3::new(0.0, -5.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+            10.0,
+        )
+        .expect("valid ray");
+        assert!(bvh.raycast_first(&parallel_outside).is_none());
+
+        let parallel_inside = Ray3::new(
+            Vector3::new(1.5, -5.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+            10.0,
+        )
+        .expect("valid ray");
+        let hit = bvh
+            .raycast_first(&parallel_inside)
+            .expect("parallel slab hit");
+        assert_eq!(hit.id, 20);
+        assert_eq!(hit.distance, 4.0);
+
+        let clipped_before_entry = Ray3::new(
+            Vector3::new(3.0, 0.0, 0.0),
+            Vector3::new(-1.0e-13, 1.0, 0.0),
+            9.0e12,
+        )
+        .expect("valid long ray");
+        assert!(bvh.raycast_first(&clipped_before_entry).is_none());
+    }
+
+    #[test]
     fn wasm_spatial_index_queries_aabb_frustum_and_ray() {
         let items = r#"[
             {"id": 1, "min": [-2, 0, 0], "max": [-1, 1, 1]},
