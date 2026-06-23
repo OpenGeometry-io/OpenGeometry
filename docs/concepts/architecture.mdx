@@ -29,6 +29,7 @@ The architecture consists of three primary layers:
 │   • Primitives                          │
 │   • Operations                          │
 │   • BREP                                │
+│   • Spatial queries                     │
 │   • Export                              │
 └─────────────────────────────────────────┘
 ```
@@ -69,6 +70,10 @@ The Rust core is organized into focused modules as defined in `src/lib.rs`:
 
 **booleans**
 - Kernel-backed boolean operations (union, intersection, subtraction)
+
+**spatial**
+- `placement` - Translation, rotation, and scale transforms for kernel-backed geometry
+- `bvh` - AABB spatial index for broad-phase scene queries
 
 **brep**
 Boundary representation data structures:
@@ -186,6 +191,7 @@ Secondary target for server-side use:
 - **Rust Core**: Near-native performance, memory-safe
 - **WASM Overhead**: Minimal for compute-heavy operations
 - **Serialization**: JSON for complex types, typed arrays for vertex data
+- **Spatial Queries**: AABB BVH queries for broad-phase culling and candidate selection
 - **Three.js Integration**: Efficient mesh creation from BREP output
 
 ## Next Steps
@@ -196,5 +202,8 @@ Secondary target for server-side use:
   </Card>
   <Card title="Scene Graph" icon="sitemap" href="/concepts/scene-graph">
     Understand multi-entity scene management
+  </Card>
+  <Card title="Spatial Index" icon="magnifying-glass" href="/concepts/spatial-index">
+    Learn how to query large sets of scene bounds
   </Card>
 </CardGroup>
