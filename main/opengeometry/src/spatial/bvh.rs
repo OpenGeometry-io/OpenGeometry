@@ -240,19 +240,30 @@ impl Ray3 {
             );
         }
 
-        let length_squared =
-            direction.x * direction.x + direction.y * direction.y + direction.z * direction.z;
-        if length_squared <= RAY_EPSILON {
+        let max_component = direction
+            .x
+            .abs()
+            .max(direction.y.abs())
+            .max(direction.z.abs());
+        if max_component == 0.0 {
             return Err("Invalid ray: direction must be non-zero.".to_string());
         }
 
+        let scaled_direction = Vector3::new(
+            direction.x / max_component,
+            direction.y / max_component,
+            direction.z / max_component,
+        );
+        let length_squared = scaled_direction.x * scaled_direction.x
+            + scaled_direction.y * scaled_direction.y
+            + scaled_direction.z * scaled_direction.z;
         let inv_length = 1.0 / length_squared.sqrt();
         Ok(Self {
             origin,
             direction: Vector3::new(
-                direction.x * inv_length,
-                direction.y * inv_length,
-                direction.z * inv_length,
+                scaled_direction.x * inv_length,
+                scaled_direction.y * inv_length,
+                scaled_direction.z * inv_length,
             ),
             max_distance,
         })
@@ -792,6 +803,27 @@ mod tests {
         let hit = bvh.raycast_first(&ray).expect("nearest hit");
         assert_eq!(hit.id, 20);
         assert_eq!(hit.distance, 2.0);
+    }
+
+    #[test]
+    fn raycast_accepts_small_non_zero_direction_before_normalizing() {
+        let bvh = Bvh3::build(vec![box_primitive(20, (2.0, -1.0, -1.0), (3.0, 1.0, 1.0))]);
+        let ray = Ray3::new(
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0e-7, 0.0, 0.0),
+            100.0,
+        )
+        .expect("small non-zero direction should normalize");
+
+        let hit = bvh.raycast_first(&ray).expect("hit");
+        assert_eq!(hit.id, 20);
+        assert_eq!(hit.distance, 2.0);
+        assert!(Ray3::new(
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 0.0),
+            100.0,
+        )
+        .is_err());
     }
 
     #[test]

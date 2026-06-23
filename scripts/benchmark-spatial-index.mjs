@@ -119,13 +119,18 @@ function percentile(values, p) {
   return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1))] ?? 0;
 }
 
-function measure(fn) {
+function measure(fn, options = {}) {
   const samples = [];
   let value;
   for (let index = 0; index < repeatCount; index += 1) {
     const startedAt = performance.now();
-    value = fn();
+    const nextValue = fn();
     samples.push(performance.now() - startedAt);
+    if (index === repeatCount - 1) {
+      value = nextValue;
+    } else {
+      options.dispose?.(nextValue);
+    }
   }
   return {
     value,
@@ -157,7 +162,9 @@ if (typeof OGSpatialIndex?.fromFlatArrays !== "function") {
 const { bounds, ids, items } = createSceneItems(itemCount);
 const queries = createQueries(queryCount);
 
-const build = measure(() => OGSpatialIndex.fromFlatArrays(ids, bounds));
+const build = measure(() => OGSpatialIndex.fromFlatArrays(ids, bounds), {
+  dispose: (value) => value.free?.(),
+});
 const index = build.value;
 
 const linearSamples = [];
