@@ -11,6 +11,7 @@
     "test": "cargo test --manifest-path main/opengeometry/Cargo.toml && cargo test --examples --manifest-path main/opengeometry/Cargo.toml",
     "lint": "eslint main/opengeometry-three/src/**/*.ts --fix",
     "lint:check": "eslint main/opengeometry-three/src/**/*.ts",
+    "benchmark:spatial-index": "node scripts/benchmark-spatial-index.mjs",
     "build-three": "rollup -c rollup.config.js",
     "build-example-three": "npm --prefix main/opengeometry-three run build-example-three",
     "build-core": "cd main/opengeometry && wasm-pack build --target web && cargo build --release",
