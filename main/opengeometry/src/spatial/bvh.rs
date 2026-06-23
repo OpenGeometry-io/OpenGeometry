@@ -678,7 +678,7 @@ fn update_ray_interval(
     t_min: &mut f64,
     t_max: &mut f64,
 ) -> Option<()> {
-    if direction.abs() <= RAY_EPSILON {
+    if direction == 0.0 {
         return (origin >= min && origin <= max).then_some(());
     }
 
@@ -824,6 +824,27 @@ mod tests {
             100.0,
         )
         .is_err());
+    }
+
+    #[test]
+    fn raycast_does_not_treat_tiny_non_zero_axis_components_as_parallel() {
+        let bvh = Bvh3::build(vec![box_primitive(
+            20,
+            (1.0, 0.0, -1.0),
+            (2.0, 2.0e13, 1.0),
+        )]);
+        let ray = Ray3::new(
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0e-13, 1.0, 0.0),
+            2.0e13,
+        )
+        .expect("tiny non-zero axis component should remain directional");
+
+        let hit = bvh
+            .raycast_first(&ray)
+            .expect("hit through tiny x component");
+        assert_eq!(hit.id, 20);
+        assert!(hit.distance > 9.0e12);
     }
 
     #[test]
