@@ -5,8 +5,6 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 const BVH_LEAF_SIZE: usize = 8;
-const RAY_EPSILON: f64 = 1.0e-12;
-
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct Aabb3 {
     pub min: Vector3,
@@ -196,8 +194,8 @@ impl Plane3 {
             return Err("Invalid frustum plane: constant must be finite.".to_string());
         }
 
-        let length_squared = normal.x * normal.x + normal.y * normal.y + normal.z * normal.z;
-        if length_squared <= RAY_EPSILON {
+        let max_component = normal.x.abs().max(normal.y.abs()).max(normal.z.abs());
+        if max_component == 0.0 {
             return Err("Invalid frustum plane: normal must be non-zero.".to_string());
         }
 
@@ -638,10 +636,14 @@ fn parse_frustum_json(planes_json: &str) -> Result<Frustum3, String> {
 }
 
 fn primitives_from_flat_arrays(ids: &[u32], bounds: &[f64]) -> Result<Vec<BvhPrimitive>, String> {
-    if bounds.len() != ids.len() * 6 {
+    let expected_bounds_len = ids
+        .len()
+        .checked_mul(6)
+        .ok_or_else(|| "Invalid spatial index arrays: id count is too large.".to_string())?;
+    if bounds.len() != expected_bounds_len {
         return Err(format!(
             "Invalid spatial index arrays: expected {} bounds values for {} ids, got {}.",
-            ids.len() * 6,
+            expected_bounds_len,
             ids.len(),
             bounds.len()
         ));
@@ -693,7 +695,7 @@ fn update_ray_interval(
     *t_min = (*t_min).max(near);
     *t_max = (*t_max).min(far);
 
-    (t_min <= t_max).then_some(())
+    (*t_min <= *t_max).then_some(())
 }
 
 fn validate_vector3(vector: Vector3, label: &str) -> Result<(), String> {
@@ -785,6 +787,20 @@ mod tests {
             sorted(bvh.query_frustum(&test_frustum())),
             vec![0, 1, 2, 3, 4, 5]
         );
+    }
+
+    #[test]
+    fn frustum_accepts_tiny_non_zero_plane_normals() {
+        let bvh = Bvh3::build(vec![
+            box_primitive(10, (-2.0, 0.0, 0.0), (-1.0, 1.0, 1.0)),
+            box_primitive(20, (1.0, 0.0, 0.0), (2.0, 1.0, 1.0)),
+        ]);
+        let frustum = Frustum3::new(vec![Plane3::new(Vector3::new(1.0e-13, 0.0, 0.0), 0.0)
+            .expect("tiny non-zero normal is valid")])
+        .expect("valid frustum");
+
+        assert_eq!(bvh.query_frustum(&frustum), vec![20]);
+        assert!(Plane3::new(Vector3::new(0.0, 0.0, 0.0), 0.0).is_err());
     }
 
     #[test]
