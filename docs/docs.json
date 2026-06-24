@@ -58,6 +58,7 @@
               "concepts/operations",
               "concepts/brep",
               "concepts/booleans",
+              "concepts/spatial-index",
               "concepts/exports"
             ]
           },
@@ -76,7 +77,8 @@
           {
             "group": "Core",
             "pages": [
-              "api/core/opengeometry"
+              "api/core/opengeometry",
+              "api/core/spatial-index"
             ]
           },
           {

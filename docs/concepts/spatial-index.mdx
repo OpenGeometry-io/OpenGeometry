@@ -1,0 +1,85 @@
+---
+title: 'Spatial Index'
+description: 'Broad-phase scene queries with a WASM-backed AABB BVH'
+---
+
+OpenGeometry includes a lightweight spatial index for broad-phase scene queries. It stores
+application-provided axis-aligned bounding boxes (AABBs) in a bounding volume hierarchy (BVH) and
+answers coarse AABB, frustum, and ray queries inside the WASM kernel.
+
+Use it when your application already has object, chunk, or entity bounds and needs to reduce a large
+set to a smaller candidate list before doing more expensive work.
+
+## What It Solves
+
+The spatial index is designed for:
+
+- view-frustum candidate culling
+- broad-phase picking before exact geometry tests
+- object or chunk visibility queries
+- fast overlap checks for many scene items
+
+It is not a triangle-level mesh acceleration structure. `raycastFirst(...)` returns the nearest
+intersected bounding box, not the nearest triangle on a mesh. Applications that need exact picking
+should use the result as a candidate set and then run a narrow-phase test against their own geometry
+or a future triangle BVH.
+
+## Data Model
+
+Each indexed item has:
+
+- a numeric `id`
+- a minimum AABB corner `[x, y, z]`
+- a maximum AABB corner `[x, y, z]`
+
+The index does not own B-Reps, Three.js objects, scene graph entities, or mesh buffers. This keeps it
+usable from different downstream scene systems without making the B-Rep or renderer layers maintain a
+second source of geometry truth.
+
+## Runtime Flow
+
+1. Initialize OpenGeometry once.
+2. Build an `OGSpatialIndex` from item bounds.
+3. Query it with an AABB, frustum plane set, or ray.
+4. Use the returned IDs to look up your application objects.
+
+```ts
+import { OGSpatialIndex, OpenGeometry } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+
+const ids = new Uint32Array([101, 102, 103]);
+const bounds = new Float64Array([
+  0, 0, 0, 2, 2, 2,
+  8, 0, 0, 10, 2, 2,
+  0, 0, 8, 2, 2, 10,
+]);
+
+const index = OGSpatialIndex.fromFlatArrays(ids, bounds);
+const visibleIds = index.queryAabbIds(-1, -1, -1, 3, 3, 3);
+
+console.log([...visibleIds]); // [101]
+```
+
+## Why It Lives in the Kernel
+
+`OGSpatialIndex` is a geometry-adjacent primitive rather than an application workflow. It belongs in
+the core because the same broad-phase index is useful for scene export, viewport culling, picking
+candidates, and downstream AEC/BIM tools.
+
+Downstream packages can still decide when to rebuild the index, how to map IDs back to application
+objects, and which exact narrow-phase test to run after the broad-phase query.
+
+## Limits
+
+- Bounds must be finite and axis-aligned.
+- The index is immutable after construction; rebuild it when item bounds change.
+- Ray queries intersect AABBs only.
+- Frustum queries accept plane equations and return items whose bounds intersect the frustum.
+- This does not replace B-Rep topology, exact boolean operations, or renderer-specific mesh BVHs.
+
+## Related Reading
+
+- [Spatial Index API](/api/core/spatial-index)
+- [Scene Graph](/concepts/scene-graph)
+- [Architecture Overview](/concepts/architecture)

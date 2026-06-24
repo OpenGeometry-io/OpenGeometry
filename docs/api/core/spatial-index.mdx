@@ -1,0 +1,159 @@
+---
+title: Spatial Index
+description: Query AABB bounds with the OGSpatialIndex broad-phase API
+---
+
+`OGSpatialIndex` is a WASM-backed AABB BVH. It accepts application-provided bounds and returns item
+IDs for broad-phase queries.
+
+<Note>
+Initialize the runtime once before creating an index:
+
+```ts
+import { OpenGeometry } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+```
+</Note>
+
+## Create an Index
+
+### fromFlatArrays()
+
+Builds an index from typed arrays. This is the preferred path for large scenes because it avoids
+JSON parsing.
+
+```ts
+import { OGSpatialIndex } from "opengeometry";
+
+const ids = new Uint32Array([1, 2]);
+const bounds = new Float64Array([
+  0, 0, 0, 1, 1, 1,
+  4, 0, 0, 5, 1, 1,
+]);
+
+const index = OGSpatialIndex.fromFlatArrays(ids, bounds);
+```
+
+<ParamField path="ids" type="Uint32Array">
+  Item IDs returned by queries.
+</ParamField>
+
+<ParamField path="bounds" type="Float64Array">
+  Flat AABB values in `[minX, minY, minZ, maxX, maxY, maxZ]` order for each ID.
+</ParamField>
+
+### constructor()
+
+Builds an index from a JSON string. This path is convenient for small payloads and tests.
+
+```ts
+const index = new OGSpatialIndex(JSON.stringify([
+  { id: 1, min: [0, 0, 0], max: [1, 1, 1] },
+  { id: 2, min: [4, 0, 0], max: [5, 1, 1] },
+]));
+```
+
+## Inspect the Index
+
+### primitiveCount()
+
+Returns the number of indexed AABBs.
+
+```ts
+const count = index.primitiveCount();
+```
+
+### nodeCount()
+
+Returns the number of BVH nodes.
+
+```ts
+const nodes = index.nodeCount();
+```
+
+## Query AABBs
+
+### queryAabbIds()
+
+Returns a `Uint32Array` of IDs whose bounds intersect the query bounds.
+
+```ts
+const ids = index.queryAabbIds(0, 0, 0, 2, 2, 2);
+console.log([...ids]);
+```
+
+### queryAabb()
+
+Returns the same result as a JSON string.
+
+```ts
+const ids = JSON.parse(index.queryAabb(0, 0, 0, 2, 2, 2));
+```
+
+## Query Frustums
+
+### queryFrustumIds()
+
+Returns a `Uint32Array` of IDs whose bounds intersect the supplied frustum.
+
+Frustum planes use `{ normal: [x, y, z], constant }`, where a point is inside the plane when:
+
+```ts
+normal.x * point.x + normal.y * point.y + normal.z * point.z + constant >= 0
+```
+
+```ts
+const planes = JSON.stringify([
+  { normal: [1, 0, 0], constant: 0 },
+  { normal: [-1, 0, 0], constant: 10 },
+  { normal: [0, 1, 0], constant: 0 },
+  { normal: [0, -1, 0], constant: 10 },
+  { normal: [0, 0, 1], constant: 0 },
+  { normal: [0, 0, -1], constant: 10 },
+]);
+
+const ids = index.queryFrustumIds(planes);
+```
+
+### queryFrustum()
+
+Returns the same result as a JSON string.
+
+```ts
+const ids = JSON.parse(index.queryFrustum(planes));
+```
+
+## Raycast Bounds
+
+### raycastFirst()
+
+Returns the nearest intersected AABB as JSON, or `null` if no bounds are hit.
+
+```ts
+const hit = JSON.parse(index.raycastFirst(
+  0, 0.5, 0.5,
+  1, 0, 0,
+  100,
+));
+```
+
+<Warning>
+This is a broad-phase ray query against bounding boxes. It does not test mesh triangles or B-Rep
+faces.
+</Warning>
+
+## Errors
+
+The index rejects:
+
+- non-finite coordinates
+- bounds where `min > max`
+- flat arrays whose bounds length is not `ids.length * 6`
+- frustum planes with zero normals
+- rays with zero direction or negative max distance
+
+## Related Reading
+
+- [Spatial Index concept](/concepts/spatial-index)
+- [Scene Management](/api/scene/scene-management)

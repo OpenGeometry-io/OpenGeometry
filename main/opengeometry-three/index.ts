@@ -3,6 +3,7 @@
  */
 import init, {
   OGSceneManager,
+  OGSpatialIndex,
   Vector3,
 } from "../opengeometry/pkg/opengeometry";
 import { SpotLabel } from "./src/markup/spotMarker";
@@ -105,6 +106,11 @@ export class OpenGeometry {
  * export, and other scene-level workflows.
  */
 export { OGSceneManager };
+
+/**
+ * WASM-backed AABB spatial index for broad-phase scene queries.
+ */
+export { OGSpatialIndex };
 
 /**
  * Shared wasm-backed vector type used throughout the public API.

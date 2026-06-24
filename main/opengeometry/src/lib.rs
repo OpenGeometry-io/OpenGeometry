@@ -36,6 +36,7 @@ pub mod primitives {
 }
 
 pub mod spatial {
+    pub mod bvh;
     pub mod placement;
     pub mod workplane;
 }
