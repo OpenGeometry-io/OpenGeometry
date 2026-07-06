@@ -1,3 +1,4 @@
+// main/opengeometry/src/export/projection.rs
 use std::collections::HashMap;
 
 use openmaths::Vector3;
@@ -104,11 +105,13 @@ pub enum Segment2D {
 }
 
 /// One classified output segment from the HLR projection.
+/// Uses camelCase for JSON serialization to match JavaScript/TypeScript API.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ClassifiedSegment {
     pub geometry: Segment2D,
     pub class: EdgeClass,
-    /// AIA/NCS layer code (e.g. "A-WALL"). Populated by OGEntityRegistry in Phase 2.
+    /// AIA/NCS layer code (e.g. "A-WALL"). Populated by OGEntityRegistry.
     pub layer: Option<String>,
     /// BRep UUID of the originating entity.
     pub source_entity_id: Option<String>,
@@ -144,6 +147,7 @@ impl Path2D {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Scene2D {
     pub name: Option<String>,
     pub segments: Vec<ClassifiedSegment>,
@@ -151,6 +155,7 @@ pub struct Scene2D {
 
 /// Flat line representation used by the existing WASM `projectTo2DLines` API.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Line2D {
     pub start: Vec2,
     pub end: Vec2,
@@ -162,6 +167,7 @@ pub struct Line2D {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Scene2DLines {
     pub name: Option<String>,
     pub lines: Vec<Line2D>,

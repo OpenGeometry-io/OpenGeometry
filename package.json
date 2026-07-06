@@ -7,8 +7,20 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
+    "generate:layers": "tsx scripts/generate-layers.ts",
+    "prebuild": "npm run generate:layers",
     "dev": "vite",
-    "test": "cargo test --manifest-path main/opengeometry/Cargo.toml && cargo test --examples --manifest-path main/opengeometry/Cargo.toml",
+    "test": "npm run test:rust && npm run test:ts",
+    "test:rust": "cargo test --manifest-path main/opengeometry/Cargo.toml",
+    "test:rust:verbose": "cargo test --manifest-path main/opengeometry/Cargo.toml -- --nocapture",
+    "test:rust:registry": "cargo test --manifest-path main/opengeometry/Cargo.toml registry_",
+    "test:rust:scene": "cargo test --manifest-path main/opengeometry/Cargo.toml test_scene_",
+    "test:ts": "vitest",
+    "test:ts:watch": "vitest --watch",
+    "test:ts:ui": "vitest --ui",
+    "test:ts:coverage": "vitest --coverage",
+    "bench": "cargo bench --manifest-path main/opengeometry/Cargo.toml",
+    "bench:registry": "cargo bench --manifest-path main/opengeometry/Cargo.toml -- registry_benchmark",
     "lint": "eslint main/opengeometry-three/src/**/*.ts --fix",
     "lint:check": "eslint main/opengeometry-three/src/**/*.ts",
     "build-three": "rollup -c rollup.config.js",
@@ -16,7 +28,10 @@
     "build-core": "cd main/opengeometry && wasm-pack build --target web && cargo build --release",
     "prepare-dist": "node ./scripts/prepare-dist.mjs",
     "copy-wasm": "npm run prepare-dist",
-    "build": "npm run build-core && npm run build-three && npm run prepare-dist"
+    "build": "npm run build-core && npm run build-three && npm run prepare-dist",
+    "clean": "cargo clean --manifest-path main/opengeometry/Cargo.toml && rm -rf node_modules dist coverage",
+    "clean:rust": "cargo clean --manifest-path main/opengeometry/Cargo.toml",
+    "clean:ts": "rm -rf node_modules dist coverage"
   },
   "repository": {
     "type": "git",
@@ -59,9 +74,14 @@
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
+    "@vitest/ui": "^2.0.0",
     "eslint": "^9.35.0",
     "rollup": "^4.21.3",
     "tslib": "^2.7.0",
-    "vite": "^6.2.2"
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^6.2.2",
+    "vitest": "^2.0.0",
+    "yaml": "^2.4.0"
   }
 }
