@@ -1,6 +1,6 @@
 [package]
 name = "opengeometry"
-version = "1.0.9"
+version = "1.0.10"
 authors = ["Vishwajeet Mane <manevishwajeet1@gmail.com>"]
 description = "Graphics Kernel for Next Gen"
 license = "MIT/Apache-2.0"

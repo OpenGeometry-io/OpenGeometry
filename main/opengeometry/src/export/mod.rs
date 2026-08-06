@@ -10,7 +10,7 @@ pub mod pdf;
 pub use ifc::{
     export_brep_to_ifc_text, export_breps_to_ifc_text, export_scene_entities_to_ifc_text,
     IfcEntityInput, IfcEntitySemantics, IfcErrorPolicy, IfcExportConfig, IfcExportError,
-    IfcExportReport, IfcSchemaVersion,
+    IfcExportReport, IfcPropertyValue, IfcSchemaVersion,
 };
 pub use projection::{
     project_brep_to_scene, CameraParameters, ClassifiedSegment, EdgeClass, HlrOptions, Line2D,

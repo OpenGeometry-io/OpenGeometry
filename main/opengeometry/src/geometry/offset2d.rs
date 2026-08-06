@@ -1,8 +1,8 @@
 //! Generic 2D polyline offset: miter/bevel joins, mitered bands, offset outline.
 
-use openmaths::Vector3;
-use crate::geometry::poly2d::*;
 use crate::geometry::boolean2d::*;
+use crate::geometry::poly2d::*;
+use openmaths::Vector3;
 
 /// Whether a centreline is (or should be treated as) a closed loop: the caller's
 /// `closed` flag OR a first≈last coincidence. Returns the working points (closing
@@ -153,10 +153,26 @@ pub fn mitered_offset_bands(
         let prev_seg = (i + seg_count - 1) % seg_count;
         let next_seg = (i + 1) % seg_count;
         let mut quad: Vec<Pt2> = vec![
-            if start_free { cap(start_vi, i, 1.0) } else { corner(start_vi, prev_seg, i, 1.0, i) },
-            if end_free { cap(end_vi, i, 1.0) } else { corner(end_vi, i, next_seg, 1.0, i) },
-            if end_free { cap(end_vi, i, -1.0) } else { corner(end_vi, i, next_seg, -1.0, i) },
-            if start_free { cap(start_vi, i, -1.0) } else { corner(start_vi, prev_seg, i, -1.0, i) },
+            if start_free {
+                cap(start_vi, i, 1.0)
+            } else {
+                corner(start_vi, prev_seg, i, 1.0, i)
+            },
+            if end_free {
+                cap(end_vi, i, 1.0)
+            } else {
+                corner(end_vi, i, next_seg, 1.0, i)
+            },
+            if end_free {
+                cap(end_vi, i, -1.0)
+            } else {
+                corner(end_vi, i, next_seg, -1.0, i)
+            },
+            if start_free {
+                cap(start_vi, i, -1.0)
+            } else {
+                corner(start_vi, prev_seg, i, -1.0, i)
+            },
         ];
         if self_intersects2(&quad, eps) || signed_area2(&quad).abs() < eps {
             // Over-deep trim folded the quad — fall back to a plain rectangle band.
@@ -178,7 +194,12 @@ pub fn mitered_offset_bands(
 /// Replace sharp convex miter spikes on a 2D ring with a flat BEVEL (the chamfer
 /// joining the two offset points), past `miter_limit` — the same threshold the
 /// per-corner joins use. Concave vertices and corners within the limit are kept.
-pub fn bevel_sharp_convex_pts(ring: &[Pt2], half_width: f64, miter_limit: f64, eps: f64) -> Vec<Pt2> {
+pub fn bevel_sharp_convex_pts(
+    ring: &[Pt2],
+    half_width: f64,
+    miter_limit: f64,
+    eps: f64,
+) -> Vec<Pt2> {
     let count = ring.len();
     if count < 3 {
         return ring.to_vec();
@@ -220,8 +241,14 @@ pub fn bevel_sharp_convex_pts(ring: &[Pt2], half_width: f64, miter_limit: f64, e
             out.push(vertex);
             continue;
         }
-        out.push(Pt2::new(vertex.x + to_prev.x * trim, vertex.z + to_prev.z * trim));
-        out.push(Pt2::new(vertex.x + to_next.x * trim, vertex.z + to_next.z * trim));
+        out.push(Pt2::new(
+            vertex.x + to_prev.x * trim,
+            vertex.z + to_prev.z * trim,
+        ));
+        out.push(Pt2::new(
+            vertex.x + to_next.x * trim,
+            vertex.z + to_next.z * trim,
+        ));
     }
     out
 }
@@ -308,20 +335,21 @@ pub fn offset_outline(
         left_normal.push(Pt2::new(-dz / length, dx / length));
     }
 
-    let points_at = |vi: usize, in_seg: usize, out_seg: usize, side: f64, forward: bool| -> Vec<Pt2> {
-        join_points(
-            pts[vi],
-            dir[in_seg],
-            dir[out_seg],
-            left_normal[in_seg],
-            left_normal[out_seg],
-            side,
-            half_width,
-            miter_limit,
-            eps,
-            forward,
-        )
-    };
+    let points_at =
+        |vi: usize, in_seg: usize, out_seg: usize, side: f64, forward: bool| -> Vec<Pt2> {
+            join_points(
+                pts[vi],
+                dir[in_seg],
+                dir[out_seg],
+                left_normal[in_seg],
+                left_normal[out_seg],
+                side,
+                half_width,
+                miter_limit,
+                eps,
+                forward,
+            )
+        };
     let cap = |vi: usize, seg: usize, side: f64| -> Pt2 {
         Pt2::new(
             pts[vi].x + side * half_width * left_normal[seg].x,
