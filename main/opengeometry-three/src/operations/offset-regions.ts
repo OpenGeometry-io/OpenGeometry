@@ -57,6 +57,50 @@ export function offsetPolylineRegions(
   return JSON.parse(result.regionsSerialized);
 }
 
+type KernelOffsetRingVariable = (
+  ringFlat: Float64Array,
+  distances: Float64Array,
+) => KernelOffsetRegionsResult;
+
+/**
+ * Inset a CLOSED ring inward with one distance per edge (edge i =
+ * `ring[i] → ring[i+1]`; an explicit closing duplicate point is accepted and
+ * stripped, the distance count stays one per unique edge). Built for setback
+ * envelopes: the result is the CLEARANCE-EXACT buildable region — the ring's
+ * interior minus every point within `distances[i]` of edge i's SEGMENT, so
+ * distant lot lines are honoured across notches and corners where distances
+ * differ become circumscribed clearance arcs (conservative). There is no
+ * `miterLimit` parameter, deliberately: miters and bevels only approximate the
+ * clearance arc, and a bevel would claim points inside the required distance.
+ *
+ * Returns CW-outer / CCW-hole regions (canonical start vertex), possibly
+ * SEVERAL when a deep inset splits a waisted ring into disjoint lobes, and an
+ * EMPTY array when the inset collapses or the input ring is degenerate
+ * (< 3 unique points, zero area, self-intersecting). THROWS on malformed
+ * arguments: a distance count that does not match the edge count, or a
+ * negative / non-finite distance — those are caller bugs, not geometry.
+ *
+ * @param ring closed ring points as `[x,y,z, …]` (Y is carried through).
+ * @param distances inward inset distance per edge, metres, each >= 0
+ *                  (0 = the edge stays in place, e.g. lot-line construction).
+ */
+export function offsetRingVariable(
+  ring: number[] | Float64Array,
+  distances: number[] | Float64Array,
+): OffsetRegion[] {
+  const buildExport = (OGKernel as Record<string, unknown>).offsetRingVariable;
+  if (typeof buildExport !== "function") {
+    throw new Error(
+      "offsetRingVariable is not available in the loaded wasm package. It requires opengeometry >= 2.0.12 — rebuild or upgrade the opengeometry wasm bindings.",
+    );
+  }
+  const flatRing = ring instanceof Float64Array ? ring : new Float64Array(ring);
+  const flatDistances =
+    distances instanceof Float64Array ? distances : new Float64Array(distances);
+  const result = (buildExport as KernelOffsetRingVariable)(flatRing, flatDistances);
+  return JSON.parse(result.regionsSerialized);
+}
+
 /** One polyline in an offset group: centreline `[x,y,z, …]`, stroke width, closed flag. */
 export interface OffsetPolyline {
   centreline: number[];

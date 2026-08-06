@@ -12,7 +12,9 @@ use super::part21::{sanitize_string_literal, Part21Writer};
 
 const IFC_LENGTH_EPSILON: f64 = 1.0e-12;
 const IFC_CLASS_PROXY: &str = "IFCBUILDINGELEMENTPROXY";
-const IFC_ALLOWED_CLASSES: [&str; 12] = [
+const IFC_CLASS_SPACE: &str = "IFCSPACE";
+const IFC_CLASS_SITE: &str = "IFCSITE";
+const IFC_ALLOWED_CLASSES: [&str; 14] = [
     IFC_CLASS_PROXY,
     "IFCWALL",
     "IFCSLAB",
@@ -25,6 +27,8 @@ const IFC_ALLOWED_CLASSES: [&str; 12] = [
     "IFCSTAIR",
     "IFCRAILING",
     "IFCFOOTING",
+    IFC_CLASS_SPACE,
+    IFC_CLASS_SITE,
 ];
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -58,6 +62,17 @@ impl IfcSchemaVersion {
     }
 }
 
+/// A typed IfcPropertySingleValue payload. `#[serde(untagged)]` keeps the
+/// config JSON natural (`true` / `4500` / `"office"`) and remains backward
+/// compatible with the previous string-only property sets.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum IfcPropertyValue {
+    Bool(bool),
+    Number(f64),
+    Text(String),
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct IfcEntitySemantics {
     pub ifc_class: Option<String>,
@@ -66,7 +81,7 @@ pub struct IfcEntitySemantics {
     pub object_type: Option<String>,
     pub tag: Option<String>,
     #[serde(default)]
-    pub property_sets: HashMap<String, HashMap<String, String>>,
+    pub property_sets: HashMap<String, HashMap<String, IfcPropertyValue>>,
     #[serde(default)]
     pub quantity_sets: HashMap<String, HashMap<String, f64>>,
 }
@@ -92,6 +107,11 @@ pub struct IfcExportConfig {
     /// tessellation when a brep has no analytic geometry.
     #[serde(default = "default_true_ifc")]
     pub analytic_surfaces: bool,
+    /// Convert source Y-up geometry (Three.js convention) to IFC's Z-up
+    /// world by mapping `(x, y, z) -> (x, -z, y)` once, before any
+    /// emission. Default on, since kernel BReps are authored Y-up.
+    #[serde(default = "default_true_ifc")]
+    pub up_axis_conversion: bool,
 }
 
 fn default_true_ifc() -> bool {
@@ -113,8 +133,42 @@ impl Default for IfcExportConfig {
             semantics: None,
             length_unit: crate::units::LengthUnit::default(),
             analytic_surfaces: true,
+            up_axis_conversion: true,
         }
     }
+}
+
+/// Map a single source Y-up coordinate/direction to IFC Z-up:
+/// `(x, y, z) -> (x, -z, y)`. A proper rotation (+90° about X,
+/// determinant +1) so handedness is preserved and nothing mirrors.
+fn to_z_up(v: Vector3) -> Vector3 {
+    Vector3::new(v.x, -v.z, v.y)
+}
+
+/// Return a Z-up copy of `brep`, transforming vertices, analytic edge
+/// curves and face surfaces consistently, then recomputing normals.
+/// Applied exactly once at export entry so the rest of the pipeline is
+/// untouched and double-application is impossible.
+fn brep_to_z_up(brep: &Brep) -> Brep {
+    let mut converted = brep.clone();
+    for vertex in &mut converted.vertices {
+        vertex.position = to_z_up(vertex.position);
+    }
+    for edge in &mut converted.edges {
+        if let Some(curve) = &edge.curve {
+            // scale = 1.0: the conversion carries no scale (radii unchanged).
+            edge.curve = Some(curve.transformed_with(&to_z_up, 1.0));
+        }
+    }
+    for face in &mut converted.faces {
+        if let Some(surface) = &face.surface {
+            face.surface = Some(surface.transformed_with(&to_z_up, 1.0));
+        }
+    }
+    if !converted.faces.is_empty() {
+        converted.recompute_face_normals();
+    }
+    converted
 }
 
 /// IFC SI prefix token (e.g. `.MILLI.`) for the length unit, or `$` for the
@@ -287,6 +341,28 @@ fn export_owned_entities_to_ifc_text<'a>(
         return Err(IfcExportError::EmptyInput);
     }
 
+    // Y-up -> Z-up once, up front: convert each BREP and re-bind the
+    // working entities to the converted geometry. Everything downstream
+    // (analytic surfaces, tessellation, placements) then operates on
+    // Z-up data unchanged.
+    let converted_breps: Vec<Brep>;
+    let converted_entities: Vec<IfcOwnedEntity<'_>>;
+    let entities: &[IfcOwnedEntity<'_>] = if config.up_axis_conversion {
+        converted_breps = entities.iter().map(|e| brep_to_z_up(e.brep)).collect();
+        converted_entities = entities
+            .iter()
+            .zip(converted_breps.iter())
+            .map(|(e, brep)| IfcOwnedEntity {
+                entity_id: e.entity_id.clone(),
+                kind: e.kind.clone(),
+                brep,
+            })
+            .collect();
+        &converted_entities
+    } else {
+        entities
+    };
+
     let mut report = IfcExportReport {
         input_breps: entities.len(),
         ..IfcExportReport::default()
@@ -409,6 +485,8 @@ fn export_owned_entities_to_ifc_text<'a>(
     ));
 
     let mut element_ids = Vec::new();
+    let mut space_ids = Vec::new();
+    let mut site_ids = Vec::new();
 
     for entity in entities {
         let brep = entity.brep;
@@ -523,24 +601,63 @@ fn export_owned_entities_to_ifc_text<'a>(
             .and_then(|sem| sem.tag.clone())
             .unwrap_or_else(|| entity.entity_id.clone());
 
-        let element_expr = format!(
-            "{}('{}',$,'{}',{},'{}',{},{},'{}',.NOTDEFINED.)",
-            class_name,
-            ifc_guid(&format!("element-{}", entity.entity_id)),
-            sanitize_string_literal(&name),
-            if description.is_empty() {
-                "$".to_string()
-            } else {
-                format!("'{}'", sanitize_string_literal(&description))
-            },
-            sanitize_string_literal(&object_type),
-            Part21Writer::reference(placement),
-            Part21Writer::reference(definition_shape),
-            sanitize_string_literal(&tag)
-        );
+        let guid = ifc_guid(&format!("element-{}", entity.entity_id));
+        let name_literal = sanitize_string_literal(&name);
+        let description_expr = if description.is_empty() {
+            "$".to_string()
+        } else {
+            format!("'{}'", sanitize_string_literal(&description))
+        };
+        let object_type_literal = sanitize_string_literal(&object_type);
+        let placement_ref = Part21Writer::reference(placement);
+        let shape_ref = Part21Writer::reference(definition_shape);
+        let tag_literal = sanitize_string_literal(&tag);
+
+        // IfcSpace and IfcSite are spatial elements with their own attribute
+        // signatures (LongName + CompositionType instead of Tag); everything
+        // else uses the shared building-element signature.
+        let element_expr = match class_name {
+            IFC_CLASS_SPACE => format!(
+                "IFCSPACE('{}',$,'{}',{},'{}',{},{},'{}',.ELEMENT.,.NOTDEFINED.,$)",
+                guid,
+                name_literal,
+                description_expr,
+                object_type_literal,
+                placement_ref,
+                shape_ref,
+                tag_literal
+            ),
+            IFC_CLASS_SITE => format!(
+                "IFCSITE('{}',$,'{}',{},'{}',{},{},'{}',.ELEMENT.,$,$,$,$,$)",
+                guid,
+                name_literal,
+                description_expr,
+                object_type_literal,
+                placement_ref,
+                shape_ref,
+                tag_literal
+            ),
+            _ => format!(
+                "{}('{}',$,'{}',{},'{}',{},{},'{}',.NOTDEFINED.)",
+                class_name,
+                guid,
+                name_literal,
+                description_expr,
+                object_type_literal,
+                placement_ref,
+                shape_ref,
+                tag_literal
+            ),
+        };
 
         let element_id = writer.add_entity(element_expr);
-        element_ids.push(element_id);
+        // Spatial elements may not ride IfcRelContainedInSpatialStructure:
+        // spaces AGGREGATE under the storey, extra sites under the project.
+        match class_name {
+            IFC_CLASS_SPACE => space_ids.push(element_id),
+            IFC_CLASS_SITE => site_ids.push(element_id),
+            _ => element_ids.push(element_id),
+        }
 
         if let Some(semantics) = semantics {
             write_property_sets(
@@ -562,18 +679,36 @@ fn export_owned_entities_to_ifc_text<'a>(
         report.exported_elements += 1;
     }
 
-    if element_ids.is_empty() {
+    if element_ids.is_empty() && space_ids.is_empty() && site_ids.is_empty() {
         return Err(IfcExportError::MeshGeneration(
             "No elements were exported from the provided BREP inputs".to_string(),
         ));
     }
 
-    writer.add_entity(format!(
-        "IFCRELCONTAINEDINSPATIALSTRUCTURE('{}',$,'ContainedInStorey',$,({}),{})",
-        ifc_guid("rel-contained-storey"),
-        join_refs(&element_ids),
-        Part21Writer::reference(storey)
-    ));
+    if !element_ids.is_empty() {
+        writer.add_entity(format!(
+            "IFCRELCONTAINEDINSPATIALSTRUCTURE('{}',$,'ContainedInStorey',$,({}),{})",
+            ifc_guid("rel-contained-storey"),
+            join_refs(&element_ids),
+            Part21Writer::reference(storey)
+        ));
+    }
+    if !space_ids.is_empty() {
+        writer.add_entity(format!(
+            "IFCRELAGGREGATES('{}',$,$,$,{},({}))",
+            ifc_guid("rel-storey-spaces"),
+            Part21Writer::reference(storey),
+            join_refs(&space_ids)
+        ));
+    }
+    if !site_ids.is_empty() {
+        writer.add_entity(format!(
+            "IFCRELAGGREGATES('{}',$,$,$,{},({}))",
+            ifc_guid("rel-project-element-sites"),
+            Part21Writer::reference(project),
+            join_refs(&site_ids)
+        ));
+    }
 
     let text = writer.build().map_err(IfcExportError::Serialization)?;
     Ok((text, report))
@@ -1144,17 +1279,34 @@ fn write_property_sets(
     semantics: &IfcEntitySemantics,
     report: &mut IfcExportReport,
 ) {
-    for (set_name, properties) in &semantics.property_sets {
+    // Sorted iteration: HashMap order is arbitrary and the SPF output must be
+    // deterministic across runs.
+    let mut set_names: Vec<&String> = semantics.property_sets.keys().collect();
+    set_names.sort();
+    for set_name in set_names {
+        let properties = &semantics.property_sets[set_name];
         if properties.is_empty() {
             continue;
         }
 
+        let mut property_names: Vec<&String> = properties.keys().collect();
+        property_names.sort();
         let mut property_ids = Vec::new();
-        for (property_name, property_value) in properties {
+        for property_name in property_names {
+            let property_value = &properties[property_name];
+            let literal = match property_value {
+                IfcPropertyValue::Bool(value) => {
+                    format!("IFCBOOLEAN({})", if *value { ".T." } else { ".F." })
+                }
+                IfcPropertyValue::Number(value) => format!("IFCREAL({})", format_real(*value)),
+                IfcPropertyValue::Text(value) => {
+                    format!("IFCTEXT('{}')", sanitize_string_literal(value))
+                }
+            };
             let property = writer.add_entity(format!(
-                "IFCPROPERTYSINGLEVALUE('{}',$,IFCTEXT('{}'),$)",
+                "IFCPROPERTYSINGLEVALUE('{}',$,{},$)",
                 sanitize_string_literal(property_name),
-                sanitize_string_literal(property_value)
+                literal
             ));
             property_ids.push(property);
         }
@@ -1184,17 +1336,22 @@ fn write_quantity_sets(
     semantics: &IfcEntitySemantics,
     report: &mut IfcExportReport,
 ) {
-    for (set_name, quantities) in &semantics.quantity_sets {
+    let mut set_names: Vec<&String> = semantics.quantity_sets.keys().collect();
+    set_names.sort();
+    for set_name in set_names {
+        let quantities = &semantics.quantity_sets[set_name];
         if quantities.is_empty() {
             continue;
         }
 
+        let mut quantity_names: Vec<&String> = quantities.keys().collect();
+        quantity_names.sort();
         let mut quantity_ids = Vec::new();
-        for (quantity_name, quantity_value) in quantities {
+        for quantity_name in quantity_names {
             let quantity = writer.add_entity(format!(
                 "IFCQUANTITYLENGTH('{}',$,$,{},$)",
                 sanitize_string_literal(quantity_name),
-                format_real(*quantity_value)
+                format_real(quantities[quantity_name])
             ));
             quantity_ids.push(quantity);
         }
@@ -1359,6 +1516,63 @@ mod tests {
         assert!(!text.contains("IFCTRIANGULATEDFACESET("));
     }
 
+    /// A tetrahedron whose apex is at source (1, 3, 2) so the Y-up/Z-up
+    /// distinction is unambiguous (no zero components on the apex).
+    fn oriented_tetrahedron() -> Brep {
+        let mut builder = BrepBuilder::new(Uuid::new_v4());
+        builder.add_vertices(&[
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(4.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 4.0),
+            Vector3::new(1.0, 3.0, 2.0),
+        ]);
+        builder.add_face(&[0, 2, 1], &[]).unwrap();
+        builder.add_face(&[0, 1, 3], &[]).unwrap();
+        builder.add_face(&[1, 2, 3], &[]).unwrap();
+        builder.add_face(&[2, 0, 3], &[]).unwrap();
+        builder.build().unwrap()
+    }
+
+    #[test]
+    fn up_axis_conversion_default_maps_y_to_z() {
+        // Default config has up_axis_conversion = true: source apex
+        // (1, 3, 2) -> IFC (1, -2, 3).
+        let brep = oriented_tetrahedron();
+        let (text, _) =
+            export_brep_to_ifc_text(&brep, &IfcExportConfig::default()).expect("ifc export");
+        assert!(
+            text.contains("(1.0,-2.0,3.0)"),
+            "apex should be Z-up (1,-2,3); got:\n{}",
+            text
+        );
+        assert!(
+            !text.contains("(1.0,3.0,2.0)"),
+            "source Y-up apex must not appear when conversion is on"
+        );
+    }
+
+    #[test]
+    fn up_axis_conversion_off_preserves_source_coordinates() {
+        // Flag off: geometry is emitted exactly as authored.
+        let brep = oriented_tetrahedron();
+        let config = IfcExportConfig {
+            up_axis_conversion: false,
+            ..IfcExportConfig::default()
+        };
+        let (text, _) = export_brep_to_ifc_text(&brep, &config).expect("ifc export");
+        assert!(
+            text.contains("(1.0,3.0,2.0)"),
+            "apex should be unchanged (1,3,2) when conversion is off; got:\n{}",
+            text
+        );
+        assert!(!text.contains("(1.0,-2.0,3.0)"));
+    }
+
+    #[test]
+    fn up_axis_conversion_config_defaults_true() {
+        assert!(IfcExportConfig::default().up_axis_conversion);
+    }
+
     #[test]
     fn applies_semantics_class_when_supported() {
         let brep = tetrahedron_brep();
@@ -1404,5 +1618,158 @@ mod tests {
 
         let result = export_brep_to_ifc_text(&brep, &config);
         assert!(result.is_err());
+    }
+
+    /// IFCSPACE exports as a real space — its own attribute signature,
+    /// AGGREGATED under the storey rather than contained in it — instead of
+    /// degrading to a building element proxy.
+    #[test]
+    fn exports_space_as_aggregated_spatial_element() {
+        let brep = tetrahedron_brep();
+
+        let mut semantics = HashMap::new();
+        semantics.insert(
+            "brep-0".to_string(),
+            IfcEntitySemantics {
+                ifc_class: Some("IfcSpace".to_string()),
+                name: Some("Living Room".to_string()),
+                object_type: Some("residential".to_string()),
+                ..IfcEntitySemantics::default()
+            },
+        );
+
+        let config = IfcExportConfig {
+            semantics: Some(semantics),
+            error_policy: IfcErrorPolicy::Strict,
+            ..IfcExportConfig::default()
+        };
+
+        let (text, report) = export_brep_to_ifc_text(&brep, &config).expect("ifc export");
+        assert!(text.contains("IFCSPACE("), "space class applied");
+        assert!(
+            !text.contains("IFCBUILDINGELEMENTPROXY("),
+            "no proxy fallback"
+        );
+        assert!(
+            !text.contains("IFCRELCONTAINEDINSPATIALSTRUCTURE("),
+            "a lone space is not contained-in-storey"
+        );
+        assert!(
+            text.contains("'residential'"),
+            "object type (program/usage) survives"
+        );
+        // Storey → space aggregation exists (beyond the 3 scaffold aggregates).
+        assert_eq!(text.matches("IFCRELAGGREGATES(").count(), 4);
+        assert_eq!(report.semantics_applied, 1);
+        assert_eq!(report.proxy_fallbacks, 0);
+    }
+
+    /// IFCSITE exports with the site attribute signature, aggregated under the
+    /// project (a project may hold several sites).
+    #[test]
+    fn exports_site_aggregated_under_project() {
+        let brep = tetrahedron_brep();
+
+        let mut semantics = HashMap::new();
+        semantics.insert(
+            "brep-0".to_string(),
+            IfcEntitySemantics {
+                ifc_class: Some("IFCSITE".to_string()),
+                name: Some("Parcel 12".to_string()),
+                ..IfcEntitySemantics::default()
+            },
+        );
+
+        let config = IfcExportConfig {
+            semantics: Some(semantics),
+            error_policy: IfcErrorPolicy::Strict,
+            ..IfcExportConfig::default()
+        };
+
+        let (text, _) = export_brep_to_ifc_text(&brep, &config).expect("ifc export");
+        // Scaffold site + the exported parcel site.
+        assert_eq!(text.matches("IFCSITE(").count(), 2);
+        assert!(text.contains("'Parcel 12'"));
+        assert!(!text.contains("IFCRELCONTAINEDINSPATIALSTRUCTURE("));
+    }
+
+    /// Property sets carry TYPED values (IFCREAL / IFCBOOLEAN / IFCTEXT) and
+    /// the writer's output is deterministic (sorted set / property names).
+    #[test]
+    fn writes_typed_property_sets() {
+        let brep = tetrahedron_brep();
+
+        let mut properties = HashMap::new();
+        properties.insert("gfaM2".to_string(), IfcPropertyValue::Number(4500.25));
+        properties.insert(
+            "program".to_string(),
+            IfcPropertyValue::Text("office".to_string()),
+        );
+        properties.insert("compliant".to_string(), IfcPropertyValue::Bool(true));
+        let mut property_sets = HashMap::new();
+        property_sets.insert("OpenPlans_Yield".to_string(), properties);
+
+        let mut quantities = HashMap::new();
+        quantities.insert("NetSideArea".to_string(), 3735.5);
+        let mut quantity_sets = HashMap::new();
+        quantity_sets.insert("Qto_SpaceBaseQuantities".to_string(), quantities);
+
+        let mut semantics = HashMap::new();
+        semantics.insert(
+            "brep-0".to_string(),
+            IfcEntitySemantics {
+                ifc_class: Some("IFCSPACE".to_string()),
+                property_sets,
+                quantity_sets,
+                ..IfcEntitySemantics::default()
+            },
+        );
+
+        let config = IfcExportConfig {
+            semantics: Some(semantics),
+            error_policy: IfcErrorPolicy::Strict,
+            ..IfcExportConfig::default()
+        };
+
+        let (text, report) = export_brep_to_ifc_text(&brep, &config).expect("ifc export");
+        assert!(text.contains("IFCPROPERTYSINGLEVALUE('gfaM2',$,IFCREAL(4500.25),$)"));
+        assert!(text.contains("IFCPROPERTYSINGLEVALUE('program',$,IFCTEXT('office'),$)"));
+        assert!(text.contains("IFCPROPERTYSINGLEVALUE('compliant',$,IFCBOOLEAN(.T.),$)"));
+        assert!(text.contains("IFCPROPERTYSET("));
+        assert!(text.contains("IFCELEMENTQUANTITY("));
+        assert!(text.contains("IFCRELDEFINESBYPROPERTIES("));
+        assert_eq!(report.property_sets_written, 1);
+        assert_eq!(report.quantity_sets_written, 1);
+
+        let (again, _) = export_brep_to_ifc_text(
+            &brep,
+            &IfcExportConfig {
+                semantics: config.semantics.clone(),
+                error_policy: IfcErrorPolicy::Strict,
+                ..IfcExportConfig::default()
+            },
+        )
+        .expect("ifc export");
+        assert_eq!(text, again, "SPF output is deterministic across runs");
+    }
+
+    /// Legacy string-only property-set JSON still parses (untagged enum).
+    #[test]
+    fn legacy_string_property_sets_still_parse() {
+        let json = r#"{
+            "ifc_class": "IFCWALL",
+            "property_sets": { "Custom": { "material": "brick", "rating": "A" } }
+        }"#;
+        let semantics: IfcEntitySemantics =
+            serde_json::from_str(json).expect("legacy semantics parse");
+        let set = &semantics.property_sets["Custom"];
+        assert_eq!(set["material"], IfcPropertyValue::Text("brick".to_string()));
+
+        let typed = r#"{ "property_sets": { "Yield": { "gfa": 12.5, "ok": true } } }"#;
+        let semantics: IfcEntitySemantics =
+            serde_json::from_str(typed).expect("typed semantics parse");
+        let set = &semantics.property_sets["Yield"];
+        assert_eq!(set["gfa"], IfcPropertyValue::Number(12.5));
+        assert_eq!(set["ok"], IfcPropertyValue::Bool(true));
     }
 }

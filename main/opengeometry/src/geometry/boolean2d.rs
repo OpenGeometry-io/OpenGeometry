@@ -182,17 +182,33 @@ pub fn resolve_ring_nonzero(input: &[Pt2], eps: f64) -> Option<RingRegion> {
     Some(RingRegion { outer, holes })
 }
 
-// ── Multi-contour nonzero-winding union (overlapping-band merge) ──────────────
-// Union a set of CCW polygons (per-segment offset bands) into their filled-region
-// boundary by the NONZERO-WINDING rule: build the planar arrangement (split every
-// edge at all crossings + vertex-touches), keep only sub-edges that separate filled
-// (winding ≠ 0) from empty, orient them filled-on-LEFT, and stitch into loops. Where
-// bands OVERLAP (a self-crossing) the shared interior edges have filled on both
-// sides → dropped, so the overlap merges into one clean region. Pure 2D, no CSG —
-// the crossing cleanup the single-ring offset cannot do.
+// ── Multi-contour winding boolean (overlapping-band merge / oriented clip) ────
+// Resolve a set of ORIENTED polygons into their filled-region boundary by a
+// winding rule: build the planar arrangement (split every edge at all crossings
+// + vertex-touches), keep only sub-edges that separate filled from empty,
+// orient them filled-on-LEFT, and stitch into loops. Where contours OVERLAP the
+// shared interior edges have filled on both sides → dropped. Pure 2D, no CSG.
+//
+// `union_polygons_nonzero` (winding ≠ 0, all-CCW inputs) is the overlapping
+// stroke-band merge; `resolve_polygons_positive` (winding > 0) treats CCW rings
+// as additive and CW rings as subtractive — the clip a setback envelope needs.
 
+/// Union CCW polygons by the NONZERO-WINDING rule (the crossing cleanup the
+/// single-ring offset cannot do).
 pub fn union_polygons_nonzero(polys: &[Vec<Pt2>], eps: f64) -> Vec<RingRegion> {
-    // 1. directed edges from all (CCW) polygons + the vertex set for T-touch splits.
+    winding_regions(polys, eps, |winding| winding != 0)
+}
+
+/// Boundary of the POSITIVE-winding area of oriented rings: each CCW ring adds
+/// +1, each CW ring −1, and a point is filled when the sum is > 0. With one CCW
+/// base ring and CW cutters this is base-minus-cutters, keeping EVERY disjoint
+/// remainder (a clip can split the base into separate regions).
+pub fn resolve_polygons_positive(polys: &[Vec<Pt2>], eps: f64) -> Vec<RingRegion> {
+    winding_regions(polys, eps, |winding| winding > 0)
+}
+
+fn winding_regions(polys: &[Vec<Pt2>], eps: f64, filled: impl Fn(i32) -> bool) -> Vec<RingRegion> {
+    // 1. directed edges from all oriented polygons + the vertex set for T-touch splits.
     let mut edges: Vec<Edge2> = Vec::new();
     for poly in polys {
         let m = poly.len();
@@ -260,8 +276,8 @@ pub fn union_polygons_nonzero(polys: &[Vec<Pt2>], eps: f64) -> Vec<RingRegion> {
         let nz = dx / len;
         let mx = (a.x + b.x) / 2.0;
         let mz = (a.z + b.z) / 2.0;
-        let left = winding_at(Pt2::new(mx + nx * probe, mz + nz * probe)) != 0;
-        let right = winding_at(Pt2::new(mx - nx * probe, mz - nz * probe)) != 0;
+        let left = filled(winding_at(Pt2::new(mx + nx * probe, mz + nz * probe)));
+        let right = filled(winding_at(Pt2::new(mx - nx * probe, mz - nz * probe)));
         if left == right {
             continue; // interior or exterior — not a boundary
         }
@@ -271,6 +287,12 @@ pub fn union_polygons_nonzero(polys: &[Vec<Pt2>], eps: f64) -> Vec<RingRegion> {
             boundary.push((b, a));
         }
     }
+    // Drop coincident duplicates (e.g. two contours sharing a corner emit the
+    // same geometric boundary twice): both copies pass the probe test and the
+    // stitcher would trace the same loop twice.
+    let mut seen: std::collections::HashSet<((i64, i64), (i64, i64))> =
+        std::collections::HashSet::new();
+    boundary.retain(|&(a, b)| seen.insert((qkey(a), qkey(b))));
     if boundary.is_empty() {
         return Vec::new();
     }
@@ -350,4 +372,91 @@ pub fn union_polygons_nonzero(polys: &[Vec<Pt2>], eps: f64) -> Vec<RingRegion> {
         }
     }
     regions
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn p(x: f64, z: f64) -> Pt2 {
+        Pt2::new(x, z)
+    }
+
+    fn ccw_square(x0: f64, z0: f64, x1: f64, z1: f64) -> Vec<Pt2> {
+        vec![p(x0, z0), p(x1, z0), p(x1, z1), p(x0, z1)]
+    }
+
+    fn cw(mut ring: Vec<Pt2>) -> Vec<Pt2> {
+        ring.reverse();
+        ring
+    }
+
+    /// A CW cutter strictly inside a CCW base subtracts to an annulus:
+    /// one region whose hole is the cutter.
+    #[test]
+    fn positive_clip_inner_cutter_makes_a_hole() {
+        let base = ccw_square(0.0, 0.0, 10.0, 10.0);
+        let cutter = cw(ccw_square(4.0, 4.0, 6.0, 6.0));
+        let regions = resolve_polygons_positive(&[base, cutter], DEFAULT_EPS);
+        assert_eq!(regions.len(), 1, "one annular region");
+        assert_eq!(regions[0].holes.len(), 1, "the cutter is its hole");
+        assert!((signed_area2(&regions[0].outer) - 100.0).abs() < 1e-6);
+        assert!(
+            (signed_area2(&regions[0].holes[0]) + 4.0).abs() < 1e-6,
+            "hole is CW, area -4"
+        );
+    }
+
+    /// A CW cutter spanning the base's full width splits it into TWO disjoint
+    /// remainder regions — every remainder is kept, not just the largest.
+    #[test]
+    fn positive_clip_keeps_every_disjoint_remainder() {
+        let base = ccw_square(0.0, 0.0, 10.0, 10.0);
+        let cutter = cw(ccw_square(-1.0, 4.0, 11.0, 6.0));
+        let regions = resolve_polygons_positive(&[base, cutter], DEFAULT_EPS);
+        assert_eq!(regions.len(), 2, "the band splits the base in two");
+        for region in &regions {
+            assert!(
+                (signed_area2(&region.outer) - 40.0).abs() < 1e-6,
+                "each half is 10×4"
+            );
+            assert!(region.holes.is_empty());
+        }
+    }
+
+    /// Cutters covering the whole base leave nothing — and a lone CW ring is
+    /// nothing too (no positive area anywhere), where the nonzero rule fills it.
+    #[test]
+    fn positive_clip_total_cover_and_lone_cutter_are_empty() {
+        let base = ccw_square(0.0, 0.0, 4.0, 4.0);
+        let cutter = cw(ccw_square(-1.0, -1.0, 5.0, 5.0));
+        assert!(resolve_polygons_positive(&[base, cutter], DEFAULT_EPS).is_empty());
+
+        let lone = cw(ccw_square(0.0, 0.0, 1.0, 1.0));
+        assert!(resolve_polygons_positive(&[lone.clone()], DEFAULT_EPS).is_empty());
+        assert_eq!(
+            union_polygons_nonzero(&[lone], DEFAULT_EPS).len(),
+            1,
+            "contrast: the nonzero rule fills a lone CW ring"
+        );
+    }
+
+    /// Overlapping cutters merge: clearance bands from adjacent parcel edges
+    /// carve one connected bite, not internal-edge artifacts.
+    #[test]
+    fn positive_clip_overlapping_cutters_merge() {
+        let base = ccw_square(0.0, 0.0, 10.0, 10.0);
+        let cutter_a = cw(ccw_square(-1.0, -1.0, 3.0, 3.0));
+        let cutter_b = cw(ccw_square(1.0, 1.0, 4.0, 2.0));
+        let regions = resolve_polygons_positive(&[base, cutter_a, cutter_b], DEFAULT_EPS);
+        assert_eq!(regions.len(), 1);
+        let region = &regions[0];
+        assert!(region.holes.is_empty());
+        assert!(
+            !self_intersects2(&region.outer, DEFAULT_EPS),
+            "merged outline is simple"
+        );
+        let expected = 100.0 - 9.0 - 1.0; // corner bite 3×3 (clipped to base) + 1×1 extra strip
+        assert!((signed_area2(&region.outer) - expected).abs() < 1e-6);
+    }
 }
