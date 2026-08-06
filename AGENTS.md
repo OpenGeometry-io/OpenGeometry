@@ -34,6 +34,8 @@ App Code (Browser/Node)
 opengeometry-three  ← TypeScript wrapper (main/opengeometry-three/)
     │                 Shapes:     Polygon, Cuboid, Cylinder, Sphere, Wedge, Sweep, Opening, Solid
     │                 Primitives: Line, Arc, Curve, Polyline, Rectangle
+    │                 Operations: boolean, extrude, offsetPolylineRegions,
+    │                             offsetPolylineGroupRegions, offsetRingVariable
     │                 Editor:     parametric/freeform editing helpers
     │                 Markup:     SpotLabel
     │
@@ -43,7 +45,10 @@ Rust Kernel        ← main/opengeometry/src/
     ├── brep/         B-Rep topology: Vertex, Edge, HalfEdge, Face, Loop, Wire, Shell, Brep, BrepBuilder
     ├── primitives/   OGPolygon, OGCuboid, OGCylinder, OGSphere, OGWedge, OGSweep, etc.
     ├── operations/   Triangulation (Earcut), extrude, offset, sweep, winding
-    ├── geometry/     GeometryBuffer (vertex/normal/index serialization), Triangle
+    ├── geometry/     GeometryBuffer (vertex/normal/index serialization), Triangle;
+    │                 2D toolkit: poly2d, offset2d, boolean2d (winding booleans:
+    │                 nonzero union + positive-winding clip), offset_regions
+    │                 (stroke bands, per-edge ring inset for setback envelopes)
     ├── spatial/      Placement3D (translation, rotation, scale)
     ├── scenegraph.rs OGSceneManager + OGEntityRegistry: multi-entity orchestration, BRep snapshots
     ├── export/       projection (HLR, EdgeClass), pdf (native-only), step, stl, ifc, part21
