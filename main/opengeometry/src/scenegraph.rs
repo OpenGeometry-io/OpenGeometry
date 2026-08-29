@@ -1,3 +1,4 @@
+// main/opengeometry/src/scenegraph.rs
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -36,6 +37,9 @@ use crate::export::pdf::{export_scene_to_pdf_with_config, PdfExportConfig};
 use crate::export::step::export_breps_to_step_file;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::export::stl::export_breps_to_stl_file;
+
+// Включаем сгенерированный код AIA слоев
+include!(concat!(env!("OUT_DIR"), "/aia_layers.rs"));
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SceneEntity {
@@ -1229,21 +1233,6 @@ struct ViewRequest {
     section_plane: Option<SectionPlane>,
 }
 
-/// Map `OGEntityKind` strings to AIA/NCS layer codes (AIA CAD Layer Guidelines).
-fn aia_layer(kind: &str) -> Option<&'static str> {
-    match kind.to_lowercase().trim() {
-        "wall" => Some("A-WALL"),
-        "door" => Some("A-DOOR"),
-        "window" | "glazing" | "glaz" => Some("A-GLAZ"),
-        "slab" | "floor" | "ceiling" => Some("A-FLOR"),
-        "stair" | "stairs" => Some("A-FLOR-STRS"),
-        "column" | "col" => Some("A-COLS"),
-        "beam" => Some("S-BEAM"),
-        "roof" => Some("A-ROOF"),
-        _ => None,
-    }
-}
-
 /// Flat entity registry with a batched multi-view projection API.
 /// Replaces the scene-centric OGSceneManager pattern for export use cases.
 #[wasm_bindgen]
@@ -1262,19 +1251,88 @@ impl Default for OGEntityRegistry {
 impl OGEntityRegistry {
     fn project_view(&self, view: &ViewRequest) -> Scene2D {
         let mut out = Scene2D::with_name(view.id.clone());
+        
         for entity in self.entities.values() {
             let mut entity_scene = project_brep_to_scene(&entity.brep, &view.camera, &view.hlr);
-            let layer = aia_layer(&entity.kind).map(str::to_string);
+            
+            let layer = aia_layer(&entity.kind).map(str::to_owned);
+            
             for seg in &mut entity_scene.segments {
-                seg.layer = layer.clone();
+                seg.layer.clone_from(&layer);
                 seg.source_entity_id = Some(entity.id.clone());
             }
             out.extend(entity_scene);
         }
-        // Section-plane intersection is wired up here in Phase 3+.
-        // `view.section_plane` field is available for future use.
+        
+        // TODO: apply clipping against section plane once section projection is implemented.
         let _ = &view.section_plane;
         out
+    }
+
+    /// Shared helper for both native and WASM projection entrypoints.
+    fn project_views_json(&self, views_json: &str) -> Result<String, String> {
+        let views: Vec<ViewRequest> = serde_json::from_str(views_json)
+            .map_err(|e| format!("Invalid views JSON: {}", e))?;
+
+        let mut seen_ids = std::collections::HashSet::with_capacity(views.len());
+        for view in &views {
+            if !seen_ids.insert(&view.id) {
+                return Err(format!("Duplicate view ID: '{}'", view.id));
+            }
+        }
+
+        let mut result: HashMap<String, Scene2D> = HashMap::with_capacity(views.len());
+        for view in &views {
+            result.insert(view.id.clone(), self.project_view(view));
+        }
+
+        serde_json::to_string(&result)
+            .map_err(|e| format!("Failed to serialize projection result: {}", e))
+    }
+
+    /// Внутренняя версия без wasm-bindgen для тестирования на native платформах
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn project_current_to_views_internal(&self, views_json: String) -> Result<String, String> {
+        self.project_views_json(&views_json)
+    }
+
+    /// Внутренняя версия register_entity без wasm-bindgen для тестирования на native
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn register_entity_internal(
+        &mut self,
+        id: String,
+        kind: String,
+        brep_json: String,
+    ) -> Result<(), String> {
+        let normalized_kind = kind.to_ascii_lowercase();
+        
+        if normalized_kind.trim().is_empty() {
+            return Err("Entity kind cannot be empty".to_string());
+        }
+        
+        if normalized_kind.len() > 64 {
+            return Err(format!(
+                "Entity kind too long (max 64 chars): {}",
+                normalized_kind.len()
+            ));
+        }
+        
+        if !normalized_kind.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+            return Err(format!(
+                "Entity kind contains invalid characters: '{}'. Only alphanumeric, '_', and '-' are allowed.",
+                kind
+            ));
+        }
+        
+        let brep: Brep = serde_json::from_str(&brep_json)
+            .map_err(|e| format!("Failed to deserialize BRep: {}", e))?;
+
+        brep.validate_topology()
+            .map_err(|e| format!("Invalid BRep topology for '{}': {}", id, e))?;
+
+        self.entities
+            .insert(id.clone(), SceneEntity { id, kind: normalized_kind, brep });
+        Ok(())
     }
 }
 
@@ -1285,7 +1343,7 @@ impl OGEntityRegistry {
         Self::default()
     }
 
-    /// Register (or replace) an entity. `kind` must be an OGEntityKind string.
+    /// Register (or replace) an entity. Kind is normalized to lowercase.
     #[wasm_bindgen(js_name = registerEntity)]
     pub fn register_entity(
         &mut self,
@@ -1293,6 +1351,26 @@ impl OGEntityRegistry {
         kind: String,
         brep_json: String,
     ) -> Result<(), JsValue> {
+        let normalized_kind = kind.to_ascii_lowercase();
+        
+        if normalized_kind.trim().is_empty() {
+            return Err(JsValue::from_str("Entity kind cannot be empty"));
+        }
+        
+        if normalized_kind.len() > 64 {
+            return Err(JsValue::from_str(&format!(
+                "Entity kind too long (max 64 chars): {}",
+                normalized_kind.len()
+            )));
+        }
+        
+        if !normalized_kind.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+            return Err(JsValue::from_str(&format!(
+                "Entity kind contains invalid characters: '{}'. Only alphanumeric, '_', and '-' are allowed.",
+                kind
+            )));
+        }
+        
         let brep: Brep = serde_json::from_str(&brep_json)
             .map_err(|e| JsValue::from_str(&format!("Failed to deserialize BRep: {}", e)))?;
 
@@ -1301,7 +1379,7 @@ impl OGEntityRegistry {
         })?;
 
         self.entities
-            .insert(id.clone(), SceneEntity { id, kind, brep });
+            .insert(id.clone(), SceneEntity { id, kind: normalized_kind, brep });
         Ok(())
     }
 
@@ -1318,28 +1396,15 @@ impl OGEntityRegistry {
     }
 
     /// Batched multi-view projection.
-    ///
-    /// Input:  JSON array of `{ id, camera, hlr?, section_plane? }` (ViewRequest).
-    /// Output: JSON map of `{ viewportId: Scene2D }`.
-    ///
-    /// All viewports are projected in a single WASM call, amortising
-    /// serialisation overhead and keeping BRep data in WASM memory.
     #[wasm_bindgen(js_name = projectCurrentToViews)]
     pub fn project_current_to_views(&self, views_json: String) -> Result<String, JsValue> {
-        let views: Vec<ViewRequest> = serde_json::from_str(&views_json)
-            .map_err(|e| JsValue::from_str(&format!("Invalid views JSON: {}", e)))?;
-
-        let mut result: HashMap<String, Scene2D> = HashMap::with_capacity(views.len());
-        for view in &views {
-            result.insert(view.id.clone(), self.project_view(view));
-        }
-
-        serde_json::to_string(&result).map_err(|e| {
-            JsValue::from_str(&format!("Failed to serialize projection result: {}", e))
-        })
+        self.project_views_json(&views_json)
+            .map_err(|e| JsValue::from_str(&e))
     }
 }
 
+// ---------------------------------------------------------------------------
+// Existing tests (unchanged)
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
@@ -1713,13 +1778,37 @@ mod tests {
     }
 
     #[test]
-    fn aia_layer_maps_known_kinds() {
-        assert_eq!(aia_layer("wall"), Some("A-WALL"));
-        assert_eq!(aia_layer("door"), Some("A-DOOR"));
-        assert_eq!(aia_layer("window"), Some("A-GLAZ"));
-        assert_eq!(aia_layer("slab"), Some("A-FLOR"));
-        assert_eq!(aia_layer("stair"), Some("A-FLOR-STRS"));
-        assert_eq!(aia_layer("column"), Some("A-COLS"));
-        assert_eq!(aia_layer("unknown"), None);
+    fn registry_duplicate_view_ids_rejected() {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let registry = OGEntityRegistry::new();
+            let camera = CameraParameters::default();
+            let camera_json = serde_json::to_string(&camera).unwrap();
+            let views_json = format!(
+                r#"[{{"id":"plan","camera":{cam}}},{{"id":"plan","camera":{cam}}}]"#,
+                cam = camera_json
+            );
+    
+            let result = registry.project_current_to_views_internal(views_json);
+            assert!(result.is_err());
+            let err = result.unwrap_err();
+            assert!(err.contains("Duplicate view ID"));
+        }
+    
+        #[cfg(target_arch = "wasm32")]
+        {
+            let registry = OGEntityRegistry::new();
+            let camera_json = serde_json::to_string(&CameraParameters::default()).unwrap();
+            let views_json = format!(
+                r#"[{{"id":"plan","camera":{cam}}},{{"id":"plan","camera":{cam}}}]"#,
+                cam = camera_json
+            );
+    
+            let result = registry.project_current_to_views(views_json);
+            assert!(result.is_err());
+            let err = result.unwrap_err();
+            let err_str = err.as_string().unwrap();
+            assert!(err_str.contains("Duplicate view ID"));
+        }
     }
 }

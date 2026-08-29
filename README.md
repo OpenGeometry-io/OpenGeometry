@@ -92,6 +92,19 @@ If you are using ChatGPT, Claude, Gemini, Copilot, or other coding agents on thi
 | **Exports** | STL, STEP, IFC, PDF projection (PDF is currently native/Node-only — browser PDF is on the roadmap) |
 | **Integration** | Three.js scene management, WebAssembly-powered performance |
 
+## Recent Highlights
+
+Recent improvements to the OpenGeometry kernel include:
+
+- ✅ Analytic geometry preservation (circles, arcs, cylinders, planar surfaces)
+- ✅ STEP and IFC export of analytic geometry where supported
+- ✅ Robust deterministic boolean operations with validation
+- ✅ Multi-cutter boolean subtraction workflows
+- ✅ B-Rep validity checking and topology healing
+- ✅ Snapshot-based scenegraph with explicit refresh/replace semantics
+- ✅ Stable entity registry with semantic projection metadata
+- ✅ Improved Three.js integration and registry APIs
+
 ## Demos
 
 See OpenGeometry in action — interactive, browser-based demos showcasing the kernel's capabilities:

@@ -1,0 +1,306 @@
+# aia-layers.yaml
+# Единый источник истины для AIA/NCS Layer Mapping
+
+layers:
+  # ===== Архитектурные элементы =====
+  A-WALL:
+    - wall
+    - walls
+    - partition
+  
+  A-DOOR:
+    - door
+    - doors
+  
+  A-GLAZ:
+    - window
+    - windows
+    - glazing
+    - glaz
+    - glass
+  
+  A-GLAZ-CW:
+    - curtainwall
+    - curtain_wall
+  
+  A-GLAZ-SF:
+    - storefront
+  
+  A-FLOR:
+    - floor
+    - floors
+    - slab
+    - slabs
+    - floor_slab
+  
+  A-ROOF:
+    - roof
+    - roofs
+  
+  A-CEIL:
+    - ceiling
+    - ceilings
+  
+  A-FLOR-STRS:
+    - stair
+    - stairs
+    - staircase
+    - stairwell
+  
+  A-FLOR-RAIL:
+    - railing
+    - railings
+    - handrail
+    - guardrail
+  
+  A-FLOR-RAMP:
+    - ramp
+    - ramps
+  
+  A-COLS:
+    - column
+    - columns
+    - col
+    - pillar
+  
+  A-CASE:
+    - casework
+    - cabinet
+    - cabinets
+    - millwork
+  
+  A-FURN:
+    - furniture
+    - furn
+    - furnishings
+  
+  A-EQPM:
+    - equipment
+    - equip
+    - appliance
+  
+  A-OPEN:
+    - opening
+    - openings
+  
+  A-SHAF:
+    - shaft
+    - shafts
+    - chase
+  
+  A-PLMB:
+    - toilet
+    - restroom
+    - bathroom
+    - plumbing_fixture
+  
+  A-ELEV:
+    - elevator
+    - elev
+  
+  A-ESCL:
+    - escalator
+
+  # ===== Инженерные системы =====
+  M-DUCT:
+    - duct
+    - ducts
+    - hvac
+    - air_handler
+    - diffuser
+  
+  P-PIPE:
+    - pipe
+    - pipes
+    - plumbing
+    - plumb
+  
+  E-COND:
+    - conduit
+    - conduits
+  
+  E-CTRAY:
+    - cable_tray
+    - cabletray
+    - cable_trays
+  
+  E-LITE:
+    - lighting
+    - light
+    - lights
+    - luminaire
+  
+  F-SPRK:
+    - fire_protection
+    - sprinkler
+    - fire_alarm
+  
+  T-TELC:
+    - telecom
+    - telecommunications
+    - data
+    - network
+  
+  T-SEC:
+    - security
+    - camera
+    - access_control
+
+  # ===== Структурные элементы =====
+  S-FOOT:
+    - footing
+    - foundation
+    - footings
+  
+  S-GRDN:
+    - gradebeam
+    - grade_beam
+  
+  S-COLN:
+    - structural_column
+    - structural_columns
+  
+  S-BEAM:
+    - structural_beam
+    - structural_beams
+    - beam
+    - beams
+  
+  S-BRAC:
+    - brace
+    - bracing
+    - diagonal_brace
+  
+  S-TRUS:
+    - truss
+    - trusses
+  
+  S-GIRD:
+    - girder
+    - girders
+  
+  S-JOIS:
+    - joist
+    - joists
+  
+  S-DECK:
+    - deck
+    - decks
+    - metal_deck
+  
+  S-SHWR:
+    - shearwall
+    - shear_wall
+  
+  S-MOMF:
+    - moment_frame
+    - momentframe
+
+  # ===== Земельные работы =====
+  G-SITE:
+    - site
+    - grading
+    - topography
+  
+  G-ROAD:
+    - road
+    - roads
+    - pavement
+    - asphalt
+  
+  G-SWAL:
+    - sidewalk
+    - walkway
+    - path
+  
+  G-CURB:
+    - curb
+    - curbs
+    - gutter
+  
+  G-FENC:
+    - fence
+    - fencing
+    - gate
+  
+  G-LNDS:
+    - landscape
+    - planting
+    - plants
+    - tree
+  
+  G-PARK:
+    - parking
+    - parking_lot
+    - parking_stall
+  
+  G-RETW:
+    - retaining_wall
+    - retainingwall
+  
+  G-DRAN:
+    - drainage
+    - drain
+    - storm_drain
+
+  # ===== Существующие и демонтируемые =====
+  A-EXST:
+    - existing
+    - exist
+    - exst
+  
+  A-DEMO:
+    - demolish
+    - demo
+    - demolition
+  
+  A-TEMP:
+    - temporary
+    - temp
+  
+  A-FUTR:
+    - future
+
+  # ===== Аннотации и документация =====
+  A-ANNO:
+    - annotation
+    - annotations
+    - text
+    - label
+  
+  A-DIMN:
+    - dimension
+    - dim
+    - dimensions
+  
+  A-GRID:
+    - grid
+    - grids
+    - gridline
+    - refplane
+  
+  A-CALO:
+    - bubble
+    - bubbles
+    - callout
+  
+  A-SECM:
+    - section_mark
+    - sectionmark
+  
+  A-ELEM:
+    - elevation_mark
+    - elevationmark
+
+  # ===== Специальные =====
+  GENERAL:
+    - generic
+    - default
+  
+  HIDDEN:
+    - hidden
+    - invisible
+  
+  REFERENCE:
+    - reference
+    - ref

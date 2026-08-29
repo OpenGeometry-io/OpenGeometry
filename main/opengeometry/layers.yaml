@@ -1,0 +1,50 @@
+# main/opengeometry/layers.yaml
+layers:
+  A-WALL:
+    - wall
+    - walls
+    - partition
+  A-DOOR:
+    - door
+    - doors
+  A-GLAZ:
+    - window
+    - windows
+    - glazing
+    - glaz
+    - glass
+  A-FLOR:
+    - floor
+    - floors
+    - slab
+    - slabs
+  A-ROOF:
+    - roof
+    - roofs
+  A-COLS:
+    - column
+    - columns
+    - col
+    - pillar
+  S-BEAM:
+    - structural_beam
+    - structural_beams
+    - beam
+    - beams
+  M-DUCT:
+    - duct
+    - ducts
+    - hvac
+  P-PIPE:
+    - pipe
+    - pipes
+    - plumbing
+  G-SITE:
+    - site
+    - grading
+  A-EXST:
+    - existing
+    - exist
+  GENERAL:
+    - generic
+    - default

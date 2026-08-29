@@ -23,6 +23,10 @@ earcutr = "=0.3.0"
 dxf = "0.6.0"
 stl_io = "0.8"
 boolmesh = "0.1.7"
+phf = { version = "0.11", features = ["macros"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 printpdf = "0.5"
+
+[build-dependencies]
+serde_yaml = "0.9"
