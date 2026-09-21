@@ -148,8 +148,22 @@ fn extract_references(expression: &str) -> Vec<usize> {
     let bytes = expression.as_bytes();
     let mut refs = Vec::new();
     let mut idx = 0;
+    let mut quoted = false;
 
     while idx < bytes.len() {
+        if bytes[idx] == b'\'' {
+            if quoted && bytes.get(idx + 1) == Some(&b'\'') {
+                idx += 2;
+                continue;
+            }
+            quoted = !quoted;
+            idx += 1;
+            continue;
+        }
+        if quoted {
+            idx += 1;
+            continue;
+        }
         if bytes[idx] != b'#' {
             idx += 1;
             continue;
@@ -212,5 +226,17 @@ mod tests {
         let raw = "A'B\nCø";
         let sanitized = sanitize_string_literal(raw);
         assert_eq!(sanitized, "A''B C?");
+    }
+
+    #[test]
+    fn ignores_reference_like_text_inside_escaped_literals() {
+        let mut writer = Part21Writer::new("AUTOMOTIVE_DESIGN");
+        let point = writer.add_entity("CARTESIAN_POINT('body #999''s point',(0.,0.,0.))");
+        writer.add_entity(format!("VERTEX_POINT('#888',#{point})"));
+        assert!(writer.build().is_ok());
+        assert_eq!(
+            extract_references("X('a #999''b',#12,'#88',#3)"),
+            vec![12, 3]
+        );
     }
 }

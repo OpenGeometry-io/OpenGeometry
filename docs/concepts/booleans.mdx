@@ -1,88 +1,77 @@
 ---
 title: Booleans
-description: How kernel-backed boolean operations work in OpenGeometry
+description: How authoritative analytic boolean operations work in OpenGeometry
 ---
 
 ## What booleans do
 
-Boolean operations combine or modify solids:
+Union combines occupied material, intersection retains common material, and subtraction removes the
+cutter's occupied material from the host. OpenGeometry applies these operations to strict analytic
+BRep v2 solids.
 
-- **Union** merges two solids into one
-- **Intersection** keeps only the overlapping volume
-- **Subtraction** cuts one solid by another
+The model keeps surfaces, curves, trims, edge uses, pcurves, shell membership, and face provenance.
+Triangles are generated after the operation for rendering and never become the result's authority.
 
-In OpenGeometry, boolean helpers operate on **B-Rep payloads** and return a renderable mesh result
-along with the output B-Rep and a report you can use for debugging.
+## Inputs and results
 
-## How you run booleans
+Use the binary `booleanUnion`, `booleanIntersection`, and `booleanSubtraction` helpers, or the
+corresponding `AnalyticSolid` methods. Every operand must be an `AnalyticSolid`. Public `Cylinder`
+and `Sphere` instances satisfy that contract.
 
-You can use either:
+The result is another `AnalyticSolid`. Its report contains contacts, coincident ownership, and
+one-to-many source-face mappings. Separate solids that touch only at an edge or point remain
+separate closed shells.
 
-- The standalone helpers: `booleanUnion`, `booleanIntersection`, `booleanSubtraction`
-- Shape convenience methods: `shape.subtract([operands], options?)`
-- The opening-centric workflow: `opening.subtractFrom(host, options?)`
+## Tolerances
 
-All of these call the same kernel entry points under the hood.
+The model carries separate geometric, intersection, tessellation, and exchange budgets. Boolean
+callers do not override these with a single tolerance. Rebuild an authored solid with the required
+accuracy when a different modeling budget is needed.
 
-The standalone `booleanSubtraction(lhs, rhs, options?)` helper stays binary. Wrapper subtraction is
-array-only, so pass `shape.subtract([operand], options?)` even when you only have one cutter.
+Changing render deflection changes triangle density only. It does not change intersections, trims,
+classification, or topology.
 
-The operands can be:
+## Failure behavior
 
-- Wrapper objects such as `Cuboid`, `Opening`, `Solid`, or other shapes that expose B-Rep accessors
-- Parsed B-Rep objects
-- Serialized B-Rep JSON strings
+The analytic engine does not use a faceted fallback. It returns `AnalyticGeometryError` when:
 
-That means `polygon.extrude(height)` fits naturally into boolean workflows because it returns a
-`Solid`.
+- the requested surface-family case is not covered (`coverage_gap`)
+- an intersection branch cannot be certified within its numerical budget (`unresolved_intersection`)
+- topology or required geometry is invalid
+- a resource limit is exhausted
 
-## Initialization requirement
+Unknown point classification is never treated as outside. Invalid input is never routed to an
+approximate bridge.
 
-Booleans require the WASM module to be initialized:
+## Release coverage and explicit limits
 
-```ts
-import { OpenGeometry } from "opengeometry";
+The SSI service dispatches every unordered pair of Plane, Sphere, Cylinder, Cone, and ring Torus.
+It uses analytic sections where they can be certified and bounded numerical branches elsewhere.
+The boolean topology layer covers the released canonical solids, planar multi-loop extrusions,
+closed-loop imprints, periodic winding, two-sided curved cutter bands, cavities, disconnected
+results, and deterministic identical-body ownership.
 
-await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
-```
+The following configurations remain explicit release limits and return a structured error:
 
-## Input expectations
+- a numerical branch whose conservative UV tube can cross a trim boundary between certified anchors
+- a higher-order singularity or tangency that cannot be separated within the intersection budget
+- a partial coincident overlap between independently trimmed nonplanar faces outside a canonical fast path
+- an arrangement where several open SSI branches cross more than two unrelated trimmed faces and the
+  available imprint path cannot prove one closed manifold result
+- features, clearances, or cap spans at or below the model's geometric budget
+- exhaustion of patch visits, branch steps, Newton corrections, or subdivision depth
 
-Booleans work best when both operands represent **closed, valid solids**.
+These failures preserve the operands and identify `coverage_gap`, `unresolved_intersection`, or
+`limit_exceeded`. They never produce a faceted substitute or claim an unverified result.
 
-Common failure modes include:
+## Provenance
 
-- Non-closed shells (missing faces)
-- Self-intersections or degenerate faces
-- Very small features relative to the kernel tolerance
-
-When a boolean returns an empty result, inspect `BooleanResult.report` to see what the kernel
-processed and produced.
-
-## Tolerance and coplanar faces
-
-You can tune kernel behavior:
-
-- `kernel.tolerance` controls how aggressively the kernel treats edges/faces as coincident.
-- `kernel.mergeCoplanarFaces` attempts to merge coplanar faces in the output.
-
-If you see tiny sliver faces or noisy results, increase tolerance slightly and enable coplanar face
-merging. If you see missing details, lower tolerance.
-
-## Debugging tips
-
-- Read `result.report` to get counts and an `empty` flag.
-- Start with simple operands (two cuboids), then move to complex geometry.
-- Turn on outlines (default for the helpers) so you can see output edges clearly.
-- Use `result.toFreeform()` when you want to inspect or continue editing the output as direct
-  geometry.
-
-## Status and limitations
-
-Booleans are under active refinement. Some inputs may produce unexpected results or require
-additional tuning. If you get stuck, reach out on [Discord](https://discord.gg/9wJpbfgGGA).
+Each result face records its source entity, body, and face key together with its preserved, split,
+cut, or coincident role. Subtraction reverses retained cutter faces where required. The report maps
+each input face to all corresponding result faces for the completed boolean.
 
 ## Related
 
 - [Boolean operations API](/api/operations/boolean-operations)
-- [Exports](/concepts/exports) for exporting boolean results to STL/STEP/IFC
+- [Analytic solid](/api/shapes/analytic-solid)
+- [Exports](/concepts/exports)

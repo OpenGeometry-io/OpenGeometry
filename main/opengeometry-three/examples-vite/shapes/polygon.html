@@ -62,6 +62,9 @@
           <span class="og-control-bool-state" data-state>Disabled</span>
         </div>
       </label>
+      <button id="check-tessellation" type="button">Check kernel triangulation</button>
+      <p id="tessellation-report" role="status"></p>
+      <p id="error" role="alert"></p>
     </aside>
 
     <div id="app"></div>
@@ -72,7 +75,7 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Polygon, Vector3 } from "opengeometry";
+      import { OpenGeometry, Polygon, Vector3, tessellateFacetedBrep } from "opengeometry";
 
       const app = document.getElementById("app");
       if (!app) {
@@ -126,7 +129,12 @@
 
         const commit = (nextValue) => {
           const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
+          number.setCustomValidity("");
+          if (String(nextValue).trim() === "" || !Number.isFinite(parsed)
+            || (number.min !== "" && parsed < Number(number.min))
+            || (number.max !== "" && parsed > Number(number.max))) {
+            number.setCustomValidity("Enter a finite value within the displayed limits.");
+            number.reportValidity();
             return;
           }
 
@@ -174,13 +182,30 @@
           return;
         }
 
-        polygon.setConfig({
-          vertices: config.vertices.map((vertex) => vertex.clone()),
-          holes: config.holes.map((hole) => hole.map((vertex) => vertex.clone())),
-          color: config.color,
-          outlineWidth: config.outlineWidth,
-        });
-        polygon.outline = true;
+        try {
+          if (config.holes.length && config.vertices[3].z <= 0.35) {
+            throw new Error("The hole overlaps the boundary. Set Vertex 4 Z above 0.35.");
+          }
+          const next = new Polygon({
+            ogid: polygon.ogid,
+            vertices: config.vertices.map((vertex) => vertex.clone()),
+            holes: config.holes.map((hole) => hole.map((vertex) => vertex.clone())),
+            color: config.color,
+            outlineWidth: config.outlineWidth,
+          });
+          next.outline = true;
+          const previous = polygon;
+          previous.parent?.add(next);
+          previous.removeFromParent();
+          polygon = next;
+          previous.dispose();
+          previous.polygon.free();
+          document.querySelector("#tessellation-report").textContent = "";
+          document.querySelector("#error").textContent = "";
+        } catch (failure) {
+          document.querySelector("#error").textContent = `Previous valid preview retained. ${String(failure)}`;
+          return;
+        }
 
         console.groupCollapsed("[polygon] updated");
         console.log("Config", config);
@@ -249,11 +274,33 @@
 
         updatePolygon();
 
+        document.querySelector("#check-tessellation").addEventListener("click", () => {
+          const report = document.querySelector("#tessellation-report");
+          try {
+            const positions = tessellateFacetedBrep(polygon.getBrepData());
+            let area = 0;
+            for (let i = 0; i < positions.length; i += 9) {
+              area += Math.abs((positions[i + 3] - positions[i]) * (positions[i + 8] - positions[i + 2])
+                - (positions[i + 5] - positions[i + 2]) * (positions[i + 6] - positions[i])) / 2;
+            }
+            report.textContent = `${positions.length / 9} kernel triangles · area ${area.toFixed(3)} · ${config.holes.length} holes retained`;
+          } catch (failure) { report.textContent = `Triangulation unavailable: ${String(failure)}`; }
+        });
+
         renderer.setAnimationLoop(() => {
           stats.update();
           controls.update();
           renderer.render(scene, camera);
         });
+
+        window.addEventListener("pagehide", () => {
+          renderer.setAnimationLoop(null);
+          polygon?.dispose();
+          polygon?.polygon.free();
+          controls.dispose();
+          renderer.dispose();
+          stats.dom.remove();
+        }, { once: true });
 
         window.addEventListener("resize", () => {
           camera.aspect = window.innerWidth / window.innerHeight;

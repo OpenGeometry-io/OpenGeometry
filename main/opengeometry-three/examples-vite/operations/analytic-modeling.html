@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenGeometry Analytic Modeling Operations</title>
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Analytic Modeling Operations</span>
+    </div>
+    <aside class="og-controls">
+      <h3>Choose an operation</h3>
+      <p
+        class="og-control-summary">Each branch below is a direct public API call. Unsupported inputs fail instead of replacing the BRep with facets.</p>
+      <label class="og-control-row">
+        Operation
+        <select id="operation">
+          <option value="loft">Coaxial circle loft</option>
+          <option value="revolve">Revolved rectangle</option>
+          <option value="chamfer">Planar chamfer</option>
+          <option value="fillet">Cylinder fillet</option>
+          <option value="shell">Torus shell</option>
+        </select>
+      </label>
+      <label class="og-control-row">
+        Chord error
+        <input id="deflection" type="range" min="-3" max="-1" step="0.1" value="-2" />
+      </label>
+      <p id="statistics" role="status"></p>
+      <p id="error" role="alert"></p>
+    </aside>
+    <div id="app"></div>
+
+    <script type="module">
+    import "../src/styles/theme.css";
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+    import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+    import { AnalyticSolid, OpenGeometry } from "opengeometry";
+
+    const input = (id) => document.querySelector(`#${id}`);
+    const chordError = () => 10 ** Number(input("deflection").value);
+    let scene;
+    let solid;
+
+    function createResult(operation) {
+      if (operation === "loft") {
+        return new AnalyticSolid({
+          kind: "coaxialCircleLoft",
+          lowerRadius: 1.2,
+          upperRadius: 0.55,
+          height: 2.4,
+          deflection: chordError(),
+          color: 0x329ac7,
+        });
+      }
+      if (operation === "revolve") {
+        return new AnalyticSolid({
+          kind: "revolvedRectangle",
+          innerRadius: 0.7,
+          outerRadius: 1.45,
+          height: 1.1,
+          deflection: chordError(),
+          color: 0x329ac7,
+        });
+      }
+      if (operation === "chamfer") {
+        return new AnalyticSolid({
+          kind: "chamferedCuboid",
+          width: 2.2,
+          depth: 1.7,
+          height: 1.5,
+          chamfer: 0.22,
+          deflection: chordError(),
+          color: 0x329ac7,
+        });
+      }
+      if (operation === "fillet") {
+        return new AnalyticSolid({
+          kind: "filletedCylinder",
+          radius: 1.15,
+          height: 2.2,
+          filletRadius: 0.18,
+          deflection: chordError(),
+          color: 0x329ac7,
+        });
+      }
+
+      const torus = new AnalyticSolid({
+        kind: "torus",
+        majorRadius: 1.4,
+        minorRadius: 0.45,
+        deflection: chordError(),
+      });
+      try {
+        return torus.shell(0.12, { deflection: chordError(), color: 0x329ac7 });
+      } finally {
+        torus.dispose();
+      }
+    }
+
+    function rebuild() {
+      const next = createResult(input("operation").value);
+      next.outline = true;
+      const stats = next.retessellate(chordError());
+      const brep = JSON.parse(next.getBrepSerialized());
+      if (solid) {
+        scene.remove(solid);
+        solid.dispose();
+      }
+      solid = next;
+      scene.add(solid);
+      input("statistics").textContent =
+        `${brep.topology.faces.length} analytic faces · ${stats.triangleCount.toLocaleString()} render triangles`;
+      input("error").textContent = "";
+    }
+
+    function attempt(action) {
+      try {
+        action();
+      } catch (failure) {
+        input("error").textContent = `Previous result retained. ${String(failure)}`;
+      }
+    }
+
+    async function initialize() {
+      try {
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+        scene.add(new THREE.GridHelper(16, 16, 0x7188aa, 0xcbd5e1));
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+        const light = new THREE.DirectionalLight(0xffffff, 2);
+        light.position.set(4, 7, 5);
+        scene.add(light);
+
+        const camera = new THREE.PerspectiveCamera(
+          45,
+          innerWidth / innerHeight,
+          0.1,
+          100,
+        );
+        camera.position.set(5, 4, 5);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(devicePixelRatio);
+        input("app").replaceChildren(renderer.domElement);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 1, 0);
+        controls.enableDamping = true;
+
+        rebuild();
+        input("operation").addEventListener("change", () => attempt(rebuild));
+        input("deflection").addEventListener("input", () => attempt(rebuild));
+        addEventListener("resize", () => {
+          camera.aspect = innerWidth / innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(innerWidth, innerHeight);
+        });
+        addEventListener("pagehide", () => {
+          renderer.setAnimationLoop(null);
+          solid?.dispose();
+          controls.dispose();
+          renderer.dispose();
+        }, { once: true });
+        renderer.setAnimationLoop(() => {
+          controls.update();
+          renderer.render(scene, camera);
+        });
+      } catch (failure) {
+        input("error").textContent = String(failure);
+      }
+    }
+
+    initialize();
+    </script>
+  </body>
+</html>

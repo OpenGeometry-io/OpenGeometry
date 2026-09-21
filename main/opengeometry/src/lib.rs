@@ -7,6 +7,9 @@ pub mod geometry {
     pub mod triangle;
 }
 
+pub mod analytic;
+pub mod math;
+
 pub mod operations {
     pub mod extrude;
     pub mod offset;
@@ -40,11 +43,10 @@ pub mod spatial {
     pub mod workplane;
 }
 
-pub mod booleans;
 pub mod brep;
-pub mod tolerance;
-pub mod units;
 pub mod editor;
 pub mod export;
 pub mod freeform;
 pub mod scenegraph;
+pub mod tolerance;
+pub mod units;

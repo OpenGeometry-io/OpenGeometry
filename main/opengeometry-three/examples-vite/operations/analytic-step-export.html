@@ -1,313 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Analytic STEP Export Example</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Analytic STEP export of a kernel-backed cylinder with a single CYLINDRICAL_SURFACE, using OpenGeometry and OGSceneManager." />
-    <meta name="author" content="Vishwajeet Mane" />
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OpenGeometry analytic STEP export</title>
   </head>
   <body class="og-example-page">
-    <div class="og-badge-title-card">
-      <a href="../index.html" class="og-badge-title-link">Back</a>
-      <span class="og-badge-title">Analytic STEP Export</span>
-    </div>
-
+    <div
+      class="og-badge-title-card"><a class="og-badge-title-link" href="../index.html">Back</a><span class="og-badge-title">Analytic exchange · v2</span></div>
     <aside class="og-controls">
-      <h3>Analytic STEP Export</h3>
-      <p class="og-control-summary">
-        Build one kernel-backed cylinder, then export it as an analytic STEP file. The cylindrical
-        wall should serialize as a single CYLINDRICAL_SURFACE, not a fan of facets.
-      </p>
-
-      <label class="og-control-row" data-control="radius">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Radius</span>
-          <code class="og-control-value" data-value>0.9</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="0.3" max="2" step="0.05" value="0.9" />
-          <input data-number type="number" min="0.3" max="2" step="0.05" value="0.9" />
-        </div>
-      </label>
-
-      <label class="og-control-row" data-control="height">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Height</span>
-          <code class="og-control-value" data-value>2</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="0.5" max="4" step="0.1" value="2" />
-          <input data-number type="number" min="0.5" max="4" step="0.1" value="2" />
-        </div>
-      </label>
-
-      <label class="og-control-row" data-control="segments">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Segments</span>
-          <code class="og-control-value" data-value>32</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="8" max="64" step="1" value="32" />
-          <input data-number type="number" min="8" max="64" step="1" value="32" />
-        </div>
-      </label>
-
-      <button type="button" class="og-control-action og-control-action-amber" data-export>
-        Export STEP
-      </button>
-      <a hidden data-download></a>
-
-      <div class="og-control-summary" data-headline style="margin-top: 12px; font-weight: 600;">
-        Export the cylinder to verify the analytic surface count.
-      </div>
-
-      <div
-        class="og-control-summary"
-        data-readout
-        style="margin-top: 8px; white-space: pre-line; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;"
-      >
-        CYLINDRICAL_SURFACE: —
-        CIRCLE: —
-        ADVANCED_FACE: —
-        PLANE: —
-      </div>
+      <h3>Export authored geometry</h3>
+      <p
+        class="og-control-summary">Shared analytic surfaces, curves and oriented edge uses go directly to STEP. Display deflection never changes the exported model. Coordinates are authored in metres.</p>
+      <label
+        class="og-control-row">Body <select id="body" aria-label="Body"><option value="cuboid">Cuboid</option><option value="cylinder">Cylinder</option><option value="sphere">Sphere</option><option value="cone">Cone</option><option value="frustum">Frustum</option><option value="torus">Ring torus</option><option value="circularWall">Circular wall</option><option value="cut">Sphere subtraction</option><option value="cavity">Sphere cavity</option></select></label>
+      <label
+        class="og-control-row">STEP length unit <select id="unit" aria-label="STEP length unit"><option value="metre">Metre</option><option value="millimetre">Millimetre</option></select></label>
+      <label
+        class="og-control-row">Display chord error <input id="deflection" aria-label="Display chord error" type="range" min="-3" max="-1" step="0.1" value="-2"></label>
+      <button class="og-control-action" id="download">Download STEP</button>
+      <pre id="report" style="white-space:pre-wrap" aria-live="polite"></pre>
+      <p id="error" role="alert" style="color:#b42318"></p>
+      <p
+        class="og-control-summary">Checks cover v2 structure, sampled geometry residuals and Part-21 references. STEP schema and importer validation is pending. Numerical SSI curves require bounded export fitting.</p>
     </aside>
-
     <div id="app"></div>
-
     <script type="module">
-      import "../src/styles/theme.css";
-      import * as THREE from "three";
-      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-      import Stats from "three/examples/jsm/libs/stats.module.js";
-      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { Cylinder, OGSceneManager, OpenGeometry, Vector3 } from "opengeometry";
+    import "../src/styles/theme.css";
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+    import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+    import { AnalyticSolid, OpenGeometry } from "opengeometry";
 
-      const app = document.getElementById("app");
-      const exportButton = document.querySelector("[data-export]");
-      const downloadLink = document.querySelector("[data-download]");
-      const headlineEl = document.querySelector("[data-headline]");
-      const readoutEl = document.querySelector("[data-readout]");
+    const body = document.querySelector("#body");
+    const unit = document.querySelector("#unit");
+    const deflection = document.querySelector("#deflection");
+    const report = document.querySelector("#report");
+    const error = document.querySelector("#error");
+    const frame = (y = 0, x = 0) => ({
+      origin: [x, y, 0],
+      x: [1, 0, 0],
+      y: [0, 0, -1],
+      z: [0, 1, 0],
+    });
+    let solid;
+    let baseline;
+    let lodVerified = false;
+    let scene;
+    const chordError = () => 10 ** Number(deflection.value);
 
-      if (!app || !exportButton || !downloadLink || !headlineEl || !readoutEl) {
-        throw new Error("Missing analytic STEP export page nodes");
+    function attempt(action) {
+      try {
+        action();
+        error.textContent = "";
+      } catch (failure) {
+        error.textContent = `Previous valid preview retained. ${String(failure)}`;
       }
-
-      const config = {
-        radius: 0.9,
-        height: 2,
-        segments: 32,
+    }
+    function currentExport(body = solid) {
+      return body.exportStep(unit.value);
+    }
+    function show(exported) {
+      const counts = [
+        "CYLINDRICAL_SURFACE",
+        "SPHERICAL_SURFACE",
+        "CONICAL_SURFACE",
+        "TOROIDAL_SURFACE",
+        "PLANE",
+        "CIRCLE",
+        "ELLIPSE",
+        "SEAM_CURVE",
+      ];
+      report.textContent =
+        `v2 · ${exported.report.faces} faces · ${exported.report.edges} regular edges · ${exported.report.solids} solids · ${exported.report.cavity_shells} cavities\n` +
+        counts.map((name) =>
+          `${name}: ${exported.text.split(`=${name}(`).length - 1}`
+        ).join("\n") +
+        `\n${unit.value} · ${
+          new TextEncoder().encode(exported.text).length.toLocaleString()
+        } bytes\nDisplay-only deflection: ${chordError().toPrecision(2)}\n${
+          lodVerified
+            ? "Export unchanged by LOD: verified"
+            : "Export uses authored analytic geometry"
+        }`;
+    }
+    function rebuild() {
+      const options = {
+        cuboid: { kind: "cuboid", width: 2, depth: 1, height: 2 },
+        cylinder: { kind: "cylinder", radius: 0.9, height: 2 },
+        sphere: { kind: "sphere", radius: 1.1, frame: frame(1.1) },
+        cone: { kind: "cone", radius: 1, height: 2 },
+        frustum: { kind: "frustum", lowerRadius: 1.2, upperRadius: 0.6, height: 2 },
+        torus: {
+          kind: "torus",
+          majorRadius: 1.4,
+          minorRadius: 0.4,
+          frame: frame(0.4),
+        },
+        circularWall: {
+          kind: "circularWall",
+          radius: 2,
+          thickness: 0.3,
+          height: 1.5,
+          startAngle: 0.3,
+          sweepAngle: 2.3,
+        },
+        cut: { kind: "sphere", radius: 1.2, frame: frame(1.2) },
+        cavity: { kind: "sphere", radius: 1.2, frame: frame(1.2) },
       };
-
-      let cylinder = null;
-
-      function formatNumber(value) {
-        return Number(value).toFixed(2).replace(/\.?0+$/, "");
-      }
-
-      function countOccurrences(text, token) {
-        if (!text) {
-          return 0;
-        }
-        return text.split(token).length - 1;
-      }
-
-      function mountStats() {
-        const stats = new Stats();
-        stats.showPanel(0);
-        stats.dom.style.position = "fixed";
-        stats.dom.style.left = "12px";
-        stats.dom.style.bottom = "12px";
-        stats.dom.style.top = "auto";
-        stats.dom.style.zIndex = "1000";
-        document.body.appendChild(stats.dom);
-        return stats;
-      }
-
-      function attachNumberControl(name, onChange) {
-        const row = document.querySelector(`[data-control="${name}"]`);
-        const range = row?.querySelector("[data-range]");
-        const number = row?.querySelector("[data-number]");
-        const value = row?.querySelector("[data-value]");
-
-        if (!row || !range || !number || !value) {
-          throw new Error(`Missing number control: ${name}`);
-        }
-
-        const commit = (nextValue) => {
-          const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
-            return;
-          }
-
-          range.value = String(parsed);
-          number.value = String(parsed);
-          value.textContent = formatNumber(parsed);
-          onChange(parsed);
-        };
-
-        range.addEventListener("input", () => commit(range.value));
-        number.addEventListener("input", () => commit(number.value));
-        commit(range.value);
-      }
-
-      function downloadText(text, filename) {
-        const blob = new Blob([text], { type: "application/step" });
-        const url = URL.createObjectURL(blob);
-        downloadLink.href = url;
-        downloadLink.download = filename;
-        downloadLink.click();
-        URL.revokeObjectURL(url);
-      }
-
-      function updateCylinder() {
-        if (!cylinder) {
-          return;
-        }
-
-        cylinder.setConfig({
-          center: new Vector3(0, config.height * 0.5, 0),
-          radius: config.radius,
-          height: config.height,
-          segments: config.segments,
-          angle: Math.PI * 2,
-          color: 0x0ea5e9,
-          outlineWidth: 2,
-        });
-        cylinder.outline = true;
-
-        console.groupCollapsed("[analytic-step-export] shape updated");
-        console.log("Config", { ...config });
-        console.groupEnd();
-      }
-
-      async function main() {
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xeef2ff);
-
-        const camera = new THREE.PerspectiveCamera(
-          55,
-          window.innerWidth / window.innerHeight,
-          0.1,
-          100
-        );
-        camera.position.set(5.6, 4.4, 6.8);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        app.replaceChildren(renderer.domElement);
-
-        const stats = mountStats();
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.target.set(0, 1, 0);
-        controls.update();
-
-        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
-        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-
-        const light = new THREE.DirectionalLight(0xffffff, 1.1);
-        light.position.set(6, 8, 4);
-        scene.add(light);
-
-        await OpenGeometry.create({ wasmURL: wasmUrl });
-
-        cylinder = new Cylinder({
-          center: new Vector3(0, config.height * 0.5, 0),
-          radius: config.radius,
-          height: config.height,
-          segments: config.segments,
-          angle: Math.PI * 2,
-          color: 0x0ea5e9,
-          outlineWidth: 2,
-        });
-        scene.add(cylinder);
-
-        attachNumberControl("radius", (value) => {
-          config.radius = value;
-          updateCylinder();
-        });
-        attachNumberControl("height", (value) => {
-          config.height = value;
-          updateCylinder();
-        });
-        attachNumberControl("segments", (value) => {
-          config.segments = Math.round(value);
-          updateCylinder();
-        });
-
-        updateCylinder();
-
-        exportButton.addEventListener("click", () => {
-          const manager = new OGSceneManager();
-          const sceneId = manager.createScene("analytic-step");
-          manager.addBrepEntityToScene(
-            sceneId,
-            "cyl",
-            "OGCylinder",
-            JSON.stringify(cylinder.getBrep())
-          );
-
-          const result = manager.exportSceneToStep(sceneId, JSON.stringify({
-            schema: "AutomotiveDesign",
-            product_name: "OpenGeometry Analytic Export",
-            scale: 1,
-            error_policy: "BestEffort",
-            validate_topology: true,
-            require_closed_shell: true,
-            analytic_surfaces: true,
-            length_unit: "Millimetre",
-          }));
-
-          const cylindricalSurfaceCount = countOccurrences(result.text, "CYLINDRICAL_SURFACE");
-          const circleCount = countOccurrences(result.text, "CIRCLE(");
-          const advancedFaceCount = countOccurrences(result.text, "ADVANCED_FACE");
-          const planeCount = countOccurrences(result.text, "PLANE(");
-
-          readoutEl.textContent =
-            `CYLINDRICAL_SURFACE: ${cylindricalSurfaceCount}\n` +
-            `CIRCLE: ${circleCount}\n` +
-            `ADVANCED_FACE: ${advancedFaceCount}\n` +
-            `PLANE: ${planeCount}`;
-
-          if (cylindricalSurfaceCount === 1) {
-            headlineEl.textContent = "✓ 1 analytic CYLINDRICAL_SURFACE (not a facet fan)";
-          } else {
-            headlineEl.textContent =
-              `Expected 1 analytic CYLINDRICAL_SURFACE, found ${cylindricalSurfaceCount}.`;
-          }
-
-          const report = JSON.parse(result.reportJson);
-          downloadText(result.text, "opengeometry-analytic-cylinder.step");
-
-          console.groupCollapsed("[analytic-step-export] export complete");
-          console.log("Config", { ...config });
-          console.log("Counts", {
-            CYLINDRICAL_SURFACE: cylindricalSurfaceCount,
-            CIRCLE: circleCount,
-            ADVANCED_FACE: advancedFaceCount,
-            PLANE: planeCount,
+      let next = new AnalyticSolid({
+        frame: frame(),
+        ...options[body.value],
+        ogid: `step-${body.value}`,
+        deflection: chordError(),
+        color: 0x329ac7,
+      });
+      try {
+        if (body.value === "cut" || body.value === "cavity") {
+          const cutter = new AnalyticSolid({
+            kind: "sphere",
+            radius: body.value === "cut" ? 0.9 : 0.5,
+            frame: frame(1.2, body.value === "cut" ? 0.9 : 0),
+            deflection: chordError(),
           });
-          console.log("Report", report);
-          console.groupEnd();
+          try {
+            const result = next.boolean(cutter, "subtraction", {
+              deflection: chordError(),
+            });
+            next.dispose();
+            next = result;
+          } finally {
+            cutter.dispose();
+          }
+        }
+        const exported = currentExport(next);
+        if (solid) {
+          scene.remove(solid);
+          solid.dispose();
+        }
+        solid = next;
+        scene.add(solid);
+        baseline = exported.text;
+        lodVerified = false;
+        show(exported);
+      } catch (failure) {
+        next.dispose();
+        throw failure;
+      }
+    }
+    async function initialize() {
+      try {
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+        scene.add(
+          new THREE.GridHelper(16, 16),
+          new THREE.HemisphereLight(0xffffff, 0x526070, 2),
+        );
+        const light = new THREE.DirectionalLight(0xffffff, 2);
+        light.position.set(4, 7, 5);
+        scene.add(light);
+        const camera = new THREE.PerspectiveCamera(
+          45,
+          innerWidth / innerHeight,
+          0.1,
+          100,
+        );
+        camera.position.set(6, 4.5, 6);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(devicePixelRatio);
+        document.querySelector("#app").replaceChildren(renderer.domElement);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0.8, 0);
+        controls.enableDamping = true;
+        attempt(rebuild);
+        body.addEventListener("change", () => attempt(rebuild));
+        unit.addEventListener("change", () =>
+          attempt(() => {
+            const exported = currentExport();
+            baseline = exported.text;
+            show(exported);
+          }));
+        deflection.addEventListener("input", () =>
+          attempt(() => {
+            solid.retessellate(chordError());
+            const exported = currentExport();
+            if (baseline !== exported.text) {
+              throw new Error("LOD changed the STEP geometry");
+            }
+            lodVerified = true;
+            show(exported);
+          }));
+        document.querySelector("#download").addEventListener(
+          "click",
+          () =>
+            attempt(() => {
+              const exported = currentExport();
+              show(exported);
+              const url = URL.createObjectURL(
+                new Blob([exported.text], { type: "application/step" }),
+              );
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `analytic-${body.value}.step`;
+              link.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }),
+        );
+        addEventListener("resize", () => {
+          camera.aspect = innerWidth / innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(innerWidth, innerHeight);
+          renderer.setPixelRatio(devicePixelRatio);
         });
-
+        addEventListener("pagehide", () => {
+          renderer.setAnimationLoop(null);
+          solid?.dispose();
+          controls.dispose();
+          renderer.dispose();
+        }, { once: true });
         renderer.setAnimationLoop(() => {
-          stats.update();
           controls.update();
           renderer.render(scene, camera);
         });
-
-        window.addEventListener("resize", () => {
-          camera.aspect = window.innerWidth / window.innerHeight;
-          camera.updateProjectionMatrix();
-          renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+      } catch (failure) {
+        error.textContent = String(failure);
       }
-
-      void main();
+    }
+    initialize();
     </script>
   </body>
 </html>

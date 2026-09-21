@@ -84,6 +84,7 @@
             "pages": [
               "api/primitives/line",
               "api/primitives/arc",
+              "api/primitives/elliptical-arc",
               "api/primitives/rectangle",
               "api/primitives/polyline",
               "api/primitives/curve"
@@ -94,6 +95,7 @@
             "pages": [
               "api/shapes/polygon",
               "api/shapes/solid",
+              "api/shapes/analytic-solid",
               "api/shapes/cylinder",
               "api/shapes/cuboid",
               "api/shapes/sphere",
@@ -106,6 +108,7 @@
             "group": "Operations",
             "pages": [
               "api/operations/extrude",
+              "api/operations/loft",
               "api/operations/offset",
               "api/operations/sweep",
               "api/operations/triangulate",

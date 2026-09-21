@@ -100,7 +100,7 @@
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
       import { OpenGeometry, Polygon, Vector3 } from "opengeometry";
-      import { extrudeBrepFaceDirectional } from "../../../opengeometry/pkg/opengeometry";
+      import { extrudeBrepFaceDirectional } from "opengeometry";
 
       const app = document.getElementById("app");
       const readout = document.querySelector("[data-readout]");
@@ -152,7 +152,12 @@
 
         const commit = (nextValue) => {
           const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
+          number.setCustomValidity("");
+          if (String(nextValue).trim() === "" || !Number.isFinite(parsed)
+            || (number.min !== "" && parsed < Number(number.min))
+            || (number.max !== "" && parsed > Number(number.max))) {
+            number.setCustomValidity("Enter a finite value within the displayed limits.");
+            number.reportValidity();
             return;
           }
 
@@ -204,7 +209,8 @@
           outlineWidth: 2,
         });
         // getBrepData() returns the serialized BRep JSON string for the profile face.
-        return profile.getBrepData();
+        try { return profile.getBrepData(); }
+        finally { disposeObject(profile); }
       }
 
       function updateExtrude() {
@@ -224,11 +230,7 @@
           );
           parsed = JSON.parse(resultJson);
         } catch (error) {
-          disposeObject(wireframe);
-          disposeObject(points);
-          wireframe = null;
-          points = null;
-          readout.textContent = `Extrude error:\n${String(error?.message ?? error)}`;
+          readout.textContent = `Previous valid extrusion retained.\n${String(error?.message ?? error)}`;
           return;
         }
 

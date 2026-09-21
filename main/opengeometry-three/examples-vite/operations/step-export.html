@@ -4,7 +4,7 @@
     <title>OpenGeometry STEP Export Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Browser CAD STEP export workflow with OpenGeometry and OGSceneManager." />
+    <meta name="description" content="Browser CAD STEP export from an authoritative OpenGeometry BRep v2 solid." />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
   <body class="og-example-page">
@@ -57,6 +57,8 @@
         Export STEP
       </button>
       <a hidden data-download></a>
+      <pre id="export-report" style="white-space:pre-wrap" aria-live="polite"></pre>
+      <p id="error" role="alert" style="color:#b42318"></p>
     </aside>
 
     <div id="app"></div>
@@ -67,7 +69,7 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { Cuboid, OGSceneManager, OpenGeometry, Vector3 } from "opengeometry";
+      import { Cuboid, OpenGeometry, Vector3 } from "opengeometry";
 
       const app = document.getElementById("app");
       const exportButton = document.querySelector("[data-export]");
@@ -84,6 +86,8 @@
       };
 
       let cuboid = null;
+      const exportReadout = document.querySelector("#export-report");
+      const errorReadout = document.querySelector("#error");
 
       function formatNumber(value) {
         return Number(value).toFixed(2).replace(/\.?0+$/, "");
@@ -113,7 +117,12 @@
 
         const commit = (nextValue) => {
           const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
+          number.setCustomValidity("");
+          if (String(nextValue).trim() === "" || !Number.isFinite(parsed)
+            || (number.min !== "" && parsed < Number(number.min))
+            || (number.max !== "" && parsed > Number(number.max))) {
+            number.setCustomValidity("Enter a finite value within the displayed limits.");
+            number.reportValidity();
             return;
           }
 
@@ -134,7 +143,7 @@
         downloadLink.href = url;
         downloadLink.download = filename;
         downloadLink.click();
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
 
       function updateCuboid() {
@@ -148,7 +157,7 @@
           height: config.height,
           depth: config.depth,
           color: 0x0ea5e9,
-          outlineWidth: 2,
+          deflection: 0.005,
         });
         cuboid.outline = true;
 
@@ -195,7 +204,7 @@
           height: config.height,
           depth: config.depth,
           color: 0x0ea5e9,
-          outlineWidth: 2,
+          deflection: 0.005,
         });
         scene.add(cuboid);
 
@@ -215,31 +224,20 @@
         updateCuboid();
 
         exportButton.addEventListener("click", () => {
-          const manager = new OGSceneManager();
-          const sceneId = manager.createScene("step-export-scene");
-          manager.addBrepEntityToScene(
-            sceneId,
-            "step-cuboid",
-            "OGCuboid",
-            JSON.stringify(cuboid.getBrepData())
-          );
+          try {
+            const result = cuboid.exportStep("metre");
+            const report = result.report;
+            exportReadout.textContent = JSON.stringify(report, null, 2);
+            errorReadout.textContent = "";
+            downloadText(result.text, "opengeometry-cuboid.step");
 
-          const result = manager.exportSceneToStep(sceneId, JSON.stringify({
-            schema: "AutomotiveDesign",
-            product_name: "OpenGeometry STEP Export",
-            scale: 1,
-            error_policy: "BestEffort",
-            validate_topology: true,
-            require_closed_shell: true,
-          }));
-
-          const report = JSON.parse(result.reportJson);
-          downloadText(result.text, "opengeometry-cuboid.step");
-
-          console.groupCollapsed("[step-export] export complete");
-          console.log("Config", { ...config });
-          console.log("Report", report);
-          console.groupEnd();
+            console.groupCollapsed("[step-export] export complete");
+            console.log("Config", { ...config });
+            console.log("Report", report);
+            console.groupEnd();
+          } catch (failure) {
+            errorReadout.textContent = `Export failed: ${String(failure)}`;
+          }
         });
 
         renderer.setAnimationLoop(() => {
@@ -255,7 +253,7 @@
         });
       }
 
-      void main();
+      void main().catch(failure => { errorReadout.textContent = String(failure); });
     </script>
   </body>
 </html>

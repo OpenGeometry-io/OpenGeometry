@@ -1,18 +1,17 @@
 ---
 title: 'Cylinder'
-description: 'Create cylindrical solids with configurable radius, height, angle, and placement'
+description: 'Create authoritative cylindrical solids and sectors with deflection-controlled rendering'
 icon: 'database'
 ---
 
 ## Overview
 
-`Cylinder` creates a cylindrical solid aligned to the Y axis. It supports configurable segment
-count, partial-angle sweeps, kernel-backed placement, freeform conversion, parsed BRep access, and
-boolean subtraction.
+`Cylinder` creates a strict BRep v2 solid aligned to the Y axis. A full cylinder contains one
+trimmed cylindrical face and two planar caps. A partial sweep adds two exact radial planes.
+Changing render deflection never changes this topology.
 
 <Note>
-  Initialize `OpenGeometry.create(...)` before constructing `Vector3` or running the examples on
-  this page.
+  Initialize `OpenGeometry.create(...)` before constructing `Vector3` or `Cylinder`.
 </Note>
 
 ## Constructor
@@ -24,147 +23,51 @@ const cylinder = new Cylinder(options?: ICylinderOptions);
 ### ICylinderOptions
 
 <ParamField path="ogid" type="string" optional>
-  Unique identifier for the cylinder. Auto-generated when omitted.
+  Stable entity identifier. Auto-generated when omitted.
 </ParamField>
 
-<ParamField path="center" type="Vector3" required>
-  Center point of the cylinder.
+<ParamField path="center" type="Vector3" optional>
+  Object center. Defaults to the origin.
 </ParamField>
 
-<ParamField path="radius" type="number" required>
-  Cylinder radius.
+<ParamField path="radius" type="number" default="1">
+  Authoritative cylinder radius.
 </ParamField>
 
-<ParamField path="height" type="number" required>
-  Cylinder height along the Y axis.
+<ParamField path="height" type="number" default="1">
+  Height along the local Y axis.
 </ParamField>
 
-<ParamField path="segments" type="number" required>
-  Number of segments around the circumference.
+<ParamField path="startAngle" type="number" default="0">
+  Sector start parameter in radians.
 </ParamField>
 
-<ParamField path="angle" type="number" required>
-  Sweep angle in radians. Use `2 * Math.PI` for a full cylinder.
+<ParamField path="sweepAngle" type="number" default="2 * Math.PI">
+  Signed sector sweep in radians. A full turn creates a periodic full cylinder.
 </ParamField>
 
-<ParamField path="color" type="number" required>
-  Mesh color as a hex number.
+<ParamField path="deflection" type="number" default="0.01">
+  Maximum requested render chord error in model units.
 </ParamField>
 
-<ParamField path="fatOutlines" type="boolean" default="false">
-  Enables wide outline rendering with `LineSegments2`.
+<ParamField path="color" type="ColorRepresentation" default="0x00ff00">
+  Three.js surface color.
 </ParamField>
 
-<ParamField path="outlineWidth" type="number" default="1">
-  Outline width used when `fatOutlines` is enabled.
-</ParamField>
+## Geometry and booleans
 
-<ParamField path="translation" type="Vector3" optional>
-  Initial placement translation.
-</ParamField>
+`getBrepSerialized()` and `getBrepData()` return the strict schema-version-2 model. Use
+`retessellate(deflection)` to replace only the transient GPU mesh. `faceIdForTriangle(...)` and
+`edgeIdForOutlineSegment(...)` map picking results back to model topology.
 
-<ParamField path="rotation" type="Vector3" optional>
-  Initial placement rotation in radians.
-</ParamField>
+`Cylinder` inherits `union(other)`, `intersection(other)`, `subtract([cutters])`, and
+`boolean(other, operation)`. Every operand must be an `AnalyticSolid`; unsupported surface
+arrangements return a structured kernel error instead of falling back to a mesh boolean.
 
-<ParamField path="scale" type="Vector3" optional>
-  Initial placement scale.
-</ParamField>
-
-## Methods
-
-### setConfig(), getConfig()
-
-Updates or reads the current cylinder config.
-
-```ts
-cylinder.setConfig(options: CylinderConfigUpdate): void
-const config = cylinder.getConfig();
-```
-
-### getPlacement(), getAnchor()
-
-Returns cloned placement values or the current kernel anchor.
-
-```ts
-const placement = cylinder.getPlacement();
-const anchor = cylinder.getAnchor();
-```
-
-### setPlacement(), setTransform(), setTranslation(), setRotation(), setScale()
-
-Placement helpers for moving the cylinder through the kernel transform path.
-
-```ts
-cylinder.setPlacement({ translation?, rotation?, scale? });
-```
-
-### toFreeform()
-
-Converts the cylinder into a freeform geometry wrapper.
-
-```ts
-const freeform = cylinder.toFreeform(id?);
-```
-
-### getBrep()
-
-Returns the parsed BRep object for the current cylinder.
-
-```ts
-const brep = cylinder.getBrep();
-```
-
-### subtract()
-
-Subtracts one or more boolean operands from the cylinder and returns a renderable boolean result.
-
-```ts
-const result = cylinder.subtract([operand], options?);
-```
-
-### generateGeometry(), discardGeometry()
-
-Rebuilds or disposes the current Three.js geometry.
-
-```ts
-cylinder.generateGeometry(): void
-cylinder.discardGeometry(): void
-```
-
-## Properties
-
-<ResponseField name="ogid" type="string">
-  Stable identifier for the cylinder wrapper.
-</ResponseField>
-
-<ResponseField name="options" type="ICylinderOptions">
-  Current cylinder configuration and placement state.
-</ResponseField>
-
-<ResponseField name="radius" type="number">
-  Sets the cylinder radius and regenerates geometry.
-</ResponseField>
-
-<ResponseField name="color" type="number">
-  Gets or sets the render color.
-</ResponseField>
-
-<ResponseField name="outline" type="boolean">
-  Enables or disables outline rendering.
-</ResponseField>
-
-<ResponseField name="fatOutlines" type="boolean">
-  Enables or disables wide outlines.
-</ResponseField>
-
-<ResponseField name="outlineWidth" type="number">
-  Outline width used for wide outlines.
-</ResponseField>
+Use the normal Three.js `position`, `rotation`, and uniform positive `scale` properties for
+placement. Boolean operations and world BRep serialization evaluate that placement exactly.
 
 ## Examples
-
-### Create a full cylinder
 
 ```ts
 import { Cylinder, Vector3 } from "opengeometry";
@@ -173,37 +76,25 @@ const cylinder = new Cylinder({
   center: new Vector3(0, 1, 0),
   radius: 0.9,
   height: 2,
-  segments: 48,
-  angle: 2 * Math.PI,
+  deflection: 0.01,
   color: 0xf97316,
 });
+cylinder.outline = true;
 ```
 
-### Create a partial cylinder
-
 ```ts
-const partial = new Cylinder({
-  center: new Vector3(0, 1, 0),
+const sector = new Cylinder({
+  center: new Vector3(0, 1.1, 0),
   radius: 1.4,
   height: 2.2,
-  segments: 48,
-  angle: Math.PI * 1.25,
+  startAngle: -Math.PI / 4,
+  sweepAngle: Math.PI * 1.25,
+  deflection: 0.01,
   color: 0x2563eb,
 });
 ```
 
-### Reconfigure and move the cylinder
+## Live demos
 
-```ts
-cylinder.setConfig({
-  radius: 1.2,
-  height: 2.6,
-  segments: 64,
-});
-
-cylinder.setTranslation(new Vector3(1.8, 0, 0));
-```
-
-## Live demo
-
-- [Cylinder demo](https://demo.opengeometry.io/shapes/cylinder.html)
+- [Cylinder](https://demo.opengeometry.io/shapes/cylinder.html)
+- [Cylinder sector](https://demo.opengeometry.io/shapes/cylinder-sector.html)

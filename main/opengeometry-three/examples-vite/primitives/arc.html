@@ -1,250 +1,165 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Arc Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Simple OpenGeometry arc example for Three.js." />
-    <meta name="author" content="Vishwajeet Mane" />
+    <title>OpenGeometry Analytic Arc Example</title>
   </head>
   <body class="og-example-page">
     <div class="og-badge-title-card">
       <a href="../index.html" class="og-badge-title-link">Back</a>
-      <span class="og-badge-title">Arc</span>
+      <span class="og-badge-title">Analytic Arc</span>
     </div>
-
     <aside class="og-controls">
-      <h3>Arc</h3>
-      <p class="og-control-summary">
-        This page keeps the real arc config visible: `center`, `radius`, `startAngle`,
-        `endAngle`, and `segments`.
-      </p>
-
-      <label class="og-control-row" data-control="radius">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Radius</span>
-          <code class="og-control-value" data-value>2.2</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="0.5" max="4" step="0.1" value="2.2" />
-          <input data-number type="number" min="0.5" max="4" step="0.1" value="2.2" />
-        </div>
+      <h3>Analytic Arc</h3>
+      <p
+        class="og-control-summary">A circular arc is one authoritative Circle edge. Chord error changes only its render sampling.</p>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Radius</span>
+        <input id="radius" type="number" min="0.5" max="4" step="0.05"
+          value="2.2" required />
       </label>
-
-      <label class="og-control-row" data-control="start">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Start (deg)</span>
-          <code class="og-control-value" data-value>0</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="0" max="360" step="1" value="0" />
-          <input data-number type="number" min="0" max="360" step="1" value="0" />
-        </div>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Start (degrees)</span>
+        <input id="start-angle" type="number" min="-360" max="360" step="5"
+          value="0" required />
       </label>
-
-      <label class="og-control-row" data-control="end">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">End (deg)</span>
-          <code class="og-control-value" data-value>270</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="1" max="360" step="1" value="270" />
-          <input data-number type="number" min="1" max="360" step="1" value="270" />
-        </div>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Sweep (degrees)</span>
+        <input id="sweep-angle" type="number" min="-360" max="360" step="5"
+          value="270" required />
       </label>
-
-      <label class="og-control-row" data-control="segments">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Segments</span>
-          <code class="og-control-value" data-value>64</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="8" max="96" step="1" value="64" />
-          <input data-number type="number" min="8" max="96" step="1" value="64" />
-        </div>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Chord error</span>
+        <input id="deflection" type="range" min="-3" max="-0.5" step="0.1"
+          value="-2" />
       </label>
+      <p id="statistics" role="status"></p>
+      <p id="selection">Click the curve to inspect its edge.</p>
+      <p id="error" role="alert"></p>
     </aside>
-
     <div id="app"></div>
 
     <script type="module">
-      import "../src/styles/theme.css";
-      import * as THREE from "three";
-      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-      import Stats from "three/examples/jsm/libs/stats.module.js";
-      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { Arc, OpenGeometry, Vector3 } from "opengeometry";
+    import "../src/styles/theme.css";
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+    import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+    import { AnalyticCurve, OpenGeometry } from "opengeometry";
 
-      const app = document.getElementById("app");
-      if (!app) {
-        throw new Error("Missing #app container");
+    const input = (id) => document.querySelector(`#${id}`);
+    const value = (id) => Number(input(id).value);
+    const radians = (id) => THREE.MathUtils.degToRad(value(id));
+    const chordError = () => 10 ** value("deflection");
+    let scene;
+    let curve;
+
+    function createCurve() {
+      return new AnalyticCurve({
+        kind: "arc",
+        radius: value("radius"),
+        startAngle: radians("start-angle"),
+        sweepAngle: radians("sweep-angle"),
+        deflection: chordError(),
+        color: 0x329ac7,
+      });
+    }
+
+    function showStatistics(stats) {
+      const brep = JSON.parse(curve.getBrepSerialized());
+      input("statistics").textContent =
+        `${brep.topology.edges.length} analytic edge · ${stats.segmentCount} render segments`;
+    }
+
+    function rebuild() {
+      const next = createCurve();
+      if (curve) {
+        scene.remove(curve);
+        curve.dispose();
       }
+      curve = next;
+      scene.add(curve);
+      showStatistics(curve.retessellate(chordError()));
+      input("error").textContent = "";
+    }
 
-      let config = null;
-
-      function createConfig() {
-        return {
-          center: new Vector3(0, 0, 0),
-          radius: 2.2,
-          startAngle: 0,
-          endAngle: (270 * Math.PI) / 180,
-          segments: 64,
-          color: 0x2563eb,
-        };
+    function attempt(action) {
+      try {
+        action();
+      } catch (failure) {
+        input("error").textContent = `Previous result retained. ${String(failure)}`;
       }
+    }
 
-      let arc = null;
-
-      function formatNumber(value) {
-        return Number(value).toFixed(2).replace(/\.?0+$/, "");
-      }
-
-      function degToRad(value) {
-        return (value * Math.PI) / 180;
-      }
-
-      function radToDeg(value) {
-        return (value * 180) / Math.PI;
-      }
-
-      function mountStats() {
-        const stats = new Stats();
-        stats.showPanel(0);
-        stats.dom.style.position = "fixed";
-        stats.dom.style.left = "12px";
-        stats.dom.style.bottom = "12px";
-        stats.dom.style.top = "auto";
-        stats.dom.style.zIndex = "1000";
-        document.body.appendChild(stats.dom);
-        return stats;
-      }
-
-      function attachNumberControl(name, onChange) {
-        const row = document.querySelector(`[data-control="${name}"]`);
-        const range = row?.querySelector("[data-range]");
-        const number = row?.querySelector("[data-number]");
-        const value = row?.querySelector("[data-value]");
-
-        if (!row || !range || !number || !value) {
-          throw new Error(`Missing number control: ${name}`);
-        }
-
-        const commit = (nextValue) => {
-          const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
-            return;
-          }
-
-          range.value = String(parsed);
-          number.value = String(parsed);
-          value.textContent = formatNumber(parsed);
-          onChange(parsed);
-        };
-
-        range.addEventListener("input", () => commit(range.value));
-        number.addEventListener("input", () => commit(number.value));
-        commit(range.value);
-      }
-
-      function updateArc() {
-        if (!arc) {
-          return;
-        }
-
-        arc.setConfig({
-          center: config.center.clone(),
-          radius: config.radius,
-          startAngle: config.startAngle,
-          endAngle: config.endAngle,
-          segments: Math.round(config.segments),
-          color: config.color,
-        });
-
-        console.groupCollapsed("[arc] updated");
-        console.log("Config", config);
-        console.log("Angles (deg)", {
-          startAngle: radToDeg(config.startAngle),
-          endAngle: radToDeg(config.endAngle),
-        });
-        console.groupEnd();
-      }
-
-      async function main() {
-        const scene = new THREE.Scene();
+    async function initialize() {
+      try {
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+        scene = new THREE.Scene();
         scene.background = new THREE.Color(0xeef2ff);
+        scene.add(new THREE.GridHelper(12, 12, 0x7188aa, 0xcbd5e1));
 
         const camera = new THREE.PerspectiveCamera(
-          55,
-          window.innerWidth / window.innerHeight,
+          45,
+          innerWidth / innerHeight,
           0.1,
-          100
+          100,
         );
-        camera.position.set(5.5, 4, 6.5);
-
+        camera.position.set(6, 7, 7);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        app.replaceChildren(renderer.domElement);
-
-        const stats = mountStats();
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(devicePixelRatio);
+        input("app").replaceChildren(renderer.domElement);
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(0, 0.2, 0);
-        controls.update();
 
-        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
-        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        rebuild();
+        document.querySelectorAll('input[type="number"]').forEach((control) =>
+          control.addEventListener("change", () => attempt(rebuild))
+        );
+        input("deflection").addEventListener(
+          "input",
+          () => attempt(() => showStatistics(curve.retessellate(chordError()))),
+        );
 
-        const light = new THREE.DirectionalLight(0xffffff, 1.1);
-        light.position.set(6, 8, 4);
-        scene.add(light);
-
-        await OpenGeometry.create({ wasmURL: wasmUrl });
-        config = createConfig();
-
-        arc = new Arc({
-          center: config.center.clone(),
-          radius: config.radius,
-          startAngle: config.startAngle,
-          endAngle: config.endAngle,
-          segments: Math.round(config.segments),
-          color: config.color,
-        });
-        scene.add(arc);
-
-        attachNumberControl("radius", (value) => {
-          config.radius = value;
-          updateArc();
-        });
-        attachNumberControl("start", (value) => {
-          config.startAngle = degToRad(value);
-          updateArc();
-        });
-        attachNumberControl("end", (value) => {
-          config.endAngle = degToRad(value);
-          updateArc();
-        });
-        attachNumberControl("segments", (value) => {
-          config.segments = value;
-          updateArc();
+        const raycaster = new THREE.Raycaster();
+        raycaster.params.Line.threshold = 0.08;
+        renderer.domElement.addEventListener("pointerdown", (event) => {
+          const bounds = renderer.domElement.getBoundingClientRect();
+          raycaster.setFromCamera(
+            new THREE.Vector2(
+              ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+              -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
+            ),
+            camera,
+          );
+          const hit = raycaster.intersectObject(curve.line)[0];
+          if (hit?.index != null) {
+            input("selection").textContent = `Edge ${
+              curve.edgeIdForSegment(Math.floor(hit.index / 2))
+            }`;
+          }
         });
 
-        updateArc();
-
+        addEventListener("resize", () => {
+          camera.aspect = innerWidth / innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(innerWidth, innerHeight);
+        });
+        addEventListener("pagehide", () => {
+          curve?.dispose();
+          controls.dispose();
+          renderer.dispose();
+        }, { once: true });
         renderer.setAnimationLoop(() => {
-          stats.update();
           controls.update();
           renderer.render(scene, camera);
         });
-
-        window.addEventListener("resize", () => {
-          camera.aspect = window.innerWidth / window.innerHeight;
-          camera.updateProjectionMatrix();
-          renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+      } catch (failure) {
+        input("error").textContent = String(failure);
       }
+    }
 
-      void main();
+    initialize();
     </script>
   </body>
 </html>

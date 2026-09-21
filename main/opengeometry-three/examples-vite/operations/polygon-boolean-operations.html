@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Polygon Boolean Example</title>
+    <title>OpenGeometry Planar Profile Solid Boolean Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
@@ -13,14 +13,14 @@
   <body class="og-example-page">
     <div class="og-badge-title-card">
       <a href="../index.html" class="og-badge-title-link">Back</a>
-      <span class="og-badge-title">Polygon Boolean Operations</span>
+      <span class="og-badge-title">Planar Profile Solid Booleans</span>
     </div>
 
     <aside class="og-controls">
-      <h3>Polygon Boolean</h3>
+      <h3>Profile solid boolean</h3>
       <p class="og-control-summary">
-        Two coplanar polygon faces are shown on the left. The boolean face result is rebuilt on the
-        right.
+        Two thin, authoritative line-profile extrusions are shown on the left. Their strict-v2
+        boolean result is shown on the right with source-face ancestry.
       </p>
 
       <label class="og-control-row" data-control="operation">
@@ -44,6 +44,8 @@
           <input data-number type="number" min="-1.2" max="1.2" step="0.05" value="0.45" />
         </div>
       </label>
+      <pre id="result-report" style="white-space:pre-wrap" aria-live="polite"></pre>
+      <p id="error" role="alert" style="color:#b42318"></p>
     </aside>
 
     <div id="app"></div>
@@ -59,8 +61,7 @@
         booleanSubtraction,
         booleanUnion,
         OpenGeometry,
-        Polygon,
-        Vector3,
+        AnalyticSolid,
       } from "opengeometry";
 
       const app = document.getElementById("app");
@@ -75,6 +76,8 @@
 
       let scene = null;
       let currentGroup = null;
+      const readout = document.querySelector("#result-report");
+      const errorReadout = document.querySelector("#error");
 
       function formatNumber(value) {
         return Number(value).toFixed(2).replace(/\.?0+$/, "");
@@ -104,7 +107,8 @@
 
         const commit = (nextValue) => {
           const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
+          if (String(nextValue).trim() === "" || !Number.isFinite(parsed) || parsed < Number(number.min) || parsed > Number(number.max)) {
+            errorReadout.textContent = "Enter a value within the displayed limits; previous preview retained.";
             return;
           }
 
@@ -138,6 +142,10 @@
 
       function disposeObject(object) {
         object.traverse((child) => {
+          if (child instanceof AnalyticSolid) {
+            child.dispose();
+            return;
+          }
           child.geometry?.dispose?.();
           if (Array.isArray(child.material)) {
             child.material.forEach((material) => material?.dispose?.());
@@ -163,57 +171,55 @@
           return;
         }
 
-        if (currentGroup) {
-          scene.remove(currentGroup);
-          disposeObject(currentGroup);
+        const nextGroup = new THREE.Group();
+        try {
+
+          const base = new AnalyticSolid({
+            kind: "linearExtrusion",
+            outer: [[-1.8, 0.8], [0.6, 0.8], [0.6, -1], [-1.8, -1]],
+            holes: [],
+            height: 0.12,
+            color: 0x60a5fa,
+            deflection: 0.01,
+          });
+          nextGroup.add(base);
+          base.outline = true;
+
+          const tool = new AnalyticSolid({
+            kind: "linearExtrusion",
+            outer: [[-0.5, 0.4], [1.1, 0.4], [1.1, -0.7], [-0.5, -0.7]],
+            holes: [],
+            height: 0.12,
+            color: 0xf97316,
+            deflection: 0.01,
+          });
+          nextGroup.add(tool);
+          tool.outline = true;
+          tool.position.x = config.offsetX;
+
+          const result = getExecutor()(base, tool, {
+            outline: true,
+          });
+
+          base.position.x -= 4;
+          tool.position.x -= 4;
+          result.position.x += 4;
+
+          nextGroup.add(result);
+          if (currentGroup) { scene.remove(currentGroup); disposeObject(currentGroup); }
+          currentGroup = nextGroup;
+          scene.add(currentGroup);
+          readout.textContent = JSON.stringify(result.report, null, 2);
+          errorReadout.textContent = "";
+
+          console.groupCollapsed("[boolean-polygon] rebuilt");
+          console.log("Config", { ...config });
+          console.log("Report", result.report);
+          console.groupEnd();
+        } catch (failure) {
+          disposeObject(nextGroup);
+          errorReadout.textContent = `Previous preview retained. ${String(failure)}`;
         }
-
-        const base = new Polygon({
-          vertices: [
-            new Vector3(-1.8, 0, -0.8),
-            new Vector3(0.6, 0, -0.8),
-            new Vector3(0.6, 0, 1),
-            new Vector3(-1.8, 0, 1),
-          ],
-          color: 0x60a5fa,
-          outlineWidth: 2,
-        });
-        base.outline = true;
-
-        const tool = new Polygon({
-          vertices: [
-            new Vector3(-0.5, 0, -0.4),
-            new Vector3(1.1, 0, -0.4),
-            new Vector3(1.1, 0, 0.7),
-            new Vector3(-0.5, 0, 0.7),
-          ],
-          color: 0xf97316,
-          outlineWidth: 2,
-        });
-        tool.outline = true;
-        tool.setPlacement({
-          translation: new Vector3(config.offsetX, 0, 0),
-        });
-
-        const result = getExecutor()(base, tool, {
-          outline: true,
-          outlineWidth: 2,
-        });
-
-        base.position.x = -4;
-        tool.position.x = -4;
-        result.position.x = 4;
-
-        currentGroup = new THREE.Group();
-        currentGroup.add(base);
-        currentGroup.add(tool);
-        currentGroup.add(result);
-        scene.add(currentGroup);
-
-        console.groupCollapsed("[boolean-polygon] rebuilt");
-        console.log("Config", { ...config });
-        console.log("Report", result.report);
-        console.groupEnd();
       }
 
       async function main() {
@@ -272,7 +278,7 @@
         });
       }
 
-      void main();
+      void main().catch(failure => { errorReadout.textContent = String(failure); });
     </script>
   </body>
 </html>

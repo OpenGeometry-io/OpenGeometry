@@ -359,7 +359,7 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Arc</h3>
             </div>
-            <p class="og-card-desc">Circular arc with direct radius, start, end, and segment controls.</p>
+            <p class="og-card-desc">Analytic circular arc with radius, signed sweep, deflection, and edge picking.</p>
             <div class="og-tag-row">
               <span class="og-tag">Radius</span>
               <span class="og-tag">Angles</span>
@@ -370,7 +370,7 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Curve</h3>
             </div>
-            <p class="og-card-desc">Control-point curve example with direct edits to the inner control points.</p>
+            <p class="og-card-desc">Explicit piecewise linear curve with direct edits to its sampled points.</p>
             <div class="og-tag-row">
               <span class="og-tag">Control Points</span>
               <span class="og-tag">Curve</span>
@@ -381,10 +381,10 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Elliptical Arc</h3>
             </div>
-            <p class="og-card-desc">Elliptical arc with independent X and Z radius, start, end, and segment controls.</p>
+            <p class="og-card-desc">Analytic ellipse edge with major/minor radii, signed sweep, and deflection.</p>
             <div class="og-tag-row">
-              <span class="og-tag">Radius X</span>
-              <span class="og-tag">Radius Z</span>
+              <span class="og-tag">Major radius</span>
+              <span class="og-tag">Minor radius</span>
               <span class="og-tag">Angles</span>
             </div>
             <a class="og-open" href="./primitives/elliptical_arc.html">Open example</a>
@@ -428,7 +428,7 @@
       <section id="shapes" class="og-section-card">
         <div class="og-section-head">
           <h2 class="og-section-title"><a href="#shapes" class="og-anchor">Shapes</a></h2>
-          <p class="og-section-count">9 core demos</p>
+          <p class="og-section-count">16 core demos</p>
         </div>
         <div class="og-grid">
           <article class="og-example-card">
@@ -458,18 +458,77 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Cylinder</h3>
             </div>
-            <p class="og-card-desc">Cylindrical volume for ducts, pipes, and shafts.</p>
+            <p class="og-card-desc">Analytic cylindrical volume with chord-error tessellation and face picking.</p>
             <div class="og-tag-row">
               <span class="og-tag">Radius</span>
-              <span class="og-tag">Segments</span>
+              <span class="og-tag">Deflection</span>
             </div>
             <a class="og-open" href="./shapes/cylinder.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top"><h3 class="og-card-title">Analytic cylinder sector</h3></div>
+            <p class="og-card-desc">Trimmed cylindrical side with exact radial planes and deflection-controlled rendering.</p>
+            <div class="og-tag-row"><span class="og-tag">Analytic BRep v2</span><span class="og-tag">Sweep angle</span></div>
+            <a class="og-open" href="./shapes/cylinder-sector.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top">
+              <h3 class="og-card-title">Analytic Solids</h3>
+            </div>
+            <p class="og-card-desc">Authoritative curved surfaces with adjustable chord error and face picking.</p>
+            <div class="og-tag-row">
+              <span class="og-tag">Deflection</span>
+              <span class="og-tag">Analytic BRep v2</span>
+            </div>
+            <a class="og-open" href="./shapes/analytic-solids.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top"><h3 class="og-card-title">Cone</h3></div>
+            <p class="og-card-desc">Analytic cone with a declared apex and a planar base.</p>
+            <div class="og-tag-row"><span class="og-tag">Analytic BRep v2</span><span class="og-tag">Deflection</span></div>
+            <a class="og-open" href="./shapes/cone.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top"><h3 class="og-card-title">Frustum</h3></div>
+            <p class="og-card-desc">Trimmed cone with cylinder and cone limits.</p>
+            <div class="og-tag-row"><span class="og-tag">Analytic BRep v2</span><span class="og-tag">Deflection</span></div>
+            <a class="og-open" href="./shapes/frustum.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top"><h3 class="og-card-title">Ring Torus</h3></div>
+            <p class="og-card-desc">Periodic toroidal surface with adjustable chord error.</p>
+            <div class="og-tag-row"><span class="og-tag">Analytic BRep v2</span><span class="og-tag">Deflection</span></div>
+            <a class="og-open" href="./shapes/torus.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top"><h3 class="og-card-title">Circular Wall</h3></div>
+            <p class="og-card-desc">True inner and outer arcs, height, thickness, and signed sweep.</p>
+            <div class="og-tag-row"><span class="og-tag">Analytic BRep v2</span><span class="og-tag">Deflection</span></div>
+            <a class="og-open" href="./shapes/circular-wall.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top"><h3 class="og-card-title">Circular Wall Arch</h3></div>
+            <p class="og-card-desc">Stationed arched opening with cylindrical header and corrected wall intersection curves.</p>
+            <div class="og-tag-row"><span class="og-tag">Curved wall</span><span class="og-tag">SSI</span></div>
+            <a class="og-open" href="./shapes/circular-wall-arched-opening.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top"><h3 class="og-card-title">Straight Wall Arch</h3></div>
+            <p class="og-card-desc">Exact semicircle edges, planar jambs, and an authoritative cylindrical header face.</p>
+            <div class="og-tag-row"><span class="og-tag">Analytic opening</span><span class="og-tag">Shared edges</span></div>
+            <a class="og-open" href="./shapes/straight-wall-arched-opening.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top"><h3 class="og-card-title">Analytic Patterns</h3></div>
+            <p class="og-card-desc">Linear, rectangular, and circular rigid instances sharing one authoritative BRep and render mesh.</p>
+            <div class="og-tag-row"><span class="og-tag">Instancing</span><span class="og-tag">Picking</span></div>
+            <a class="og-open" href="./shapes/analytic-patterns.html">Open example</a>
           </article>
           <article class="og-example-card">
             <div class="og-card-top">
               <h3 class="og-card-title">Opening</h3>
             </div>
-            <p class="og-card-desc">Opening helper volume for void and penetration previews.</p>
+            <p class="og-card-desc">Strict v2 opening cutter with live analytic wall subtraction.</p>
             <div class="og-tag-row">
               <span class="og-tag">Width</span>
               <span class="og-tag">Height</span>
@@ -491,10 +550,10 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Sphere</h3>
             </div>
-            <p class="og-card-desc">UV sphere for equipment envelopes and clearance studies.</p>
+            <p class="og-card-desc">Authoritative spherical surface with adjustable chord error and pole handling.</p>
             <div class="og-tag-row">
               <span class="og-tag">Radius</span>
-              <span class="og-tag">Segments</span>
+              <span class="og-tag">Deflection</span>
             </div>
             <a class="og-open" href="./shapes/sphere.html">Open example</a>
           </article>
@@ -537,19 +596,37 @@
       <section id="operations" class="og-section-card">
         <div class="og-section-head">
           <h2 class="og-section-title"><a href="#operations" class="og-anchor">Operations</a></h2>
-          <p class="og-section-count">9 core demos</p>
+          <p class="og-section-count">19 core demos</p>
         </div>
         <div class="og-grid">
           <article class="og-example-card">
             <div class="og-card-top">
               <h3 class="og-card-title">Boolean Operations</h3>
             </div>
-            <p class="og-card-desc">Solid union, intersection, and subtraction with inputs on the left and the result on the right.</p>
+            <p class="og-card-desc">Strict BRep v2 union, intersection, and subtraction with provenance.</p>
             <div class="og-tag-row">
               <span class="og-tag">Solid</span>
               <span class="og-tag">Select</span>
             </div>
             <a class="og-open" href="./operations/boolean-operations.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top"><h3 class="og-card-title">Analytic Material Booleans</h3></div>
+            <p class="og-card-desc">In-house union, intersection, subtraction, cavities, contacts, round openings, cylindrical and spherical pockets, and source-face mappings across analytic families.</p>
+            <div class="og-tag-row"><span class="og-tag">Analytic trims</span><span class="og-tag">Provenance</span></div>
+            <a class="og-open" href="./operations/analytic-boolean-operations.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top"><h3 class="og-card-title">Restricted Analytic Modeling</h3></div>
+            <p class="og-card-desc">Coaxial loft, revolve, planar chamfer, supported fillet, and shell/thicken without faceted authority.</p>
+            <div class="og-tag-row"><span class="og-tag">Modeling</span><span class="og-tag">Analytic BRep v2</span></div>
+            <a class="og-open" href="./operations/analytic-modeling.html">Open example</a>
+          </article>
+          <article class="og-example-card">
+            <div class="og-card-top"><h3 class="og-card-title">Polygon Loft</h3></div>
+            <p class="og-card-desc">Select two polygon sections and create a capped ruled Plane/Line BRep with automatic vertex correspondence.</p>
+            <div class="og-tag-row"><span class="og-tag">Ruled loft</span><span class="og-tag">Profile selection</span></div>
+            <a class="og-open" href="./operations/polygon-loft.html">Open example</a>
           </article>
           <article class="og-example-card">
             <div class="og-card-top">
@@ -575,12 +652,12 @@
           </article>
           <article class="og-example-card">
             <div class="og-card-top">
-              <h3 class="og-card-title">Parametric and Freeform</h3>
+              <h3 class="og-card-title">Analytic Parametric Editing</h3>
             </div>
-            <p class="og-card-desc">Start parametric, convert to freeform, then push-pull one face on the copy.</p>
+            <p class="og-card-desc">Regenerate an analytic cuboid and inspect its strict v2 topology.</p>
             <div class="og-tag-row">
               <span class="og-tag">Parametric</span>
-              <span class="og-tag">Freeform</span>
+              <span class="og-tag">BRep v2</span>
             </div>
             <a class="og-open" href="./operations/editor-modes.html">Open example</a>
           </article>
@@ -625,7 +702,7 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Analytic STEP Export</h3>
             </div>
-            <p class="og-card-desc">Cylinder exported as one exact CYLINDRICAL_SURFACE + circle edges, not a facet fan (D1+D9).</p>
+            <p class="og-card-desc">Direct STEP export of cuboids, all five surface families, circular walls, sphere cuts and cavities.</p>
             <div class="og-tag-row">
               <span class="og-tag">Analytic</span>
               <span class="og-tag">STEP</span>
@@ -636,7 +713,7 @@
             <div class="og-card-top">
               <h3 class="og-card-title">Units &amp; STEP</h3>
             </div>
-            <p class="og-card-desc">Export the same model tagged mm / cm / m / inch; inspect the emitted unit context (D8).</p>
+            <p class="og-card-desc">Export the same analytic model in metres or millimetres and inspect the STEP unit context.</p>
             <div class="og-tag-row">
               <span class="og-tag">Units</span>
               <span class="og-tag">STEP</span>
@@ -656,12 +733,12 @@
           </article>
           <article class="og-example-card">
             <div class="og-card-top">
-              <h3 class="og-card-title">B-rep Validity &amp; Healing</h3>
+              <h3 class="og-card-title">BRep diagnostics</h3>
             </div>
-            <p class="og-card-desc">Geometric validity report (closed shell, manifold, orientation) + vertex-weld healing (D5).</p>
+            <p class="og-card-desc">Strict v2 validation, detectable geometry/topology defects and regeneration from parameters.</p>
             <div class="og-tag-row">
               <span class="og-tag">Validity</span>
-              <span class="og-tag">Healing</span>
+              <span class="og-tag">Regeneration</span>
             </div>
             <a class="og-open" href="./operations/brep-validity.html">Open example</a>
           </article>

@@ -4,7 +4,7 @@
     <title>OpenGeometry Units STEP Export Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Browser CAD STEP export with selectable length units using OpenGeometry and OGSceneManager." />
+    <meta name="description" content="Analytic BRep v2 STEP export with selectable length units." />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
   <body class="og-example-page">
@@ -58,11 +58,8 @@
           <span class="og-control-label-chip">Length Unit</span>
         </div>
         <select data-unit>
-          <option value="Millimetre">Millimetre</option>
-          <option value="Centimetre">Centimetre</option>
-          <option value="Metre" selected>Metre</option>
-          <option value="Inch">Inch</option>
-          <option value="Foot">Foot</option>
+          <option value="millimetre">Millimetre</option>
+          <option value="metre" selected>Metre</option>
         </select>
       </label>
 
@@ -72,6 +69,8 @@
       <a hidden data-download></a>
 
       <div class="og-control-readout" data-readout>Unit context: (export to see)</div>
+      <pre id="export-report" style="white-space:pre-wrap" aria-live="polite"></pre>
+      <p id="error" role="alert" style="color:#b42318"></p>
     </aside>
 
     <div id="app"></div>
@@ -82,7 +81,7 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { Cuboid, OGSceneManager, OpenGeometry, Vector3 } from "opengeometry";
+      import { Cuboid, OpenGeometry, Vector3 } from "opengeometry";
 
       const app = document.getElementById("app");
       const exportButton = document.querySelector("[data-export]");
@@ -101,6 +100,8 @@
       };
 
       let cuboid = null;
+      const exportReadout = document.querySelector("#export-report");
+      const errorReadout = document.querySelector("#error");
 
       function formatNumber(value) {
         return Number(value).toFixed(2).replace(/\.?0+$/, "");
@@ -130,7 +131,12 @@
 
         const commit = (nextValue) => {
           const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
+          number.setCustomValidity("");
+          if (String(nextValue).trim() === "" || !Number.isFinite(parsed)
+            || (number.min !== "" && parsed < Number(number.min))
+            || (number.max !== "" && parsed > Number(number.max))) {
+            number.setCustomValidity("Enter a finite value within the displayed limits.");
+            number.reportValidity();
             return;
           }
 
@@ -151,14 +157,13 @@
         downloadLink.href = url;
         downloadLink.download = filename;
         downloadLink.click();
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
 
       function extractUnitContext(text) {
         const lines = String(text).split(/\r?\n/);
-        const match = lines.find(
-          (line) => line.includes("SI_UNIT") || line.includes("CONVERSION_BASED_UNIT")
-        );
+        const match = lines.find(line => line.includes("CONVERSION_BASED_UNIT"))
+          ?? lines.find(line => line.includes("LENGTH_UNIT") && line.includes("SI_UNIT"));
         return match ? match.trim() : null;
       }
 
@@ -173,7 +178,7 @@
           height: config.height,
           depth: config.depth,
           color: 0x0ea5e9,
-          outlineWidth: 2,
+          deflection: 0.005,
         });
         cuboid.outline = true;
 
@@ -220,7 +225,7 @@
           height: config.height,
           depth: config.depth,
           color: 0x0ea5e9,
-          outlineWidth: 2,
+          deflection: 0.005,
         });
         scene.add(cuboid);
 
@@ -242,39 +247,27 @@
         exportButton.addEventListener("click", () => {
           const lengthUnit = unitSelect.value;
 
-          const manager = new OGSceneManager();
-          const sceneId = manager.createScene("units-step-export-scene");
-          manager.addBrepEntityToScene(
-            sceneId,
-            "step-cuboid",
-            "OGCuboid",
-            JSON.stringify(cuboid.getBrepData())
-          );
+          try {
+            const result = cuboid.exportStep(lengthUnit);
+            const report = result.report;
+            exportReadout.textContent = JSON.stringify(report, null, 2);
+            errorReadout.textContent = "";
+            const unitContext = extractUnitContext(result.text);
+            readout.textContent = unitContext
+              ? `Unit context: ${unitContext}`
+              : `Unit context: (not found for ${lengthUnit})`;
 
-          const result = manager.exportSceneToStep(sceneId, JSON.stringify({
-            schema: "AutomotiveDesign",
-            product_name: "OpenGeometry Units Export",
-            scale: 1,
-            error_policy: "BestEffort",
-            validate_topology: true,
-            require_closed_shell: true,
-            length_unit: lengthUnit,
-          }));
+            downloadText(result.text, "opengeometry-cuboid-units.step");
 
-          const report = JSON.parse(result.reportJson);
-          const unitContext = extractUnitContext(result.text);
-          readout.textContent = unitContext
-            ? `Unit context: ${unitContext}`
-            : `Unit context: (not found for ${lengthUnit})`;
-
-          downloadText(result.text, "opengeometry-cuboid-units.step");
-
-          console.groupCollapsed("[units-step-export] export complete");
-          console.log("Length unit", lengthUnit);
-          console.log("Unit context", unitContext);
-          console.log("Config", { ...config });
-          console.log("Report", report);
-          console.groupEnd();
+            console.groupCollapsed("[units-step-export] export complete");
+            console.log("Length unit", lengthUnit);
+            console.log("Unit context", unitContext);
+            console.log("Config", { ...config });
+            console.log("Report", report);
+            console.groupEnd();
+          } catch (failure) {
+            errorReadout.textContent = `Export failed: ${String(failure)}`;
+          }
         });
 
         renderer.setAnimationLoop(() => {
@@ -290,7 +283,7 @@
         });
       }
 
-      void main();
+      void main().catch(failure => { errorReadout.textContent = String(failure); });
     </script>
   </body>
 </html>

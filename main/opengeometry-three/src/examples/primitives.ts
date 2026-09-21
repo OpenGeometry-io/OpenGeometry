@@ -30,8 +30,8 @@ export function createPrimitivesExample(scene: THREE.Scene) {
     center: new Vector3(1.0, 0.0, -1.0),
     radius: 1.0,
     startAngle: 0.0,
-    endAngle: Math.PI * 1.5,
-    segments: 32,
+    sweepAngle: Math.PI * 1.5,
+    deflection: 0.01,
     color: 0xb91c1c,
   });
 

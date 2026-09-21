@@ -29,6 +29,11 @@ export default [
         document: 'readonly',
         window: 'readonly',
         navigator: 'readonly',
+        URL: 'readonly',
+        Worker: 'readonly',
+        MessageEvent: 'readonly',
+        DOMException: 'readonly',
+        performance: 'readonly',
       },
     },
     plugins: {

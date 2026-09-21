@@ -7,12 +7,6 @@ import { createFreeformGeometry, type FreeformGeometry } from "../freeform";
 import type { FreeformSource, ObjectTransformation } from "../freeform/types";
 import { extrudeBrepFace } from "../operations/extrude";
 import { getUUID } from "../utils/randomizer";
-import type {
-  ShapeSubtractOperands,
-  ShapeSubtractOptions,
-  ShapeSubtractResult,
-} from "./boolean-subtract";
-import { subtractShapeOperand } from "./boolean-subtract";
 import {
   createShapeOutlineMesh,
   disposeShapeOutlineMesh,
@@ -235,19 +229,6 @@ export class Solid extends THREE.Mesh {
       throw new Error("Brep data is not available for this solid.");
     }
     return JSON.parse(brepSerialized);
-  }
-
-  /**
-   * Subtracts one or more boolean operands from this solid.
-   *
-   * This is the main shape-level boolean workflow after operations like
-   * `polygon.extrude(height)` or `Solid.extrude(...)`.
-   */
-  subtract(
-    operands: ShapeSubtractOperands,
-    options?: ShapeSubtractOptions
-  ): ShapeSubtractResult {
-    return subtractShapeOperand(this, operands, options);
   }
 
   /**

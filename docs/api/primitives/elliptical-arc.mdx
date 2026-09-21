@@ -1,0 +1,33 @@
+---
+title: Elliptical Arc
+description: An authoritative elliptical edge rendered to a requested chord error
+icon: 'circle-ellipsis'
+---
+
+## Overview
+
+`EllipticalArc` stores an analytic ellipse edge and its parameter span in strict BRep schema v2. It accepts `majorRadius`, `minorRadius`, `startAngle`, signed `sweepAngle`, and render `deflection`; it has no modeling segment count.
+
+```ts
+import { EllipticalArc, OpenGeometry, Vector3 } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL });
+const ellipse = new EllipticalArc({
+  center: new Vector3(0, 0, 0),
+  majorRadius: 3,
+  minorRadius: 1.25,
+  startAngle: 0,
+  sweepAngle: -Math.PI,
+  deflection: 0.01,
+  color: 0x7c3aed,
+});
+scene.add(ellipse);
+
+ellipse.retessellate(0.002);
+```
+
+The radii require `majorRadius >= minorRadius > 0`. `getBrepSerialized()`, `getBrep()`, `edgeIdForSegment(index)`, and `dispose()` follow the `Arc` contract.
+
+## Live demo
+
+- [Elliptical arc demo](https://demo.opengeometry.io/primitives/elliptical_arc.html)

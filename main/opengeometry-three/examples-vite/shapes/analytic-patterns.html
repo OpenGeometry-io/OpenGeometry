@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenGeometry Analytic Patterns</title>
+  </head>
+  <body class="og-example-page">
+    <div
+      class="og-badge-title-card"><a href="../index.html" class="og-badge-title-link">Back</a><span class="og-badge-title">Analytic Patterns</span></div>
+    <aside class="og-controls">
+      <h3>Shared analytic instances</h3>
+      <p
+        class="og-control-summary">One authoritative cylinder BRep supplies every rendered instance. Each repeated item stores only its identity and rigid placement.</p>
+      <label class="og-control-row">Pattern
+        <select id="pattern"><option value="linear">Linear</option><option value="rectangular">Rectangular</option><option value="circular">Circular</option></select>
+      </label>
+      <label
+        class="og-control-row">Count<input id="count" type="number" min="1" max="64" value="12" /></label>
+      <p id="statistics" role="status"></p>
+      <p
+        id="selection">Click an instance to inspect its identity and source face.</p>
+      <p id="error" role="alert"></p>
+    </aside>
+    <div id="app"></div>
+    <script type="module">
+    import "../src/styles/theme.css";
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+    import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+    import {
+      AnalyticSolid,
+      circularPattern,
+      linearPattern,
+      OpenGeometry,
+      rectangularPattern,
+    } from "opengeometry";
+
+    const error = document.querySelector("#error");
+    const statistics = document.querySelector("#statistics");
+    const selection = document.querySelector("#selection");
+    let source;
+    let pattern;
+    let scene;
+
+    function rebuild() {
+      const count = Number(document.querySelector("#count").value);
+      const kind = document.querySelector("#pattern").value;
+      const next = kind === "linear"
+        ? linearPattern(source, count, new THREE.Vector3(0.75, 0, 0))
+        : kind === "rectangular"
+        ? rectangularPattern(source, [
+          Math.ceil(Math.sqrt(count)),
+          Math.ceil(count / Math.ceil(Math.sqrt(count))),
+        ], [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0, 0.8)])
+        : circularPattern(source, count, 2.8);
+      if (pattern) {
+        scene.remove(pattern);
+        pattern.dispose();
+      }
+      pattern = next;
+      scene.add(pattern);
+      statistics.textContent =
+        `${pattern.count} placements · one analytic BRep · one shared render mesh`;
+      selection.textContent =
+        "Click an instance to inspect its identity and source face.";
+      error.textContent = "";
+    }
+
+    async function initialize() {
+      try {
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+        source = new AnalyticSolid({
+          kind: "cylinder",
+          radius: 0.24,
+          height: 1.5,
+          color: 0x329ac7,
+          deflection: 0.01,
+        });
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+        scene.add(new THREE.GridHelper(16, 16, 0x7188aa, 0xcbd5e1));
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+        const light = new THREE.DirectionalLight(0xffffff, 2);
+        light.position.set(4, 7, 5);
+        scene.add(light);
+        const camera = new THREE.PerspectiveCamera(
+          45,
+          innerWidth / innerHeight,
+          0.1,
+          100,
+        );
+        camera.position.set(7, 5, 7);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(devicePixelRatio);
+        document.querySelector("#app").replaceChildren(renderer.domElement);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(1.5, 0.7, 0);
+        controls.enableDamping = true;
+        rebuild();
+        document.querySelector("#pattern").addEventListener("change", () => {
+          try {
+            rebuild();
+          } catch (failure) {
+            error.textContent = String(failure);
+          }
+        });
+        document.querySelector("#count").addEventListener("change", (event) => {
+          if (!event.target.checkValidity()) {
+            error.textContent = "Count must be between 1 and 64.";
+            return;
+          }
+          try {
+            rebuild();
+          } catch (failure) {
+            error.textContent = String(failure);
+          }
+        });
+        const raycaster = new THREE.Raycaster();
+        renderer.domElement.addEventListener("pointerdown", (event) => {
+          const rect = renderer.domElement.getBoundingClientRect();
+          raycaster.setFromCamera(
+            new THREE.Vector2(
+              (event.clientX - rect.left) / rect.width * 2 - 1,
+              -(event.clientY - rect.top) / rect.height * 2 + 1,
+            ),
+            camera,
+          );
+          const hit = raycaster.intersectObject(pattern.surface)[0];
+          const resolved = hit && pattern.resolveIntersection(hit);
+          if (resolved) {
+            selection.textContent =
+              `${resolved.instanceId} · source ${resolved.source.ogid} · face ${
+                resolved.faceId ?? "unknown"
+              }`;
+          }
+        });
+        addEventListener("resize", () => {
+          camera.aspect = innerWidth / innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(innerWidth, innerHeight);
+          renderer.setPixelRatio(devicePixelRatio);
+        });
+        addEventListener("pagehide", () => {
+          renderer.setAnimationLoop(null);
+          pattern?.dispose();
+          source?.dispose();
+          controls.dispose();
+          renderer.dispose();
+        }, { once: true });
+        renderer.setAnimationLoop(() => {
+          controls.update();
+          renderer.render(scene, camera);
+        });
+      } catch (failure) {
+        error.textContent = String(failure);
+      }
+    }
+    initialize();
+    </script>
+  </body>
+</html>

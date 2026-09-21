@@ -1,22 +1,18 @@
 ---
 title: IFC export (experimental)
-description: Export B-Reps and scenes to IFC4 text with optional semantics mapping
+description: Export strict analytic BRep v2 geometry directly or prepare it for semantic IFC assembly
 ---
 
 ## Overview
 
-OpenGeometry can export a single B-Rep payload or a stored wasm scene to **IFC4** text. In
-practice, scene export is the stronger public workflow because IFC semantics are keyed by scene
-entity IDs.
+Analytic IFC export has two v2 workflows:
 
-<Warning>
-IFC export is experimental and may change. If you hit an exporter limitation or confusing output,
-reach out on [Discord](https://discord.gg/9wJpbfgGGA).
-</Warning>
+- `solid.exportIfc()` writes one IFC4 product directly from the authoritative BRep.
+- `solid.prepareIfcExchange()` returns the strict Rust-prepared `AnalyticExchangeBodyV2` used by a
+  semantic BIM assembler such as OpenPlans and `openplans-ifc-py`.
 
-## Initialization
-
-Initialize the WASM module once before using `OGSceneManager`:
+Both workflows retain analytic surfaces and curves, actual face/bound orientations, cavities,
+general bounded intersection curves, and face provenance. They do not inspect a viewport mesh.
 
 ```ts
 import { OpenGeometry } from "opengeometry";
@@ -24,179 +20,65 @@ import { OpenGeometry } from "opengeometry";
 await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 ```
 
-## Export APIs
-
-### exportBrepToIfc()
-
-Export a single serialized B-Rep JSON payload.
+## Direct IFC text
 
 ```ts
-import { OGSceneManager } from "opengeometry";
+import { Cuboid } from "opengeometry";
 
-const manager = new OGSceneManager();
-const result = manager.exportBrepToIfc(brepSerialized);
-```
+const wall = new Cuboid({ width: 6, height: 3, depth: 0.3 });
+const result = wall.exportIfc();
 
-### exportSceneToIfc() / exportCurrentSceneToIfc()
-
-Export a stored scene or the current scene.
-
-```ts
-import { OGSceneManager } from "opengeometry";
-
-const manager = new OGSceneManager();
-const sceneId = manager.createScene("ifc export");
-
-const result = manager.exportSceneToIfc(sceneId);
-const currentResult = manager.exportCurrentSceneToIfc();
-```
-
-## Result type
-
-`export*ToIfc(...)` returns an `OGIfcExportResult`:
-
-<ResponseField name="text" type="string">
-  IFC text output.
-</ResponseField>
-
-<ResponseField name="reportJson" type="string">
-  A JSON string containing export statistics such as elements written, semantics applied, fallback
-  classes, and validation notes.
-</ResponseField>
-
-## Config JSON
-
-All IFC exports accept an optional `config_json` string. If it is `null`, `undefined`, or an empty
-string, OpenGeometry uses defaults. If you provide `config_json`, it must deserialize into the full
-`IfcExportConfig` shape.
-
-Example JSON payload:
-
-```json
-{
-  "schema": "Ifc4Add2",
-  "project_name": "OpenGeometry Project",
-  "site_name": "OpenGeometry Site",
-  "building_name": "OpenGeometry Building",
-  "storey_name": "OpenGeometry Storey",
-  "scale": 1.0,
-  "error_policy": "BestEffort",
-  "validate_topology": true,
-  "require_closed_shell": true,
-  "semantics": {
-    "wall-1": {
-      "ifc_class": "IFCWALL",
-      "name": "Exterior wall",
-      "tag": "W1"
-    }
-  }
-}
-```
-
-### Semantics mapping
-
-The `semantics` map is keyed by your `entity_id` values in the scene. This is why scene export is
-usually the better IFC workflow when you want class mapping or property data.
-
-Supported classes include:
-
-- `IFCBUILDINGELEMENTPROXY`
-- `IFCWALL`
-- `IFCSLAB`
-- `IFCCOLUMN`
-- `IFCBEAM`
-- `IFCMEMBER`
-- `IFCDOOR`
-- `IFCWINDOW`
-- `IFCROOF`
-- `IFCSTAIR`
-- `IFCRAILING`
-- `IFCFOOTING`
-
-## Example
-
-### Export a wrapper scene to IFC
-
-```ts
-import { Cuboid, OGSceneManager, Vector3 } from "opengeometry";
-
-function toBrepSerialized(source: unknown) {
-  const value =
-    source && typeof (source as { getBrepSerialized?: () => string }).getBrepSerialized === "function"
-      ? (source as { getBrepSerialized: () => string }).getBrepSerialized()
-      : source && typeof (source as { getBrepData?: () => unknown }).getBrepData === "function"
-        ? (source as { getBrepData: () => unknown }).getBrepData()
-        : source && typeof (source as { getBrep?: () => unknown }).getBrep === "function"
-          ? (source as { getBrep: () => unknown }).getBrep()
-          : source;
-
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-const manager = new OGSceneManager();
-const sceneId = manager.createScene("ifc export");
-
-const wall = new Cuboid({
-  center: new Vector3(0, 1.5, 0),
-  width: 6,
-  height: 3,
-  depth: 0.3,
-  color: 0x9ca3af,
-});
-
-manager.addBrepEntityToScene(sceneId, "wall-1", "Cuboid", toBrepSerialized(wall));
-
-const configJson = JSON.stringify({
-  schema: "Ifc4Add2",
-  project_name: "OpenGeometry Project",
-  site_name: "OpenGeometry Site",
-  building_name: "OpenGeometry Building",
-  storey_name: "Level 01",
-  scale: 1.0,
-  error_policy: "BestEffort",
-  validate_topology: true,
-  require_closed_shell: true,
-  semantics: {
-    "wall-1": {
-      ifc_class: "IFCWALL",
-      name: "Exterior wall",
-      tag: "W1",
-    },
-  },
-});
-
-const result = manager.exportSceneToIfc(sceneId, configJson);
+console.log(result.report.schema_version); // 2
 console.log(result.text);
-console.log(JSON.parse(result.reportJson));
 ```
 
-### Download IFC in the browser
+`result.report` is the same prepared body used to assemble the IFC text. It reports world-metre,
+Z-up geometry, revision, quality, exchange error, entities, solid roots, and per-face provenance.
+World placement is applied once.
+
+## Semantic exchange
 
 ```ts
-const blob = new Blob([result.text], { type: "text/plain" });
-const url = URL.createObjectURL(blob);
+const geometry = wall.prepareIfcExchange();
 
+const payload = {
+  schemaVersion: "2.0",
+  elements: [{
+    type: "FREEFORM_ANALYTIC",
+    id: "wall-1",
+    name: "Exterior wall",
+    ifcClass: "IfcWall",
+    geometries: [geometry],
+  }],
+};
+```
+
+`geometries` is a required nonempty array. This keeps a composite authored element as one semantic
+IFC product while retaining every exact body. Semantic openings remain explicit relationships; the
+host geometry and opening cutter are both prepared by Rust, while the downstream service creates
+the IFC products and relations.
+
+The semantic schema version is exactly `"2.0"`. Schema-v1 payloads, a singular legacy `geometry`
+field, compatibility defaults, and faceted fallback are rejected.
+
+## Download direct IFC in the browser
+
+```ts
+const blob = new Blob([result.text], { type: "application/x-step" });
+const url = URL.createObjectURL(blob);
 const link = document.createElement("a");
 link.href = url;
 link.download = "model.ifc";
 link.click();
-
 URL.revokeObjectURL(url);
 ```
 
-### Native-only file export
-
-<Note>
-Native-only builds also expose `exportSceneToIfcFile(...)` (not available in browser/WASM builds).
-</Note>
-
 ## Related
 
-- [Exports](/concepts/exports) for an overview of available exporters and runtime constraints
-- [STL export](/api/export/stl) (experimental)
-- [STEP export](/api/export/step) (experimental)
+- [Analytic solid](/api/shapes/analytic-solid)
+- [Exports](/concepts/exports)
+- [STEP export](/api/export/step)
 
 ## Live demo
 
-There is no dedicated IFC export demo page yet. Start from the demo index:
-[OpenGeometry demos](https://demo.opengeometry.io/).
+[Analytic STEP and IFC demo](https://demo.opengeometry.io/operations/analytic-step-export.html)

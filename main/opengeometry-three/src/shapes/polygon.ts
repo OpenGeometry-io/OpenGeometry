@@ -16,13 +16,12 @@ import {
 } from "../editor";
 import { createFreeformGeometry } from "../freeform";
 import { Solid } from "./solid";
-import { subtractShapeOperand } from "./boolean-subtract";
-import type {
-  ShapeSubtractOperands,
-  ShapeSubtractOptions,
-  ShapeSubtractResult,
-} from "./boolean-subtract";
 import { extrudeBrepFace } from "../operations/extrude";
+import {
+  loftPolygonSections,
+  type PolygonLoftOptions,
+  type PolygonLoftPoint,
+} from "../operations/loft";
 
 /**
  * Construction options for a planar polygon.
@@ -349,6 +348,18 @@ export class Polygon extends THREE.Mesh {
     return solid;
   }
 
+  /** Builds a capped analytic ruled loft from this profile to `other`. */
+  loftTo(other: Polygon, options: PolygonLoftOptions = {}) {
+    if (!(other instanceof Polygon)) throw new Error("Polygon.loftTo requires another Polygon");
+    if ((this.options.holes?.length ?? 0) > 0 || (other.options.holes?.length ?? 0) > 0) {
+      throw new Error("Polygon loft holes are not supported yet");
+    }
+    return loftPolygonSections(
+      [this.worldProfilePoints(), other.worldProfilePoints()],
+      { color: this.options.color, ...options },
+    );
+  }
+
   /**
    * Returns the serialized BRep payload for this polygon.
    */
@@ -358,14 +369,31 @@ export class Polygon extends THREE.Mesh {
     return brepData;
   }
 
-  /**
-   * Subtracts one or more boolean operands from this polygon.
-   */
-  subtract(
-    operands: ShapeSubtractOperands,
-    options?: ShapeSubtractOptions
-  ): ShapeSubtractResult {
-    return subtractShapeOperand(this, operands, options);
+  private worldProfilePoints(): PolygonLoftPoint[] {
+    const anchor = this.getAnchor();
+    const placement = this.getPlacement();
+    const matrix = new THREE.Matrix4().compose(
+      new THREE.Vector3(
+        anchor.x + placement.translation.x,
+        anchor.y + placement.translation.y,
+        anchor.z + placement.translation.z,
+      ),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        placement.rotation.x,
+        placement.rotation.y,
+        placement.rotation.z,
+        "XYZ",
+      )),
+      new THREE.Vector3(placement.scale.x, placement.scale.y, placement.scale.z),
+    );
+    return this.options.vertices.map((point) => {
+      const transformed = new THREE.Vector3(
+        point.x - anchor.x,
+        point.y - anchor.y,
+        point.z - anchor.z,
+      ).applyMatrix4(matrix);
+      return [transformed.x, transformed.y, transformed.z] as const;
+    });
   }
 
   set outlineColor(color: number) {

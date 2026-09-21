@@ -1,26 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Parametric and Freeform Example</title>
+    <title>OpenGeometry Analytic Parametric Editing Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Simple OpenGeometry parametric to freeform example for Three.js."
+      content="Strict BRep v2 parametric editing and face inspection in Three.js."
     />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
   <body class="og-example-page">
     <div class="og-badge-title-card">
       <a href="../index.html" class="og-badge-title-link">Back</a>
-      <span class="og-badge-title">Parametric and Freeform</span>
+      <span class="og-badge-title">Analytic Parametric Editing</span>
     </div>
 
     <aside class="og-controls">
       <h3>Guided Flow</h3>
       <p class="og-control-summary">
-        Start with the blue parametric cuboid. Resize it, convert it to a freeform copy, then
-        push-pull the top face on the orange copy.
+        Resize the authoritative six-plane cuboid, change its placement, then inspect its
+        strict BRep v2 face topology.
       </p>
 
       <div class="og-control-row">
@@ -29,19 +29,15 @@
           <code class="og-control-value" data-status>ready</code>
         </div>
         <p class="og-control-summary" data-summary>
-          Click the buttons from top to bottom. The parametric cuboid stays on the left and the
-          freeform copy appears on the right.
+          Parametric edits rebuild analytic planes and trims without converting the model to triangles.
         </p>
       </div>
 
       <button class="og-control-action og-control-action-cyan" data-action="resize">
         Resize Parametric Cuboid
       </button>
-      <button class="og-control-action og-control-action-amber" data-action="convert">
-        Convert to Freeform
-      </button>
-      <button class="og-control-action og-control-action-amber" data-action="push-pull" disabled>
-        Push-Pull Top Face
+      <button class="og-control-action og-control-action-amber" data-action="inspect">
+        Inspect BRep v2
       </button>
       <button class="og-control-action og-control-action-rose" data-action="reset">
         Reset Demo
@@ -56,20 +52,13 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import {
-        createFreeformEditor,
-        Cuboid,
-        OpenGeometry,
-        Solid,
-        Vector3,
-      } from "opengeometry";
+      import { Cuboid, OpenGeometry, Vector3 } from "opengeometry";
 
       const app = document.getElementById("app");
       const statusNode = document.querySelector("[data-status]");
       const summaryNode = document.querySelector("[data-summary]");
       const resizeButton = document.querySelector('[data-action="resize"]');
-      const convertButton = document.querySelector('[data-action="convert"]');
-      const pushPullButton = document.querySelector('[data-action="push-pull"]');
+      const inspectButton = document.querySelector('[data-action="inspect"]');
       const resetButton = document.querySelector('[data-action="reset"]');
 
       if (
@@ -77,20 +66,14 @@
         !statusNode ||
         !summaryNode ||
         !resizeButton ||
-        !convertButton ||
-        !pushPullButton ||
+        !inspectButton ||
         !resetButton
       ) {
-        throw new Error("Missing parametric/freeform example nodes");
+        throw new Error("Missing analytic editing example nodes");
       }
 
-      let scene = null;
       let cuboid = null;
-      let freeform = null;
-      let freeformEditor = null;
-      let freeformPreview = null;
       let parametricEdited = false;
-      let pushPullCount = 0;
 
       function mountStats() {
         const stats = new Stats();
@@ -109,17 +92,6 @@
         summaryNode.textContent = summary;
       }
 
-      function disposeObject(object) {
-        object.traverse((child) => {
-          child.geometry?.dispose?.();
-          if (Array.isArray(child.material)) {
-            child.material.forEach((material) => material?.dispose?.());
-            return;
-          }
-          child.material?.dispose?.();
-        });
-      }
-
       function resetCuboidState() {
         cuboid.setConfig({
           center: new Vector3(0, 0.75, 0),
@@ -127,7 +99,7 @@
           height: 1.5,
           depth: 1.1,
           color: 0x2563eb,
-          outlineWidth: 2,
+          deflection: 0.005,
         });
         cuboid.setPlacement({
           translation: new Vector3(-2.5, 0, 0),
@@ -138,48 +110,6 @@
         parametricEdited = false;
       }
 
-      function rebuildFreeformPreview() {
-        if (!scene) {
-          return;
-        }
-
-        if (freeformPreview) {
-          scene.remove(freeformPreview);
-          disposeObject(freeformPreview);
-          freeformPreview = null;
-        }
-
-        if (!freeform) {
-          pushPullButton.disabled = true;
-          return;
-        }
-
-        freeformPreview = new Solid({
-          brep: freeform,
-          color: 0xf97316,
-          outlineWidth: 2,
-          translation: new Vector3(2.7, 0, 0),
-        });
-        freeformPreview.outline = true;
-        scene.add(freeformPreview);
-        pushPullButton.disabled = false;
-      }
-
-      function findTopFaceId(editor) {
-        let bestFaceId = null;
-        let bestY = Number.NEGATIVE_INFINITY;
-
-        for (const face of editor.getTopologyRenderData().faces) {
-          const info = editor.getFaceInfo(face.face_id);
-          if (info.centroid.y > bestY) {
-            bestY = info.centroid.y;
-            bestFaceId = face.face_id;
-          }
-        }
-
-        return bestFaceId;
-      }
-
       function resizeParametricCuboid() {
         cuboid.setConfig({
           center: new Vector3(0, 0.95, 0),
@@ -187,7 +117,7 @@
           height: 1.9,
           depth: 1.25,
           color: 0x2563eb,
-          outlineWidth: 2,
+          deflection: 0.005,
         });
         cuboid.setPlacement({
           translation: new Vector3(-2.5, 0, 0),
@@ -204,72 +134,30 @@
 
         setStatus(
           "parametric",
-          "The blue cuboid was edited through its normal config and placement API. Convert it now if you want direct face editing."
+          "The cuboid was regenerated as six analytic plane faces and its placement remained separate."
         );
       }
 
-      function convertToFreeform() {
-        freeform = cuboid.toFreeform(`${cuboid.ogid}-freeform`);
-        freeformEditor = createFreeformEditor(freeform);
-        pushPullCount = 0;
-        rebuildFreeformPreview();
-
-        console.groupCollapsed("[editor-modes] converted");
+      function inspectBrep() {
+        const brep = cuboid.getBrepData();
+        const faces = brep.topology.faces;
+        console.groupCollapsed("[editor-modes] strict BRep v2");
         console.log("Parametric edited", parametricEdited);
-        console.log("Freeform id", freeform.getId());
+        console.log("BRep", brep);
         console.groupEnd();
-
-        setStatus(
-          "converted",
-          "The orange freeform copy was created from the current cuboid state. The blue cuboid is still parametric."
-        );
-      }
-
-      function pushPullTopFace() {
-        if (!freeformEditor) {
-          return;
-        }
-
-        const faceId = findTopFaceId(freeformEditor);
-        if (faceId === null) {
-          setStatus("error", "Could not find a top face on the freeform copy.");
-          return;
-        }
-
-        const result = freeformEditor.pushPullFace(faceId, 0.35, {
-          includeTopologyRemap: true,
-          includeDeltas: true,
-        });
-        pushPullCount += 1;
-        rebuildFreeformPreview();
-
-        console.groupCollapsed("[editor-modes] push-pull");
-        console.log("Face", faceId);
-        console.log("Result", result);
-        console.groupEnd();
-
-        setStatus(
-          result.validity.ok ? "freeform" : "failed",
-          result.validity.ok
-            ? `Push-pull #${pushPullCount} changed the freeform copy. Check the console for the topology report.`
-            : (result.validity.diagnostics[0]?.message ?? "Push-pull failed.")
-        );
+        setStatus("v2", `schema ${brep.schema_version}; ${faces.length} analytic plane faces; revision ${brep.revision}`);
       }
 
       function resetDemo() {
         resetCuboidState();
-        freeform = null;
-        freeformEditor = null;
-        pushPullCount = 0;
-        rebuildFreeformPreview();
         setStatus(
           "ready",
-          "Click the buttons from top to bottom. The parametric cuboid stays on the left and the freeform copy appears on the right."
+          "Resize the cuboid, then inspect the strict analytic BRep v2 payload."
         );
       }
 
       async function main() {
-        scene = new THREE.Scene();
+        const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xeef2ff);
 
         const camera = new THREE.PerspectiveCamera(
@@ -306,13 +194,12 @@
           height: 1.5,
           depth: 1.1,
           color: 0x2563eb,
-          outlineWidth: 2,
+          deflection: 0.005,
         });
         scene.add(cuboid);
 
         resizeButton.addEventListener("click", resizeParametricCuboid);
-        convertButton.addEventListener("click", convertToFreeform);
-        pushPullButton.addEventListener("click", pushPullTopFace);
+        inspectButton.addEventListener("click", inspectBrep);
         resetButton.addEventListener("click", resetDemo);
 
         resetDemo();

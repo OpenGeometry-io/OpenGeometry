@@ -16,7 +16,7 @@
     <aside class="og-controls">
       <h3>WorkPlane Sketch</h3>
       <p class="og-control-summary">
-        A fixed 2D unit square sketch in (u, v) is lifted to 3D purely by the work-plane frame.
+        A fixed 2D 1.4-unit square sketch in (u, v) is lifted to 3D purely by the work-plane frame.
         Tilt the plane normal and the square follows, with no hand-written transforms.
       </p>
 
@@ -78,7 +78,7 @@
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
       import { OpenGeometry, Vector3 } from "opengeometry";
-      import { WorkPlane } from "../../../opengeometry/pkg/opengeometry";
+      import { WorkPlane } from "opengeometry";
 
       const app = document.getElementById("app");
       const readout = document.querySelector("[data-readout]");
@@ -87,7 +87,7 @@
         throw new Error("Missing WorkPlane sketch page nodes");
       }
 
-      // Fixed 2D unit square sketch defined purely in plane coordinates (u, v).
+      // Fixed 2D 1.4-unit square sketch defined purely in plane coordinates (u, v).
       const SKETCH_UV = [
         [-0.7, -0.7],
         [0.7, -0.7],
@@ -130,7 +130,12 @@
 
         const commit = (nextValue) => {
           const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
+          number.setCustomValidity("");
+          if (String(nextValue).trim() === "" || !Number.isFinite(parsed)
+            || (number.min !== "" && parsed < Number(number.min))
+            || (number.max !== "" && parsed > Number(number.max))) {
+            number.setCustomValidity("Enter a finite value within the displayed limits.");
+            number.reportValidity();
             return;
           }
 
@@ -205,78 +210,83 @@
         }
 
         function updateSketch() {
-          clearSketchGroup();
-
           const nx = config.normalX;
           const ny = config.normalY;
           const nz = config.normalZ;
 
           // Guard against a degenerate (zero-length) normal.
           if (nx === 0 && ny === 0 && nz === 0) {
-            readout.textContent = "Normal is zero-length; pick a non-zero direction.";
+            readout.textContent = "Normal is zero-length; previous sketch retained. Pick a non-zero direction.";
             return;
           }
 
           const origin = new Vector3(0, config.originY, 0);
           const normal = new Vector3(nx, ny, nz);
           const plane = WorkPlane.fromOriginNormal(origin, normal);
+          try {
 
-          // Lift the fixed 2D sketch into 3D world space via the frame only.
-          const positions = [];
-          const liftedCorners = [];
-          for (const [u, v] of SKETCH_UV) {
-            const p = plane.liftPoint(u, v);
-            positions.push(p.x, p.y, p.z);
-            liftedCorners.push({ u, v, x: p.x, y: p.y, z: p.z });
-          }
+            // Lift the fixed 2D sketch into 3D world space via the frame only.
+            const positions = [];
+            const liftedCorners = [];
+            for (const [u, v] of SKETCH_UV) {
+              const p = plane.liftPoint(u, v);
+              positions.push(p.x, p.y, p.z);
+              liftedCorners.push({ u, v, x: p.x, y: p.y, z: p.z });
+              p.free();
+            }
 
-          // Lifted square as a closed line loop.
-          const loopGeometry = new THREE.BufferGeometry();
-          loopGeometry.setAttribute(
-            "position",
-            new THREE.Float32BufferAttribute(positions, 3)
-          );
-          const loopMaterial = new THREE.LineBasicMaterial({ color: 0x0ea5e9 });
-          const lineLoop = new THREE.LineLoop(loopGeometry, loopMaterial);
-          sketchGroup.add(lineLoop);
+            // Lifted square as a closed line loop.
+            clearSketchGroup();
+            const loopGeometry = new THREE.BufferGeometry();
+            loopGeometry.setAttribute(
+              "position",
+              new THREE.Float32BufferAttribute(positions, 3)
+            );
+            const loopMaterial = new THREE.LineBasicMaterial({ color: 0x0ea5e9 });
+            const lineLoop = new THREE.LineLoop(loopGeometry, loopMaterial);
+            sketchGroup.add(lineLoop);
 
-          // Small sphere at each lifted corner.
-          for (const c of liftedCorners) {
-            const sphere = new THREE.Mesh(cornerGeometry, cornerMaterial);
-            sphere.position.set(c.x, c.y, c.z);
-            sketchGroup.add(sphere);
-          }
+            // Small sphere at each lifted corner.
+            for (const c of liftedCorners) {
+              const sphere = new THREE.Mesh(cornerGeometry, cornerMaterial);
+              sphere.position.set(c.x, c.y, c.z);
+              sketchGroup.add(sphere);
+            }
 
-          // Arrow for the plane normal, anchored at the plane origin.
-          const planeOrigin = plane.origin;
-          const planeNormal = plane.normal;
-          const arrowDir = new THREE.Vector3(
-            planeNormal.x,
-            planeNormal.y,
-            planeNormal.z
-          ).normalize();
-          const arrowOrigin = new THREE.Vector3(
-            planeOrigin.x,
-            planeOrigin.y,
-            planeOrigin.z
-          );
-          const arrow = new THREE.ArrowHelper(arrowDir, arrowOrigin, 1.2, 0x16a34a, 0.3, 0.18);
-          sketchGroup.add(arrow);
+            // Arrow for the plane normal, anchored at the plane origin.
+            const planeOrigin = plane.origin;
+            const planeNormal = plane.normal;
+            const arrowDir = new THREE.Vector3(
+              planeNormal.x,
+              planeNormal.y,
+              planeNormal.z
+            ).normalize();
+            const arrowOrigin = new THREE.Vector3(
+              planeOrigin.x,
+              planeOrigin.y,
+              planeOrigin.z
+            );
+            planeOrigin.free(); planeNormal.free();
+            const arrow = new THREE.ArrowHelper(arrowDir, arrowOrigin, 1.2, 0x16a34a, 0.3, 0.18);
+            sketchGroup.add(arrow);
 
-          // On-screen readout of the 2D -> 3D mapping.
-          const lines = liftedCorners.map(
-            (c) =>
-              `(u ${formatNumber(c.u)}, v ${formatNumber(c.v)})  ->  ` +
-              `(${formatNumber(c.x)}, ${formatNumber(c.y)}, ${formatNumber(c.z)})`
-          );
-          readout.textContent =
-            `normal (${formatNumber(arrowDir.x)}, ${formatNumber(arrowDir.y)}, ${formatNumber(arrowDir.z)})\n` +
-            lines.join("\n");
+            // On-screen readout of the 2D -> 3D mapping.
+            const lines = liftedCorners.map(
+              (c) =>
+                `(u ${formatNumber(c.u)}, v ${formatNumber(c.v)})  ->  ` +
+                `(${formatNumber(c.x)}, ${formatNumber(c.y)}, ${formatNumber(c.z)})`
+            );
+            readout.textContent =
+              `normal (${formatNumber(arrowDir.x)}, ${formatNumber(arrowDir.y)}, ${formatNumber(arrowDir.z)})\n` +
+              lines.join("\n");
 
-          console.groupCollapsed("[work-plane-sketch] sketch lifted");
-          console.log("Config", { ...config });
-          console.log("Lifted corners", liftedCorners);
-          console.groupEnd();
+            console.groupCollapsed("[work-plane-sketch] sketch lifted");
+            console.log("Config", { ...config });
+            console.log("Lifted corners", liftedCorners);
+            console.groupEnd();
+          } catch (failure) {
+            readout.textContent = String(failure);
+          } finally { plane.free(); }
         }
 
         attachNumberControl("normalX", (value) => {

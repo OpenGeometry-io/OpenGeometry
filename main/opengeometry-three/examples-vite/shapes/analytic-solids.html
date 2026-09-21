@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Analytic solids and deflection</title>
+    <style>
+      body { margin: 0; font: 14px system-ui; background: #e9edf4; }
+      canvas { display: block; }
+      aside { position: fixed; z-index: 2; top: 18px; left: 18px; padding: 18px; border-radius: 12px; background: #fff; box-shadow: 0 4px 20px #0002; max-width: 300px; }
+      h1 { font-size: 18px; margin: 0 0 10px; }
+      p { line-height: 1.5; }
+      input[type=range] { width: 100%; }
+      output { display: block; margin-top: 10px; }
+      #error { color: #a22020; }
+    </style>
+  </head>
+  <body>
+    <aside>
+      <a href="../index.html">All examples</a>
+      <h1>Analytic solids</h1>
+      <p>Orbit the analytic primitives, circular wall, restricted coaxial loft, revolve, fillet, shell, and a line-profile extrusion with a true cap hole. A WASM worker refines visible bodies to 0.5 physical pixels at rest and 2 pixels during motion. Manual chord error retains the same authored surfaces.</p>
+      <label><input id="automatic" type="checkbox" checked /> Camera LOD</label><br />
+      <label for="deflection">Chord error</label>
+      <input id="deflection" type="range" min="-3" max="-0.5" step="0.1" value="-2" disabled />
+      <output id="stats"></output>
+      <output id="selection">Click a solid to inspect its surface.</output>
+      <output id="error"></output>
+    </aside>
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import { OpenGeometry, AnalyticSolid, AnalyticTessellationWorker, AnalyticLodController } from "opengeometry";
+      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+      import kernelUrl from "../../../opengeometry/pkg/opengeometry.js?url&no-inline";
+      import workerUrl from "../../src/rendering/analytic-worker.js?url&no-inline";
+
+      const stats = document.querySelector("#stats");
+      const error = document.querySelector("#error");
+      async function initialize() {
+        try {
+          await OpenGeometry.create({ wasmURL: wasmUrl });
+          const scene = new THREE.Scene();
+          scene.background = new THREE.Color(0xe9edf4);
+          const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
+          camera.position.set(8, 6, 12);
+          const renderer = new THREE.WebGLRenderer({ antialias: true });
+          renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+          renderer.setSize(innerWidth, innerHeight);
+          document.body.append(renderer.domElement);
+          const controls = new OrbitControls(camera, renderer.domElement);
+          controls.target.set(0, 1, 0);
+          controls.enableDamping = true;
+          scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 2));
+          const light = new THREE.DirectionalLight(0xffffff, 3);
+          light.position.set(3, 6, 5);
+          scene.add(light, new THREE.GridHelper(16, 32, 0xb0bac8, 0xcbd3df));
+          const definitions = [
+            { kind: "cylinder", radius: 0.7, height: 1.8, color: 0xdf9b4e },
+            { kind: "cone", radius: 0.7, height: 1.8, color: 0xaf83cf },
+            { kind: "sphere", radius: 0.8, color: 0x639bd0 },
+            { kind: "frustum", lowerRadius: 0.8, upperRadius: 0.45, height: 1.8, color: 0x61b0c1 },
+            { kind: "torus", majorRadius: 0.75, minorRadius: 0.25, color: 0x7cba83 },
+            { kind: "circularWallWithOpenings", radius: 2.4, thickness: 0.3, height: 1.4, startAngle: 0.15, sweepAngle: 1.8, openings: [{ id: "gallery-window", angle: 1.0, width: 0.7, bottom: 0.35, height: 0.7 }], color: 0xd89a88 },
+            { kind: "linearExtrusion", outer: [[-1, -0.75], [1, -0.75], [1, 0.75], [-1, 0.75]], holes: [[[-0.45, -0.3], [-0.45, 0.3], [0.45, 0.3], [0.45, -0.3]]], height: 1.5, color: 0x4d9b86 },
+            { kind: "coaxialCircleLoft", lowerRadius: 0.8, upperRadius: 0.25, height: 1.6, color: 0xd97757 },
+            { kind: "revolvedRectangle", innerRadius: 0.45, outerRadius: 0.85, height: 1.5, color: 0x6763c8 },
+            { kind: "chamferedCuboid", width: 1.6, depth: 1.4, height: 1.5, chamfer: 0.2, color: 0xb86d9b },
+            { kind: "filletedCylinder", radius: 0.9, height: 1.8, filletRadius: 0.18, color: 0x4a9ca1 },
+          ];
+          const placements = [[-4, 0, 0], [-2, 0, 0], [0, 0.9, 0], [2, 0, 0], [4, 0.9, 0], [-5.5, 0, -3], [-2.5, 0, -3], [0.2, 0, -3], [2.3, 0, -3], [4.4, 0, -3], [6.5, 0, -3]];
+          const solids = definitions.map((definition, i) => {
+            const solid = new AnalyticSolid({ ...definition, deflection: 0.01 });
+            if (solid.getModelBounds().isEmpty()) throw new Error("Missing analytic body bounds");
+            solid.name = definition.kind;
+            solid.position.set(...placements[i]);
+            scene.add(solid);
+            return solid;
+          });
+          const shellSource = new AnalyticSolid({ kind: "cuboid", width: 1.6, depth: 1.6, height: 1.6, deflection: 0.01 });
+          const shell = shellSource.shell(0.2, { color: 0x6a86c7, deflection: 0.01 });
+          shellSource.dispose();
+          shell.name = "cuboid shell";
+          shell.position.set(8.4, 0, -3);
+          scene.add(shell);
+          solids.push(shell);
+          const coneShellSource = new AnalyticSolid({ kind: "cone", radius: 0.85, height: 1.8, deflection: 0.01 });
+          const coneShell = coneShellSource.shell(0.12, { color: 0xc07b55, deflection: 0.01 });
+          coneShellSource.dispose();
+          coneShell.name = "cone shell";
+          coneShell.position.set(6.3, 0, 0);
+          scene.add(coneShell);
+          solids.push(coneShell);
+          const original = solids.map(solid => solid.getBrepSerialized());
+          const worker = new AnalyticTessellationWorker({ workerURL: workerUrl, kernelURL: kernelUrl, wasmURL: wasmUrl });
+          const lod = new AnalyticLodController(worker, {
+            onUpdate(solid, result) {
+              if (solid.getBrepSerialized() !== original[solids.indexOf(solid)]) { error.textContent = "Tessellation changed authored geometry"; return; }
+              const faces = solids.reduce((sum, body) => sum + JSON.parse(body.getBrepSerialized()).topology.faces.length, 0);
+              stats.textContent = `${document.querySelector("#automatic").checked ? "Camera LOD" : "Manual worker LOD"} · ${solids.reduce((sum, body) => sum + body.surface.geometry.index.count / 3, 0).toLocaleString()} triangles · ${faces} surfaces · last achieved error ${result.achievedDeflection.toPrecision(3)} · authored geometry unchanged`;
+              error.textContent = "";
+            },
+            onError(solid, failure) { error.textContent = `${solid.name}: ${failure.message}; previous mesh retained`; },
+          });
+          await Promise.all(solids.map(solid => lod.register(solid)));
+          function updateMode() {
+            const automatic = document.querySelector("#automatic").checked;
+            const slider = document.querySelector("#deflection");
+            slider.disabled = automatic;
+            lod.setDeflection(automatic ? undefined : 10 ** Number(slider.value));
+          }
+          document.querySelector("#automatic").addEventListener("change", updateMode);
+          document.querySelector("#deflection").addEventListener("input", updateMode);
+          const raycaster = new THREE.Raycaster();
+          renderer.domElement.addEventListener("pointerdown", event => {
+            const rect = renderer.domElement.getBoundingClientRect();
+            raycaster.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), camera);
+            const hit = raycaster.intersectObjects(solids.map(solid => solid.surface))[0];
+            if (!hit || hit.faceIndex == null) return;
+            const solid = solids.find(solid => solid.surface === hit.object);
+            try {
+              const face = solid.faceIdForTriangle(hit.faceIndex);
+              const normal = solid.normalAtFace(face, solid.worldToLocal(hit.point.clone()));
+              document.querySelector("#selection").textContent = `${solid.name} · face ${face} · analytic normal (${normal.toArray().map(v => v.toFixed(3)).join(", ")})`;
+            } catch (failure) { error.textContent = String(failure); }
+          });
+          window.addEventListener("resize", () => {
+            camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(innerWidth, innerHeight);
+            renderer.setPixelRatio(devicePixelRatio);
+          });
+          window.addEventListener("pagehide", () => { renderer.setAnimationLoop(null); lod.dispose(); worker.dispose(); solids.forEach(solid => solid.dispose()); controls.dispose(); renderer.dispose(); }, { once: true });
+          renderer.setAnimationLoop(() => { controls.update(); lod.update(camera, renderer.domElement.height); renderer.render(scene, camera); });
+        } catch (failure) {
+          error.textContent = String(failure);
+        }
+      }
+      initialize();
+    </script>
+  </body>
+</html>

@@ -87,7 +87,7 @@
           height: 1.6,
           depth: 1.2,
           color: 0x0ea5e9,
-          outlineWidth: 2,
+          deflection: 0.005,
         };
       }
       const viewState = {
@@ -124,7 +124,12 @@
 
         const commit = (nextValue) => {
           const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
+          number.setCustomValidity("");
+          if (String(nextValue).trim() === "" || !Number.isFinite(parsed)
+            || (number.min !== "" && parsed < Number(number.min))
+            || (number.max !== "" && parsed > Number(number.max))) {
+            number.setCustomValidity("Enter a finite value within the displayed limits.");
+            number.reportValidity();
             return;
           }
 
@@ -169,7 +174,7 @@
           height: config.height,
           depth: config.depth,
           color: config.color,
-          outlineWidth: config.outlineWidth,
+          deflection: config.deflection,
         });
         cuboid.outline = viewState.outline;
 
@@ -218,7 +223,7 @@
           height: config.height,
           depth: config.depth,
           color: config.color,
-          outlineWidth: config.outlineWidth,
+          deflection: config.deflection,
         });
         scene.add(cuboid);
 

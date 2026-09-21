@@ -1,19 +1,17 @@
 ---
 title: 'Opening'
-description: 'Create subtractive opening solids for walls, slabs, and other host geometry'
+description: 'Subtract a strict analytic box volume from a BRep v2 host'
 icon: 'door-open'
 ---
 
 ## Overview
 
-`Opening` is a cuboid-like solid wrapper used as a subtractive operand in architectural workflows.
-It supports kernel-backed placement, outline rendering, freeform conversion, parsed BRep access,
-direct subtraction, and the host-oriented `subtractFrom(...)` helper.
+`Opening` is an authoritative six-plane BRep v2 cutter. It extends `Cuboid`, renders its surface
+transparent by default, and keeps its topology available for selection, export, and provenance.
+`subtractFrom()` runs the in-house analytic boolean engine and returns a new `AnalyticSolid`; it
+does not mutate the host or rebuild a triangle BRep.
 
-<Note>
-  Initialize `OpenGeometry.create(...)` before constructing `Vector3` or running the examples on
-  this page.
-</Note>
+Initialize `OpenGeometry.create(...)` before constructing `Vector3` or an opening.
 
 ## Constructor
 
@@ -21,158 +19,16 @@ direct subtraction, and the host-oriented `subtractFrom(...)` helper.
 const opening = new Opening(options?: IOpeningOptions);
 ```
 
-### IOpeningOptions
+The options are `ogid`, `center`, `width`, `height`, `depth`, `color`, `deflection`, `accuracy`,
+`translation`, `rotation`, and positive uniform `scale`. Defaults are a `1 × 1 × 0.2` cutter
+centered at the origin.
 
-<ParamField path="ogid" type="string" optional>
-  Unique identifier for the opening. Auto-generated when omitted.
-</ParamField>
-
-<ParamField path="center" type="Vector3" required>
-  Center point of the opening volume.
-</ParamField>
-
-<ParamField path="width" type="number" required>
-  Width along the X axis.
-</ParamField>
-
-<ParamField path="height" type="number" required>
-  Height along the Y axis.
-</ParamField>
-
-<ParamField path="depth" type="number" required>
-  Depth along the Z axis.
-</ParamField>
-
-<ParamField path="color" type="number" required>
-  Render color as a hex number.
-</ParamField>
-
-<ParamField path="fatOutlines" type="boolean" default="false">
-  Enables wide outline rendering with `LineSegments2`.
-</ParamField>
-
-<ParamField path="outlineWidth" type="number" default="1">
-  Outline width used when `fatOutlines` is enabled.
-</ParamField>
-
-<ParamField path="translation" type="Vector3" optional>
-  Initial placement translation.
-</ParamField>
-
-<ParamField path="rotation" type="Vector3" optional>
-  Initial placement rotation in radians.
-</ParamField>
-
-<ParamField path="scale" type="Vector3" optional>
-  Initial placement scale.
-</ParamField>
-
-## Methods
-
-### setConfig(), getConfig()
-
-Updates or reads the current opening config.
+## Subtract from a host
 
 ```ts
-opening.setConfig(options: OpeningConfigUpdate): void
-const config = opening.getConfig();
-```
+import { Cuboid, Opening, OpenGeometry, Vector3 } from "opengeometry";
 
-### getPlacement(), getAnchor()
-
-Returns cloned placement values or the current kernel anchor.
-
-```ts
-const placement = opening.getPlacement();
-const anchor = opening.getAnchor();
-```
-
-### setPlacement(), setTransform(), setTranslation(), setRotation(), setScale()
-
-Placement helpers for moving the opening through the kernel transform path.
-
-```ts
-opening.setPlacement({ translation?, rotation?, scale? });
-```
-
-### toFreeform()
-
-Converts the opening into a freeform geometry wrapper.
-
-```ts
-const freeform = opening.toFreeform(id?);
-```
-
-### getBrepData()
-
-Returns the parsed BRep object for the current opening volume.
-
-```ts
-const brep = opening.getBrepData();
-```
-
-### subtract(), subtractFrom()
-
-Runs a boolean subtraction either with the opening as the host or as the cutting tool.
-
-```ts
-const result = opening.subtract([operand], options?);
-const cutHost = opening.subtractFrom(host, options?);
-```
-
-### generateGeometry(), discardGeometry()
-
-Rebuilds or disposes the current Three.js geometry.
-
-```ts
-opening.generateGeometry(): void
-opening.discardGeometry(): void
-```
-
-## Properties
-
-<ResponseField name="ogid" type="string">
-  Stable identifier for the opening wrapper.
-</ResponseField>
-
-<ResponseField name="options" type="IOpeningOptions">
-  Current opening configuration and placement state.
-</ResponseField>
-
-<ResponseField name="width" type="number">
-  Sets the opening width and regenerates geometry.
-</ResponseField>
-
-<ResponseField name="height" type="number">
-  Sets the opening height and regenerates geometry.
-</ResponseField>
-
-<ResponseField name="depth" type="number">
-  Sets the opening depth and regenerates geometry.
-</ResponseField>
-
-<ResponseField name="dimensions" type="{ width: number; height: number; depth: number }">
-  Returns the current width, height, and depth together.
-</ResponseField>
-
-<ResponseField name="outline" type="boolean">
-  Enables or disables outline rendering.
-</ResponseField>
-
-<ResponseField name="fatOutlines" type="boolean">
-  Enables or disables wide outlines.
-</ResponseField>
-
-<ResponseField name="outlineWidth" type="number">
-  Outline width used for wide outlines.
-</ResponseField>
-
-## Examples
-
-### Cut a host object
-
-```ts
-import { Cuboid, Opening, Vector3 } from "opengeometry";
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 
 const wall = new Cuboid({
   center: new Vector3(0, 1.6, 0),
@@ -181,34 +37,24 @@ const wall = new Cuboid({
   depth: 0.32,
   color: 0xcbd5e1,
 });
-
 const opening = new Opening({
   center: new Vector3(0, 1.35, 0),
   width: 1.4,
   height: 2,
   depth: 0.45,
-  color: 0xf97316,
 });
 
-const cutWall = opening.subtractFrom(wall, { outline: true });
+const cutWall = opening.subtractFrom(wall, { deflection: 0.005 });
+cutWall.outline = true;
 ```
 
-### Reuse the same opening in another position
+`setConfig()` regenerates the cutter. `setPlacement()` changes translation, rotation, and scale.
+`getBrepSerialized()`, `getBrepData()`, `getWorldBrepSerialized()`, picking mappings, STEP/IFC
+exchange, and `retessellate()` are inherited from the analytic solid API.
 
-```ts
-opening.setConfig({
-  width: 1.8,
-  height: 2.1,
-  depth: 0.5,
-});
-
-opening.setPlacement({
-  translation: new Vector3(1.6, 0.1, 0),
-  rotation: new Vector3(0, 0, 0),
-  scale: new Vector3(1, 1, 1),
-});
-```
+The boolean report is available as `cutWall.report`. It includes source-to-result face mappings,
+cut-face ancestry, contact points, and coincident-boundary status.
 
 ## Live demo
 
-- [Opening demo](https://demo.opengeometry.io/shapes/opening.html)
+- [Opening boolean demo](https://demo.opengeometry.io/shapes/opening.html)

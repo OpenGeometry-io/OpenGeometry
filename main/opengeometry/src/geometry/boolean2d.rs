@@ -113,6 +113,13 @@ pub struct RingRegion {
     pub holes: Vec<Vec<Pt2>>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PlanarBooleanOp {
+    Union,
+    Intersection,
+    Subtraction,
+}
+
 /// Resolve a self-intersecting offset ring into the boundary of its nonzero-winding
 /// region. Port of `resolveRingNonzero`. Returns `None` only if nothing fillable remains.
 pub fn resolve_ring_nonzero(input: &[Pt2], eps: f64) -> Option<RingRegion> {
@@ -207,7 +214,48 @@ pub fn resolve_polygons_positive(polys: &[Vec<Pt2>], eps: f64) -> Vec<RingRegion
     winding_regions(polys, eps, |winding| winding > 0)
 }
 
+/// Boolean two oriented region sets without combining their winding fields.
+/// Each set uses nonzero winding internally, so CCW outer loops and CW holes
+/// retain their intended meaning even where the two inputs overlap.
+pub fn boolean_oriented_regions(
+    a: &[Vec<Pt2>],
+    b: &[Vec<Pt2>],
+    operation: PlanarBooleanOp,
+    eps: f64,
+) -> Vec<RingRegion> {
+    let mut contours = Vec::with_capacity(a.len() + b.len());
+    contours.extend_from_slice(a);
+    contours.extend_from_slice(b);
+    winding_regions_by(&contours, eps, |point| {
+        let in_a = a
+            .iter()
+            .map(|ring| winding_number2(point, ring))
+            .sum::<i32>()
+            != 0;
+        let in_b = b
+            .iter()
+            .map(|ring| winding_number2(point, ring))
+            .sum::<i32>()
+            != 0;
+        match operation {
+            PlanarBooleanOp::Union => in_a || in_b,
+            PlanarBooleanOp::Intersection => in_a && in_b,
+            PlanarBooleanOp::Subtraction => in_a && !in_b,
+        }
+    })
+}
+
 fn winding_regions(polys: &[Vec<Pt2>], eps: f64, filled: impl Fn(i32) -> bool) -> Vec<RingRegion> {
+    winding_regions_by(polys, eps, |point| {
+        filled(polys.iter().map(|poly| winding_number2(point, poly)).sum())
+    })
+}
+
+fn winding_regions_by(
+    polys: &[Vec<Pt2>],
+    eps: f64,
+    filled: impl Fn(Pt2) -> bool,
+) -> Vec<RingRegion> {
     // 1. directed edges from all oriented polygons + the vertex set for T-touch splits.
     let mut edges: Vec<Edge2> = Vec::new();
     for poly in polys {
@@ -262,7 +310,6 @@ fn winding_regions(polys: &[Vec<Pt2>], eps: f64, filled: impl Fn(i32) -> bool) -
     }
 
     // 3. keep sub-edges with filled on exactly one side; orient filled-on-LEFT.
-    let winding_at = |p: Pt2| -> i32 { polys.iter().map(|poly| winding_number2(p, poly)).sum() };
     let mut boundary: Vec<Edge2> = Vec::new();
     for &(a, b) in &split {
         let dx = b.x - a.x;
@@ -276,8 +323,8 @@ fn winding_regions(polys: &[Vec<Pt2>], eps: f64, filled: impl Fn(i32) -> bool) -
         let nz = dx / len;
         let mx = (a.x + b.x) / 2.0;
         let mz = (a.z + b.z) / 2.0;
-        let left = filled(winding_at(Pt2::new(mx + nx * probe, mz + nz * probe)));
-        let right = filled(winding_at(Pt2::new(mx - nx * probe, mz - nz * probe)));
+        let left = filled(Pt2::new(mx + nx * probe, mz + nz * probe));
+        let right = filled(Pt2::new(mx - nx * probe, mz - nz * probe));
         if left == right {
             continue; // interior or exterior — not a boundary
         }
@@ -292,6 +339,13 @@ fn winding_regions(polys: &[Vec<Pt2>], eps: f64, filled: impl Fn(i32) -> bool) -
     // stitcher would trace the same loop twice.
     let mut seen: std::collections::HashSet<((i64, i64), (i64, i64))> =
         std::collections::HashSet::new();
+    let qkey = |point: Pt2| {
+        let step = (2.0 * eps).max(f64::EPSILON);
+        (
+            (point.x / step).round() as i64,
+            (point.z / step).round() as i64,
+        )
+    };
     boundary.retain(|&(a, b)| seen.insert((qkey(a), qkey(b))));
     if boundary.is_empty() {
         return Vec::new();
@@ -458,5 +512,44 @@ mod tests {
         );
         let expected = 100.0 - 9.0 - 1.0; // corner bite 3×3 (clipped to base) + 1×1 extra strip
         assert!((signed_area2(&region.outer) - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn grouped_boolean_preserves_holes_and_all_operations() {
+        let a = vec![
+            ccw_square(0.0, 0.0, 10.0, 10.0),
+            cw(ccw_square(4.0, 4.0, 6.0, 6.0)),
+        ];
+        let b = vec![ccw_square(5.0, -1.0, 12.0, 5.0)];
+
+        let union = boolean_oriented_regions(&a, &b, PlanarBooleanOp::Union, DEFAULT_EPS);
+        assert_eq!(union.len(), 1);
+        assert_eq!(union[0].holes.len(), 1);
+        assert!((signed_area2(&union[0].holes[0]) + 3.0).abs() < 1e-6);
+
+        let intersection =
+            boolean_oriented_regions(&a, &b, PlanarBooleanOp::Intersection, DEFAULT_EPS);
+        assert_eq!(intersection.len(), 1);
+        assert!(intersection[0].holes.is_empty());
+        assert!((signed_area2(&intersection[0].outer) - 24.0).abs() < 1e-6);
+
+        let subtraction =
+            boolean_oriented_regions(&a, &b, PlanarBooleanOp::Subtraction, DEFAULT_EPS);
+        assert_eq!(subtraction.len(), 1);
+        assert!(subtraction[0].holes.is_empty());
+        assert!(
+            (signed_area2(&subtraction[0].outer) - 72.0).abs() < 1e-6,
+            "the cutter opens the original void to the exterior"
+        );
+    }
+
+    #[test]
+    fn arrangement_stitching_uses_the_requested_scale() {
+        let scale = 1.0e-4;
+        let a = vec![ccw_square(0.0, 0.0, scale, scale)];
+        let b = vec![ccw_square(0.5 * scale, 0.0, 1.5 * scale, scale)];
+        let result = boolean_oriented_regions(&a, &b, PlanarBooleanOp::Union, 1.0e-10);
+        assert_eq!(result.len(), 1);
+        assert!((signed_area2(&result[0].outer) - 1.5 * scale * scale).abs() < 1.0e-14);
     }
 }

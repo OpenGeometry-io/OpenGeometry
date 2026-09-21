@@ -16,8 +16,8 @@
     <aside class="og-controls">
       <h3>Curve</h3>
       <p class="og-control-summary">
-        The curve config is an array of control points. This example exposes the middle two points
-        directly so the page still matches the real API.
+        This sampled Curve is explicitly piecewise linear. Its points define straight segments;
+        edit the middle two points to change the path.
       </p>
 
       <label class="og-control-row" data-control="cp2-z">
@@ -124,7 +124,12 @@
 
         const commit = (nextValue) => {
           const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
+          number.setCustomValidity("");
+          if (String(nextValue).trim() === "" || !Number.isFinite(parsed)
+            || (number.min !== "" && parsed < Number(number.min))
+            || (number.max !== "" && parsed > Number(number.max))) {
+            number.setCustomValidity("Enter a finite value within the displayed limits.");
+            number.reportValidity();
             return;
           }
 

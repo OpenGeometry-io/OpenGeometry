@@ -3,14 +3,11 @@ import { Vector3 } from "../../../opengeometry/pkg/opengeometry";
 
 import {
   BooleanExecutionOptions,
-  BooleanResult,
   booleanIntersection,
   booleanSubtraction,
   booleanUnion,
 } from "../operations/boolean";
-import { Cuboid } from "../shapes/cuboid";
-import { Polygon } from "../shapes/polygon";
-import { Sphere } from "../shapes/sphere";
+import { AnalyticSolid } from "../shapes/analytic-solid";
 
 export type BooleanExampleOperation = "union" | "intersection" | "subtraction";
 export type BooleanExampleMode = "solid" | "polygon" | "extruded";
@@ -26,7 +23,7 @@ export interface BooleanExampleBuildResult {
   group: THREE.Group;
   lhs: THREE.Object3D;
   rhs: THREE.Object3D;
-  result: BooleanResult;
+  result: AnalyticSolid;
   title: string;
   description: string;
 }
@@ -79,33 +76,29 @@ function createSolidPreset(
   operation: BooleanExampleOperation,
   options: BooleanExampleBuildOptions
 ) {
-  const outlineWidth = options.outlineWidth ?? 3;
-  const base = new Cuboid({
-    center: new Vector3(-0.1, 0.0, 0.0),
-    width: 2.1,
-    height: 1.4,
-    depth: 1.6,
+  const base = new AnalyticSolid({
+    kind: "sphere",
+    radius: 1,
     color: 0x60a5fa,
-    fatOutlines: options.fatOutlines ?? true,
-    outlineWidth,
+    deflection: 0.01,
   });
+  base.position.set(-0.45, 1, 0);
 
-  const tool = new Sphere({
-    center: options.sphereCenter ?? new Vector3(0.45, 0.12, 0.18),
-    radius: operation === "intersection" ? 0.88 : 0.78,
-    widthSegments: 22,
-    heightSegments: 16,
+  const tool = new AnalyticSolid({
+    kind: "sphere",
+    radius: operation === "intersection" ? 0.95 : 0.85,
     color: 0xf97316,
-    fatOutlines: options.fatOutlines ?? true,
-    outlineWidth,
+    deflection: 0.01,
   });
+  const center = options.sphereCenter ?? new Vector3(0.45, 1, 0.1);
+  tool.position.set(center.x, center.y, center.z);
 
   base.outline = options.outline ?? true;
   tool.outline = options.outline ?? true;
 
   return {
-    title: `${capitalize(operation)} Solid`,
-    description: "Cuboid and sphere overlap to demonstrate the 3D solid boolean path.",
+    title: `${capitalize(operation)} Analytic Spheres`,
+    description: "Two exact spheres exercise the in-house analytic boolean path and retain face ancestry.",
     lhsOperand: base,
     rhsOperand: tool,
     lhsVisual: base,
@@ -114,13 +107,12 @@ function createSolidPreset(
 }
 
 /**
- * Builds the coplanar polygon preset used by the example pages.
+ * Builds the thin planar-profile solid preset used by the example pages.
  */
 function createPolygonPreset(
   operation: BooleanExampleOperation,
   options: BooleanExampleBuildOptions
 ) {
-  const outlineWidth = options.outlineWidth ?? 3;
   const polygonOffset = options.polygonOffset ?? new Vector3(0.0, 0.0, 0.0);
   const lhsVertices = [
     new Vector3(-1.8, 0.0, -0.8),
@@ -145,25 +137,29 @@ function createPolygonPreset(
     polygonOffset
   );
 
-  const lhs = new Polygon({
-    vertices: lhsVertices,
+  const lhs = new AnalyticSolid({
+    kind: "linearExtrusion",
+    outer: lhsVertices.map((point) => [point.x, -point.z]),
+    holes: [],
+    height: 0.12,
     color: 0x60a5fa,
-    fatOutlines: options.fatOutlines ?? true,
-    outlineWidth,
+    deflection: 0.01,
   });
-  const rhs = new Polygon({
-    vertices: rhsVertices,
+  const rhs = new AnalyticSolid({
+    kind: "linearExtrusion",
+    outer: rhsVertices.map((point) => [point.x, -point.z]),
+    holes: [],
+    height: 0.12,
     color: 0xf97316,
-    fatOutlines: options.fatOutlines ?? true,
-    outlineWidth,
+    deflection: 0.01,
   });
 
   lhs.outline = options.outline ?? true;
   rhs.outline = options.outline ?? true;
 
   return {
-    title: `${capitalize(operation)} Polygon`,
-    description: "Two coplanar polygon faces exercise the planar boolean path.",
+    title: `${capitalize(operation)} Planar Profile Solids`,
+    description: "Two authoritative line-profile extrusions exercise planar imprint, classify, select, and sew.",
     lhsOperand: lhs,
     rhsOperand: rhs,
     lhsVisual: lhs,
@@ -172,44 +168,31 @@ function createPolygonPreset(
 }
 
 /**
- * Builds an extrusion-first preset that exercises polygon.extrude(height) and
- * reuses the standard solid boolean pipeline.
+ * Builds a strict-v2 line-profile extrusion preset with a coextensive slab.
  */
 function createExtrudedPreset(
   operation: BooleanExampleOperation,
   options: BooleanExampleBuildOptions
 ) {
-  const outlineWidth = options.outlineWidth ?? 3;
   const extrudedOffset = options.extrudedOffset ?? new Vector3(0.0, 0.0, 0.0);
 
-  const wallProfile = new Polygon({
-    vertices: [
-      new Vector3(-2.2, 0.0, -0.18),
-      new Vector3(2.2, 0.0, -0.18),
-      new Vector3(2.2, 0.0, 0.18),
-      new Vector3(-2.2, 0.0, 0.18),
-    ],
+  const wall = new AnalyticSolid({
+    kind: "linearExtrusion",
+    outer: [[-2.2, -0.18], [2.2, -0.18], [2.2, 0.18], [-2.2, 0.18]],
+    holes: [],
+    height: 2.8,
     color: 0x60a5fa,
-    fatOutlines: options.fatOutlines ?? true,
-    outlineWidth,
+    deflection: 0.01,
   });
-  const openingProfile = new Polygon({
-    vertices: [
-      new Vector3(-0.7, 0.0, -0.34),
-      new Vector3(0.9, 0.0, -0.34),
-      new Vector3(0.9, 0.0, 0.34),
-      new Vector3(-0.7, 0.0, 0.34),
-    ],
+  const opening = new AnalyticSolid({
+    kind: "linearExtrusion",
+    outer: [[-0.7, -0.34], [0.9, -0.34], [0.9, 0.34], [-0.7, 0.34]],
+    holes: [],
+    height: 2.8,
     color: 0xf97316,
-    fatOutlines: options.fatOutlines ?? true,
-    outlineWidth,
+    deflection: 0.01,
   });
-
-  const wall = wallProfile.extrude(2.8);
-  const opening = openingProfile.extrude(operation === "intersection" ? 1.45 : 1.35);
-  opening.setTranslation(
-    new Vector3(extrudedOffset.x, 0.85, extrudedOffset.z)
-  );
+  opening.position.set(extrudedOffset.x, 0, extrudedOffset.z);
 
   wall.outline = options.outline ?? true;
   opening.outline = options.outline ?? true;
@@ -217,7 +200,7 @@ function createExtrudedPreset(
   return {
     title: `${capitalize(operation)} Extruded Solid`,
     description:
-      "Two polygon.extrude(height) solids overlap to demonstrate renderable BRep booleans.",
+      "Two coextensive authoritative line-profile extrusions use the in-house planar arrangement.",
     lhsOperand: wall,
     rhsOperand: opening,
     lhsVisual: wall,

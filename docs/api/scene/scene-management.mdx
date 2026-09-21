@@ -59,7 +59,7 @@ For wrapper shapes, add serialized BRep payloads with `addBrepEntityToScene(...)
 `addBrepEntityToCurrentScene(...)`.
 
 ```ts
-import { Cuboid, OGSceneManager, Sphere, Vector3 } from "opengeometry";
+import { Cuboid, OGSceneManager, Vector3 } from "opengeometry";
 
 function toBrepSerialized(source: unknown) {
   const value =
@@ -85,16 +85,7 @@ const cuboid = new Cuboid({
   color: 0x9ca3af,
 });
 
-const sphere = new Sphere({
-  center: new Vector3(0, 2.5, 0),
-  radius: 2.5,
-  widthSegments: 32,
-  heightSegments: 24,
-  color: 0x0ea5e9,
-});
-
 manager.addBrepEntityToScene(sceneId, "cuboid-1", "Cuboid", toBrepSerialized(cuboid));
-manager.addBrepEntityToScene(sceneId, "sphere-1", "Sphere", toBrepSerialized(sphere));
 ```
 
 ### addBrepEntityToCurrentScene()

@@ -14,12 +14,6 @@ import {
   createParametricEditCapabilities,
 } from "../editor";
 import { createFreeformGeometry } from "../freeform";
-import { subtractShapeOperand } from "./boolean-subtract";
-import type {
-  ShapeSubtractOperands,
-  ShapeSubtractOptions,
-  ShapeSubtractResult,
-} from "./boolean-subtract";
 
 /**
  * Construction options for a swept solid.
@@ -348,16 +342,6 @@ export class Sweep extends THREE.Mesh {
       throw new Error("Brep data is not available for Sweep.");
     }
     return JSON.parse(brepData);
-  }
-
-  /**
-   * Subtracts one or more boolean operands, such as Opening volumes, from this sweep.
-   */
-  subtract(
-    operands: ShapeSubtractOperands,
-    options?: ShapeSubtractOptions
-  ): ShapeSubtractResult {
-    return subtractShapeOperand(this, operands, options);
   }
 
   set outline(enable: boolean) {

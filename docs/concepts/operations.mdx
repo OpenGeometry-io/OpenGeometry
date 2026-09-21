@@ -9,6 +9,7 @@ In OpenGeometry you will typically use:
 
 - **Offset** to create parallel paths and profiles
 - **Extrude** to turn a planar profile into a solid
+- **Loft** to bridge and cap compatible polygon or coaxial-circle sections
 - **Sweep** to move a profile along a path
 - **Booleans** to union, intersect, or subtract solids
 
@@ -59,12 +60,23 @@ Go to the API pages:
 - [Sweep operation](/api/operations/sweep)
 - [Sweep shape (Three.js wrapper)](/api/shapes/sweep)
 
+## Loft
+
+Use `lower.loftTo(upper)` or `loftPolygonSections([lower, upper])` for two simple planar polygon
+sections with equal vertex counts and planar ruled sides. Reversed winding and shifted start
+vertices are aligned automatically. Coaxial circular sections remain available through
+`AnalyticSolid`'s `coaxialCircleLoft` specialization.
+
+Go to the API page:
+
+- [Polygon loft](/api/operations/loft)
+
 ## Booleans
 
 Booleans combine solids or cut one solid by another.
 
-The standalone boolean helpers return a renderable `BooleanResult`, which can also be converted to
-freeform for downstream editing.
+The standalone boolean helpers consume strict analytic BRep v2 solids and return a renderable
+`AnalyticSolid` with retained face provenance and analytic exchange support.
 
 Go to the API and concept pages:
 

@@ -1,201 +1,73 @@
 ---
 title: Arc
-description: A circular arc primitive defined by center, radius, and angle range
+description: An authoritative circular edge rendered to a requested chord error
 icon: 'circle-notch'
 ---
 
 ## Overview
 
-`Arc` creates a line-based circular arc or full circle on the XZ plane. It supports segment
-control, optional wide-line rendering, placement helpers, freeform conversion, and a parsed BRep
-accessor.
+`Arc` stores one analytic circle edge and its parameter span in strict BRep schema v2. Rendering samples that edge to `deflection`; changing the deflection never changes the model topology.
 
 <Note>
-  Initialize `OpenGeometry.create(...)` before constructing `Vector3` or running the examples on
-  this page.
+  Initialize `OpenGeometry.create(...)` before constructing `Vector3` or an `Arc`.
 </Note>
 
 ## Constructor
 
-<Tabs>
-  <Tab title="Rust">
-    ```rust
-    let arc = OGArc::new("arc-1".to_string());
-    ```
-  </Tab>
-  <Tab title="TypeScript">
-    ```ts
-    const arc = new Arc(options?: IArcOptions);
-    ```
-  </Tab>
-</Tabs>
-
-### IArcOptions
+```ts
+const arc = new Arc(options?: IArcOptions);
+```
 
 <ParamField path="ogid" type="string" optional>
-  Unique identifier for the arc. Auto-generated when omitted.
+  Stable entity identifier. Generated when omitted.
 </ParamField>
 
-<ParamField path="center" type="Vector3" required>
-  Center point of the arc.
+<ParamField path="center" type="Vector3" optional>
+  Circle center. Defaults to the origin.
 </ParamField>
 
-<ParamField path="radius" type="number" required>
-  Arc radius.
+<ParamField path="radius" type="number" default="1">
+  Positive circle radius.
 </ParamField>
 
-<ParamField path="startAngle" type="number" required>
-  Start angle in radians.
+<ParamField path="startAngle" type="number" default="0">
+  Edge start parameter in radians.
 </ParamField>
 
-<ParamField path="endAngle" type="number" required>
-  End angle in radians.
+<ParamField path="sweepAngle" type="number" default="2π">
+  Signed sweep in radians. Its magnitude must be nonzero and at most one full turn.
 </ParamField>
 
-<ParamField path="segments" type="number" required>
-  Number of segments used to approximate the arc.
+<ParamField path="deflection" type="number" default="0.01">
+  Maximum requested chord error for the transient render line.
 </ParamField>
 
-<ParamField path="color" type="number" required>
-  Arc color as a hex number.
-</ParamField>
-
-<ParamField path="fatLines" type="boolean" default="false">
-  Enables wide-line rendering with `Line2`.
-</ParamField>
-
-<ParamField path="width" type="number" default="20">
-  Wide-line width used when `fatLines` is enabled.
-</ParamField>
-
-<ParamField path="translation" type="Vector3" optional>
-  Initial placement translation.
-</ParamField>
-
-<ParamField path="rotation" type="Vector3" optional>
-  Initial placement rotation in radians.
-</ParamField>
-
-<ParamField path="scale" type="Vector3" optional>
-  Initial placement scale.
+<ParamField path="color" type="ColorRepresentation" default="0x00ff00">
+  Three.js line color.
 </ParamField>
 
 ## Methods
 
-### setConfig()
-
-Updates arc geometry or render style.
+`retessellate(deflection)` updates only the render sampling and returns the achieved error and segment count. `getBrepSerialized()` returns the strict v2 wire, while `getBrep()` returns the parsed object. Use `edgeIdForSegment(index)` to map a picked render segment back to the authoritative edge. Call `dispose()` when removing the object.
 
 ```ts
-arc.setConfig(options: ArcConfigUpdate): void
-```
+import { Arc, OpenGeometry, Vector3 } from "opengeometry";
 
-### getConfig(), getPlacement()
-
-Returns the current arc config or cloned placement values.
-
-```ts
-const config = arc.getConfig();
-const placement = arc.getPlacement();
-```
-
-### getAnchor()
-
-Returns the current kernel anchor.
-
-```ts
-const anchor = arc.getAnchor();
-```
-
-### setPlacement(), setTransform(), setTranslation(), setRotation(), setScale()
-
-Placement helpers for moving the arc through the kernel transform path.
-
-```ts
-arc.setPlacement({ translation?, rotation?, scale? });
-```
-
-### toFreeform()
-
-Converts the arc into a freeform geometry wrapper.
-
-```ts
-const freeform = arc.toFreeform(id?);
-```
-
-### getBrep()
-
-Returns the parsed BRep object for the current arc.
-
-```ts
-const brep = arc.getBrep();
-```
-
-### discardGeometry()
-
-Disposes the current Three.js geometry buffer.
-
-```ts
-arc.discardGeometry(): void
-```
-
-## Properties
-
-<ResponseField name="ogid" type="string">
-  Stable identifier for the arc wrapper.
-</ResponseField>
-
-<ResponseField name="options" type="IArcOptions">
-  Current arc configuration and placement state.
-</ResponseField>
-
-<ResponseField name="color" type="number">
-  Gets or sets the arc color.
-</ResponseField>
-
-## Examples
-
-### Create an open arc
-
-```ts
-import { Arc, Vector3 } from "opengeometry";
-
+await OpenGeometry.create({ wasmURL });
 const arc = new Arc({
   center: new Vector3(0, 0, 0),
   radius: 2.2,
   startAngle: 0,
-  endAngle: Math.PI * 1.5,
-  segments: 64,
+  sweepAngle: Math.PI * 1.5,
+  deflection: 0.01,
   color: 0x2563eb,
 });
+scene.add(arc);
+
+arc.retessellate(0.002);
 ```
 
-### Create a full circle
-
-```ts
-const circle = new Arc({
-  center: new Vector3(0, 0, 0),
-  radius: 1.8,
-  startAngle: 0,
-  endAngle: 2 * Math.PI,
-  segments: 96,
-  color: 0x0f172a,
-  fatLines: true,
-  width: 10,
-});
-```
-
-### Reconfigure the arc
-
-```ts
-arc.setConfig({
-  radius: 2.8,
-  endAngle: Math.PI,
-  color: 0xf97316,
-});
-
-arc.setTranslation(new Vector3(0, 0.25, 0));
-```
+A full circle uses one model vertex and one closed edge. The default right-handed frame lies in the XZ plane with Y as its normal.
 
 ## Live demo
 

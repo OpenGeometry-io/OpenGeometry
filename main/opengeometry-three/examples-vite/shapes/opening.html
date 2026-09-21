@@ -16,8 +16,8 @@
     <aside class="og-controls">
       <h3>Opening</h3>
       <p class="og-control-summary">
-        The gray wall is just a visual reference. The orange object is the opening volume, defined
-        by `center`, `width`, `height`, and `depth`.
+        The orange outline is an authoritative v2 opening volume. Each change runs an in-house
+        analytic subtraction and rebuilds the gray wall result without a mesh bridge.
       </p>
 
       <label class="og-control-row" data-control="width">
@@ -48,8 +48,8 @@
           <code class="og-control-value" data-value>0.45</code>
         </div>
         <div class="og-control-range">
-          <input data-range type="range" min="0.15" max="0.9" step="0.05" value="0.45" />
-          <input data-number type="number" min="0.15" max="0.9" step="0.05" value="0.45" />
+          <input data-range type="range" min="0.35" max="0.9" step="0.05" value="0.45" />
+          <input data-number type="number" min="0.35" max="0.9" step="0.05" value="0.45" />
         </div>
       </label>
 
@@ -89,12 +89,14 @@
           height: 2,
           depth: 0.45,
           color: 0xf97316,
-          outlineWidth: 2,
+          deflection: 0.005,
         };
       }
 
       let wall = null;
       let opening = null;
+      let cutWall = null;
+      let scene = null;
 
       function formatNumber(value) {
         return Number(value).toFixed(2).replace(/\.?0+$/, "");
@@ -124,7 +126,12 @@
 
         const commit = (nextValue) => {
           const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
+          number.setCustomValidity("");
+          if (String(nextValue).trim() === "" || !Number.isFinite(parsed)
+            || (number.min !== "" && parsed < Number(number.min))
+            || (number.max !== "" && parsed > Number(number.max))) {
+            number.setCustomValidity("Enter a finite value within the displayed limits.");
+            number.reportValidity();
             return;
           }
 
@@ -150,9 +157,17 @@
           height: config.height,
           depth: config.depth,
           color: config.color,
-          outlineWidth: config.outlineWidth,
+          deflection: config.deflection,
         });
         opening.outline = true;
+        const next = opening.subtractFrom(wall, { deflection: config.deflection, color: 0xcbd5e1 });
+        next.outline = true;
+        if (cutWall) {
+          scene.remove(cutWall);
+          cutWall.dispose();
+        }
+        cutWall = next;
+        scene.add(cutWall);
 
         console.groupCollapsed("[opening] updated");
         console.log("Config", config);
@@ -160,7 +175,7 @@
       }
 
       async function main() {
-        const scene = new THREE.Scene();
+        scene = new THREE.Scene();
         scene.background = new THREE.Color(0xeef2ff);
 
         const camera = new THREE.PerspectiveCamera(
@@ -200,7 +215,6 @@
           color: 0xcbd5e1,
         });
         wall.outline = true;
-        scene.add(wall);
 
         opening = new Opening({
           center: config.center.clone(),
@@ -208,7 +222,7 @@
           height: config.height,
           depth: config.depth,
           color: config.color,
-          outlineWidth: config.outlineWidth,
+          deflection: config.deflection,
         });
         scene.add(opening);
 

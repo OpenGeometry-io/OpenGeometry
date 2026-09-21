@@ -134,9 +134,9 @@ scene.add(cuboid);
 ```
 
 <Info>
-  The `Cuboid` class extends `THREE.Mesh`, so it can be added directly to Three.js scenes. Other
-  3D shape wrappers work the same way, while primitive wrappers such as `Line` and `Arc` are
-  line-based instead of mesh-based.
+  `Cuboid` is a `THREE.Group` containing a transient surface mesh and analytic feature outline, so
+  it can be added directly to Three.js scenes. Primitive wrappers such as `Line` and `Arc` are
+  line-based.
 </Info>
 
 </Step>
@@ -254,8 +254,7 @@ const cylinder = new Cylinder({
   center: new Vector3(0, 0.8, 0),
   radius: 0.6,
   height: 1.6,
-  segments: 32,
-  angle: Math.PI * 2,
+  deflection: 0.01,
   color: 0xf97316,
 });
 cylinder.outline = true;
@@ -270,8 +269,7 @@ import { Sphere, Vector3 } from 'opengeometry';
 const sphere = new Sphere({
   center: new Vector3(0, 1.0, 0),
   radius: 0.9,
-  widthSegments: 32,
-  heightSegments: 24,
+  deflection: 0.01,
   color: 0x0ea5e9,
 });
 sphere.outline = true;
@@ -298,8 +296,8 @@ const arc = new Arc({
   center: new Vector3(0, 0, 0),
   radius: 1.0,
   startAngle: 0,
-  endAngle: Math.PI * 1.5,
-  segments: 32,
+  sweepAngle: Math.PI * 1.5,
+  deflection: 0.01,
   color: 0xb91c1c,
 });
 scene.add(arc);

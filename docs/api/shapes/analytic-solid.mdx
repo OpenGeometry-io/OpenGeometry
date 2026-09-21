@@ -1,0 +1,206 @@
+---
+title: "Analytic solid"
+description: "Render authoritative analytic primitives with chord-error tessellation."
+---
+
+`AnalyticSolid` constructs line-profile extrusions, cuboids, cylinders, spheres, cones, frusta, ring tori, circular-wall segments, coaxial circle lofts, and rectangular revolutions from analytic surfaces. Its required surface and curve geometry uses BRep schema version 2. Render triangles are generated from that geometry.
+
+The public boolean helpers accept only `AnalyticSolid` operands and use the in-house analytic engine.
+Schema-v1 and faceted operands are rejected; there is no mesh fallback.
+
+The current validator checks structural links and sampled curve/surface residuals. Full solid validity, arbitrary trim arrangements, and numerical intersection branch completeness are not yet certified. Current curved tessellation supports rectangular UV trims with axis-aligned hole loops; unsupported trims return an error.
+
+```ts
+import { OpenGeometry, AnalyticSolid } from "opengeometry";
+
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
+
+const solid = new AnalyticSolid({
+  kind: "cylinder",
+  radius: 1,
+  height: 2,
+  deflection: 0.01,
+  color: 0x6699dd,
+});
+scene.add(solid);
+
+const stats = solid.retessellate(0.002);
+const serialized = solid.getBrepSerialized();
+```
+
+## Construction
+
+Use `kind: "cuboid"` with `width`, `depth`, and `height`; `"cylinder"` or `"cone"` with `radius` and `height`; `"sphere"` with `radius`; `"frustum"` with `lowerRadius`, `upperRadius`, and `height`; or `"torus"` with `majorRadius` and `minorRadius`. Restricted modeling verbs use `"coaxialCircleLoft"` with two radii and a height, `"revolvedRectangle"` with inner/outer radii and a height, `"chamferedCuboid"` for an exact planar chamfer on the four vertical corners, and `"filletedCylinder"` for two supported circular-edge fillets. The fillet uses two trimmed ring-torus faces and requires `filletRadius < min(radius / 2, height / 2)`. These forms deliberately reject profiles that would require a surface family outside the v2 contract.
+
+Use `kind: "linearExtrusion"` with an `outer` array of 2D points, a required `holes` array, and positive `height`. Coordinates are evaluated in the frame's XY plane and extrusion follows its Z axis. The constructor emits shared Line edges, Plane faces, cap hole loops, and pcurves directly in v2. It rejects self-intersections, touching boundaries, nested or overlapping holes, and features below the geometric tolerance.
+
+```ts
+const profile = new AnalyticSolid({
+  kind: "linearExtrusion",
+  outer: [[-2, -1], [2, -1], [2, 1], [-2, 1]],
+  holes: [[[-0.5, -0.4], [-0.5, 0.4], [0.5, 0.4], [0.5, -0.4]]],
+  height: 2,
+});
+```
+
+Dimensions must be finite and positive. A frustum may have a zero upper radius. Ring tori require `majorRadius > minorRadius > 0`.
+
+Use `kind: "circularWall"` with centerline `radius`, `thickness`, `height`, `startAngle`, and signed `sweepAngle` in radians. The frame origin is the arc center at the wall's base. Radius must exceed half thickness; sweep must be nonzero and smaller than a full turn. Negative sweep retains the authored start/end identity.
+
+`kind: "circularWallWithOpenings"` adds a required `openings` array. Each opening supplies `id`, center `angle`, tangent `width`, `bottom`, and `height`. Interior openings retain exact inner/outer cylinder trim holes plus planar sill, header, and jamb faces with cut ancestry. Set `bottom: 0` for a door: the cylinder trims follow the bottom notch, the remaining bottom regions are split exactly, and the cut contains a header and two jambs without an inset. Openings must remain strictly inside the authored wall ends and leave resolved material above the head.
+
+```ts
+const wall = new AnalyticSolid({
+  kind: "circularWallWithOpenings",
+  radius: 3,
+  thickness: 0.3,
+  height: 3,
+  startAngle: 0,
+  sweepAngle: Math.PI / 2,
+  openings: [{ id: "window-1", angle: 0.8, width: 0.9, bottom: 0.9, height: 1.2 }],
+});
+```
+
+Use `kind: "circularWallWithArchedOpening"` for one arched opening on a circular wall.
+Its `opening` has the same fields. `height` is the total opening height and must exceed
+`width / 2`. The lower jamb region is exact circular-wall trimming; the header is a cylindrical
+face bounded by corrected intersection curves on the inner and outer wall supports.
+
+Use `kind: "straightWallWithArchedOpening"` with wall `width`, `depth`, and `height`, plus
+`opening: { id, station, width, bottom, height }`. It constructs the opening directly with two
+shared semicircle edges and a cylindrical header face. The opening must remain strictly inside the
+wall ends and top. These arched forms avoid overlapping cutter booleans and remain authoritative
+when retessellated.
+
+`solid.shell(thickness, options?)` offsets inward and returns a closed analytic shell for canonical cuboids, cylinders, spheres, cones, frusta, ring tori, and straight-edge line-profile extrusions. It builds an oriented cavity shell, retains the source face mapping, and includes the solid's complete world placement. Cone offsets move the cavity apex by the true normal offset; frustum offsets trim both caps and retain the authored semi-angle. Profile offsets intersect neighboring offset planes at exact miter vertices and expand authored holes. Thickness must leave a resolved positive interior in every offset dimension; collapsing, reversing, or self-intersecting offsets return `UnresolvedIntersection`. Already-composite solids return `CoverageGap`.
+
+```ts
+const source = new AnalyticSolid({ kind: "cuboid", width: 2, depth: 2, height: 2 });
+const shelled = source.shell(0.2, { deflection: 0.01 });
+scene.add(shelled);
+```
+
+The default frame uses Y as the height axis. Supply `frame: { origin, x, y, z }` to choose a different right-handed orthonormal frame; each value is a three-number array. `z` is the primitive's axis.
+
+## Tessellation
+
+`retessellate(deflection)` updates the child `surface` mesh, retaining its analytic model and face IDs. Deflection is a chord-error bound in model units, not a segment count. The default is `0.001`.
+
+The kernel caches meshes and samples shared edges consistently. Normals come from the analytic surfaces. The wrapper packs positions around a local origin and includes Float32 encoding error in `achievedDeflection`.
+
+Each WASM runtime shares a 64 MiB mesh cache with at most three entries per body. Tessellation objects and GPU arrays held by callers are additional transient allocations.
+
+Resource or precision limits throw an error and preserve the previous render geometry. Very small deflections below the model tolerance are rejected.
+
+## Picking and placement
+
+Raycast against `solid.surface`, then call `solid.faceIdForTriangle(hit.faceIndex)`. The returned ID identifies an analytic face and remains independent of mesh density.
+
+`solid.normalAtFace(faceId, modelPoint)` projects onto the retained support and evaluates its oriented normal. Convert a raycast's world point with `solid.worldToLocal(hit.point.clone())` first. The returned vector is in model space; this query does not classify trim membership. Surface singularities without a unique normal return an error.
+
+`AnalyticSolid` is a Three.js group. Apply render placement to that group; `getBrepSerialized()` returns the model before the group's Three.js transform. The child mesh's position stores its GPU packing origin.
+
+`getModelBounds()` returns a conservative bounding box from analytic faces and curves before the group's transform. It includes curved extents absent from the topological vertex set.
+
+Call `solid.dispose()` when you remove it permanently.
+
+## STEP export and diagnostics
+
+`solid.exportStep("metre")` returns `{ text, report }` directly from v2 surfaces, shared curves and oriented edge uses. It supports all five target surface families, frusta, circular walls and the current sphere and aligned-cuboid boolean results, including cavities. It does not require a viewport mesh or facet regrouping.
+
+Authored coordinates are interpreted as metres. Pass `"millimetre"` to convert coordinates and dimensions once and emit the corresponding unit context. Export applies the complete Three.js world placement once, including positive uniform scale. `getWorldBrepSerialized()` returns the corresponding world model; `getBrepSerialized()` retains local geometry. Retessellation does not alter export text.
+
+The report states the validation level: v2 structure, sampled residuals and Part-21 reference integrity. Complete external schema and importer validation remains pending. Numerical intersection edges are fitted as export-only non-rational cubic B-splines when their conservative curve enclosure fits within the remaining exchange budget. The fitted error is included in `exchange_error_bound`; projected pcurves without a certified representation still return `UnsupportedGeometry`.
+
+The report includes `exchange_error_bound` in the output unit, accounting for geometric tolerance, frame normalization and coordinate precision. Export rejects budgets below this bound and bodies exceeding its resource limits. Report revisions are decimal strings, preserving the full unsigned 64-bit value.
+
+`JSON.parse(validateAnalyticBrep(serialized))` returns `{ valid, validation_level, error }`. Import the helper from `"opengeometry"` and initialize the WASM runtime first. Invalid schema, required fields, topology or sampled residuals produce structured diagnostics. A successful report does not certify general self-intersections or cavity containment. Rebuild defective geometry from authored parameters rather than assuming vertex welding repairs analytic models.
+
+## IFC4 exchange
+
+`solid.prepareIfcExchange()` returns a strict `AnalyticExchangeBodyV2`: shared IFC geometry definitions, solid membership, face ancestry, quality and exchange error bounds. Rust applies world placement and converts Y-up metres to Z-up metres exactly once. The receiver assembles those definitions without geometry reconstruction.
+
+`solid.exportIfc()` returns `{ text, report }` for standalone IFC4 export. The Python semantic service accepts the same prepared body with required `schemaVersion: "2.0"` and `type: "FREEFORM_ANALYTIC"`. Old semantic versions and old raw BRep are rejected. Shared native fixtures pass formal IFC4 entity and EXPRESS validation.
+
+Cavity bodies use analytic CSG differences of AdvancedBreps. This avoids the inverted inner comparison in [IFC4's published `VoidsHaveAdvancedFaces` rule](https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2_TC1/HTML/schema/ifcgeometricmodelresource/lexical/ifcadvancedbrepwithvoids.htm) while preserving exact surfaces and cut ancestry. General numerical intersection edges use the same bounded export-only cubic fitting as STEP.
+
+## Worker camera LOD
+
+Import `AnalyticTessellationWorker` and `AnalyticLodController` from `"opengeometry"`. Construct the worker with explicit `workerURL` (the published `opengeometry/analytic-worker.js` asset), `kernelURL` (the public WASM glue asset) and `wasmURL`. Await `lod.register(solid)` after each authored model replacement; unchanged camera requests send only its handle and deflection. Unregister removed models and dispose both controller and worker.
+
+Call `lod.update(camera, renderer.domElement.height)` each frame. Visible bodies target 0.5 physical pixels at rest and 2 during motion, with factor-two buckets, 25% hysteresis, at most 100 ms scheduling and 150 ms settle refinement. Stale responses are discarded. Resource or precision failures retain the prior mesh and call `onError`. Sync computations already running in WASM finish before the next queued job; they cannot be interrupted midway.
+
+Await `lod.refine(worldDeflection)` before image export to require explicit refinement. Positive uniform scale adjusts local deflection; unsupported placement returns an error. Render LOD never refreshes authored scene snapshots.
+
+OpenPlans `OpenThree.enableAnalyticLod(options)` uses this service. Await `syncAnalyticLod()` after authored tree replacements, then `refineAnalyticView(deflection)` before synchronous image capture. The downstream `views/analytic-rendering.html` example exercises those calls and semantic v2 exchange. Current development uses the local tested kernel artifact; a coordinated published major release remains pending.
+
+## Feature outlines
+
+Set `shape.outline = true` to show analytic boundary and crease edges. The tessellator suppresses
+chart seams and shared coplanar subdivisions. Outlines retessellate together with surfaces and
+use the same local GPU origin and combined error budget. Raycast against `shape.featureOutline`
+and pass `Math.floor(hit.index / 2)` to `shape.edgeIdForOutlineSegment(...)` to retrieve the EdgeId.
+Dispose the shape to release both its surface and outline buffers.
+
+## Analytic booleans
+
+`host.boolean(cutter, operation, options?)` supports `"union"`, `"intersection"`, and `"subtraction"` for canonical full spheres, aligned cuboids, line-profile extrusions with coextensive slabs or matching profiles, coaxial cone/frustum containment, and the documented cylinder configurations. This experimental path uses in-house intersection and topology construction with retained analytic faces and shared edges. It does not use the mesh bridge. The standalone `booleanUnion`, `booleanIntersection`, and `booleanSubtraction` helpers route pairs of `AnalyticSolid` operands to the same path.
+
+```ts
+const host = new AnalyticSolid({ kind: "sphere", radius: 1, deflection: 0.01 });
+const cutter = new AnalyticSolid({
+  kind: "sphere", radius: 1, deflection: 0.01,
+  frame: { origin: [1, 0, 0], x: [1, 0, 0], y: [0, 0, -1], z: [0, 1, 0] },
+});
+const result = host.boolean(cutter, "subtraction", { deflection: 0.01 });
+// Equivalent: booleanSubtraction(host, cutter, { outline: true })
+scene.add(result);
+console.log(result.report); // contacts and input-to-result face mappings
+```
+
+Disjoint union retains separate closed solids; external point contacts are reported without sewing shells. Subtracting an enclosed cutter creates an inward-oriented cavity shell. Coincident faces use host ownership and record both sources. Empty intersections and fully removed hosts return an empty v2 model. Results inherit the host's color unless `options.color` overrides it.
+
+Boolean operands include their complete world placement, including positive uniform scale. Results contain world-space geometry with identity group placement; add them to the scene root. Nonuniform scale, reflections, shear and insufficient coordinate precision return errors.
+
+Aligned cuboid inputs sharing the same axes use a bounded plane arrangement for union,
+intersection and subtraction. Coextensive `linearExtrusion` operands use a grouped winding
+arrangement that preserves authored holes, boundary-touching differences, and every disconnected
+result region. Results retain Plane surfaces, shared Line edges, and immediate face ancestry;
+cutter side faces are marked as reversed cut faces. Face contact joins regularized material;
+edge and point contacts keep separate solids. Plane arrangements with unresolved widths return
+`UnresolvedIntersection`. Matching-profile extrusions also support different axial spans: overlap
+merges or intersects the intervals, and subtraction can return two closed solids with cutter-cap
+ancestry. Extrusions that differ in both profile and height span, different extrusion axes, boxes
+with different axes, and other planar solids still return `CoverageGap`.
+
+Cylinder coverage includes coaxial overlap and containment, parallel generator contact, coextensive transverse material operations, bounded transverse intersection, embedded transverse union/subtraction, full-span cuts, concentric and eccentric through-holes, and sealed cavities. Every result remains Plane/Cylinder BRep with one-boolean provenance. Strictly nested coaxial cones/frusta, sphere/conic, coaxial cylinder/conic, and cuboid/conic containment, nested coaxial ring tori, and sphere/torus containment also preserve exact supports and create oriented cavity shells. Ring tori can additionally form exact cavities inside proven enclosing cylinders, cuboids, and coaxial cone/frustum sections. Coincident conic bodies resolve deterministic ownership; cap or lateral contact within the geometric budget returns `UnresolvedIntersection`. Other intersecting conic and torus arrangements still return `CoverageGap`.
+
+
+The SSI query layer covers analytic fast cases and bounded numerical branches for finite sphere/torus source charts, including general torus interactions. Boolean topology construction still returns `CoverageGap` for intersecting surface arrangements outside the documented sphere, cuboid, cylinder, and containment cases. Internal tangency that would join a cavity to the host at a point and caps or clearances below geometric resolution return `UnresolvedIntersection`. No automatic faceted fallback occurs in this API.
+
+Each result face records immediate input entity/body/face-key ancestry, split/cut/coincident role, and reversal. `result.report.face_mappings` includes discarded input faces with empty result lists. Naming across arbitrary chained edits is not guaranteed.
+
+`AnalyticSolid.fromBrep(serialized, { deflection, color })` renders a validated v2 model with its original body ID. It rejects old raw BRep payloads. Retessellating a boolean result changes render density without changing its geometry or provenance.
+
+## Analytic arcs
+
+`AnalyticCurve` constructs an authoritative circle or ellipse edge with a parameter span and an oriented wire use. Its `startAngle` and signed `sweepAngle` use radians. Sweeps must be nonzero and at most one full turn; a full circle has one model vertex and one closed edge. Positive sweep follows the supplied right-handed frame.
+
+```ts
+import { AnalyticCurve } from "opengeometry";
+
+// Construct after OpenGeometry.create() resolves.
+const arc = new AnalyticCurve({
+  kind: "arc", radius: 2, startAngle: 0, sweepAngle: Math.PI, deflection: 0.01,
+});
+const ellipse = new AnalyticCurve({
+  kind: "ellipticalArc", majorRadius: 3, minorRadius: 1,
+  startAngle: 0, sweepAngle: -Math.PI, deflection: 0.01,
+});
+scene.add(arc, ellipse);
+arc.retessellate(0.002);
+```
+
+Ellipse radii require `majorRadius >= minorRadius > 0`. The frame's `x` direction carries the major radius and `y` the minor radius. The default frame draws in the XZ plane with Y as its normal.
+
+Raycast against `curve.line` and pass `Math.floor(hit.index / 2)` to `curve.edgeIdForSegment(...)`. Call `curve.getBrepSerialized()` for its strict v2 wire model and `curve.dispose()` when removing it. Deflection sampling uses the same kernel service and cache as analytic solids; the render segments never replace the circle or ellipse definition.

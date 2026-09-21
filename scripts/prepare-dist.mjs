@@ -114,6 +114,7 @@ function buildDistPackageJson(rootPackageJson) {
         default: "./opengeometry/pkg/opengeometry.js",
       },
       "./opengeometry_bg.wasm": "./opengeometry_bg.wasm",
+      "./analytic-worker.js": "./analytic-worker.js",
       "./package.json": "./package.json",
     },
     keywords: rootPackageJson.keywords ?? [],
@@ -148,6 +149,7 @@ async function main() {
   }
 
   await cp(path.join(rootDir, "README.md"), path.join(distDir, "README.md"), { force: true });
+  await cp(path.join(rootDir, "main/opengeometry-three/src/rendering/analytic-worker.js"), path.join(distDir, "analytic-worker.js"), { force: true });
 
   await rewriteKernelImportSpecifiers();
 

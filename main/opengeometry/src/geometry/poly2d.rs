@@ -75,13 +75,7 @@ pub fn self_intersects2(ring: &[Pt2], eps: f64) -> bool {
             if j == i + 1 || (i == 0 && j == m - 1) {
                 continue; // adjacent edges share a vertex
             }
-            if segments_cross2(
-                ring[i],
-                ring[(i + 1) % m],
-                ring[j],
-                ring[(j + 1) % m],
-                eps,
-            ) {
+            if segments_cross2(ring[i], ring[(i + 1) % m], ring[j], ring[(j + 1) % m], eps) {
                 return true;
             }
         }
@@ -172,9 +166,7 @@ pub fn point_in_ring2(p: Pt2, ring: &[Pt2]) -> bool {
     for i in 0..n {
         let a = ring[i];
         let b = ring[j];
-        if (a.z > p.z) != (b.z > p.z)
-            && p.x < (b.x - a.x) * (p.z - a.z) / (b.z - a.z) + a.x
-        {
+        if (a.z > p.z) != (b.z > p.z) && p.x < (b.x - a.x) * (p.z - a.z) / (b.z - a.z) + a.x {
             inside = !inside;
         }
         j = i;

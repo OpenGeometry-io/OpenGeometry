@@ -113,6 +113,17 @@ const solid = polygon.extrude(height);
   Finite, non-zero extrusion height.
 </ParamField>
 
+### loftTo()
+
+Creates a capped analytic ruled solid between this polygon and another placed polygon.
+
+```ts
+const loft = lower.loftTo(upper, { alignment: "auto", deflection: 0.01 });
+```
+
+The two polygons must have equal vertex counts, no holes, parallel section planes, and planar side
+quadrilaterals. See [Polygon loft](/api/operations/loft) for correspondence controls and errors.
+
 ### toFreeform()
 
 Converts the polygon into a freeform geometry wrapper.
@@ -129,12 +140,17 @@ Returns the serialized BRep JSON string for the current polygon face.
 const brepSerialized = polygon.getBrepData();
 ```
 
-### subtract()
-
-Subtracts one or more boolean operands from the polygon and returns a renderable boolean result.
+`tessellateFacetedBrep` evaluates the kernel's planar triangulation, including every hole,
+and returns transient triangle positions as a `Float64Array`. It preserves the input's
+coordinate space and face orientation. Invalid topology, empty output, and resource limits
+throw errors. This helper accepts explicitly faceted BReps; use `AnalyticSolid.retessellate`
+for versioned analytic geometry.
 
 ```ts
-const result = polygon.subtract([operand], options?);
+import { tessellateFacetedBrep } from "opengeometry";
+
+const positions = tessellateFacetedBrep(polygon.getBrepData());
+const triangleCount = positions.length / 9;
 ```
 
 ### generateGeometry(), cleanGeometry(), dispose()
@@ -226,41 +242,26 @@ footprint.addHole([
 ]);
 ```
 
-### Extrude and cut an opening
+### Build an analytic extrusion for booleans
 
 ```ts
-import { Polygon, Vector3 } from "opengeometry";
+import { AnalyticSolid } from "opengeometry";
 
-const wallProfile = new Polygon({
-  vertices: [
-    new Vector3(-2.2, 0, -0.18),
-    new Vector3(2.2, 0, -0.18),
-    new Vector3(2.2, 0, 0.18),
-    new Vector3(-2.2, 0, 0.18),
-  ],
+const wall = new AnalyticSolid({
+  kind: "linearExtrusion",
+  outer: [[-2.2, -0.18], [2.2, -0.18], [2.2, 0.18], [-2.2, 0.18]],
+  holes: [],
+  height: 2.8,
   color: 0x60a5fa,
 });
-
-const openingProfile = new Polygon({
-  vertices: [
-    new Vector3(-0.7, 0, -0.34),
-    new Vector3(0.9, 0, -0.34),
-    new Vector3(0.9, 0, 0.34),
-    new Vector3(-0.7, 0, 0.34),
-  ],
-  color: 0xf97316,
+const opening = new AnalyticSolid({
+  kind: "linearExtrusion",
+  outer: [[-0.7, -0.34], [0.9, -0.34], [0.9, 0.34], [-0.7, 0.34]],
+  holes: [],
+  height: 1.35,
 });
-
-const wall = wallProfile.extrude(2.8);
-const opening = openingProfile.extrude(1.35);
-opening.setTranslation(new Vector3(0, 0.85, 0));
-
-const cut = wall.subtract([opening], {
-  outline: true,
-  fatOutlines: true,
-  outlineWidth: 2,
-  kernel: { mergeCoplanarFaces: true },
-});
+opening.position.y = 0.85;
+const cut = wall.subtract([opening], { deflection: 0.005 });
 ```
 
 ### Move or rotate the polygon profile

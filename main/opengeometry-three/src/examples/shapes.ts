@@ -4,8 +4,8 @@ import { Cuboid } from "../shapes/cuboid";
 import { Cylinder } from "../shapes/cylinder";
 import { Opening } from "../shapes/opening";
 import { Polygon } from "../shapes/polygon";
-import { Sphere } from "../shapes/sphere";
 import { Sweep } from "../shapes/sweep";
+import { Sphere } from "../shapes/sphere";
 import { Wedge } from "../shapes/wedge";
 
 /**
@@ -33,8 +33,7 @@ export function createShapesExample(scene: THREE.Scene) {
     height: 1.6,
     depth: 1.0,
     color: 0x10b981,
-    fatOutlines: true,
-    outlineWidth: fatOutlineWidth,
+    deflection: 0.01,
   });
   cuboid.outline = true;
 
@@ -42,11 +41,8 @@ export function createShapesExample(scene: THREE.Scene) {
     center: new Vector3(1.8, 0.8, -0.8),
     radius: 0.6,
     height: 1.6,
-    segments: 28,
-    angle: Math.PI * 2,
     color: 0xf97316,
-    fatOutlines: true,
-    outlineWidth: fatOutlineWidth,
+    deflection: 0.01,
   });
   cylinder.outline = true;
 
@@ -62,13 +58,10 @@ export function createShapesExample(scene: THREE.Scene) {
   wedge.outline = true;
 
   const sphere = new Sphere({
-    center: new Vector3(0.6, 1.0, 1.2),
+    center: new Vector3(0.6, 1, 1.2),
     radius: 0.9,
-    widthSegments: 28,
-    heightSegments: 18,
     color: 0x0ea5e9,
-    fatOutlines: true,
-    outlineWidth: fatOutlineWidth,
+    deflection: 0.01,
   });
   sphere.outline = true;
 
@@ -78,8 +71,7 @@ export function createShapesExample(scene: THREE.Scene) {
     height: 1.8,
     depth: 0.3,
     color: 0x9ca3af,
-    fatOutlines: true,
-    outlineWidth: fatOutlineWidth,
+    deflection: 0.01,
   });
   opening.outline = true;
 

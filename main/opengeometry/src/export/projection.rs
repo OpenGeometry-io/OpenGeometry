@@ -3,7 +3,12 @@ use std::collections::HashMap;
 use openmaths::Vector3;
 use serde::{Deserialize, Serialize};
 
-use crate::brep::Brep;
+use crate::{
+    analytic::{
+        tessellation::tessellate as tessellate_analytic, BrepEnvelope, GeometryError, Surface,
+    },
+    brep::Brep,
+};
 
 const EPSILON: f64 = crate::tolerance::MODELING_TOLERANCE_FLOOR;
 const CREASE_COS_THRESHOLD: f64 = 0.9995;
@@ -450,6 +455,88 @@ pub fn project_brep_to_scene(brep: &Brep, camera: &CameraParameters, hlr: &HlrOp
     scene
 }
 
+pub fn project_analytic_brep_to_scene(
+    brep: &BrepEnvelope,
+    camera: &CameraParameters,
+    hlr: &HlrOptions,
+    deflection: f64,
+    max_triangles: usize,
+) -> Result<Scene2D, GeometryError> {
+    let mut scene = Scene2D::with_name(format!("Analytic BRep {}", brep.id));
+    let Some(frame) = build_camera_frame(camera) else {
+        return Err(GeometryError::InvalidGeometry(
+            "projection camera is degenerate".into(),
+        ));
+    };
+    let tessellation = tessellate_analytic(brep, deflection, max_triangles)?;
+    if tessellation.outline_positions.len() != tessellation.outline_edge_ids.len() * 6 {
+        return Err(GeometryError::InvalidTopology(
+            "analytic outline mapping is inconsistent".into(),
+        ));
+    }
+    let mut adjacent_faces: HashMap<u32, Vec<u32>> = HashMap::new();
+    for halfedge in &brep.topology.halfedges {
+        if let Some(face) = halfedge.face {
+            let faces = adjacent_faces.entry(halfedge.edge).or_default();
+            if !faces.contains(&face) {
+                faces.push(face);
+            }
+        }
+    }
+    for (segment, &edge_id) in tessellation
+        .outline_positions
+        .chunks_exact(6)
+        .zip(&tessellation.outline_edge_ids)
+    {
+        let start = [segment[0], segment[1], segment[2]];
+        let end = [segment[3], segment[4], segment[5]];
+        let midpoint = std::array::from_fn(|axis| (start[axis] + end[axis]) * 0.5);
+        let mut face_info = Vec::new();
+        for &face_id in adjacent_faces.get(&edge_id).into_iter().flatten() {
+            let face = brep.topology.faces.get(face_id as usize).ok_or_else(|| {
+                GeometryError::InvalidTopology("analytic edge references a missing face".into())
+            })?;
+            let surface = brep.geometry.surface(face.surface)?;
+            let uv = surface.project(midpoint, None)?;
+            let mut normal = surface.normal_at(uv)?;
+            normal = mul_scalar(normal, face.sense.multiplier());
+            face_info.push(FaceInfo {
+                front_facing: dot(normal, sub(frame.position, midpoint)) > 0.0,
+                normal,
+            });
+        }
+        let class = classify_face_info(&face_info);
+        if class == EdgeClass::VisibleSmooth
+            || (class == EdgeClass::Hidden && hlr.hide_hidden_edges)
+        {
+            continue;
+        }
+        let start_view = array_to_view(start, &frame);
+        let end_view = array_to_view(end, &frame);
+        let Some((start_clipped, end_clipped)) =
+            clip_segment_to_near_plane(start_view, end_view, frame.near)
+        else {
+            continue;
+        };
+        let (Some(start), Some(end)) = (
+            project_view_point(start_clipped, frame.mode),
+            project_view_point(end_clipped, frame.mode),
+        ) else {
+            continue;
+        };
+        if is_zero_length_2d(start, end) {
+            continue;
+        }
+        scene.add_segment(ClassifiedSegment {
+            geometry: Segment2D::Line { start, end },
+            class,
+            layer: None,
+            source_entity_id: Some(brep.id.clone()),
+        });
+    }
+    Ok(scene)
+}
+
 fn classify_edge(
     edge_id: u32,
     adjacency: &HashMap<u32, Vec<usize>>,
@@ -457,14 +544,23 @@ fn classify_edge(
 ) -> EdgeClass {
     let adjacent_faces = adjacency.get(&edge_id).cloned().unwrap_or_default();
 
+    let faces: Vec<FaceInfo> = adjacent_faces
+        .iter()
+        .filter_map(|&fi| face_info.get(fi).copied())
+        .collect();
+
+    classify_face_info(&faces)
+}
+
+fn classify_face_info(adjacent_faces: &[FaceInfo]) -> EdgeClass {
     if adjacent_faces.is_empty() {
         return EdgeClass::VisibleCrease;
     }
 
     let front_faces: Vec<FaceInfo> = adjacent_faces
         .iter()
-        .filter_map(|&fi| face_info.get(fi).copied())
-        .filter(|f| f.front_facing)
+        .copied()
+        .filter(|face| face.front_facing)
         .collect();
 
     if front_faces.is_empty() {
@@ -505,7 +601,11 @@ fn build_camera_frame(camera: &CameraParameters) -> Option<CameraFrame> {
 }
 
 fn world_to_view(point: &Vector3, frame: &CameraFrame) -> ViewPoint {
-    let relative = sub(vec3_to_arr(point), frame.position);
+    array_to_view(vec3_to_arr(point), frame)
+}
+
+fn array_to_view(point: [f64; 3], frame: &CameraFrame) -> ViewPoint {
+    let relative = sub(point, frame.position);
     ViewPoint {
         x: dot(relative, frame.right),
         y: dot(relative, frame.up),
@@ -809,6 +909,41 @@ mod tests {
 
         let line_scene = scene.to_lines();
         assert_eq!(line_scene.lines.len(), 1);
+    }
+
+    #[test]
+    fn analytic_projection_uses_v2_edges_and_face_normals() {
+        let brep = crate::analytic::primitives::cuboid(
+            "wall-volume".into(),
+            crate::analytic::Frame3::IDENTITY,
+            [4.0, 0.2, 3.0],
+            crate::analytic::topology::Accuracy {
+                geometric: 1.0e-8,
+                intersection: 1.0e-9,
+                tessellation: 0.01,
+                exchange: 1.0e-5,
+            },
+        )
+        .unwrap();
+        let camera = CameraParameters {
+            position: Vector3::new(6.0, 5.0, 7.0),
+            target: Vector3::new(2.0, 0.1, 1.5),
+            up: Vector3::new(0.0, 0.0, 1.0),
+            near: 0.01,
+            projection_mode: ProjectionMode::Orthographic,
+        };
+        let projected =
+            project_analytic_brep_to_scene(&brep, &camera, &HlrOptions::default(), 0.01, 10_000)
+                .unwrap();
+        assert!(!projected.segments.is_empty());
+        assert!(projected
+            .segments
+            .iter()
+            .any(|segment| segment.class == EdgeClass::VisibleOutline));
+        assert!(projected.segments.iter().all(|segment| {
+            segment.source_entity_id.as_deref() == Some("wall-volume")
+                && matches!(segment.geometry, Segment2D::Line { .. })
+        }));
     }
 
     #[test]

@@ -1,0 +1,60 @@
+---
+title: 'Polygon loft'
+description: 'Create a capped ruled solid between two planar polygon sections'
+icon: 'layer-group'
+---
+
+## Overview
+
+`loftPolygonSections()` creates an authoritative Plane/Line BRep between two closed polygon
+sections. `Polygon.loftTo()` provides the same operation directly from two placed polygon wrappers.
+The operation matches winding and cyclic start indices automatically, constructs one shared edge
+for every paired boundary, and caps both ends.
+
+```ts
+import { loftPolygonSections } from "opengeometry";
+
+const solid = loftPolygonSections([
+  [[-1, -1, 0], [1, -1, 0], [1, 1, 0], [-1, 1, 0]],
+  [[-.6, -.6, 2], [.6, -.6, 2], [.6, .6, 2], [-.6, .6, 2]],
+], { deflection: 0.01 });
+```
+
+From existing polygons:
+
+```ts
+const solid = lower.loftTo(upper, {
+  alignment: "auto",
+  deflection: 0.01,
+  color: 0x329ac7,
+});
+```
+
+Both paths return an [`AnalyticSolid`](/api/shapes/analytic-solid). The source polygons remain
+unchanged and are not retained as hidden dependencies of the result.
+
+## Requirements
+
+- Each section is a simple closed polygon with at least three vertices.
+- The sections have the same vertex count and no holes.
+- Both section planes are parallel and separated by more than the geometric tolerance.
+- Every corresponding side quadrilateral is planar.
+- Automatic alignment must have one unambiguous minimum-length correspondence.
+
+Reversed winding and different start vertices are supported. If symmetry creates multiple equally
+good correspondences, provide an indexed alignment:
+
+```ts
+const solid = lower.loftTo(upper, {
+  alignment: { upperStartIndex: 2, reverseUpper: true },
+});
+```
+
+Unequal vertex counts and warped side quadrilaterals return `unsupported_geometry`. Ambiguous
+automatic correspondence returns `ambiguous_profile_alignment`. General twisted and smooth lofts
+need a ruled-surface or spline surface family and are not silently triangulated.
+
+## Live examples
+
+- [OpenGeometry polygon loft](https://demo.opengeometry.io/operations/polygon-loft.html)
+

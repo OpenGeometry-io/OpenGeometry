@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>OpenGeometry Polygon Loft</title>
+  </head>
+  <body class="og-example-page">
+    <div
+      class="og-badge-title-card"><a href="../index.html" class="og-badge-title-link">Back</a><span class="og-badge-title">Polygon Loft</span></div>
+    <aside class="og-controls">
+      <h3>Capped ruled loft</h3>
+      <p
+        class="og-control-summary">Click both polygon profiles, then build the exact Plane/Line BRep between them. Shift is optional; clicking a selected profile deselects it.</p>
+      <button id="loft" type="button" disabled>Loft selected profiles</button>
+      <button id="reset" type="button">Reset profiles</button>
+      <label
+        class="og-control-row">Upper scale<input id="upper-scale" type="range" min="0.4" max="1.4" step="0.05" value="0.7"></label>
+      <label
+        class="og-control-row">Upper height<input id="upper-height" type="range" min="0.5" max="4" step="0.1" value="2.4"></label>
+      <p id="selection" role="status"></p>
+      <p id="statistics" role="status"></p>
+      <p id="error" role="alert"></p>
+    </aside>
+    <div id="app"></div>
+    <script type="module">
+    import "../src/styles/theme.css";
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+    import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+    import { OpenGeometry, Polygon, Vector3 } from "opengeometry";
+
+    const selected = [];
+    const error = document.querySelector("#error");
+    const selection = document.querySelector("#selection");
+    const statistics = document.querySelector("#statistics");
+    const loftButton = document.querySelector("#loft");
+    let scene;
+    let profiles = [];
+    let result;
+
+    function profilePoints(y, scale) {
+      return [
+        [-1.6, -1.0],
+        [0.25, -1.0],
+        [1.35, -0.35],
+        [1.1, 1.0],
+        [-0.4, 1.25],
+        [-1.6, 0.45],
+      ].map(([x, z]) => new Vector3(x * scale, y, z * scale));
+    }
+
+    function updateSelection() {
+      profiles.forEach((profile) => {
+        profile.color = selected.includes(profile) ? 0xff8a3d : 0x5875d8;
+      });
+      loftButton.disabled = selected.length !== 2;
+      selection.textContent = selected.length === 2
+        ? "Two compatible polygon sections selected."
+        : `Select ${2 - selected.length} more polygon profile${
+          selected.length === 1 ? "" : "s"
+        }.`;
+    }
+
+    function resetProfiles() {
+      if (result) {
+        scene.remove(result);
+        result.dispose();
+        result = undefined;
+      }
+      profiles.forEach((profile) => {
+        scene.remove(profile);
+        profile.dispose();
+      });
+      profiles = [
+        new Polygon({ vertices: profilePoints(0, 1), color: 0x5875d8 }),
+        new Polygon({
+          vertices: profilePoints(
+            Number(document.querySelector("#upper-height").value),
+            Number(document.querySelector("#upper-scale").value),
+          ).reverse(),
+          color: 0x5875d8,
+        }),
+      ];
+      profiles.forEach((profile) => {
+        profile.outline = true;
+        profile.material.transparent = true;
+        profile.material.opacity = 0.45;
+        scene.add(profile);
+      });
+      selected.length = 0;
+      error.textContent = "";
+      statistics.textContent = "";
+      updateSelection();
+    }
+
+    function buildLoft() {
+      try {
+        const next = selected[0].loftTo(selected[1], {
+          deflection: 0.01,
+          color: 0x329ac7,
+        });
+        next.outline = true;
+        if (result) {
+          scene.remove(result);
+          result.dispose();
+        }
+        result = next;
+        scene.add(result);
+        const model = JSON.parse(result.getBrepSerialized());
+        statistics.textContent =
+          `${model.topology.faces.length} planar faces · ${model.topology.edges.length} shared edges · ${model.solids.length} closed solid`;
+        error.textContent = "";
+      } catch (failure) {
+        error.textContent = String(failure);
+      }
+    }
+
+    async function initialize() {
+      try {
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+        scene.add(
+          new THREE.GridHelper(16, 16, 0x7188aa, 0xcbd5e1),
+          new THREE.HemisphereLight(0xffffff, 0x526070, 2),
+        );
+        const light = new THREE.DirectionalLight(0xffffff, 2);
+        light.position.set(5, 8, 5);
+        scene.add(light);
+        const camera = new THREE.PerspectiveCamera(
+          45,
+          innerWidth / innerHeight,
+          0.1,
+          100,
+        );
+        camera.position.set(6, 4.5, 6);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(devicePixelRatio);
+        document.querySelector("#app").replaceChildren(renderer.domElement);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 1.2, 0);
+        controls.enableDamping = true;
+        resetProfiles();
+        const raycaster = new THREE.Raycaster();
+        renderer.domElement.addEventListener("pointerdown", (event) => {
+          const rect = renderer.domElement.getBoundingClientRect();
+          raycaster.setFromCamera(
+            new THREE.Vector2(
+              (event.clientX - rect.left) / rect.width * 2 - 1,
+              -(event.clientY - rect.top) / rect.height * 2 + 1,
+            ),
+            camera,
+          );
+          const hit = raycaster.intersectObjects(profiles, false)[0]?.object;
+          if (!hit) return;
+          const index = selected.indexOf(hit);
+          if (index >= 0) selected.splice(index, 1);
+          else if (selected.length < 2) selected.push(hit);
+          updateSelection();
+        });
+        loftButton.addEventListener("click", buildLoft);
+        document.querySelector("#reset").addEventListener("click", resetProfiles);
+        document.querySelector("#upper-scale").addEventListener(
+          "input",
+          resetProfiles,
+        );
+        document.querySelector("#upper-height").addEventListener(
+          "input",
+          resetProfiles,
+        );
+        addEventListener("resize", () => {
+          camera.aspect = innerWidth / innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(innerWidth, innerHeight);
+          renderer.setPixelRatio(devicePixelRatio);
+        });
+        addEventListener("pagehide", () => {
+          renderer.setAnimationLoop(null);
+          result?.dispose();
+          profiles.forEach((profile) => profile.dispose());
+          controls.dispose();
+          renderer.dispose();
+        }, { once: true });
+        renderer.setAnimationLoop(() => {
+          controls.update();
+          renderer.render(scene, camera);
+        });
+      } catch (failure) {
+        error.textContent = String(failure);
+      }
+    }
+
+    initialize();
+    </script>
+  </body>
+</html>

@@ -2,7 +2,14 @@
  * Public OpenGeometry JavaScript entrypoint.
  */
 import init, {
+  OGAnalyticBrep,
+  OGAnalyticTessellation,
   OGSceneManager,
+  WorkPlane,
+  analyzeProfile,
+  extrudeBrepFaceDirectional,
+  validateAnalyticBrep,
+  tessellate_brep,
   Vector3,
 } from "../opengeometry/pkg/opengeometry";
 import { SpotLabel } from "./src/markup/spotMarker";
@@ -105,6 +112,15 @@ export class OpenGeometry {
  * export, and other scene-level workflows.
  */
 export { OGSceneManager };
+export { OGAnalyticBrep, OGAnalyticTessellation };
+export { WorkPlane, analyzeProfile, extrudeBrepFaceDirectional, validateAnalyticBrep };
+export { tessellate_brep };
+export { AnalyticSolid } from "./src/shapes/analytic-solid";
+export { AnalyticPattern, circularPattern, linearPattern, rectangularPattern } from "./src/shapes/analytic-pattern";
+export type { AnalyticPatternHit, AnalyticPatternInstance } from "./src/shapes/analytic-pattern";
+export type {
+  AnalyticBooleanOp, AnalyticBooleanReport, AnalyticBrepOptions, AnalyticFrame, AnalyticAccuracy, AnalyticCircularWallOpening, AnalyticPolygonLoftAlignment, AnalyticProjectionCamera, AnalyticProjectionHlr, AnalyticPrimitiveOptions, AnalyticTessellationStats, AnalyticTessellationOptions, AnalyticStepExport, AnalyticStlExport,
+} from "./src/shapes/analytic-solid";
 
 /**
  * Shared wasm-backed vector type used throughout the public API.
@@ -139,3 +155,12 @@ export * from "./src/editor/index";
  * Kernel-backed modeling operations (incl. analytic polyline offset → regions).
  */
 export * from "./src/operations/index";
+
+export { AnalyticCurve } from "./src/primitives/analytic-curve";
+export type { AnalyticCurveOptions, AnalyticCurveStats } from "./src/primitives/analytic-curve";
+export { AnalyticTessellationWorker } from "./src/rendering/analytic-tessellation";
+export type { AnalyticWorkerOptions, AnalyticTessellationData } from "./src/rendering/analytic-tessellation";
+export { AnalyticLodController, deflectionBucket, worldUnitsPerPixel, uniformScale } from "./src/rendering/analytic-lod";
+export type { AnalyticLodOptions } from "./src/rendering/analytic-lod";
+export { analyticIfcText } from "./src/export/analytic-ifc";
+export type { AnalyticExchangeBodyV2, IfcPreparedValue } from "./src/export/analytic-ifc";

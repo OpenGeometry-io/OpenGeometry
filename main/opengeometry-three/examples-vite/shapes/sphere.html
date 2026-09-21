@@ -1,262 +1,181 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Sphere Example</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Simple OpenGeometry sphere example for Three.js." />
-    <meta name="author" content="Vishwajeet Mane" />
+    <title>OpenGeometry Analytic Sphere Example</title>
   </head>
   <body class="og-example-page">
     <div class="og-badge-title-card">
       <a href="../index.html" class="og-badge-title-link">Back</a>
-      <span class="og-badge-title">Sphere</span>
+      <span class="og-badge-title">Analytic Sphere</span>
     </div>
-
     <aside class="og-controls">
-      <h3>Sphere</h3>
-      <p class="og-control-summary">
-        Radius changes the size. `widthSegments` and `heightSegments` control the render mesh
-        tessellation.
-      </p>
-
-      <label class="og-control-row" data-control="radius">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Radius</span>
-          <code class="og-control-value" data-value>1.1</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="0.4" max="2.2" step="0.05" value="1.1" />
-          <input data-number type="number" min="0.4" max="2.2" step="0.05" value="1.1" />
-        </div>
+      <h3>Analytic Sphere</h3>
+      <p
+        class="og-control-summary">A sphere remains one authoritative analytic surface while display tessellation follows the requested chord error.</p>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Radius</span>
+        <input id="radius" type="number" min="0.4" max="2.2" step="0.05"
+          value="1.1" required />
       </label>
-
-      <label class="og-control-row" data-control="width-segments">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Width Segments</span>
-          <code class="og-control-value" data-value>28</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="8" max="48" step="1" value="28" />
-          <input data-number type="number" min="8" max="48" step="1" value="28" />
-        </div>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Chord error</span>
+        <input id="deflection" type="range" min="-3" max="-0.5" step="0.1"
+          value="-2" />
       </label>
-
-      <label class="og-control-row" data-control="height-segments">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Height Segments</span>
-          <code class="og-control-value" data-value>18</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="6" max="32" step="1" value="18" />
-          <input data-number type="number" min="6" max="32" step="1" value="18" />
-        </div>
-      </label>
-
-      <label class="og-control-row" data-control="outline">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Outline</span>
-        </div>
-        <div class="og-control-bool">
-          <input data-toggle type="checkbox" class="og-toggle" aria-label="Outline" checked />
-          <span class="og-control-bool-state" data-state>Enabled</span>
-        </div>
-      </label>
+      <label
+        class="og-control-row"><input id="wireframe" type="checkbox" /> Show render triangles</label>
+      <label
+        class="og-control-row"><input id="outline" type="checkbox" checked /> Show feature outlines</label>
+      <p id="statistics" role="status"></p>
+      <p id="selection">Click a surface to inspect its analytic face.</p>
+      <p id="error" role="alert"></p>
     </aside>
-
     <div id="app"></div>
 
     <script type="module">
-      import "../src/styles/theme.css";
-      import * as THREE from "three";
-      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-      import Stats from "three/examples/jsm/libs/stats.module.js";
-      import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Sphere, Vector3 } from "opengeometry";
+    import "../src/styles/theme.css";
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+    import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+    import { OpenGeometry, Sphere, Vector3 } from "opengeometry";
 
-      const app = document.getElementById("app");
-      if (!app) {
-        throw new Error("Missing #app container");
+    const input = (id) => document.querySelector(`#${id}`);
+    const value = (id) => Number(input(id).value);
+    const degrees = (id) => THREE.MathUtils.degToRad(value(id));
+    const chordError = () => 10 ** value("deflection");
+    const verticalFrame = (height = 0) => ({
+      origin: [0, height, 0],
+      x: [1, 0, 0],
+      y: [0, 0, -1],
+      z: [0, 1, 0],
+    });
+
+    let scene;
+    let solid;
+
+    function createSolid() {
+      const radius = value("radius");
+      return new Sphere({
+        center: new Vector3(0, radius, 0),
+        radius,
+        deflection: chordError(),
+        color: 0x329ac7,
+      });
+    }
+
+    function showStatistics(stats) {
+      const brep = JSON.parse(solid.getBrepSerialized());
+      input("statistics").textContent =
+        `${brep.topology.faces.length} analytic faces · ${stats.triangleCount.toLocaleString()} render triangles`;
+    }
+
+    function rebuild() {
+      const next = createSolid();
+      next.outline = input("outline").checked;
+      next.surface.material.wireframe = input("wireframe").checked;
+      if (solid) {
+        scene.remove(solid);
+        solid.dispose();
       }
+      solid = next;
+      scene.add(solid);
+      showStatistics(solid.retessellate(chordError()));
+      input("error").textContent = "";
+    }
 
-      let config = null;
-
-      function createConfig() {
-        return {
-          center: new Vector3(0, 1.1, 0),
-          radius: 1.1,
-          widthSegments: 28,
-          heightSegments: 18,
-          color: 0x0891b2,
-          outlineWidth: 2,
-        };
+    function attempt(action) {
+      try {
+        action();
+      } catch (failure) {
+        input("error").textContent = `Previous result retained. ${String(failure)}`;
       }
-      const viewState = {
-        outline: true,
-      };
+    }
 
-      let sphere = null;
+    async function initialize() {
+      try {
+        await OpenGeometry.create({ wasmURL: wasmUrl });
 
-      function formatNumber(value) {
-        return Number(value).toFixed(2).replace(/\.?0+$/, "");
-      }
-
-      function mountStats() {
-        const stats = new Stats();
-        stats.showPanel(0);
-        stats.dom.style.position = "fixed";
-        stats.dom.style.left = "12px";
-        stats.dom.style.bottom = "12px";
-        stats.dom.style.top = "auto";
-        stats.dom.style.zIndex = "1000";
-        document.body.appendChild(stats.dom);
-        return stats;
-      }
-
-      function attachNumberControl(name, onChange) {
-        const row = document.querySelector(`[data-control="${name}"]`);
-        const range = row?.querySelector("[data-range]");
-        const number = row?.querySelector("[data-number]");
-        const value = row?.querySelector("[data-value]");
-
-        if (!row || !range || !number || !value) {
-          throw new Error(`Missing number control: ${name}`);
-        }
-
-        const commit = (nextValue) => {
-          const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
-            return;
-          }
-
-          range.value = String(parsed);
-          number.value = String(parsed);
-          value.textContent = formatNumber(parsed);
-          onChange(parsed);
-        };
-
-        range.addEventListener("input", () => commit(range.value));
-        number.addEventListener("input", () => commit(number.value));
-        commit(range.value);
-      }
-
-      function attachBooleanControl(name, onChange) {
-        const row = document.querySelector(`[data-control="${name}"]`);
-        const toggle = row?.querySelector("[data-toggle]");
-        const state = row?.querySelector("[data-state]");
-
-        if (!row || !toggle || !state) {
-          throw new Error(`Missing boolean control: ${name}`);
-        }
-
-        const commit = (checked) => {
-          toggle.checked = checked;
-          state.textContent = checked ? "Enabled" : "Disabled";
-          onChange(checked);
-        };
-
-        toggle.addEventListener("change", () => commit(toggle.checked));
-        commit(toggle.checked);
-      }
-
-      function updateSphere() {
-        if (!sphere) {
-          return;
-        }
-
-        sphere.setConfig({
-          center: config.center.clone(),
-          radius: config.radius,
-          widthSegments: Math.round(config.widthSegments),
-          heightSegments: Math.round(config.heightSegments),
-          color: config.color,
-          outlineWidth: config.outlineWidth,
-        });
-        sphere.outline = viewState.outline;
-
-        console.groupCollapsed("[sphere] updated");
-        console.log("Config", config);
-        console.log("View", viewState);
-        console.groupEnd();
-      }
-
-      async function main() {
-        const scene = new THREE.Scene();
+        scene = new THREE.Scene();
         scene.background = new THREE.Color(0xeef2ff);
-
-        const camera = new THREE.PerspectiveCamera(
-          55,
-          window.innerWidth / window.innerHeight,
-          0.1,
-          100
-        );
-        camera.position.set(5.7, 4.5, 6.9);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        app.replaceChildren(renderer.domElement);
-
-        const stats = mountStats();
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.target.set(0, 1, 0);
-        controls.update();
-
-        scene.add(new THREE.GridHelper(20, 20, 0x4460ff, 0xd5ddff));
-        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-
-        const light = new THREE.DirectionalLight(0xffffff, 1.1);
-        light.position.set(6, 8, 4);
+        scene.add(new THREE.GridHelper(16, 16, 0x7188aa, 0xcbd5e1));
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+        const light = new THREE.DirectionalLight(0xffffff, 2);
+        light.position.set(4, 7, 5);
         scene.add(light);
 
-        await OpenGeometry.create({ wasmURL: wasmUrl });
-        config = createConfig();
+        const camera = new THREE.PerspectiveCamera(
+          45,
+          innerWidth / innerHeight,
+          0.1,
+          100,
+        );
+        camera.position.set(6, 4.5, 6);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(devicePixelRatio);
+        input("app").replaceChildren(renderer.domElement);
 
-        sphere = new Sphere({
-          center: config.center.clone(),
-          radius: config.radius,
-          widthSegments: config.widthSegments,
-          heightSegments: config.heightSegments,
-          color: config.color,
-          outlineWidth: config.outlineWidth,
-        });
-        scene.add(sphere);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0.8, 0);
+        controls.enableDamping = true;
 
-        attachNumberControl("radius", (value) => {
-          config.radius = value;
-          config.center.y = value;
-          updateSphere();
+        rebuild();
+        document.querySelectorAll('input[type="number"]').forEach((control) => {
+          control.addEventListener("change", () => attempt(rebuild));
         });
-        attachNumberControl("width-segments", (value) => {
-          config.widthSegments = value;
-          updateSphere();
+        input("deflection").addEventListener("input", () =>
+          attempt(() => {
+            const brep = solid.getBrepSerialized();
+            showStatistics(solid.retessellate(chordError()));
+            if (solid.getBrepSerialized() !== brep) {
+              throw new Error("Tessellation changed the BRep");
+            }
+          }));
+        input("wireframe").addEventListener("change", () => {
+          solid.surface.material.wireframe = input("wireframe").checked;
         });
-        attachNumberControl("height-segments", (value) => {
-          config.heightSegments = value;
-          updateSphere();
-        });
-        attachBooleanControl("outline", (value) => {
-          viewState.outline = value;
-          updateSphere();
+        input("outline").addEventListener("change", () => {
+          solid.outline = input("outline").checked;
         });
 
-        updateSphere();
+        const raycaster = new THREE.Raycaster();
+        renderer.domElement.addEventListener("pointerdown", (event) => {
+          const bounds = renderer.domElement.getBoundingClientRect();
+          const pointer = new THREE.Vector2(
+            ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+            -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
+          );
+          raycaster.setFromCamera(pointer, camera);
+          const hit = raycaster.intersectObject(solid.surface)[0];
+          if (hit?.faceIndex == null) return;
+          const faceId = solid.faceIdForTriangle(hit.faceIndex);
+          input("selection").textContent = `Face ${faceId}`;
+        });
 
+        addEventListener("resize", () => {
+          camera.aspect = innerWidth / innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(innerWidth, innerHeight);
+          renderer.setPixelRatio(devicePixelRatio);
+        });
+        addEventListener("pagehide", () => {
+          renderer.setAnimationLoop(null);
+          solid?.dispose();
+          controls.dispose();
+          renderer.dispose();
+        }, { once: true });
         renderer.setAnimationLoop(() => {
-          stats.update();
           controls.update();
           renderer.render(scene, camera);
         });
-
-        window.addEventListener("resize", () => {
-          camera.aspect = window.innerWidth / window.innerHeight;
-          camera.updateProjectionMatrix();
-          renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+      } catch (failure) {
+        input("error").textContent = String(failure);
       }
+    }
 
-      void main();
+    initialize();
     </script>
   </body>
 </html>

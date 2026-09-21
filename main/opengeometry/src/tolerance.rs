@@ -4,7 +4,7 @@
 //! tolerate different errors, nor that geometry produced by an operation may
 //! carry its own tolerance. Historically this kernel scattered ad-hoc epsilon
 //! constants across modules (`EXTRUDE_EPSILON`, `CAP_ALIGNMENT_THRESHOLD`,
-//! `STEP_LENGTH_EPSILON`, the boolean auto-scale in `BooleanOptions`, …). This
+//! `STEP_LENGTH_EPSILON`, operation-specific geometric tolerances, …). This
 //! module is the single tolerance model that all comparison-based operations
 //! consult, so near-coincident geometry is handled consistently instead of
 //! per-operation.

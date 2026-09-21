@@ -247,3 +247,31 @@ export function createFreeformGeometry(
 
   return geometry;
 }
+
+/** Triangulates an explicitly faceted BRep, including its planar face holes. */
+export function tessellateFacetedBrep(serialized: string): Float64Array {
+  if (typeof serialized !== "string" || serialized.length > 64 * 1024 * 1024) {
+    throw new Error("Faceted BRep must be serialized JSON within the 64 MiB limit");
+  }
+  const data = JSON.parse(serialized) as Record<string, unknown>;
+  if (data === null || typeof data !== "object" || "schema_version" in data) {
+    throw new Error("Use analytic tessellation for a versioned analytic BRep");
+  }
+  for (const name of ["vertices", "edges", "halfedges", "loops", "faces", "wires", "shells"]) {
+    const table = data[name];
+    if (!Array.isArray(table) || table.length > 2_000_000) {
+      throw new Error(`Faceted BRep requires a bounded ${name} table`);
+    }
+  }
+  const geometry = new OGFreeformGeometry("faceted-tessellation", serialized);
+  try {
+    const positions = geometry.getLocalGeometryBuffer();
+    if (!positions.length || positions.length % 9 !== 0 || positions.length > 18_000_000
+      || positions.some(value => !Number.isFinite(value))) {
+      throw new Error("Faceted BRep triangulation did not produce a finite mesh within the triangle limit");
+    }
+    return positions;
+  } finally {
+    geometry.free();
+  }
+}

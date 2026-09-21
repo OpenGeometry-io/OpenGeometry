@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Wall-minus-openings workflow built from polygon.extrude(height) and array-backed solid subtraction."
+      content="Exact through-cut workflow using strict analytic profile extrusions and in-house booleans."
     />
     <meta name="author" content="Vishwajeet Mane" />
   </head>
@@ -17,12 +17,10 @@
     </div>
 
     <aside class="og-controls">
-      <h3>Wall Minus Openings</h3>
+      <h3>Wall Minus Through Slot</h3>
       <p class="og-control-summary">
-        This page shows the production-style flow: build two polygons, call
-        <code>polygon.extrude(height)</code>, then subtract an array of openings from the wall. The
-        boolean result inherits the host wall's material — color, transparency, and side mode —
-        across multi-cutter subtraction.
+        This page builds coextensive strict-v2 profile extrusions and subtracts a through slot
+        from the wall. Each result face keeps its planar support and source-face ancestry.
       </p>
 
       <label class="og-control-row" data-control="wall-height">
@@ -47,27 +45,8 @@
         </div>
       </label>
 
-      <label class="og-control-row" data-control="opening-height">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Opening Height</span>
-          <code class="og-control-value" data-value>1.6</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="0.8" max="2.4" step="0.05" value="1.6" />
-          <input data-number type="number" min="0.8" max="2.4" step="0.05" value="1.6" />
-        </div>
-      </label>
-
-      <label class="og-control-row" data-control="sill">
-        <div class="og-control-header">
-          <span class="og-control-label-chip">Sill Height</span>
-          <code class="og-control-value" data-value>0.55</code>
-        </div>
-        <div class="og-control-range">
-          <input data-range type="range" min="0" max="1.2" step="0.05" value="0.55" />
-          <input data-number type="number" min="0" max="1.2" step="0.05" value="0.55" />
-        </div>
-      </label>
+      <pre id="result-report" style="white-space:pre-wrap" aria-live="polite"></pre>
+      <p id="error" role="alert" style="color:#b42318"></p>
     </aside>
 
     <div id="app"></div>
@@ -78,7 +57,7 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
-      import { OpenGeometry, Polygon, Vector3 } from "opengeometry";
+      import { AnalyticSolid, OpenGeometry } from "opengeometry";
 
       const app = document.getElementById("app");
       if (!app) {
@@ -88,12 +67,12 @@
       const config = {
         wallHeight: 2.8,
         openingWidth: 1.4,
-        openingHeight: 1.6,
-        sillHeight: 0.55,
       };
 
       let scene = null;
       let currentGroup = null;
+      const readout = document.querySelector("#result-report");
+      const errorReadout = document.querySelector("#error");
 
       function formatNumber(value) {
         return Number(value).toFixed(2).replace(/\.?0+$/, "");
@@ -123,7 +102,8 @@
 
         const commit = (nextValue) => {
           const parsed = Number(nextValue);
-          if (!Number.isFinite(parsed)) {
+          if (String(nextValue).trim() === "" || !Number.isFinite(parsed) || parsed < Number(number.min) || parsed > Number(number.max)) {
+            errorReadout.textContent = "Enter a value within the displayed limits; previous preview retained.";
             return;
           }
 
@@ -140,6 +120,10 @@
 
       function disposeObject(object) {
         object.traverse((child) => {
+          if (child instanceof AnalyticSolid) {
+            child.dispose();
+            return;
+          }
           child.geometry?.dispose?.();
           if (Array.isArray(child.material)) {
             child.material.forEach((material) => material?.dispose?.());
@@ -154,79 +138,60 @@
           return;
         }
 
-        if (currentGroup) {
-          scene.remove(currentGroup);
-          disposeObject(currentGroup);
+        const nextGroup = new THREE.Group();
+        try {
+
+          const wall = new AnalyticSolid({
+            kind: "linearExtrusion",
+            outer: [[-2.2, -0.18], [2.2, -0.18], [2.2, 0.18], [-2.2, 0.18]],
+            holes: [],
+            height: config.wallHeight,
+            color: 0xdc2626,
+            deflection: 0.01,
+          });
+          nextGroup.add(wall);
+          wall.outline = true;
+          wall.surface.material.transparent = true;
+          wall.surface.material.opacity = 0.6;
+          wall.surface.material.needsUpdate = true;
+
+          const openingOuter = [
+            [-config.openingWidth * 0.5, -0.26],
+            [config.openingWidth * 0.5, -0.26],
+            [config.openingWidth * 0.5, 0.26],
+            [-config.openingWidth * 0.5, 0.26],
+          ];
+          const opening = new AnalyticSolid({
+            kind: "linearExtrusion", outer: openingOuter, holes: [], height: config.wallHeight,
+            color: 0xf97316, deflection: 0.01,
+          });
+          nextGroup.add(opening);
+          opening.outline = true;
+
+          const result = wall.subtract([opening], {
+            color: 0xdc2626,
+          });
+          result.outline = true;
+
+          wall.position.x = -4;
+          opening.position.x = -4;
+          result.position.x = 4;
+
+          nextGroup.add(result);
+          if (currentGroup) { scene.remove(currentGroup); disposeObject(currentGroup); }
+          currentGroup = nextGroup;
+          scene.add(currentGroup);
+          readout.textContent = JSON.stringify(result.report, null, 2);
+          errorReadout.textContent = "";
+
+          console.groupCollapsed("[boolean-extruded] rebuilt");
+          console.log("Config", { ...config });
+          console.log("Report", result.report);
+          console.groupEnd();
+        } catch (failure) {
+          disposeObject(nextGroup);
+          errorReadout.textContent = `Previous preview retained. ${String(failure)}`;
         }
-
-        const wallProfile = new Polygon({
-          vertices: [
-            new Vector3(-2.2, 0, -0.18),
-            new Vector3(2.2, 0, -0.18),
-            new Vector3(2.2, 0, 0.18),
-            new Vector3(-2.2, 0, 0.18),
-          ],
-          color: 0xdc2626,
-          outlineWidth: 2,
-        });
-        const openingProfile = new Polygon({
-          vertices: [
-            new Vector3(-config.openingWidth * 0.5, 0, -0.26),
-            new Vector3(config.openingWidth * 0.5, 0, -0.26),
-            new Vector3(config.openingWidth * 0.5, 0, 0.26),
-            new Vector3(-config.openingWidth * 0.5, 0, 0.26),
-          ],
-          color: 0xf97316,
-          outlineWidth: 2,
-        });
-
-        const wall = wallProfile.extrude(config.wallHeight);
-        wall.outline = true;
-        wall.material.transparent = true;
-        wall.material.opacity = 0.6;
-        wall.material.needsUpdate = true;
-
-        const openingOffset = Math.max(
-          0.45,
-          Math.min(1.05, 2.2 - config.openingWidth * 0.5 - 0.15)
-        );
-
-        const leftOpening = openingProfile.extrude(config.openingHeight);
-        leftOpening.outline = true;
-        leftOpening.setPlacement({
-          translation: new Vector3(-openingOffset, config.sillHeight, 0),
-        });
-
-        const rightOpening = openingProfile.extrude(config.openingHeight);
-        rightOpening.outline = true;
-        rightOpening.setPlacement({
-          translation: new Vector3(openingOffset, config.sillHeight, 0),
-        });
-
-        const result = wall.subtract([leftOpening, rightOpening], {
-          outline: true,
-          outlineWidth: 2,
-          kernel: {
-            mergeCoplanarFaces: true,
-          },
-        });
-
-        wall.position.x = -4;
-        leftOpening.position.x = -4;
-        rightOpening.position.x = -4;
-        result.position.x = 4;
-
-        currentGroup = new THREE.Group();
-        currentGroup.add(wall);
-        currentGroup.add(leftOpening);
-        currentGroup.add(rightOpening);
-        currentGroup.add(result);
-        scene.add(currentGroup);
-
-        console.groupCollapsed("[boolean-extruded] rebuilt");
-        console.log("Config", { ...config });
-        console.log("Report", result.report);
-        console.groupEnd();
       }
 
       async function main() {
@@ -269,15 +234,6 @@
           config.openingWidth = value;
           rebuildExample();
         });
-        attachNumberControl("opening-height", (value) => {
-          config.openingHeight = value;
-          rebuildExample();
-        });
-        attachNumberControl("sill", (value) => {
-          config.sillHeight = value;
-          rebuildExample();
-        });
-
         rebuildExample();
 
         renderer.setAnimationLoop(() => {
@@ -293,7 +249,7 @@
         });
       }
 
-      void main();
+      void main().catch(failure => { errorReadout.textContent = String(failure); });
     </script>
   </body>
 </html>

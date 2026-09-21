@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenGeometry Analytic Frustum Example</title>
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Analytic Frustum</span>
+    </div>
+    <aside class="og-controls">
+      <h3>Analytic Frustum</h3>
+      <p
+        class="og-control-summary">A frustum is stored as a trimmed cone; equal radii produce a cylinder.</p>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Lower radius</span>
+        <input id="lower-radius" type="number" min="0.3" max="2" step="0.05"
+          value="1.2" required />
+      </label>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Upper radius</span>
+        <input id="upper-radius" type="number" min="0" max="2" step="0.05"
+          value="0.6" required />
+      </label>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Height</span>
+        <input id="height" type="number" min="0.5" max="4" step="0.1" value="2"
+          required />
+      </label>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Chord error</span>
+        <input id="deflection" type="range" min="-3" max="-0.5" step="0.1"
+          value="-2" />
+      </label>
+      <label
+        class="og-control-row"><input id="wireframe" type="checkbox" /> Show render triangles</label>
+      <label
+        class="og-control-row"><input id="outline" type="checkbox" checked /> Show feature outlines</label>
+      <p id="statistics" role="status"></p>
+      <p id="selection">Click a surface to inspect its analytic face.</p>
+      <p id="error" role="alert"></p>
+    </aside>
+    <div id="app"></div>
+
+    <script type="module">
+    import "../src/styles/theme.css";
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+    import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+    import { AnalyticSolid, OpenGeometry } from "opengeometry";
+
+    const input = (id) => document.querySelector(`#${id}`);
+    const value = (id) => Number(input(id).value);
+    const degrees = (id) => THREE.MathUtils.degToRad(value(id));
+    const chordError = () => 10 ** value("deflection");
+    const verticalFrame = (height = 0) => ({
+      origin: [0, height, 0],
+      x: [1, 0, 0],
+      y: [0, 0, -1],
+      z: [0, 1, 0],
+    });
+
+    let scene;
+    let solid;
+
+    function createSolid() {
+      return new AnalyticSolid({
+        kind: "frustum",
+        lowerRadius: value("lower-radius"),
+        upperRadius: value("upper-radius"),
+        height: value("height"),
+        frame: verticalFrame(),
+        deflection: chordError(),
+        color: 0x329ac7,
+      });
+    }
+
+    function showStatistics(stats) {
+      const brep = JSON.parse(solid.getBrepSerialized());
+      input("statistics").textContent =
+        `${brep.topology.faces.length} analytic faces · ${stats.triangleCount.toLocaleString()} render triangles`;
+    }
+
+    function rebuild() {
+      const next = createSolid();
+      next.outline = input("outline").checked;
+      next.surface.material.wireframe = input("wireframe").checked;
+      if (solid) {
+        scene.remove(solid);
+        solid.dispose();
+      }
+      solid = next;
+      scene.add(solid);
+      showStatistics(solid.retessellate(chordError()));
+      input("error").textContent = "";
+    }
+
+    function attempt(action) {
+      try {
+        action();
+      } catch (failure) {
+        input("error").textContent = `Previous result retained. ${String(failure)}`;
+      }
+    }
+
+    async function initialize() {
+      try {
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+        scene.add(new THREE.GridHelper(16, 16, 0x7188aa, 0xcbd5e1));
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+        const light = new THREE.DirectionalLight(0xffffff, 2);
+        light.position.set(4, 7, 5);
+        scene.add(light);
+
+        const camera = new THREE.PerspectiveCamera(
+          45,
+          innerWidth / innerHeight,
+          0.1,
+          100,
+        );
+        camera.position.set(6, 4.5, 6);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(devicePixelRatio);
+        input("app").replaceChildren(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0.8, 0);
+        controls.enableDamping = true;
+
+        rebuild();
+        document.querySelectorAll('input[type="number"]').forEach((control) => {
+          control.addEventListener("change", () => attempt(rebuild));
+        });
+        input("deflection").addEventListener("input", () =>
+          attempt(() => {
+            const brep = solid.getBrepSerialized();
+            showStatistics(solid.retessellate(chordError()));
+            if (solid.getBrepSerialized() !== brep) {
+              throw new Error("Tessellation changed the BRep");
+            }
+          }));
+        input("wireframe").addEventListener("change", () => {
+          solid.surface.material.wireframe = input("wireframe").checked;
+        });
+        input("outline").addEventListener("change", () => {
+          solid.outline = input("outline").checked;
+        });
+
+        const raycaster = new THREE.Raycaster();
+        renderer.domElement.addEventListener("pointerdown", (event) => {
+          const bounds = renderer.domElement.getBoundingClientRect();
+          const pointer = new THREE.Vector2(
+            ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+            -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
+          );
+          raycaster.setFromCamera(pointer, camera);
+          const hit = raycaster.intersectObject(solid.surface)[0];
+          if (hit?.faceIndex == null) return;
+          const faceId = solid.faceIdForTriangle(hit.faceIndex);
+          input("selection").textContent = `Face ${faceId}`;
+        });
+
+        addEventListener("resize", () => {
+          camera.aspect = innerWidth / innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(innerWidth, innerHeight);
+          renderer.setPixelRatio(devicePixelRatio);
+        });
+        addEventListener("pagehide", () => {
+          renderer.setAnimationLoop(null);
+          solid?.dispose();
+          controls.dispose();
+          renderer.dispose();
+        }, { once: true });
+        renderer.setAnimationLoop(() => {
+          controls.update();
+          renderer.render(scene, camera);
+        });
+      } catch (failure) {
+        input("error").textContent = String(failure);
+      }
+    }
+
+    initialize();
+    </script>
+  </body>
+</html>

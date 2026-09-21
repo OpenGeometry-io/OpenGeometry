@@ -24,6 +24,7 @@ import {
   Sweep,
   Wedge,
   Opening,
+  AnalyticSolid,
   Vector3,
 } from "opengeometry";
 ```
@@ -48,9 +49,11 @@ await OpenGeometry.create({
 
 ### Shape wrappers
 
-`Polygon`, `Cuboid`, `Cylinder`, `Sphere`, `Sweep`, `Wedge`, and `Opening` are mesh-backed wrappers.
-They extend `THREE.Mesh`, render directly in a Three.js scene, and expose boolean-friendly BRep
-accessors or subtract helpers.
+`Cuboid`, `Opening`, `Cylinder`, and `Sphere` are analytic `THREE.Group` wrappers containing a
+transient surface mesh and feature outlines. `Polygon`, `Sweep`, and `Wedge` use their explicit
+faceted paths.
+All wrappers render directly in a Three.js scene; only strict analytic wrappers participate in the
+v2 boolean engine.
 
 ### Solid wrapper
 
@@ -143,8 +146,7 @@ const cylinder = new Cylinder({
   center: new Vector3(0, 1, 0),
   radius: 0.9,
   height: 2,
-  segments: 48,
-  angle: 2 * Math.PI,
+  deflection: 0.01,
   color: 0xf97316,
 });
 ```
@@ -155,8 +157,7 @@ const cylinder = new Cylinder({
 const sphere = new Sphere({
   center: new Vector3(0, 1.1, 0),
   radius: 1.1,
-  widthSegments: 28,
-  heightSegments: 18,
+  deflection: 0.01,
   color: 0x0891b2,
 });
 ```
@@ -185,22 +186,28 @@ const sweep = new Sweep({
 
 ## Booleans
 
-You can use either the standalone boolean helpers or the shape-level convenience methods. For AEC
-workflows, `Opening.subtractFrom(...)` is usually the clearest host-cutting path.
+Booleans require strict analytic BRep v2 operands. Construct flat hosts and cutters with
+`AnalyticSolid`; `Cylinder` and `Sphere` already inherit that contract.
 
 ```ts
-const opening = new Opening({
-  center: new Vector3(0, 1.35, 0),
-  width: 1.4,
-  height: 2,
-  depth: 0.45,
-  color: 0xf97316,
+const wall = new AnalyticSolid({
+  kind: "cuboid",
+  width: 6,
+  depth: 0.3,
+  height: 3,
+  color: 0x9ca3af,
 });
+const opening = new AnalyticSolid({
+  kind: "cuboid",
+  width: 1.4,
+  depth: 0.45,
+  height: 2,
+});
+opening.position.set(0, 0.95, -0.075);
 
-const cutWall = opening.subtractFrom(cuboid, {
+const cutWall = wall.subtract([opening], {
   outline: true,
-  fatOutlines: true,
-  outlineWidth: 2,
+  deflection: 0.005,
 });
 ```
 

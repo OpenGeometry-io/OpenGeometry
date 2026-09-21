@@ -13,12 +13,6 @@ import {
   createParametricEditCapabilities,
 } from "../editor";
 import { createFreeformGeometry } from "../freeform";
-import { subtractShapeOperand } from "./boolean-subtract";
-import type {
-  ShapeSubtractOperands,
-  ShapeSubtractOptions,
-  ShapeSubtractResult,
-} from "./boolean-subtract";
 
 /**
  * Construction options for a wedge/prism shape.
@@ -291,16 +285,6 @@ export class Wedge extends THREE.Mesh {
       throw new Error("Brep data is not available for this wedge.");
     }
     return JSON.parse(brepData);
-  }
-
-  /**
-   * Subtracts one or more boolean operands, such as Opening volumes, from this wedge.
-   */
-  subtract(
-    operands: ShapeSubtractOperands,
-    options?: ShapeSubtractOptions
-  ): ShapeSubtractResult {
-    return subtractShapeOperand(this, operands, options);
   }
 
   set outline(enable: boolean) {

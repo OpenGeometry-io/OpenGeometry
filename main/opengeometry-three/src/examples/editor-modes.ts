@@ -1,33 +1,13 @@
 import * as THREE from "three";
 import { Vector3 } from "../../../opengeometry/pkg/opengeometry";
-import {
-  FreeformEditResult,
-  FreeformEditor,
-  createFreeformEditor,
-} from "../editor";
+import { FreeformEditResult, createFreeformEditor } from "../editor";
 import { Line } from "../primitives/line";
 import { Polygon } from "../shapes/polygon";
 import { Cuboid } from "../shapes/cuboid";
 
-function topFaceId(freeformEditor: FreeformEditor): number | null {
-  let bestFaceId: number | null = null;
-  let bestY = Number.NEGATIVE_INFINITY;
-
-  for (const face of freeformEditor.getTopologyRenderData().faces) {
-    const info = freeformEditor.getFaceInfo(face.face_id);
-    if (info.centroid.y > bestY) {
-      bestY = info.centroid.y;
-      bestFaceId = face.face_id;
-    }
-  }
-
-  return bestFaceId;
-}
-
 /**
- * Demonstrates the intended editing flow for editor-controls:
- * parametric config/placement edits first, then explicit freeform conversion,
- * including wire-backed freeform edge insertion on a converted line.
+ * Demonstrates strict v2 parametric solid edits and the separate sampled-wire
+ * freeform editor. Analytic solid freeform conversion is intentionally unsupported.
  */
 export function createEditorModesExample(scene: THREE.Scene) {
   const polygon = new Polygon({
@@ -62,8 +42,7 @@ export function createEditorModesExample(scene: THREE.Scene) {
     height: 1.4,
     depth: 1.0,
     color: 0x10b981,
-    fatOutlines: true,
-    outlineWidth: 4,
+    deflection: 0.01,
   });
   cuboid.outline = true;
 
@@ -101,17 +80,6 @@ export function createEditorModesExample(scene: THREE.Scene) {
     });
   }
 
-  const freeform = cuboid.toFreeform(`${cuboid.ogid}-freeform`);
-  const freeformEditor = createFreeformEditor(freeform);
-  const topFace = topFaceId(freeformEditor);
-  let freeformResult: FreeformEditResult | null = null;
-
-  if (topFace !== null) {
-    freeformResult = freeformEditor.pushPullFace(topFace, 0.35, {
-      includeTopologyRemap: true,
-    });
-  }
-
   scene.add(polygon);
   scene.add(cuboid);
   scene.add(guideLine);
@@ -126,8 +94,5 @@ export function createEditorModesExample(scene: THREE.Scene) {
     guideLineFreeform,
     guideLineEditor,
     guideLineSplitResult,
-    freeform,
-    freeformEditor,
-    freeformResult,
   };
 }

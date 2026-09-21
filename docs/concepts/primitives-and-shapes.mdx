@@ -47,8 +47,8 @@ Use primitives to draw, offset, and build profiles for shapes and operations.
 
 ## 3D shapes
 
-Shapes are kernel-backed wrappers that extend `THREE.Mesh`, so you can add them directly to a
-Three.js scene.
+Shapes are kernel-backed `THREE.Object3D` wrappers, so you can add them directly to a Three.js
+scene. Analytic curved shapes contain transient surface and outline children.
 
 <CardGroup cols={2}>
   <Card title="Polygon" icon="draw-polygon" href="/api/shapes/polygon">
@@ -61,10 +61,10 @@ Three.js scene.
     A box primitive (good baseline for booleans and exports).
   </Card>
   <Card title="Cylinder" icon="cylinder" href="/api/shapes/cylinder">
-    A cylinder with configurable segments and angle.
+    An authoritative cylinder or sector with deflection-controlled rendering.
   </Card>
   <Card title="Sphere" icon="circle" href="/api/shapes/sphere">
-    A tessellated sphere with segment controls.
+    An authoritative spherical face with explicit poles.
   </Card>
   <Card title="Wedge" icon="triangle" href="/api/shapes/wedge">
     A wedge / prism shape.

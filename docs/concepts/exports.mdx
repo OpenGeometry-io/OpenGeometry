@@ -1,69 +1,59 @@
 ---
 title: Exports
-description: Export OpenGeometry results to 2D drawings and 3D interchange formats
+description: Export authoritative analytic BRep v2 models and transient tessellations
 ---
 
-## Overview
+## Analytic and tessellated formats
 
-OpenGeometry supports both 2D and 3D export workflows:
+Strict BRep v2 solids expose export directly on `AnalyticSolid` and the public analytic wrappers:
 
-- **2D drawings**: project a 3D B-Rep to 2D lines (optionally with hidden line removal), then export
-  as PDF in native builds
-- **3D interchange**: export B-Reps or scenes to STL, STEP, or IFC
+- `exportStep("metre" | "millimetre")` retains analytic geometry and topology.
+- `exportIfc()` writes one analytic IFC4 product.
+- `prepareIfcExchange()` returns Rust-prepared geometry for semantic IFC assembly.
+- `exportStl(deflection)` creates a bounded transient triangle representation.
+- `projectTo2DLines(camera, hlr)` projects analytic edges and classifications.
 
-For Three.js applications, a common public workflow looks like this:
+STEP and IFC read the BRep. STL reads a tessellation generated from the BRep at the requested
+deflection. None of these paths rebuilds authority from the Three.js `BufferGeometry`.
 
-1. Build geometry with wrapper classes such as `Cuboid`, `Opening`, `Polygon`, `Solid`, or boolean
-   results.
-2. Serialize the resulting B-Rep payload.
-3. Export that single B-Rep directly, or add it to `OGSceneManager` and export a named scene.
+```ts
+const step = solid.exportStep("metre");
+const ifc = solid.exportIfc();
+const exchange = solid.prepareIfcExchange();
+const stl = solid.exportStl(0.005);
+```
+
+## Placement and units
+
+Authored dimensions are metres. Export applies the complete Three.js world placement once and
+supports only positive uniform scale, which preserves the analytic surface families. STEP can emit
+metres or millimetres. Prepared IFC bodies are world-space, Z-up, and metres so a downstream
+assembler must not transform them again.
+
+## Errors and budgets
+
+Exchange and tessellation have separate error budgets. An invalid model, unsupported placement,
+unrepresentable entity, exhausted resource limit, or unattainable Float32 STL tolerance produces a
+structured error. Export never substitutes a viewport mesh or silently lowers the requested
+quality.
+
+## Scene workflows
+
+The older `OGSceneManager` stores schema-v1 BRep snapshots and remains relevant only to the
+faceted scene/projection APIs that have not moved to v2. Do not pass strict v2 `Cuboid`, `Opening`,
+`Cylinder`, `Sphere`, or `AnalyticSolid` payloads through that manager. For semantic multi-element
+IFC, collect `prepareIfcExchange()` bodies under schema `"2.0"`; OpenPlans keeps multiple bodies of
+one authored element in one `FREEFORM_ANALYTIC.geometries` array.
 
 ## Runtime differences
 
-### Browser/WASM
-
-In the WebAssembly build, export APIs return data in-memory:
-
-- STL: `Uint8Array` bytes
-- STEP: text
-- IFC: text
-
-You download the data (Blob) or send it to your backend for persistence.
-
-### Native builds
-
-Some convenience functions (PDF export and file-writing helpers for STL/STEP/IFC) are only available
-in native builds and are not available in browser/WASM environments.
-
-## Export config JSON
-
-Scene exports accept an optional `config_json` string:
-
-- If `config_json` is omitted, `null`, `undefined`, or an empty string, OpenGeometry uses defaults.
-- If you provide `config_json`, the payload must deserialize into the full config struct. Missing
-  required fields cause an error. If you want defaults, omit the config entirely.
-
-For wrapper-first code, prefer serialized accessors when available:
-
-- `getBrepSerialized()`
-- `getBrepData()`
-- `getBrep()`
-
-`BooleanResult` follows the same pattern and can be exported directly after a union, intersection,
-or subtraction.
-
-## Experimental status
-
-<Warning>
-Projection/hidden line removal, PDF export, STL export, STEP export, and IFC export are
-experimental. Output and config schemas may change. If you hit an exporter limitation or confusing
-output, reach out on [Discord](https://discord.gg/9wJpbfgGGA).
-</Warning>
+Browser/WASM exports return in-memory strings or bytes. Applications create a `Blob`, upload the
+data, or persist it themselves. Native-only PDF and file-writing helpers are separate APIs.
 
 ## Related
 
-- [Projection & hidden line removal](/api/export/projection) (experimental)
-- [PDF export](/api/export/pdf) (experimental)
-- [STL export](/api/export/stl) (experimental)
-- [STEP export](/api/export/step) (experimental)
-- [IFC export](/api/export/ifc) (experimental)
+- [Projection and hidden-line removal](/api/export/projection)
+- [PDF export](/api/export/pdf)
+- [STL export](/api/export/stl)
+- [STEP export](/api/export/step)
+- [IFC export](/api/export/ifc)

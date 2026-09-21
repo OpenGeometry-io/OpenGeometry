@@ -1,18 +1,16 @@
 ---
 title: 'Sphere'
-description: 'Create spherical solids with configurable radius, tessellation, placement, and booleans'
+description: 'Create an authoritative spherical solid with deflection-controlled rendering'
 icon: 'globe'
 ---
 
 ## Overview
 
-`Sphere` creates a spherical solid with configurable `widthSegments` and `heightSegments`. It
-supports kernel-backed placement, freeform conversion, parsed BRep access, and boolean
-subtraction.
+`Sphere` creates a strict BRep v2 solid with one spherical face, one periodic seam, and explicit
+collapsed pole uses. Render triangles are generated on demand and never become model geometry.
 
 <Note>
-  Initialize `OpenGeometry.create(...)` before constructing `Vector3` or running the examples on
-  this page.
+  Initialize `OpenGeometry.create(...)` before constructing `Vector3` or `Sphere`.
 </Note>
 
 ## Constructor
@@ -24,143 +22,39 @@ const sphere = new Sphere(options?: ISphereOptions);
 ### ISphereOptions
 
 <ParamField path="ogid" type="string" optional>
-  Unique identifier for the sphere. Auto-generated when omitted.
+  Stable entity identifier. Auto-generated when omitted.
 </ParamField>
 
-<ParamField path="center" type="Vector3" required>
-  Center point of the sphere.
+<ParamField path="center" type="Vector3" optional>
+  Sphere center. Defaults to the origin.
 </ParamField>
 
-<ParamField path="radius" type="number" required>
-  Sphere radius.
+<ParamField path="radius" type="number" default="1">
+  Authoritative sphere radius.
 </ParamField>
 
-<ParamField path="widthSegments" type="number" required>
-  Horizontal tessellation count.
+<ParamField path="deflection" type="number" default="0.01">
+  Maximum requested render chord error in model units.
 </ParamField>
 
-<ParamField path="heightSegments" type="number" required>
-  Vertical tessellation count.
+<ParamField path="color" type="ColorRepresentation" default="0x00ff00">
+  Three.js surface color.
 </ParamField>
 
-<ParamField path="color" type="number" required>
-  Mesh color as a hex number.
-</ParamField>
+## Geometry and booleans
 
-<ParamField path="fatOutlines" type="boolean" default="false">
-  Enables wide outline rendering with `LineSegments2`.
-</ParamField>
+`getBrepSerialized()` and `getBrepData()` return the strict schema-version-2 model. Use
+`retessellate(deflection)` to change display density while preserving the single spherical face.
+Picking maps through `faceIdForTriangle(...)` and normals come from `normalAtFace(...)`.
 
-<ParamField path="outlineWidth" type="number" default="1">
-  Outline width used when `fatOutlines` is enabled.
-</ParamField>
+`Sphere` inherits `union(other)`, `intersection(other)`, `subtract([cutters])`, and
+`boolean(other, operation)`. Every operand must be an `AnalyticSolid`; the kernel reports missing
+coverage or unresolved intersections rather than using a mesh bridge.
 
-<ParamField path="translation" type="Vector3" optional>
-  Initial placement translation.
-</ParamField>
+Use the normal Three.js `position`, `rotation`, and uniform positive `scale` properties for
+placement.
 
-<ParamField path="rotation" type="Vector3" optional>
-  Initial placement rotation in radians.
-</ParamField>
-
-<ParamField path="scale" type="Vector3" optional>
-  Initial placement scale.
-</ParamField>
-
-## Methods
-
-### setConfig(), getConfig()
-
-Updates or reads the current sphere config.
-
-```ts
-sphere.setConfig(options: SphereConfigUpdate): void
-const config = sphere.getConfig();
-```
-
-### getPlacement(), getAnchor()
-
-Returns cloned placement values or the current kernel anchor.
-
-```ts
-const placement = sphere.getPlacement();
-const anchor = sphere.getAnchor();
-```
-
-### setPlacement(), setTransform(), setTranslation(), setRotation(), setScale()
-
-Placement helpers for moving the sphere through the kernel transform path.
-
-```ts
-sphere.setPlacement({ translation?, rotation?, scale? });
-```
-
-### toFreeform()
-
-Converts the sphere into a freeform geometry wrapper.
-
-```ts
-const freeform = sphere.toFreeform(id?);
-```
-
-### getBrep()
-
-Returns the parsed BRep object for the current sphere.
-
-```ts
-const brep = sphere.getBrep();
-```
-
-### subtract()
-
-Subtracts one or more boolean operands from the sphere and returns a renderable boolean result.
-
-```ts
-const result = sphere.subtract([operand], options?);
-```
-
-### generateGeometry(), discardGeometry()
-
-Rebuilds or disposes the current Three.js geometry.
-
-```ts
-sphere.generateGeometry(): void
-sphere.discardGeometry(): void
-```
-
-## Properties
-
-<ResponseField name="ogid" type="string">
-  Stable identifier for the sphere wrapper.
-</ResponseField>
-
-<ResponseField name="options" type="ISphereOptions">
-  Current sphere configuration and placement state.
-</ResponseField>
-
-<ResponseField name="radius" type="number">
-  Sets the sphere radius and regenerates geometry.
-</ResponseField>
-
-<ResponseField name="color" type="number">
-  Gets or sets the render color.
-</ResponseField>
-
-<ResponseField name="outline" type="boolean">
-  Enables or disables outline rendering.
-</ResponseField>
-
-<ResponseField name="fatOutlines" type="boolean">
-  Enables or disables wide outlines.
-</ResponseField>
-
-<ResponseField name="outlineWidth" type="number">
-  Outline width used for wide outlines.
-</ResponseField>
-
-## Examples
-
-### Create a sphere
+## Example
 
 ```ts
 import { Sphere, Vector3 } from "opengeometry";
@@ -168,34 +62,12 @@ import { Sphere, Vector3 } from "opengeometry";
 const sphere = new Sphere({
   center: new Vector3(0, 1.1, 0),
   radius: 1.1,
-  widthSegments: 28,
-  heightSegments: 18,
+  deflection: 0.01,
   color: 0x0891b2,
 });
-```
-
-### Increase detail and move it
-
-```ts
-sphere.setConfig({
-  radius: 1.4,
-  widthSegments: 40,
-  heightSegments: 28,
-});
-
-sphere.setPlacement({
-  translation: new Vector3(2, 0.3, 0),
-  rotation: new Vector3(0, 0, 0),
-  scale: new Vector3(1, 1, 1),
-});
-```
-
-### Convert to freeform for direct edits
-
-```ts
-const freeform = sphere.toFreeform();
+sphere.outline = true;
 ```
 
 ## Live demo
 
-- [Sphere demo](https://demo.opengeometry.io/shapes/sphere.html)
+- [Sphere](https://demo.opengeometry.io/shapes/sphere.html)

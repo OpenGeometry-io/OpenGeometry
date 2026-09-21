@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenGeometry Analytic Boolean Operations</title>
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Analytic Boolean Operations</span>
+    </div>
+    <aside class="og-controls">
+      <h3>Two-sphere boolean</h3>
+      <p
+        class="og-control-summary">The orange and blue source spheres appear on the left. Their analytic result appears on the right.</p>
+      <label class="og-control-row">
+        Operation
+        <select id="operation">
+          <option value="union">Union</option>
+          <option value="intersection">Intersection</option>
+          <option value="subtraction" selected>Subtraction</option>
+        </select>
+      </label>
+      <label class="og-control-row">
+        Sphere offset
+        <input id="offset" type="range" min="0" max="2.5" step="0.05" value="1" />
+      </label>
+      <label class="og-control-row">
+        Chord error
+        <input id="deflection" type="range" min="-3" max="-1" step="0.1" value="-2" />
+      </label>
+      <pre id="report" style="white-space: pre-wrap" aria-live="polite"></pre>
+      <p id="error" role="alert"></p>
+      <p><a href="./boolean-operations.html">Cuboid and sphere example</a></p>
+    </aside>
+    <div id="app"></div>
+
+    <script type="module">
+    import "../src/styles/theme.css";
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+    import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
+    import {
+      AnalyticSolid,
+      booleanIntersection,
+      booleanSubtraction,
+      booleanUnion,
+      OpenGeometry,
+    } from "opengeometry";
+
+    const input = (id) => document.querySelector(`#${id}`);
+    const chordError = () => 10 ** Number(input("deflection").value);
+    const frame = (x) => ({
+      origin: [x, 1.2, 0],
+      x: [1, 0, 0],
+      y: [0, 0, -1],
+      z: [0, 1, 0],
+    });
+    const operations = {
+      union: booleanUnion,
+      intersection: booleanIntersection,
+      subtraction: booleanSubtraction,
+    };
+
+    let scene;
+    let displayed;
+
+    function disposeDisplayed() {
+      if (!displayed) return;
+      scene.remove(displayed);
+      displayed.traverse((object) => {
+        if (object instanceof AnalyticSolid) object.dispose();
+      });
+    }
+
+    function rebuild() {
+      const offset = Number(input("offset").value);
+      const host = new AnalyticSolid({
+        kind: "sphere",
+        radius: 1,
+        frame: frame(0),
+        color: 0x3b82f6,
+        deflection: chordError(),
+      });
+      const tool = new AnalyticSolid({
+        kind: "sphere",
+        radius: 1,
+        frame: frame(offset),
+        color: 0xf97316,
+        deflection: chordError(),
+      });
+
+      try {
+        const operation = input("operation").value;
+        const result = operations[operation](host, tool, {
+          color: 0x22c55e,
+          deflection: chordError(),
+          outline: true,
+        });
+        host.position.x = -3.5;
+        tool.position.x = -3.5;
+        result.position.x = 3.5;
+        const next = new THREE.Group();
+        next.add(host, tool, result);
+        disposeDisplayed();
+        displayed = next;
+        scene.add(displayed);
+        const brep = JSON.parse(result.getBrepSerialized());
+        input("report").textContent =
+          `${operation} · analytic\n${brep.topology.faces.length} result faces · ${result.report.contacts.length} contacts`;
+        input("error").textContent = "";
+      } catch (failure) {
+        host.dispose();
+        tool.dispose();
+        throw failure;
+      }
+    }
+
+    function attempt(action) {
+      try {
+        action();
+      } catch (failure) {
+        input("error").textContent = `Previous result retained. ${String(failure)}`;
+      }
+    }
+
+    async function initialize() {
+      try {
+        await OpenGeometry.create({ wasmURL: wasmUrl });
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+        scene.add(new THREE.GridHelper(24, 24, 0x7188aa, 0xcbd5e1));
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+        const light = new THREE.DirectionalLight(0xffffff, 2);
+        light.position.set(5, 8, 5);
+        scene.add(light);
+
+        const camera = new THREE.PerspectiveCamera(
+          45,
+          innerWidth / innerHeight,
+          0.1,
+          100,
+        );
+        camera.position.set(9, 5, 9);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(devicePixelRatio);
+        input("app").replaceChildren(renderer.domElement);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 1, 0);
+        controls.enableDamping = true;
+
+        rebuild();
+        input("operation").addEventListener("change", () => attempt(rebuild));
+        input("offset").addEventListener("input", () => attempt(rebuild));
+        input("deflection").addEventListener("input", () => attempt(rebuild));
+        addEventListener("resize", () => {
+          camera.aspect = innerWidth / innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(innerWidth, innerHeight);
+        });
+        addEventListener("pagehide", () => {
+          renderer.setAnimationLoop(null);
+          disposeDisplayed();
+          controls.dispose();
+          renderer.dispose();
+        }, { once: true });
+        renderer.setAnimationLoop(() => {
+          controls.update();
+          renderer.render(scene, camera);
+        });
+      } catch (failure) {
+        input("error").textContent = String(failure);
+      }
+    }
+
+    initialize();
+    </script>
+  </body>
+</html>
