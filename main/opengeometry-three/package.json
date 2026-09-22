@@ -2,7 +2,7 @@
   "name": "@opengeometry/kernel-three",
   "author": "Vishwajeet Vinayak Mane",
   "license": "MPL-2.0",
-  "version": "2.0.3",
+  "version": "2.0.14",
   "description": "Three.js adapter for OpenGeometry, a CAD kernel for the web built with Rust and WebAssembly.",
   "main": "index.js",
   "homepage": "https://docs.opengeometry.io",
