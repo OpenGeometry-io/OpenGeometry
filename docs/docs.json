@@ -58,7 +58,8 @@
               "concepts/operations",
               "concepts/brep",
               "concepts/booleans",
-              "concepts/exports"
+              "concepts/exports",
+              "concepts/scene-graph"
             ]
           },
           {
@@ -77,6 +78,12 @@
             "group": "Core",
             "pages": [
               "api/core/opengeometry"
+            ]
+          },
+          {
+            "group": "Scene",
+            "pages": [
+              "api/scene/scene-management"
             ]
           },
           {
@@ -118,6 +125,7 @@
           {
             "group": "Export (Experimental)",
             "pages": [
+              "api/export/projection",
               "api/export/stl",
               "api/export/ifc",
               "api/export/pdf",

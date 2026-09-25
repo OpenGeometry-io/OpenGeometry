@@ -48,6 +48,6 @@ pub mod brep;
 pub mod editor;
 pub mod export;
 pub mod freeform;
-pub mod scenegraph;
 pub mod tolerance;
 pub mod units;
+pub mod world;

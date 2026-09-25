@@ -1,212 +1,59 @@
 ---
 title: 'Scene Graph'
-description: 'Managing named B-Rep scene snapshots with OGSceneManager'
+description: 'How WorldGraph places, shares, and queries geometry inside the kernel'
 ---
 
-The scene graph system in OpenGeometry stores named collections of geometric entities inside the
-kernel. In public applications, `OGSceneManager` is most useful when you want to:
+OpenGeometry keeps one scene inside the kernel: `WorldGraph`. It is the single place that knows
+**where** geometry is, so every spatial question — clash, clearance, 2D projection, export — is
+answered from the same transforms.
 
-- keep a long-lived scene snapshot in wasm
-- project a multi-entity model to 2D
-- export that model to STL, STEP, or IFC
+## Definitions and nodes
 
-Unlike a Three.js scene, `OGSceneManager` stores **B-Rep snapshots**, not live mesh references.
+A **definition** is geometry stored once. A **node** places it:
 
-## Overview
-
-The scene graph consists of two primary structures defined in `main/opengeometry/src/scenegraph.rs`:
-
-- **OGScene**: a named collection of serialized entities
-- **OGSceneManager**: the public wasm-facing manager for scenes, entities, projection, and export
-
-## OGScene
-
-A scene is a named container for entities:
-
-```rust
-pub struct OGScene {
-    pub id: String,
-    pub name: String,
-    pub entities: Vec<SceneEntity>,
-}
+```
+room ─┬─ storage-wall ─┬─ cabinet-1 ─┬─ top-panel     (definition: cabinet/top-panel)
+      │                │             └─ door-left     (definition: cabinet/door-left)
+      │                └─ cabinet-2 ─┬─ top-panel     (same definitions, different node)
+      │                              └─ door-left
+      └─ walls ──────── wall-0                        (definition: wall-0 body)
 ```
 
-### SceneEntity
+Each node stores its transform **relative to its parent**. A node's world transform is the product
+of every transform on the way down from the root, the same model used by IFC
+(`IfcLocalPlacement.PlacementRelTo`), USD, and CAD assemblies. Forty identical cabinets store one
+set of definitions and forty small nodes.
 
-Each entity stores a B-Rep payload plus application-facing identifiers:
+## One source of truth
 
-```rust
-pub struct SceneEntity {
-    pub id: String,
-    pub kind: String,
-    pub brep: Brep,
-}
-```
+The graph is live. `setLocal`, `reparent`, and `removeNode` take effect on the next query or
+projection; nothing is copied into a separate snapshot.
 
-The `kind` field is an app-facing label. It can match the wrapper type (`"Cuboid"`, `"Solid"`,
-`"Polygon"`) but it does not have to.
+When a Three.js scene draws graph content, bind each object with `graph.bind(object, nodeId)`. The
+graph then writes that object's matrix. Do not also move the object in Three.js: a bound object
+takes its position from the graph only. Objects that are not bound keep ordinary Three.js
+behaviour.
 
-## Public workflow
+## Transform rules
 
-For Three.js applications, the public workflow is wrapper-first:
+Transforms are rigid with a positive uniform scale. Analytic surfaces stay exact under these
+similarity transforms; shear, reflection, and non-uniform scale are rejected instead of
+approximated.
 
-1. Create wrapper geometry such as `Cuboid`, `Solid`, `Opening`, or `Polygon`.
-2. Serialize its B-Rep payload.
-3. Add that payload to `OGSceneManager`.
-4. Project or export the stored scene.
+## Geometry families
 
-```ts
-import { Cuboid, OGSceneManager, OpenGeometry, Vector3 } from "opengeometry";
+| Family | Stored with | Clash / clearance | Projection | STL / STEP / IFC |
+|---|---|---|---|---|
+| Analytic (`AnalyticSolid`, `Cuboid`, `Cylinder`, …) | `define` | yes | yes | analytic exporters on `AnalyticSolid` |
+| Schema-v1 (`Polygon`, `Sweep`, `Wedge`, …) | `defineLegacy` | refused (`unresolved` / error) | yes | `WorldGraph.exportStl/Step/Ifc` |
 
-await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
-
-function toBrepSerialized(source: unknown) {
-  const value =
-    source && typeof (source as { getBrepSerialized?: () => string }).getBrepSerialized === "function"
-      ? (source as { getBrepSerialized: () => string }).getBrepSerialized()
-      : source && typeof (source as { getBrepData?: () => unknown }).getBrepData === "function"
-        ? (source as { getBrepData: () => unknown }).getBrepData()
-        : source && typeof (source as { getBrep?: () => unknown }).getBrep === "function"
-          ? (source as { getBrep: () => unknown }).getBrep()
-          : source;
-
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-const manager = new OGSceneManager();
-const sceneId = manager.createScene("Building");
-
-const cuboid = new Cuboid({
-  center: new Vector3(0, 1.5, 0),
-  width: 5,
-  height: 3,
-  depth: 2,
-  color: 0x10b981,
-});
-
-manager.addBrepEntityToScene(sceneId, "box-1", "Cuboid", toBrepSerialized(cuboid));
-```
-
-## Scene lifecycle
-
-### createScene()
-
-```ts
-const sceneId = manager.createScene("Floor Plan");
-```
-
-### setCurrentScene() / getCurrentSceneId()
-
-```ts
-manager.setCurrentScene(sceneId);
-const currentSceneId = manager.getCurrentSceneId();
-```
-
-### listScenes()
-
-Returns a JSON array of scene summaries.
-
-```ts
-const summaries = JSON.parse(manager.listScenes());
-```
-
-### removeScene()
-
-```ts
-const removed = manager.removeScene(sceneId);
-```
-
-## Entity management
-
-### addBrepEntityToScene() / addBrepEntityToCurrentScene()
-
-These are the most general public entity entrypoints:
-
-```ts
-manager.addBrepEntityToScene(sceneId, "wall-1", "Cuboid", toBrepSerialized(cuboid));
-manager.addBrepEntityToCurrentScene("wall-2", "Cuboid", toBrepSerialized(cuboid));
-```
-
-### replace / refresh helpers
-
-When you want to overwrite an existing entity ID, these helpers are also available:
-
-- `replaceBrepEntityInScene(...)`
-- `replaceBrepEntityInCurrentScene(...)`
-- `refreshBrepEntityInScene(...)`
-- `refreshBrepEntityInCurrentScene(...)`
-
-They all keep the same public idea: update a stored scene entity using a serialized B-Rep payload.
-
-### Primitive-specific add helpers
-
-`OGSceneManager` also exposes typed add helpers such as:
-
-- `addLineToScene(...)`
-- `addPolylineToScene(...)`
-- `addArcToScene(...)`
-- `addRectangleToScene(...)`
-- `addPolygonToScene(...)`
-- `addCuboidToScene(...)`
-- `addCylinderToScene(...)`
-- `addSphereToScene(...)`
-- `addWedgeToScene(...)`
-
-These are handy when you are already working with lower-level kernel objects. For wrapper-first
-apps, `addBrepEntityToScene(...)` is usually the most consistent approach.
-
-## Projection and export
-
-Scenes can be projected to 2D with hidden line removal:
-
-<Warning>
-2D projection and hidden line removal are experimental. Output and options may change.
-</Warning>
-
-```typescript
-const cameraJson = JSON.stringify({
-  position: { x: 8, y: 6, z: 8 },
-  target: { x: 0, y: 0, z: 0 },
-  up: { x: 0, y: 1, z: 0 },
-  near: 0.1,
-  projection_mode: "Orthographic",
-});
-
-const hlrJson = JSON.stringify({
-  hide_hidden_edges: true,
-});
-
-const scene2dJson = manager.projectTo2DCamera(sceneId, cameraJson, hlrJson);
-const scene2d = JSON.parse(scene2dJson);
-```
-
-The same stored-scene model is used for export:
-
-```ts
-const stl = manager.exportSceneToStl(sceneId);
-const step = manager.exportSceneToStep(sceneId);
-const ifc = manager.exportSceneToIfc(sceneId);
-```
-
-## Serialization and snapshots
-
-Scenes are serializable snapshots:
-
-```ts
-const sceneJson = manager.getSceneSerialized(sceneId);
-const removed = manager.removeEntityFromScene(sceneId, "box-1");
-```
-
-This makes `OGSceneManager` useful for export pipelines, collaboration snapshots, and derived 2D
-documents, but it also means scene entities are not live references back to your Three.js meshes.
-
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Scene Management" icon="sitemap" href="/api/scene/scene-management">
-    See the public OGSceneManager API
+  <Card title="WorldGraph API" icon="sitemap" href="/api/scene/scene-management">
+    Methods, query results, and migration from OGSceneManager
   </Card>
   <Card title="Projection" icon="film-simple" href="/api/export/projection">
-    Understand 2D projection and hidden line removal
+    2D projection and hidden line removal
   </Card>
 </CardGroup>

@@ -82,8 +82,9 @@ Boundary representation data structures:
 - `builder` - Safe B-Rep construction helper that validates topology
 - `error` - B-Rep error types used during building and validation
 
-**scenegraph**
-Scene management system for organizing multiple geometric entities.
+**world**
+`WorldGraph`: the kernel's single scene — shared definitions, nodes with parent-relative
+transforms, clash/clearance queries, 2D projection, and scene-level export.
 
 **export**
 - `projection` - 2D projection with hidden line removal (experimental)

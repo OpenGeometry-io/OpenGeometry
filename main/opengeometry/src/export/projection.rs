@@ -113,9 +113,9 @@ pub enum Segment2D {
 pub struct ClassifiedSegment {
     pub geometry: Segment2D,
     pub class: EdgeClass,
-    /// AIA/NCS layer code (e.g. "A-WALL"). Populated by OGEntityRegistry in Phase 2.
+    /// AIA/NCS layer code (e.g. "A-WALL"). Populated by WorldGraph projection from the node kind.
     pub layer: Option<String>,
-    /// BRep UUID of the originating entity.
+    /// Id of the WorldGraph node whose body produced the segment.
     pub source_entity_id: Option<String>,
 }
 

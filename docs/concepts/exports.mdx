@@ -39,9 +39,9 @@ quality.
 
 ## Scene workflows
 
-The older `OGSceneManager` stores schema-v1 BRep snapshots and remains relevant only to the
-faceted scene/projection APIs that have not moved to v2. Do not pass strict v2 `Cuboid`, `Opening`,
-`Cylinder`, `Sphere`, or `AnalyticSolid` payloads through that manager. For semantic multi-element
+[`WorldGraph`](/api/scene/scene-management) is the kernel's single scene. Its `exportStl`,
+`exportStep`, and `exportIfc` write world-placed schema-v1 bodies and refuse analytic definitions;
+export analytic solids through their own STEP/STL/IFC methods. For semantic multi-element
 IFC, collect `prepareIfcExchange()` bodies under schema `"2.0"`; OpenPlans keeps multiple bodies of
 one authored element in one `FREEFORM_ANALYTIC.geometries` array.
 

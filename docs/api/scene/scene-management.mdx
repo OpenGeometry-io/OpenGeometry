@@ -1,161 +1,139 @@
 ---
-title: Scene Management
-description: Manage named scene collections and export/project them through OGSceneManager
+title: WorldGraph
+description: Place geometry in a kernel-owned scene graph, then query, project, and export it
 ---
 
 ## Overview
 
-`OGSceneManager` stores named scene collections inside the wasm layer and exposes scene-level
-projection and export APIs. In browser CAD and AEC/BIM applications, you typically use wrapper
-shapes to generate BRep payloads, then add those payloads to a scene through `OGSceneManager`.
+`WorldGraph` is the kernel's single scene. It stores:
+
+- **definitions** — a body's geometry, stored once and shared by every node that uses it
+- **nodes** — a parent, a transform relative to that parent, an optional definition, and an
+  optional `kind` label
+
+World transforms are derived from the parent chain, so moving a node moves everything beneath it.
+Queries (clash, clearance, distance), 2D projection, and export all read those world transforms.
 
 <Note>
-Initialize the runtime once before using `OGSceneManager`:
-
-```ts
-import { OpenGeometry } from "opengeometry";
-
-await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
-```
+`WorldGraph` replaces `OGSceneManager` and `OGEntityRegistry`, which were removed in 2.0.16. See
+[Migrating from OGSceneManager](#migrating-from-ogscenemanager).
 </Note>
 
-## Core scene operations
-
-### createScene()
-
-Creates a new scene and returns its ID.
-
 ```ts
-const sceneId = manager.createScene("Project Name");
-```
+import { Cuboid, OpenGeometry, Vector3, WorldGraph } from "opengeometry";
+import * as THREE from "three";
 
-### removeScene()
+await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
 
-Removes a scene by ID.
+const graph = new WorldGraph();
+const shelf = new Cuboid({ center: new Vector3(0, 0.5, 0), width: 1.2, height: 1, depth: 0.4 });
 
-```ts
-const removed = manager.removeScene(sceneId);
-```
-
-### setCurrentScene()
-
-Sets the current scene for APIs that operate without an explicit scene ID.
-
-```ts
-manager.setCurrentScene(sceneId);
-```
-
-### listScenes()
-
-Returns a JSON array of scene summaries.
-
-```ts
-const scenes = JSON.parse(manager.listScenes());
-```
-
-## Adding wrapper geometry
-
-For wrapper shapes, add serialized BRep payloads with `addBrepEntityToScene(...)` or
-`addBrepEntityToCurrentScene(...)`.
-
-```ts
-import { Cuboid, OGSceneManager, Vector3 } from "opengeometry";
-
-function toBrepSerialized(source: unknown) {
-  const value =
-    source && typeof (source as { getBrepSerialized?: () => string }).getBrepSerialized === "function"
-      ? (source as { getBrepSerialized: () => string }).getBrepSerialized()
-      : source && typeof (source as { getBrepData?: () => unknown }).getBrepData === "function"
-        ? (source as { getBrepData: () => unknown }).getBrepData()
-        : source && typeof (source as { getBrep?: () => unknown }).getBrep === "function"
-          ? (source as { getBrep: () => unknown }).getBrep()
-          : source;
-
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-const manager = new OGSceneManager();
-const sceneId = manager.createScene("Architecture Model");
-
-const cuboid = new Cuboid({
-  center: new Vector3(0, 0.5, 0),
-  width: 10,
-  height: 5,
-  depth: 3,
-  color: 0x9ca3af,
+graph.define("shelf", shelf);
+graph.addNode({ id: "room" });
+graph.addNode({ id: "shelf-1", parent: "room", definition: "shelf", kind: "furniture" });
+graph.addNode({
+  id: "shelf-2",
+  parent: "room",
+  definition: "shelf",
+  local: new THREE.Matrix4().makeTranslation(2, 0, 0),
 });
 
-manager.addBrepEntityToScene(sceneId, "cuboid-1", "Cuboid", toBrepSerialized(cuboid));
+graph.setLocal("room", new THREE.Matrix4().makeRotationY(Math.PI / 2));
 ```
 
-### addBrepEntityToCurrentScene()
+## Transforms
 
-Adds a serialized BRep payload to the current scene.
+Local transforms are `THREE.Matrix4` values that must be rigid with a positive **uniform** scale.
+Shear, reflection, and non-uniform scale throw — analytic geometry stays exact only under
+similarity transforms. Resize a body by changing its parameters, not its scale.
+
+## Definitions
+
+| Method | Purpose |
+|---|---|
+| `define(id, solid)` | Store an `AnalyticSolid`'s local BRep. |
+| `defineLegacy(id, brepSerialized)` | Store a schema-v1 BRep (`Polygon`, `Sweep`, `Wedge`, …). |
+| `hasDefinition(id)` / `undefine(id)` | `undefine` fails while a node still uses the definition. |
+
+Legacy definitions take part in projection and in the legacy STL/STEP/IFC exporters. Clash and
+clearance need analytic geometry: `clash` marks pairs that involve a legacy body `unresolved`, and
+`clearance` throws a `WorldGraphError` with code `geometry` whose detail is `UnsupportedGeometry`.
+
+## Nodes
+
+| Method | Purpose |
+|---|---|
+| `addNode({ id, parent?, definition?, local?, kind? })` | Add a node. |
+| `setLocal(id, matrix)` | Move a node relative to its parent. |
+| `reparent(id, parent?)` | Rejects cycles. |
+| `removeNode(id)` | Removes the node and its subtree. |
+| `getWorldMatrix(id)` / `getWorldBounds(id)` | Derived world transform and subtree bounds. |
+| `bind(object, id)` | Drive a Three.js object's matrix from the graph (one direction). |
+
+`kind` is inherited by descendants. Projection uses it for AIA layer codes (`wall` → `A-WALL`,
+`door` → `A-DOOR`, …) and IFC export uses it as the entity kind.
+
+## Queries
+
+| Method | Returns |
+|---|---|
+| `clash(itemsA, itemsB, { depth })` | `hard`, `touch`, or `unresolved` per item pair. |
+| `clearance(itemsA, itemsB, clearance)` | Item pairs closer than `clearance`, with `distance`, `errorBound`, and closest `points`. |
+| `distance(itemA, itemB, tolerance)` | Minimum distance between two items. |
+
+Parts inside the same item are never tested against each other.
+
+## Projection
 
 ```ts
-manager.addBrepEntityToCurrentScene("opening-1", "Opening", toBrepSerialized(opening));
-```
-
-### removeEntityFromScene()
-
-Removes a scene entity by ID.
-
-```ts
-const removed = manager.removeEntityFromScene(sceneId, "cuboid-1");
-```
-
-## Projection helpers
-
-`OGSceneManager` exposes projection helpers that turn stored scene geometry into 2D JSON payloads.
-
-```ts
-const cameraJson = JSON.stringify({
+const camera = {
   position: { x: 8, y: 6, z: 8 },
   target: { x: 0, y: 0, z: 0 },
   up: { x: 0, y: 1, z: 0 },
   near: 0.1,
-  projection_mode: "Orthographic",
-});
+  projection_mode: "Orthographic" as const,
+};
 
-const hlrJson = JSON.stringify({
-  hide_hidden_edges: true,
-});
-
-const scene2dJson = manager.projectTo2DCamera(sceneId, cameraJson, hlrJson);
-const scene2d = JSON.parse(scene2dJson);
+const { lines } = graph.projectLines(["room"], camera, { hide_hidden_edges: true }, 0.01);
+const views = graph.projectViews(["room"], [{ id: "iso", camera }], 0.01);
 ```
 
-Related helpers include:
+`projectLines` returns a flat `Scene2DLines` payload. `projectViews` returns one `Scene2D` per
+view, with each segment's `layer` and `source_entity_id` (the node id) filled in. The last
+argument is the tessellation deflection used for curved analytic surfaces. See
+[Projection](/api/export/projection).
 
-- `projectTo2DCameraPretty(...)`
-- `projectTo2DLines(...)`
-- `projectTo2DLinesPretty(...)`
-- `projectCurrentTo2DCamera(...)`
-- `projectCurrentTo2DLines(...)`
+## Export
 
-## Export helpers
+`exportStl(items)`, `exportStep(items)`, and `exportIfc(items)` write the world-placed schema-v1
+bodies under `items`. Analytic definitions are refused — export those through the analytic
+exporters on `AnalyticSolid`. Single-BRep helpers `exportBrepToStl`, `exportBrepToStep`, and
+`exportBrepToIfc` are plain functions exported from `opengeometry`.
 
-The same scene storage model is used for scene-level export APIs such as:
+## Migrating from OGSceneManager
 
-- `exportSceneToStl(...)`
-- `exportSceneToStep(...)`
-- `exportSceneToIfc(...)`
-- `exportCurrentSceneToStl(...)`
-- `exportCurrentSceneToStep(...)`
-- `exportCurrentSceneToIfc(...)`
+| Before | After |
+|---|---|
+| `new OGSceneManager()` + `createScene(...)` | `new WorldGraph()` |
+| `addBrepEntityToScene(scene, id, kind, brep)` | `defineLegacy(id, brep)` + `addNode({ id, definition: id, kind })` |
+| `add{Line,Polygon,Cuboid,…}ToScene(...)` | `defineLegacy(id, shape.getBrepSerialized())` or `define(id, analyticSolid)` |
+| `projectTo2DLines` / `projectCurrentTo2DLines` | `projectLines(items, camera, hlr, deflection)` |
+| `projectTo2DCamera` | `projectViews(items, [{ id, camera, hlr }], deflection)` |
+| `OGEntityRegistry.projectCurrentToViews` | `projectViews(...)` with `kind` set on nodes |
+| `exportSceneToStl` / `Step` / `Ifc` | `exportStl` / `exportStep` / `exportIfc(items)` |
+| `manager.exportBrepToStl(brep)` | `exportBrepToStl(brep)` |
+| `projectToPDF` (native) | `WorldGraph::project_to_pdf` (Rust, native) |
 
-See the export pages for result formats and config JSON shapes.
+Behavioural differences:
 
-## Notes
+- The graph is **live**: moving a node changes every later query and projection. There are no
+  frozen scene snapshots, scene lists, or "current scene".
+- Positions come from node transforms. Pass local BReps plus a transform instead of pre-baked
+  world BReps (pre-baked BReps still work with an identity node).
+- Section planes on view requests were never implemented and are no longer accepted.
 
-- Scene entities are stored as named BRep payloads, not as live Three.js object references.
-- `kind` is an app-facing label. It can match the wrapper type, but it does not need to.
-- For wrapper-first apps, `OGSceneManager` is most useful when you need projection, export, or
-  long-lived scene snapshots inside the wasm layer.
+## Related
 
-## Related reading
-
-- [Projection & hidden line removal](/api/export/projection)
-- [STL export](/api/export/stl)
-- [STEP export](/api/export/step)
-- [IFC export](/api/export/ifc)
+- [Scene graph concepts](/concepts/scene-graph)
+- [Projection](/api/export/projection)
+- [PDF export](/api/export/pdf)

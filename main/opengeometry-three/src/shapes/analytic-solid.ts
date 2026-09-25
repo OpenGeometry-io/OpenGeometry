@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OGAnalyticBrep, tessellate_brep } from "../../../opengeometry/pkg/opengeometry";
 import { getUUID } from "../utils/randomizer";
 import { GEOMETRY_DEFLECTION_SHARE, type AnalyticTessellationData } from "../rendering/analytic-tessellation";
-import { uniformScale } from "../rendering/analytic-lod";
+import { matrixToWorldTransform } from "../world/world-graph";
 import { analyticIfcText, AnalyticExchangeBodyV2 } from "../export/analytic-ifc";
 import { parseAnalyticGeometryError } from "../operations/analytic-errors";
 
@@ -626,13 +626,7 @@ export class AnalyticSolid extends THREE.Group {
     if (elements.every((value, index) => value === (index % 5 === 0 ? 1 : 0))) {
       return new OGAnalyticBrep(this.kernel.get_brep_serialized());
     }
-    const scale = uniformScale(this.matrixWorld);
-    const axis = (column: number): [number, number, number] => [
-      elements[column * 4] / scale, elements[column * 4 + 1] / scale, elements[column * 4 + 2] / scale,
-    ];
-    const frame: AnalyticFrame = {
-      origin: [elements[12], elements[13], elements[14]], x: axis(0), y: axis(1), z: axis(2),
-    };
+    const { frame, scale } = matrixToWorldTransform(this.matrixWorld);
     return this.kernel.placed(JSON.stringify(frame), scale);
   }
 }

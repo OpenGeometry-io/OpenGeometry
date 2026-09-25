@@ -3,6 +3,7 @@ pub mod part21;
 pub mod projection;
 pub mod step;
 pub mod stl;
+pub mod wasm;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod pdf;

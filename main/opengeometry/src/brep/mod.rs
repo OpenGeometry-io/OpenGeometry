@@ -125,20 +125,28 @@ impl Brep {
      */
     pub fn apply_transform(&mut self, placement: &Placement3D) {
         let placement_matrix = placement.world_matrix();
+        self.apply_point_transform(
+            |v: Vector3| {
+                let mut p = v;
+                p.apply_matrix4(placement_matrix.clone());
+                p
+            },
+            placement.scale().x,
+        );
+    }
+
+    pub fn apply_point_transform(
+        &mut self,
+        transform_point: impl Fn(Vector3) -> Vector3,
+        scale: f64,
+    ) {
         for vertex in &mut self.vertices {
-            vertex.position.apply_matrix4(placement_matrix.clone());
+            vertex.position = transform_point(vertex.position);
         }
 
         let has_analytic_geometry = self.edges.iter().any(|edge| edge.curve.is_some())
             || self.faces.iter().any(|face| face.surface.is_some());
         if has_analytic_geometry {
-            let matrix = placement_matrix.clone();
-            let transform_point = |v: Vector3| {
-                let mut p = v;
-                p.apply_matrix4(matrix.clone());
-                p
-            };
-            let scale = placement.scale().x;
             for edge in &mut self.edges {
                 if let Some(curve) = &edge.curve {
                     edge.curve = Some(curve.transformed_with(&transform_point, scale));

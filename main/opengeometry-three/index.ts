@@ -4,8 +4,10 @@
 import init, {
   OGAnalyticBrep,
   OGAnalyticTessellation,
-  OGSceneManager,
   WorkPlane,
+  exportBrepToIfc,
+  exportBrepToStep,
+  exportBrepToStl,
   analyzeProfile,
   extrudeBrepFaceDirectional,
   validateAnalyticBrep,
@@ -107,15 +109,16 @@ export class OpenGeometry {
   }
 }
 
-/**
- * Scene manager that stores serialized BRep snapshots in wasm for projection,
- * export, and other scene-level workflows.
- */
-export { OGSceneManager };
+export { exportBrepToIfc, exportBrepToStep, exportBrepToStl };
 export { OGAnalyticBrep, OGAnalyticTessellation };
 export { WorkPlane, analyzeProfile, extrudeBrepFaceDirectional, validateAnalyticBrep };
 export { tessellate_brep };
 export { AnalyticSolid } from "./src/shapes/analytic-solid";
+export { WorldGraph, WorldGraphError, matrixToWorldTransform } from "./src/world/world-graph";
+export type {
+  WorldClash, WorldClashKind, WorldClashOptions, WorldExportedFile, WorldExportedMesh, WorldGraphErrorCode, WorldNodeOptions,
+  WorldProjectedLine, WorldProjectedLines, WorldProjectedScene, WorldProjectedSegment, WorldProjectionView, WorldProximity, WorldTransform,
+} from "./src/world/world-graph";
 export { AnalyticPattern, circularPattern, linearPattern, rectangularPattern } from "./src/shapes/analytic-pattern";
 export type { AnalyticPatternHit, AnalyticPatternInstance } from "./src/shapes/analytic-pattern";
 export type {

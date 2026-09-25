@@ -9,7 +9,7 @@ OpenGeometry can export projected 2D scenes to vector PDF documents. The current
 
 - use projection APIs to derive 2D output from B-Rep geometry
 - use native Rust PDF export helpers when you need configurable output
-- optionally use `OGSceneManager.projectToPDF(...)` as a native convenience path
+- optionally use `WorldGraph::project_to_pdf(...)` as a native convenience path
 
 <Warning>
 PDF export is experimental. Output and APIs may change. If you hit an exporter limitation or
@@ -21,69 +21,30 @@ PDF export is only available in native (non-WASM) builds. Browser/WASM builds do
 PDF writer.
 </Note>
 
-## Native scene-manager convenience API
+## Native WorldGraph convenience API
 
-In native builds, `OGSceneManager` exposes:
+In native Rust builds, `WorldGraph` projects a set of nodes and writes the PDF in one call:
 
-```ts
-manager.projectToPDF(sceneId, cameraJson, hlrJson, "drawing.pdf");
+```rust
+use opengeometry::export::pdf::PdfExportConfig;
+use opengeometry::export::projection::{CameraParameters, HlrOptions};
+use opengeometry::world::WorldGraph;
+
+graph.project_to_pdf(
+    &["room".to_string()],
+    &CameraParameters::default(),
+    &HlrOptions::default(),
+    0.01,
+    "technical-drawing.pdf",
+    &PdfExportConfig::default(),
+)?;
 ```
 
-This convenience method:
+This method:
 
-1. projects the stored scene to 2D
+1. projects the bodies under the given nodes to 2D with their world transforms
 2. applies hidden line removal if requested
-3. exports a PDF file using the default `PdfExportConfig`
-
-If you need custom page size, margins, or titles, use the Rust PDF helpers directly.
-
-## Example (native JavaScript / Node.js style)
-
-```ts
-import { Cuboid, OGSceneManager, OpenGeometry, Vector3 } from "opengeometry";
-
-await OpenGeometry.create({ wasmURL: "/opengeometry_bg.wasm" });
-
-function toBrepSerialized(source: unknown) {
-  const value =
-    source && typeof (source as { getBrepSerialized?: () => string }).getBrepSerialized === "function"
-      ? (source as { getBrepSerialized: () => string }).getBrepSerialized()
-      : source && typeof (source as { getBrepData?: () => unknown }).getBrepData === "function"
-        ? (source as { getBrepData: () => unknown }).getBrepData()
-        : source && typeof (source as { getBrep?: () => unknown }).getBrep === "function"
-          ? (source as { getBrep: () => unknown }).getBrep()
-          : source;
-
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-const manager = new OGSceneManager();
-const sceneId = manager.createScene("pdf export");
-
-const cuboid = new Cuboid({
-  center: new Vector3(0, 1.5, 0),
-  width: 5,
-  height: 3,
-  depth: 2,
-  color: 0x10b981,
-});
-
-manager.addBrepEntityToScene(sceneId, "box-1", "Cuboid", toBrepSerialized(cuboid));
-
-const cameraJson = JSON.stringify({
-  position: { x: 8, y: 6, z: 8 },
-  target: { x: 0, y: 0, z: 0 },
-  up: { x: 0, y: 1, z: 0 },
-  near: 0.1,
-  projection_mode: "Orthographic",
-});
-
-const hlrJson = JSON.stringify({
-  hide_hidden_edges: true,
-});
-
-manager.projectToPDF(sceneId, cameraJson, hlrJson, "technical-drawing.pdf");
-```
+3. writes the PDF with the given `PdfExportConfig`
 
 ## Rust PDF API
 
@@ -152,11 +113,10 @@ export_scene_to_pdf_with_config(&scene, "drawing.pdf", &config)?;
 
 - Input projection units are meters. PDF output is in millimeters.
 - `auto_fit: true` scales and centers the drawing on the page.
-- The scene-manager JavaScript convenience path currently uses the default PDF config.
 - If you need custom paper sizes or in-memory bytes output, use the Rust PDF helpers directly.
 
 ## Related
 
 - [Projection & hidden line removal](/api/export/projection)
-- [Scene Management](/api/scene/scene-management)
+- [WorldGraph](/api/scene/scene-management)
 - [Exports](/concepts/exports)
