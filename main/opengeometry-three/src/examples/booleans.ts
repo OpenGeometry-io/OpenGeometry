@@ -176,7 +176,7 @@ function createExtrudedPreset(
 ) {
   const extrudedOffset = options.extrudedOffset ?? new Vector3(0.0, 0.0, 0.0);
 
-  const wall = new AnalyticSolid({
+  const host = new AnalyticSolid({
     kind: "linearExtrusion",
     outer: [[-2.2, -0.18], [2.2, -0.18], [2.2, 0.18], [-2.2, 0.18]],
     holes: [],
@@ -184,7 +184,7 @@ function createExtrudedPreset(
     color: 0x60a5fa,
     deflection: 0.01,
   });
-  const opening = new AnalyticSolid({
+  const cutter = new AnalyticSolid({
     kind: "linearExtrusion",
     outer: [[-0.7, -0.34], [0.9, -0.34], [0.9, 0.34], [-0.7, 0.34]],
     holes: [],
@@ -192,19 +192,19 @@ function createExtrudedPreset(
     color: 0xf97316,
     deflection: 0.01,
   });
-  opening.position.set(extrudedOffset.x, 0, extrudedOffset.z);
+  cutter.position.set(extrudedOffset.x, 0, extrudedOffset.z);
 
-  wall.outline = options.outline ?? true;
-  opening.outline = options.outline ?? true;
+  host.outline = options.outline ?? true;
+  cutter.outline = options.outline ?? true;
 
   return {
     title: `${capitalize(operation)} Extruded Solid`,
     description:
       "Two coextensive authoritative line-profile extrusions use the in-house planar arrangement.",
-    lhsOperand: wall,
-    rhsOperand: opening,
-    lhsVisual: wall,
-    rhsVisual: opening,
+    lhsOperand: host,
+    rhsOperand: cutter,
+    lhsVisual: host,
+    rhsVisual: cutter,
   };
 }
 

@@ -268,10 +268,20 @@ fn winding_regions_by(
             }
         }
     }
+    regions_from_edges_by(&edges, eps, filled)
+}
+
+/// Arrange closed contour edges and open intersection segments, classifying
+/// both sides of every segment with the supplied material predicate.
+pub fn regions_from_edges_by(
+    edges: &[Edge2],
+    eps: f64,
+    filled: impl Fn(Pt2) -> bool,
+) -> Vec<RingRegion> {
     if edges.is_empty() {
         return Vec::new();
     }
-    let verts: Vec<Pt2> = edges.iter().map(|e| e.0).collect();
+    let verts: Vec<Pt2> = edges.iter().flat_map(|&(a, b)| [a, b]).collect();
 
     // 2. split every edge at all crossings and on-edge vertices.
     let mut split: Vec<Edge2> = Vec::new();
@@ -443,6 +453,22 @@ mod tests {
     fn cw(mut ring: Vec<Pt2>) -> Vec<Pt2> {
         ring.reverse();
         ring
+    }
+
+    #[test]
+    fn open_section_segment_partitions_a_classified_face() {
+        let square = ccw_square(0.0, 0.0, 2.0, 2.0);
+        let mut edges = square
+            .iter()
+            .enumerate()
+            .map(|(index, &point)| (point, square[(index + 1) % square.len()]))
+            .collect::<Vec<_>>();
+        edges.push((p(1.0, 0.0), p(1.0, 2.0)));
+        let regions = regions_from_edges_by(&edges, DEFAULT_EPS, |point| {
+            point.x > 0.0 && point.x < 1.0 && point.z > 0.0 && point.z < 2.0
+        });
+        assert_eq!(regions.len(), 1);
+        assert!((signed_area2(&regions[0].outer) - 2.0).abs() < 1.0e-9);
     }
 
     /// A CW cutter strictly inside a CCW base subtracts to an annulus:

@@ -13,7 +13,7 @@
       <p
         class="og-control-summary">Shared analytic surfaces, curves and oriented edge uses go directly to STEP. Display deflection never changes the exported model. Coordinates are authored in metres.</p>
       <label
-        class="og-control-row">Body <select id="body" aria-label="Body"><option value="cuboid">Cuboid</option><option value="cylinder">Cylinder</option><option value="sphere">Sphere</option><option value="cone">Cone</option><option value="frustum">Frustum</option><option value="torus">Ring torus</option><option value="circularWall">Circular wall</option><option value="cut">Sphere subtraction</option><option value="cavity">Sphere cavity</option></select></label>
+        class="og-control-row">Body <select id="body" aria-label="Body"><option value="cuboid">Cuboid</option><option value="cylinder">Cylinder</option><option value="sphere">Sphere</option><option value="cone">Cone</option><option value="frustum">Frustum</option><option value="torus">Ring torus</option><option value="annularSectorExtrusion">Circular wall</option><option value="cut">Sphere subtraction</option><option value="cavity">Sphere cavity</option></select></label>
       <label
         class="og-control-row">STEP length unit <select id="unit" aria-label="STEP length unit"><option value="metre">Metre</option><option value="millimetre">Millimetre</option></select></label>
       <label
@@ -97,8 +97,8 @@
           minorRadius: 0.4,
           frame: frame(0.4),
         },
-        circularWall: {
-          kind: "circularWall",
+        annularSectorExtrusion: {
+          kind: "annularSectorExtrusion",
           radius: 2,
           thickness: 0.3,
           height: 1.5,

@@ -3,7 +3,7 @@ title: "Analytic solid"
 description: "Render authoritative analytic primitives with chord-error tessellation."
 ---
 
-`AnalyticSolid` constructs line-profile extrusions, cuboids, cylinders, spheres, cones, frusta, ring tori, circular-wall segments, coaxial circle lofts, and rectangular revolutions from analytic surfaces. Its required surface and curve geometry uses BRep schema version 2. Render triangles are generated from that geometry.
+`AnalyticSolid` constructs line-profile extrusions, cuboids, cylinders, spheres, cones, frusta, ring tori, annular sector extrusions, coaxial circle lofts, and rectangular revolutions from analytic surfaces. Its required surface and curve geometry uses BRep schema version 2. Render triangles are generated from that geometry.
 
 The public boolean helpers accept only `AnalyticSolid` operands and use the in-house analytic engine.
 Schema-v1 and faceted operands are rejected; there is no mesh fallback.
@@ -45,31 +45,31 @@ const profile = new AnalyticSolid({
 
 Dimensions must be finite and positive. A frustum may have a zero upper radius. Ring tori require `majorRadius > minorRadius > 0`.
 
-Use `kind: "circularWall"` with centerline `radius`, `thickness`, `height`, `startAngle`, and signed `sweepAngle` in radians. The frame origin is the arc center at the wall's base. Radius must exceed half thickness; sweep must be nonzero and smaller than a full turn. Negative sweep retains the authored start/end identity.
+Use `kind: "annularSectorExtrusion"` with reference `radius`, `thickness`, `height`, `startAngle`, and signed `sweepAngle` in radians. The frame origin is the arc center at the extrusion base. Radius must exceed half thickness; sweep must be nonzero and smaller than a full turn. Negative sweep retains the authored start/end identity.
 
-`kind: "circularWallWithOpenings"` adds a required `openings` array. Each opening supplies `id`, center `angle`, tangent `width`, `bottom`, and `height`. Interior openings retain exact inner/outer cylinder trim holes plus planar sill, header, and jamb faces with cut ancestry. Set `bottom: 0` for a door: the cylinder trims follow the bottom notch, the remaining bottom regions are split exactly, and the cut contains a header and two jambs without an inset. Openings must remain strictly inside the authored wall ends and leave resolved material above the head.
+`kind: "annularSectorExtrusionWithOpenings"` adds a required `openings` array. Each opening supplies `id`, center `angle`, tangent `width`, `bottom`, and `height`. Interior openings retain exact inner/outer cylinder trim holes plus planar lower, upper, and lateral cut faces with source ancestry. Set `bottom: 0` for a bottom-reaching opening: the cylinder trims follow the bottom notch, the remaining bottom regions are split exactly, and the cut contains an upper face and two lateral faces without an inset. Openings must remain strictly inside the authored sweep ends and leave resolved material above the head.
 
 ```ts
-const wall = new AnalyticSolid({
-  kind: "circularWallWithOpenings",
+const sector = new AnalyticSolid({
+  kind: "annularSectorExtrusionWithOpenings",
   radius: 3,
   thickness: 0.3,
   height: 3,
   startAngle: 0,
   sweepAngle: Math.PI / 2,
-  openings: [{ id: "window-1", angle: 0.8, width: 0.9, bottom: 0.9, height: 1.2 }],
+  openings: [{ id: "aperture-1", angle: 0.8, width: 0.9, bottom: 0.9, height: 1.2 }],
 });
 ```
 
-Use `kind: "circularWallWithArchedOpening"` for one arched opening on a circular wall.
+Use `kind: "annularSectorExtrusionWithArchedOpening"` for one arched opening on an annular sector extrusion.
 Its `opening` has the same fields. `height` is the total opening height and must exceed
-`width / 2`. The lower jamb region is exact circular-wall trimming; the header is a cylindrical
-face bounded by corrected intersection curves on the inner and outer wall supports.
+`width / 2`. The lower cut region uses exact annular-sector trimming; the arch cap is a cylindrical
+face bounded by corrected intersection curves on the inner and outer cylindrical supports.
 
-Use `kind: "straightWallWithArchedOpening"` with wall `width`, `depth`, and `height`, plus
+Use `kind: "boxWithArchedOpening"` with box `width`, `depth`, and `height`, plus
 `opening: { id, station, width, bottom, height }`. It constructs the opening directly with two
-shared semicircle edges and a cylindrical header face. The opening must remain strictly inside the
-wall ends and top. These arched forms avoid overlapping cutter booleans and remain authoritative
+shared semicircle edges and a cylindrical arch-cap face. The opening must remain strictly inside the
+box ends and top. These arched forms avoid overlapping cutter booleans and remain authoritative
 when retessellated.
 
 `solid.shell(thickness, options?)` offsets inward and returns a closed analytic shell for canonical cuboids, cylinders, spheres, cones, frusta, ring tori, and straight-edge line-profile extrusions. It builds an oriented cavity shell, retains the source face mapping, and includes the solid's complete world placement. Cone offsets move the cavity apex by the true normal offset; frustum offsets trim both caps and retain the authored semi-angle. Profile offsets intersect neighboring offset planes at exact miter vertices and expand authored holes. Thickness must leave a resolved positive interior in every offset dimension; collapsing, reversing, or self-intersecting offsets return `UnresolvedIntersection`. Already-composite solids return `CoverageGap`.
@@ -106,7 +106,7 @@ Call `solid.dispose()` when you remove it permanently.
 
 ## STEP export and diagnostics
 
-`solid.exportStep("metre")` returns `{ text, report }` directly from v2 surfaces, shared curves and oriented edge uses. It supports all five target surface families, frusta, circular walls and the current sphere and aligned-cuboid boolean results, including cavities. It does not require a viewport mesh or facet regrouping.
+`solid.exportStep("metre")` returns `{ text, report }` directly from v2 surfaces, shared curves and oriented edge uses. It supports all five target surface families, frusta, annular sector extrusions and the current sphere and aligned-cuboid boolean results, including cavities. It does not require a viewport mesh or facet regrouping.
 
 Authored coordinates are interpreted as metres. Pass `"millimetre"` to convert coordinates and dimensions once and emit the corresponding unit context. Export applies the complete Three.js world placement once, including positive uniform scale. `getWorldBrepSerialized()` returns the corresponding world model; `getBrepSerialized()` retains local geometry. Retessellation does not alter export text.
 

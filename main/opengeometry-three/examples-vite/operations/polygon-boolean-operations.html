@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>OpenGeometry Planar Profile Solid Boolean Example</title>
+    <title>OpenGeometry Polygon Boolean Operations</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
@@ -9,18 +9,31 @@
       content="Simple OpenGeometry polygon boolean example for Three.js."
     />
     <meta name="author" content="Vishwajeet Mane" />
+    <style>
+      @media (max-width: 640px) {
+        body.og-example-page { height: auto; overflow: auto; }
+        .og-controls {
+          position: relative;
+          top: auto;
+          right: auto;
+          max-height: none;
+          margin: 64px 12px 12px;
+        }
+        #app { height: max(360px, 50vh); }
+      }
+    </style>
   </head>
   <body class="og-example-page">
     <div class="og-badge-title-card">
       <a href="../index.html" class="og-badge-title-link">Back</a>
-      <span class="og-badge-title">Planar Profile Solid Booleans</span>
+      <span class="og-badge-title">Polygon Boolean Operations</span>
     </div>
 
     <aside class="og-controls">
-      <h3>Profile solid boolean</h3>
+      <h3>Planar polygon Boolean</h3>
       <p class="og-control-summary">
-        Two thin, authoritative line-profile extrusions are shown on the left. Their strict-v2
-        boolean result is shown on the right with source-face ancestry.
+        Two flat polygons are shown on the left. Their exact 2D union, intersection, or
+        subtraction is shown on the right. This operation produces planar regions, not solids.
       </p>
 
       <label class="og-control-row" data-control="operation">
@@ -57,11 +70,10 @@
       import Stats from "three/examples/jsm/libs/stats.module.js";
       import wasmUrl from "../../../opengeometry/pkg/opengeometry_bg.wasm?url";
       import {
-        booleanIntersection,
-        booleanSubtraction,
-        booleanUnion,
+        booleanRegions2D,
         OpenGeometry,
-        AnalyticSolid,
+        Polygon,
+        Vector3,
       } from "opengeometry";
 
       const app = document.getElementById("app");
@@ -142,80 +154,79 @@
 
       function disposeObject(object) {
         object.traverse((child) => {
-          if (child instanceof AnalyticSolid) {
+          if (child instanceof Polygon) {
             child.dispose();
-            return;
+            child.polygon.free();
           }
-          child.geometry?.dispose?.();
-          if (Array.isArray(child.material)) {
-            child.material.forEach((material) => material?.dispose?.());
-            return;
-          }
-          child.material?.dispose?.();
         });
       }
 
-      function getExecutor() {
-        switch (config.operation) {
-          case "union":
-            return booleanUnion;
-          case "intersection":
-            return booleanIntersection;
-          default:
-            return booleanSubtraction;
-        }
+      // booleanRegions2D accepts clockwise outer rings in the XZ plane.
+      function rectangle(xMin, zMin, xMax, zMax) {
+        return {
+          outer: [
+            { x: xMin, y: 0, z: zMax },
+            { x: xMax, y: 0, z: zMax },
+            { x: xMax, y: 0, z: zMin },
+            { x: xMin, y: 0, z: zMin },
+          ],
+          holes: [],
+        };
+      }
+
+      function ringArea(ring) {
+        return Math.abs(ring.reduce((sum, point, index) => {
+          const next = ring[(index + 1) % ring.length];
+          return sum + point.x * next.z - next.x * point.z;
+        }, 0)) / 2;
+      }
+
+      function regionArea(region) {
+        return ringArea(region.outer) - region.holes.reduce((sum, hole) => sum + ringArea(hole), 0);
+      }
+
+      function addPlanarPolygon(group, region, color, xOffset, yOffset = 0, opacity = 1) {
+        const toVector = (point) => new Vector3(point.x, point.y, point.z);
+        const polygon = new Polygon({
+          vertices: region.outer.map(toVector),
+          holes: region.holes.map((hole) => hole.map(toVector)),
+          color,
+        });
+        polygon.position.set(xOffset, yOffset, 0);
+        polygon.outline = true;
+        polygon.material.transparent = opacity < 1;
+        polygon.material.opacity = opacity;
+        polygon.material.depthWrite = opacity === 1;
+        group.add(polygon);
       }
 
       function rebuildExample() {
-        if (!scene) {
-          return;
-        }
+        if (!scene) return;
 
         const nextGroup = new THREE.Group();
         try {
+          const base = rectangle(-1.8, -1, 0.6, 0.8);
+          const tool = rectangle(-0.5 + config.offsetX, -0.7, 1.1 + config.offsetX, 0.4);
+          const regions = booleanRegions2D([base], [tool], config.operation);
 
-          const base = new AnalyticSolid({
-            kind: "linearExtrusion",
-            outer: [[-1.8, 0.8], [0.6, 0.8], [0.6, -1], [-1.8, -1]],
-            holes: [],
-            height: 0.12,
-            color: 0x60a5fa,
-            deflection: 0.01,
-          });
-          nextGroup.add(base);
-          base.outline = true;
+          addPlanarPolygon(nextGroup, base, 0x60a5fa, -4, 0, 0.65);
+          addPlanarPolygon(nextGroup, tool, 0xf97316, -4, 0.005, 0.65);
+          regions.forEach((region) => addPlanarPolygon(nextGroup, region, 0x22c55e, 4));
 
-          const tool = new AnalyticSolid({
-            kind: "linearExtrusion",
-            outer: [[-0.5, 0.4], [1.1, 0.4], [1.1, -0.7], [-0.5, -0.7]],
-            holes: [],
-            height: 0.12,
-            color: 0xf97316,
-            deflection: 0.01,
-          });
-          nextGroup.add(tool);
-          tool.outline = true;
-          tool.position.x = config.offsetX;
-
-          const result = getExecutor()(base, tool, {
-            outline: true,
-          });
-
-          base.position.x -= 4;
-          tool.position.x -= 4;
-          result.position.x += 4;
-
-          nextGroup.add(result);
-          if (currentGroup) { scene.remove(currentGroup); disposeObject(currentGroup); }
+          if (currentGroup) {
+            scene.remove(currentGroup);
+            disposeObject(currentGroup);
+          }
           currentGroup = nextGroup;
           scene.add(currentGroup);
-          readout.textContent = JSON.stringify(result.report, null, 2);
+          readout.textContent = JSON.stringify({
+            operation: config.operation,
+            geometry: "2D regions",
+            regionCount: regions.length,
+            area: Number(regions.reduce((sum, region) => sum + regionArea(region), 0).toFixed(6)),
+            holes: regions.reduce((sum, region) => sum + region.holes.length, 0),
+          }, null, 2);
           errorReadout.textContent = "";
-
-          console.groupCollapsed("[boolean-polygon] rebuilt");
-          console.log("Config", { ...config });
-          console.log("Report", result.report);
-          console.groupEnd();
         } catch (failure) {
           disposeObject(nextGroup);
           errorReadout.textContent = `Previous preview retained. ${String(failure)}`;
@@ -226,26 +237,32 @@
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0xeef2ff);
 
-        const camera = new THREE.PerspectiveCamera(
-          55,
-          window.innerWidth / window.innerHeight,
-          0.1,
-          100
-        );
-        camera.position.set(9.5, 5.4, 10.5);
+        const camera = new THREE.OrthographicCamera(-7.5, 7.5, 5, -5, 0.1, 100);
+        camera.position.set(0, 10, 12);
+        function resizeViewer() {
+          const aspect = app.clientWidth / app.clientHeight;
+          camera.left = -7.5;
+          camera.right = 7.5;
+          camera.top = 7.5 / aspect;
+          camera.bottom = -camera.top;
+          camera.updateProjectionMatrix();
+          renderer.setSize(app.clientWidth, app.clientHeight);
+        }
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(window.innerWidth, window.innerHeight);
         app.replaceChildren(renderer.domElement);
+        resizeViewer();
 
         const stats = mountStats();
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.target.set(0, 0.2, 0);
+        controls.target.set(0, 0, 0);
         controls.update();
 
-        scene.add(new THREE.GridHelper(30, 30, 0x4460ff, 0xd5ddff));
+        const grid = new THREE.GridHelper(30, 30, 0x4460ff, 0xd5ddff);
+        grid.position.y = -0.03;
+        scene.add(grid);
         scene.add(new THREE.AmbientLight(0xffffff, 0.82));
 
         const light = new THREE.DirectionalLight(0xffffff, 1.15);
@@ -271,11 +288,7 @@
           renderer.render(scene, camera);
         });
 
-        window.addEventListener("resize", () => {
-          camera.aspect = window.innerWidth / window.innerHeight;
-          camera.updateProjectionMatrix();
-          renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        window.addEventListener("resize", resizeViewer);
       }
 
       void main().catch(failure => { errorReadout.textContent = String(failure); });

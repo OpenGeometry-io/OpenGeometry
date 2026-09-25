@@ -387,7 +387,7 @@ mod tests {
         ]
     }
 
-    fn wall_outline_with_reflex_start() -> Vec<Vector3> {
+    fn reflex_profile_outline() -> Vec<Vector3> {
         vec![
             Vector3::new(-2.721670458045537, 0.0, -1.7107348430402753),
             Vector3::new(-1.3465727086811485, 0.0, -0.826743432734597),
@@ -451,13 +451,14 @@ mod tests {
 
     #[test]
     fn extrude_profile_loops_uses_global_winding_for_reflex_first_corner() {
-        let wall_outline = wall_outline_with_reflex_start();
+        let profile_outline = reflex_profile_outline();
 
-        let brep = extrude_profile_loops(Uuid::new_v4(), &wall_outline, &[], 2.6)
-            .expect("wall extrusion should succeed");
+        let brep = extrude_profile_loops(Uuid::new_v4(), &profile_outline, &[], 2.6)
+            .expect("profile extrusion should succeed");
 
-        brep.validate_topology().expect("wall extrusion topology");
-        assert_eq!(brep.faces.len(), wall_outline.len() + 2);
+        brep.validate_topology()
+            .expect("profile extrusion topology");
+        assert_eq!(brep.faces.len(), profile_outline.len() + 2);
         assert!(brep.faces[0].normal.y < -0.999);
         assert!(brep.faces[1].normal.y > 0.999);
     }

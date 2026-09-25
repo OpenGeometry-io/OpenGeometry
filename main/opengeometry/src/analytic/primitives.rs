@@ -6,6 +6,7 @@ use super::{
     Curve, CurveGeometry, Frame3, GeometryError, Point3, Surface, SurfaceGeometry,
 };
 use crate::math::interval::Interval;
+use serde::Deserialize;
 use std::collections::BTreeMap;
 
 pub(super) struct Use {
@@ -705,7 +706,7 @@ pub(super) fn cylinder_with_circular_hole(
         || height <= 4.0 * accuracy.geometric
     {
         return Err(GeometryError::UnresolvedIntersection(
-            "circular cylinder wall is below geometric resolution".into(),
+            "cylindrical shell is below geometric resolution".into(),
         ));
     }
 
@@ -1458,8 +1459,716 @@ pub fn linear_extrusion(
     builder.finish()
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ProfileEdge {
+    Line {
+        from: [f64; 2],
+        to: [f64; 2],
+    },
+    Arc {
+        center: [f64; 2],
+        radius: f64,
+        start_angle: f64,
+        sweep_angle: f64,
+    },
+}
+
+impl ProfileEdge {
+    fn endpoints(&self) -> ([f64; 2], [f64; 2]) {
+        match self {
+            Self::Line { from, to } => (*from, *to),
+            Self::Arc {
+                center,
+                radius,
+                start_angle,
+                sweep_angle,
+            } => {
+                let point = |angle: f64| {
+                    [
+                        center[0] + radius * angle.cos(),
+                        center[1] + radius * angle.sin(),
+                    ]
+                };
+                (point(*start_angle), point(start_angle + sweep_angle))
+            }
+        }
+    }
+
+    fn reversed(&self) -> Self {
+        match self {
+            Self::Line { from, to } => Self::Line {
+                from: *to,
+                to: *from,
+            },
+            Self::Arc {
+                center,
+                radius,
+                start_angle,
+                sweep_angle,
+            } => Self::Arc {
+                center: *center,
+                radius: *radius,
+                start_angle: start_angle + sweep_angle,
+                sweep_angle: -sweep_angle,
+            },
+        }
+    }
+
+    fn signed_area_twice(&self) -> f64 {
+        let (from, to) = self.endpoints();
+        match self {
+            Self::Line { .. } => from[0] * to[1] - to[0] * from[1],
+            Self::Arc {
+                center,
+                radius,
+                sweep_angle,
+                ..
+            } => {
+                radius * radius * sweep_angle + center[0] * (to[1] - from[1])
+                    - center[1] * (to[0] - from[0])
+            }
+        }
+    }
+}
+
+fn profile_edge_contains(edge: &ProfileEdge, point: [f64; 2], tolerance: f64) -> bool {
+    match edge {
+        ProfileEdge::Line { from, to } => {
+            let dx = to[0] - from[0];
+            let dy = to[1] - from[1];
+            let length = dx.hypot(dy);
+            let px = point[0] - from[0];
+            let py = point[1] - from[1];
+            (dx * py - dy * px).abs() <= tolerance * length
+                && px * dx + py * dy >= -tolerance * length
+                && px * dx + py * dy <= length * length + tolerance * length
+        }
+        ProfileEdge::Arc {
+            center,
+            radius,
+            start_angle,
+            sweep_angle,
+        } => {
+            let dx = point[0] - center[0];
+            let dy = point[1] - center[1];
+            if (dx.hypot(dy) - radius).abs() > tolerance {
+                return false;
+            }
+            let angle = dy.atan2(dx);
+            let travel = if *sweep_angle > 0.0 {
+                (angle - start_angle).rem_euclid(std::f64::consts::TAU)
+            } else {
+                (start_angle - angle).rem_euclid(std::f64::consts::TAU)
+            };
+            travel <= sweep_angle.abs() + tolerance / radius
+                || std::f64::consts::TAU - travel <= tolerance / radius
+        }
+    }
+}
+
+fn profile_edge_intersections(a: &ProfileEdge, b: &ProfileEdge, tolerance: f64) -> Vec<[f64; 2]> {
+    let mut candidates = Vec::new();
+    let mut offer = |point: [f64; 2]| {
+        if point.iter().all(|value| value.is_finite())
+            && profile_edge_contains(a, point, tolerance)
+            && profile_edge_contains(b, point, tolerance)
+            && !candidates.iter().any(|other: &[f64; 2]| {
+                (other[0] - point[0]).hypot(other[1] - point[1]) <= tolerance
+            })
+        {
+            candidates.push(point);
+        }
+    };
+    match (a, b) {
+        (ProfileEdge::Line { from: p, to: q }, ProfileEdge::Line { from: r, to: s }) => {
+            let d = [q[0] - p[0], q[1] - p[1]];
+            let e = [s[0] - r[0], s[1] - r[1]];
+            let divisor = d[0] * e[1] - d[1] * e[0];
+            if divisor.abs() > tolerance * (d[0].hypot(d[1]) + e[0].hypot(e[1])) {
+                let relative = [r[0] - p[0], r[1] - p[1]];
+                let t = (relative[0] * e[1] - relative[1] * e[0]) / divisor;
+                offer([p[0] + t * d[0], p[1] + t * d[1]]);
+            } else {
+                for point in [*p, *q, *r, *s] {
+                    offer(point);
+                }
+            }
+        }
+        (ProfileEdge::Line { from, to }, ProfileEdge::Arc { center, radius, .. })
+        | (ProfileEdge::Arc { center, radius, .. }, ProfileEdge::Line { from, to }) => {
+            let d = [to[0] - from[0], to[1] - from[1]];
+            let f = [from[0] - center[0], from[1] - center[1]];
+            let aa = d[0] * d[0] + d[1] * d[1];
+            let bb = 2.0 * (f[0] * d[0] + f[1] * d[1]);
+            let cc = f[0] * f[0] + f[1] * f[1] - radius * radius;
+            let discriminant = bb * bb - 4.0 * aa * cc;
+            if discriminant >= -tolerance * tolerance * aa {
+                let root = discriminant.max(0.0).sqrt();
+                for t in [(-bb - root) / (2.0 * aa), (-bb + root) / (2.0 * aa)] {
+                    offer([from[0] + t * d[0], from[1] + t * d[1]]);
+                }
+            }
+        }
+        (
+            ProfileEdge::Arc {
+                center: ca,
+                radius: ra,
+                ..
+            },
+            ProfileEdge::Arc {
+                center: cb,
+                radius: rb,
+                ..
+            },
+        ) => {
+            let d = (cb[0] - ca[0]).hypot(cb[1] - ca[1]);
+            if d <= tolerance && (ra - rb).abs() <= tolerance {
+                let (a0, a1) = a.endpoints();
+                let (b0, b1) = b.endpoints();
+                for point in [a0, a1, b0, b1] {
+                    offer(point);
+                }
+                let ProfileEdge::Arc {
+                    start_angle,
+                    sweep_angle,
+                    ..
+                } = a
+                else {
+                    unreachable!()
+                };
+                let midpoint_angle = start_angle + sweep_angle * 0.5;
+                offer([
+                    ca[0] + ra * midpoint_angle.cos(),
+                    ca[1] + ra * midpoint_angle.sin(),
+                ]);
+            } else if d > tolerance
+                && d <= ra + rb + tolerance
+                && d + ra.min(*rb) + tolerance >= ra.max(*rb)
+            {
+                let along = (ra * ra - rb * rb + d * d) / (2.0 * d);
+                let perpendicular_sq = ra * ra - along * along;
+                if perpendicular_sq >= -tolerance * tolerance {
+                    let ux = (cb[0] - ca[0]) / d;
+                    let uy = (cb[1] - ca[1]) / d;
+                    let base = [ca[0] + along * ux, ca[1] + along * uy];
+                    let off = perpendicular_sq.max(0.0).sqrt();
+                    offer([base[0] - off * uy, base[1] + off * ux]);
+                    offer([base[0] + off * uy, base[1] - off * ux]);
+                }
+            }
+        }
+    }
+    candidates
+}
+
+fn validate_arc_profile_loop(edges: &[ProfileEdge], g: f64) -> Result<f64, GeometryError> {
+    if edges.len() < 2 {
+        return Err(GeometryError::InvalidGeometry(
+            "arc-edged profile needs at least two edges".into(),
+        ));
+    }
+    for (index, edge) in edges.iter().enumerate() {
+        let (from, to) = edge.endpoints();
+        if !from.into_iter().chain(to).all(f64::is_finite) {
+            return Err(GeometryError::InvalidGeometry(
+                "profile coordinates must be finite".into(),
+            ));
+        }
+        match edge {
+            ProfileEdge::Line { .. } => {
+                if (to[0] - from[0]).hypot(to[1] - from[1]) <= 4.0 * g {
+                    return Err(GeometryError::UnresolvedIntersection(
+                        "profile line is below resolution".into(),
+                    ));
+                }
+            }
+            ProfileEdge::Arc {
+                center,
+                radius,
+                start_angle,
+                sweep_angle,
+            } => {
+                if !center.iter().all(|value| value.is_finite())
+                    || !radius.is_finite()
+                    || !start_angle.is_finite()
+                    || !sweep_angle.is_finite()
+                    || *radius <= 4.0 * g
+                    || sweep_angle.abs() >= std::f64::consts::TAU
+                    || radius * sweep_angle.abs() <= 4.0 * g
+                {
+                    return Err(GeometryError::InvalidGeometry(
+                        "profile arc is unresolved".into(),
+                    ));
+                }
+            }
+        }
+        let (next, _) = edges[(index + 1) % edges.len()].endpoints();
+        if (to[0] - next[0]).hypot(to[1] - next[1]) > g {
+            return Err(GeometryError::InvalidGeometry(
+                "profile edges do not close".into(),
+            ));
+        }
+    }
+    for first in 0..edges.len() {
+        for second in (first + 1)..edges.len() {
+            let adjacent = second == first + 1 || first == 0 && second == edges.len() - 1;
+            let expected = if second == first + 1 {
+                Some(edges[first].endpoints().1)
+            } else if first == 0 && second == edges.len() - 1 {
+                Some(edges[first].endpoints().0)
+            } else {
+                None
+            };
+            for point in profile_edge_intersections(&edges[first], &edges[second], g) {
+                let at_expected = expected
+                    .is_some_and(|shared| (point[0] - shared[0]).hypot(point[1] - shared[1]) <= g);
+                let at_second_join = edges.len() == 2
+                    && (point[0] - edges[first].endpoints().0[0])
+                        .hypot(point[1] - edges[first].endpoints().0[1])
+                        <= g;
+                if !adjacent || !(at_expected || at_second_join) {
+                    return Err(GeometryError::InvalidGeometry(
+                        "arc-edged profile self-intersects".into(),
+                    ));
+                }
+            }
+        }
+    }
+    let signed_area_twice: f64 = edges.iter().map(ProfileEdge::signed_area_twice).sum();
+    if signed_area_twice.abs() <= 16.0 * g * g {
+        return Err(GeometryError::UnresolvedIntersection(
+            "profile area is below resolution".into(),
+        ));
+    }
+    Ok(signed_area_twice)
+}
+
+fn arc_profile_contains(edges: &[ProfileEdge], point: [f64; 2], g: f64) -> bool {
+    use crate::geometry::{
+        curved_boolean2d::{winding, CurveEdge2},
+        poly2d::Pt2,
+    };
+
+    let ring = edges
+        .iter()
+        .map(|edge| match edge {
+            ProfileEdge::Line { from, to } => CurveEdge2::Line {
+                from: *from,
+                to: *to,
+            },
+            ProfileEdge::Arc {
+                center,
+                radius,
+                start_angle,
+                sweep_angle,
+            } => CurveEdge2::Arc {
+                center: *center,
+                radius: *radius,
+                start_angle: *start_angle,
+                sweep_angle: *sweep_angle,
+            },
+        })
+        .collect::<Vec<_>>();
+    winding(Pt2::new(point[0], point[1]), &ring, g) != 0
+}
+
+struct ArcExtrusionLoop {
+    edges: Vec<ProfileEdge>,
+    bottom_vertices: Vec<u32>,
+    top_vertices: Vec<u32>,
+    bottom_edges: Vec<u32>,
+    top_edges: Vec<u32>,
+    vertical_edges: Vec<u32>,
+}
+
+pub fn arc_edged_extrusion(
+    id: String,
+    frame: Frame3,
+    outer: Vec<ProfileEdge>,
+    height: f64,
+    accuracy: Accuracy,
+) -> Result<BrepEnvelope, GeometryError> {
+    arc_edged_extrusion_with_holes(id, frame, outer, Vec::new(), height, accuracy)
+}
+
+pub fn arc_edged_extrusion_with_holes(
+    id: String,
+    frame: Frame3,
+    mut outer: Vec<ProfileEdge>,
+    mut holes: Vec<Vec<ProfileEdge>>,
+    height: f64,
+    accuracy: Accuracy,
+) -> Result<BrepEnvelope, GeometryError> {
+    frame.validate()?;
+    accuracy.validate()?;
+    dimensions(&[height])?;
+    let g = accuracy.geometric;
+    if height <= 4.0 * g {
+        return Err(GeometryError::UnresolvedIntersection(
+            "arc-edged extrusion height is below geometric resolution".into(),
+        ));
+    }
+    if validate_arc_profile_loop(&outer, g)? < 0.0 {
+        outer = outer.iter().rev().map(ProfileEdge::reversed).collect();
+    }
+    for (index, hole) in holes.iter_mut().enumerate() {
+        if validate_arc_profile_loop(hole, g)? > 0.0 {
+            *hole = hole.iter().rev().map(ProfileEdge::reversed).collect();
+        }
+        for hole_edge in hole.iter() {
+            for outer_edge in &outer {
+                if !profile_edge_intersections(hole_edge, outer_edge, g).is_empty() {
+                    return Err(GeometryError::InvalidGeometry(format!(
+                        "arc-edged profile hole {index} touches its outer boundary"
+                    )));
+                }
+            }
+        }
+        if !arc_profile_contains(&outer, hole[0].endpoints().0, g) {
+            return Err(GeometryError::InvalidGeometry(format!(
+                "arc-edged profile hole {index} lies outside the outer boundary"
+            )));
+        }
+    }
+    for first in 0..holes.len() {
+        for second in (first + 1)..holes.len() {
+            if holes[first].iter().any(|a| {
+                holes[second]
+                    .iter()
+                    .any(|b| !profile_edge_intersections(a, b, g).is_empty())
+            }) || arc_profile_contains(&holes[first], holes[second][0].endpoints().0, g)
+                || arc_profile_contains(&holes[second], holes[first][0].endpoints().0, g)
+            {
+                return Err(GeometryError::InvalidGeometry(format!(
+                    "arc-edged profile holes {first} and {second} overlap or nest"
+                )));
+            }
+        }
+    }
+
+    let mut builder = Builder::new(id, accuracy)?;
+    let mut loops = Vec::with_capacity(holes.len() + 1);
+    for edges in std::iter::once(outer).chain(holes) {
+        let points = edges
+            .iter()
+            .map(|edge| edge.endpoints().0)
+            .collect::<Vec<_>>();
+        let bottom_vertices = points
+            .iter()
+            .map(|point| builder.vertex(frame.point([point[0], point[1], 0.0])))
+            .collect::<Vec<_>>();
+        let top_vertices = points
+            .iter()
+            .map(|point| builder.vertex(frame.point([point[0], point[1], height])))
+            .collect::<Vec<_>>();
+        let mut bottom_edges = Vec::with_capacity(edges.len());
+        let mut top_edges = Vec::with_capacity(edges.len());
+        let mut vertical_edges = Vec::with_capacity(edges.len());
+        for (index, edge) in edges.iter().enumerate() {
+            let from = builder.brep.topology.vertices[bottom_vertices[index] as usize].position;
+            let top_from = builder.brep.topology.vertices[top_vertices[index] as usize].position;
+            let (bottom_curve, top_curve, range) = match edge {
+                ProfileEdge::Line { from: p, to: q } => {
+                    let vector = frame.vector([q[0] - p[0], q[1] - p[1], 0.0]);
+                    let length = norm(vector);
+                    let direction = unit(vector)?;
+                    (
+                        CurveGeometry::Line {
+                            origin: from,
+                            direction,
+                        },
+                        CurveGeometry::Line {
+                            origin: top_from,
+                            direction,
+                        },
+                        Interval::new(0.0, length)?,
+                    )
+                }
+                ProfileEdge::Arc {
+                    center,
+                    radius,
+                    start_angle,
+                    sweep_angle,
+                } => {
+                    let origin = frame.point([center[0], center[1], 0.0]);
+                    let circle_frame = Frame3 { origin, ..frame };
+                    let top_circle_frame = Frame3 {
+                        origin: add(origin, scale(frame.z, height)),
+                        ..frame
+                    };
+                    let end_angle = start_angle + sweep_angle;
+                    (
+                        CurveGeometry::Circle {
+                            frame: circle_frame,
+                            radius: *radius,
+                        },
+                        CurveGeometry::Circle {
+                            frame: top_circle_frame,
+                            radius: *radius,
+                        },
+                        Interval::new(start_angle.min(end_angle), start_angle.max(end_angle))?,
+                    )
+                }
+            };
+            bottom_edges.push(builder.edge(bottom_curve, range, false));
+            top_edges.push(builder.edge(top_curve, range, false));
+            vertical_edges.push(builder.edge(
+                CurveGeometry::Line {
+                    origin: from,
+                    direction: frame.z,
+                },
+                Interval::new(0.0, height)?,
+                false,
+            ));
+        }
+        loops.push(ArcExtrusionLoop {
+            edges,
+            bottom_vertices,
+            top_vertices,
+            bottom_edges,
+            top_edges,
+            vertical_edges,
+        });
+    }
+
+    let mut bounds = [[f64::INFINITY, f64::NEG_INFINITY]; 2];
+    for edge in &loops[0].edges {
+        match edge {
+            ProfileEdge::Line { from, to } => {
+                for point in [from, to] {
+                    for axis in 0..2 {
+                        bounds[axis][0] = bounds[axis][0].min(point[axis]);
+                        bounds[axis][1] = bounds[axis][1].max(point[axis]);
+                    }
+                }
+            }
+            ProfileEdge::Arc { center, radius, .. } => {
+                for axis in 0..2 {
+                    bounds[axis][0] = bounds[axis][0].min(center[axis] - radius);
+                    bounds[axis][1] = bounds[axis][1].max(center[axis] + radius);
+                }
+            }
+        }
+    }
+    for bound in &mut bounds {
+        bound[0] -= g;
+        bound[1] += g;
+    }
+    let top_frame = Frame3 {
+        origin: frame.point([0.0, 0.0, height]),
+        ..frame
+    };
+    let bottom_frame = Frame3 {
+        y: scale(frame.y, -1.0),
+        z: scale(frame.z, -1.0),
+        ..frame
+    };
+    let cap_uses = |profile: &ArcExtrusionLoop, top: bool| -> Result<Vec<Use>, GeometryError> {
+        let count = profile.edges.len();
+        let mut uses = Vec::with_capacity(count);
+        for index in 0..count {
+            let next = (index + 1) % count;
+            let forward = !matches!(profile.edges[index], ProfileEdge::Arc { sweep_angle, .. }
+                if sweep_angle < 0.0);
+            let top_sense = if forward {
+                Orientation::Forward
+            } else {
+                Orientation::Reverse
+            };
+            let bottom_sense = if forward {
+                Orientation::Reverse
+            } else {
+                Orientation::Forward
+            };
+            uses.push(if top {
+                plane_boundary(
+                    &builder,
+                    top_frame,
+                    profile.top_edges[index],
+                    profile.top_vertices[index],
+                    profile.top_vertices[next],
+                    top_sense,
+                )?
+            } else {
+                plane_boundary(
+                    &builder,
+                    bottom_frame,
+                    profile.bottom_edges[index],
+                    profile.bottom_vertices[next],
+                    profile.bottom_vertices[index],
+                    bottom_sense,
+                )?
+            });
+        }
+        if !top {
+            uses.reverse();
+        }
+        Ok(uses)
+    };
+    let top_outer = cap_uses(&loops[0], true)?;
+    let top_holes = loops[1..]
+        .iter()
+        .map(|profile| cap_uses(profile, true))
+        .collect::<Result<Vec<_>, _>>()?;
+    let bottom_outer = cap_uses(&loops[0], false)?;
+    let bottom_holes = loops[1..]
+        .iter()
+        .map(|profile| cap_uses(profile, false))
+        .collect::<Result<Vec<_>, _>>()?;
+    builder.face_with_holes(
+        "top",
+        SurfaceGeometry::Plane { frame: top_frame },
+        bounds,
+        top_outer,
+        top_holes,
+    )?;
+    builder.face_with_holes(
+        "bottom",
+        SurfaceGeometry::Plane {
+            frame: bottom_frame,
+        },
+        [bounds[0], [-bounds[1][1], -bounds[1][0]]],
+        bottom_outer,
+        bottom_holes,
+    )?;
+
+    for (loop_index, profile) in loops.iter().enumerate() {
+        for (index, edge) in profile.edges.iter().enumerate() {
+            let next = (index + 1) % profile.edges.len();
+            let bottom_from = profile.bottom_vertices[index];
+            let bottom_to = profile.bottom_vertices[next];
+            let top_from = profile.top_vertices[index];
+            let top_to = profile.top_vertices[next];
+            let forward =
+                !matches!(edge, ProfileEdge::Arc { sweep_angle, .. } if *sweep_angle < 0.0);
+            let bottom_sense = if forward {
+                Orientation::Forward
+            } else {
+                Orientation::Reverse
+            };
+            let top_sense = if forward {
+                Orientation::Reverse
+            } else {
+                Orientation::Forward
+            };
+            match edge {
+                ProfileEdge::Line { .. } => {
+                    let origin = builder.brep.topology.vertices[bottom_from as usize].position;
+                    let destination = builder.brep.topology.vertices[bottom_to as usize].position;
+                    let edge_direction = unit(sub(destination, origin))?;
+                    let side_frame = Frame3::from_axis(
+                        origin,
+                        unit(cross(edge_direction, frame.z))?,
+                        edge_direction,
+                    )?;
+                    let uses = [
+                        (
+                            profile.bottom_edges[index],
+                            bottom_from,
+                            bottom_to,
+                            Orientation::Forward,
+                        ),
+                        (
+                            profile.vertical_edges[next],
+                            bottom_to,
+                            top_to,
+                            Orientation::Forward,
+                        ),
+                        (
+                            profile.top_edges[index],
+                            top_to,
+                            top_from,
+                            Orientation::Reverse,
+                        ),
+                        (
+                            profile.vertical_edges[index],
+                            top_from,
+                            bottom_from,
+                            Orientation::Reverse,
+                        ),
+                    ]
+                    .into_iter()
+                    .map(|(edge, from, to, sense)| {
+                        plane_boundary(&builder, side_frame, edge, from, to, sense)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                    builder.face(
+                        &format!("side-{loop_index}-{index}"),
+                        SurfaceGeometry::Plane { frame: side_frame },
+                        [[-g, norm(sub(destination, origin)) + g], [-g, height + g]],
+                        uses,
+                    )?;
+                }
+                ProfileEdge::Arc {
+                    center,
+                    radius,
+                    start_angle,
+                    sweep_angle,
+                } => {
+                    let end_angle = start_angle + sweep_angle;
+                    let circle_frame = Frame3 {
+                        origin: frame.point([center[0], center[1], 0.0]),
+                        ..frame
+                    };
+                    let uses = vec![
+                        boundary(
+                            profile.bottom_edges[index],
+                            bottom_from,
+                            bottom_to,
+                            bottom_sense,
+                            uv_line([0.0, 0.0], [1.0, 0.0]),
+                        ),
+                        boundary(
+                            profile.vertical_edges[next],
+                            bottom_to,
+                            top_to,
+                            Orientation::Forward,
+                            uv_line([end_angle, 0.0], [0.0, 1.0]),
+                        ),
+                        boundary(
+                            profile.top_edges[index],
+                            top_to,
+                            top_from,
+                            top_sense,
+                            uv_line([0.0, height], [1.0, 0.0]),
+                        ),
+                        boundary(
+                            profile.vertical_edges[index],
+                            top_from,
+                            bottom_from,
+                            Orientation::Reverse,
+                            uv_line([*start_angle, 0.0], [0.0, 1.0]),
+                        ),
+                    ];
+                    let face_id = builder.brep.topology.faces.len();
+                    builder.face(
+                        &format!("side-{loop_index}-{index}"),
+                        SurfaceGeometry::Cylinder {
+                            frame: circle_frame,
+                            radius: *radius,
+                        },
+                        [
+                            [
+                                start_angle.min(end_angle) - g / radius,
+                                start_angle.max(end_angle) + g / radius,
+                            ],
+                            [-g, height + g],
+                        ],
+                        uses,
+                    )?;
+                    if !forward {
+                        builder.brep.topology.faces[face_id].sense = Orientation::Reverse;
+                    }
+                }
+            }
+        }
+    }
+    builder.finish()
+}
+
 #[derive(Clone, Debug)]
-pub struct StraightWallArchedOpening {
+pub struct BoxArchedOpening {
     pub id: String,
     pub station: f64,
     pub width: f64,
@@ -1468,13 +2177,13 @@ pub struct StraightWallArchedOpening {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn straight_wall_with_arched_opening(
+pub fn box_with_arched_opening(
     id: String,
     frame: Frame3,
     width: f64,
     depth: f64,
     height: f64,
-    opening: StraightWallArchedOpening,
+    opening: BoxArchedOpening,
     accuracy: Accuracy,
 ) -> Result<BrepEnvelope, GeometryError> {
     frame.validate()?;
@@ -1492,7 +2201,7 @@ pub fn straight_wall_with_arched_opening(
         || opening.bottom + opening.height >= height - 4.0 * accuracy.geometric
     {
         return Err(GeometryError::InvalidGeometry(
-            "arched wall opening must remain resolved and strictly inside the wall".into(),
+            "arched opening must remain resolved and strictly inside the box".into(),
         ));
     }
     let extrusion_frame = Frame3 {
@@ -1516,17 +2225,17 @@ pub fn straight_wall_with_arched_opening(
         depth,
         accuracy,
     )?;
-    let header = result
+    let upper_cap = result
         .topology
         .faces
         .iter()
         .find(|face| face.key == "side-1-0")
         .map(|face| face.id)
-        .ok_or_else(|| GeometryError::InvalidTopology("arched header face is missing".into()))?;
-    let header_loop = result.topology.faces[header as usize].trim.outer;
-    let header_uses = loop_halfedges_for_primitive(&result, header_loop)?;
+        .ok_or_else(|| GeometryError::InvalidTopology("arched upper_cap face is missing".into()))?;
+    let upper_cap_loop = result.topology.faces[upper_cap as usize].trim.outer;
+    let upper_cap_uses = loop_halfedges_for_primitive(&result, upper_cap_loop)?;
     let mut arch_edges = Vec::new();
-    for halfedge in &header_uses {
+    for halfedge in &upper_cap_uses {
         let use_ = &result.topology.halfedges[*halfedge as usize];
         let endpoints = [use_.from, use_.to].map(|vertex| {
             extrusion_frame.local(result.topology.vertices[vertex as usize].position)
@@ -1599,8 +2308,8 @@ pub fn straight_wall_with_arched_opening(
         radius,
     });
     {
-        let face = &mut result.topology.faces[header as usize];
-        face.key = format!("{}-arched-header", opening.id);
+        let face = &mut result.topology.faces[upper_cap as usize];
+        face.key = format!("{}-arched-cap", opening.id);
         face.surface = cylinder_surface;
         face.sense = Orientation::Reverse;
         face.trim.uv_bounds = [
@@ -1615,7 +2324,7 @@ pub fn straight_wall_with_arched_opening(
         .topology
         .halfedges
         .iter()
-        .filter(|halfedge| halfedge.face == Some(header) || arch_edges.contains(&halfedge.edge))
+        .filter(|halfedge| halfedge.face == Some(upper_cap) || arch_edges.contains(&halfedge.edge))
         .map(|halfedge| halfedge.id)
         .collect::<Vec<_>>();
     for halfedge_id in affected {
@@ -1632,35 +2341,78 @@ pub fn straight_wall_with_arched_opening(
                 ))
             }
         };
-        let start = result.geometry.curve(curve)?.point_at(range.lo)?;
-        let end = result.geometry.curve(curve)?.point_at(range.hi)?;
+        let curve_geometry = &result.geometry.curves[curve as usize];
         let surface_geometry = result.geometry.surface(surface)?;
-        let mut uv_hint = surface_geometry.project(start, None)?;
-        let mut uv_end = surface_geometry.project(end, Some(uv_hint))?;
-        if surface == cylinder_surface {
-            for uv in [&mut uv_hint, &mut uv_end] {
-                if uv[0] < -accuracy.intersection {
-                    uv[0] += std::f64::consts::TAU;
+        let pcurve_geometry = match (curve_geometry, surface_geometry) {
+            (CurveGeometry::Line { origin, direction }, SurfaceGeometry::Plane { frame }) => {
+                PcurveGeometry::Line2 {
+                    origin: [
+                        dot(sub(*origin, frame.origin), frame.x),
+                        dot(sub(*origin, frame.origin), frame.y),
+                    ],
+                    direction: [dot(*direction, frame.x), dot(*direction, frame.y)],
                 }
             }
-        }
-        let uv_rate = if range.width() > accuracy.geometric {
-            std::array::from_fn(|axis| (uv_end[axis] - uv_hint[axis]) / range.width())
-        } else {
-            [0.0; 2]
+            (
+                CurveGeometry::Circle {
+                    frame: circle,
+                    radius,
+                },
+                SurfaceGeometry::Plane { frame },
+            ) => PcurveGeometry::Conic2 {
+                origin: [
+                    dot(sub(circle.origin, frame.origin), frame.x),
+                    dot(sub(circle.origin, frame.origin), frame.y),
+                ],
+                axis_a: [
+                    dot(scale(circle.x, *radius), frame.x),
+                    dot(scale(circle.x, *radius), frame.y),
+                ],
+                axis_b: [
+                    dot(scale(circle.y, *radius), frame.x),
+                    dot(scale(circle.y, *radius), frame.y),
+                ],
+            },
+            (
+                CurveGeometry::Line { origin, direction },
+                SurfaceGeometry::Cylinder { frame, .. },
+            ) => {
+                let radial = sub(*origin, frame.origin);
+                PcurveGeometry::Line2 {
+                    origin: [
+                        dot(radial, frame.y).atan2(dot(radial, frame.x)),
+                        dot(radial, frame.z),
+                    ],
+                    direction: [0.0, dot(*direction, frame.z)],
+                }
+            }
+            (
+                CurveGeometry::Circle { frame: circle, .. },
+                SurfaceGeometry::Cylinder { frame, .. },
+            ) => {
+                if dot(circle.z, frame.z).abs() < 1.0 - 1e-10 {
+                    return Err(GeometryError::UnsupportedGeometry(
+                        "arched upper_cap circle is not coaxial with its cylindrical face".into(),
+                    ));
+                }
+                let angular_rate = dot(circle.z, frame.z).signum();
+                let mut angle = dot(circle.x, frame.y).atan2(dot(circle.x, frame.x));
+                let middle = angle + angular_rate * range.midpoint();
+                angle += ((std::f64::consts::FRAC_PI_2 - middle) / std::f64::consts::TAU).round()
+                    * std::f64::consts::TAU;
+                PcurveGeometry::Line2 {
+                    origin: [angle, dot(sub(circle.origin, frame.origin), frame.z)],
+                    direction: [angular_rate, 0.0],
+                }
+            }
+            _ => {
+                return Err(GeometryError::UnsupportedGeometry(
+                    "arched boundary requires a line or circle on a plane or cylinder".into(),
+                ))
+            }
         };
         let pcurve = result.geometry.pcurves.len() as u32;
-        result
-            .geometry
-            .pcurves
-            .push(PcurveGeometry::ProjectedCurve {
-                curve,
-                surface,
-                chart: 0,
-                uv_hint,
-                uv_rate,
-                parameter_origin: range.lo,
-            });
+        result.geometry.pcurves.push(pcurve_geometry);
         result.topology.halfedges[halfedge_id as usize]
             .geometry_use
             .pcurve = Some(pcurve);
@@ -1787,7 +2539,7 @@ pub(super) fn plane_boundary(
 }
 
 #[derive(Clone, Debug)]
-pub struct CircularWallOpening {
+pub struct AnnularSectorOpening {
     pub id: String,
     pub angle: f64,
     pub width: f64,
@@ -1795,7 +2547,7 @@ pub struct CircularWallOpening {
     pub height: f64,
 }
 
-struct BuiltCircularWallOpening {
+struct BuiltAnnularSectorOpening {
     source: String,
     outer_angles: [f64; 2],
     inner_angles: [f64; 2],
@@ -1810,13 +2562,13 @@ struct BuiltCircularWallOpening {
     connectors: [[u32; 2]; 2],
 }
 
-impl BuiltCircularWallOpening {
+impl BuiltAnnularSectorOpening {
     fn touches_bottom(&self) -> bool {
         self.elevations[0] == 0.0
     }
 }
 
-pub fn circular_wall(
+pub fn annular_sector_extrusion(
     id: String,
     frame: Frame3,
     radius: f64,
@@ -1826,7 +2578,7 @@ pub fn circular_wall(
     sweep_angle: f64,
     accuracy: Accuracy,
 ) -> Result<BrepEnvelope, GeometryError> {
-    circular_wall_with_openings(
+    annular_sector_extrusion_with_openings(
         id,
         frame,
         radius,
@@ -1840,7 +2592,7 @@ pub fn circular_wall(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn circular_wall_with_openings(
+pub fn annular_sector_extrusion_with_openings(
     id: String,
     frame: Frame3,
     radius: f64,
@@ -1848,7 +2600,7 @@ pub fn circular_wall_with_openings(
     height: f64,
     start_angle: f64,
     sweep_angle: f64,
-    openings: Vec<CircularWallOpening>,
+    openings: Vec<AnnularSectorOpening>,
     accuracy: Accuracy,
 ) -> Result<BrepEnvelope, GeometryError> {
     frame.validate()?;
@@ -1858,17 +2610,17 @@ pub fn circular_wall_with_openings(
     let outer = radius + thickness * 0.5;
     if inner <= 0.0 || !outer.is_finite() {
         return Err(GeometryError::InvalidGeometry(
-            "wall radius must exceed half thickness".into(),
+            "annular sector radius must exceed half thickness".into(),
         ));
     }
     if !start_angle.is_finite() || !sweep_angle.is_finite() || sweep_angle == 0.0 {
         return Err(GeometryError::InvalidGeometry(
-            "wall angles must be finite with a nonzero sweep".into(),
+            "annular sector angles must be finite with a nonzero sweep".into(),
         ));
     }
     if sweep_angle.abs() >= std::f64::consts::TAU {
         return Err(GeometryError::UnsupportedGeometry(
-            "circular-wall sweep must be smaller than one full turn".into(),
+            "annular sector sweep must be smaller than one full turn".into(),
         ));
     }
     let end_angle = start_angle + sweep_angle;
@@ -1881,7 +2633,7 @@ pub fn circular_wall_with_openings(
         || height <= 4.0 * accuracy.geometric
     {
         return Err(GeometryError::InvalidGeometry(
-            "wall features are below geometric resolution".into(),
+            "annular sector features are below geometric resolution".into(),
         ));
     }
     let mut prepared_openings = Vec::with_capacity(openings.len());
@@ -1889,7 +2641,7 @@ pub fn circular_wall_with_openings(
     for opening in openings {
         if opening.id.is_empty() || !opening_ids.insert(opening.id.clone()) {
             return Err(GeometryError::InvalidGeometry(
-                "circular-wall opening identities must be nonempty and unique".into(),
+                "annular sector opening identities must be nonempty and unique".into(),
             ));
         }
         if !opening.angle.is_finite()
@@ -1900,13 +2652,13 @@ pub fn circular_wall_with_openings(
             || opening.height <= 4.0 * accuracy.geometric
         {
             return Err(GeometryError::InvalidGeometry(
-                "circular-wall opening dimensions and station must be finite and resolved".into(),
+                "annular sector opening dimensions and station must be finite and resolved".into(),
             ));
         }
         let half_width = opening.width * 0.5;
         if half_width >= inner {
             return Err(GeometryError::UnsupportedGeometry(
-                "circular-wall opening width reaches the wall axis".into(),
+                "annular sector opening width reaches the reference arc".into(),
             ));
         }
         let outer_delta = (half_width / outer).asin();
@@ -1919,22 +2671,22 @@ pub fn circular_wall_with_openings(
             || inner * (hi - inner_angles[1]) <= clearance
         {
             return Err(GeometryError::UnsupportedGeometry(
-                "circular-wall opening must stay strictly inside both authored wall ends".into(),
+                "annular sector opening must stay strictly inside both sweep ends".into(),
             ));
         }
         if elevations[0] < 0.0 || elevations[1] >= height {
             return Err(GeometryError::InvalidGeometry(
-                "circular-wall opening elevation lies outside the wall".into(),
+                "annular sector opening elevation lies outside the extrusion".into(),
             ));
         }
         if elevations[0] > 0.0 && elevations[0] <= clearance {
             return Err(GeometryError::UnresolvedIntersection(
-                "circular-wall opening sill is below geometric resolution".into(),
+                "annular sector opening lower clearance is below geometric resolution".into(),
             ));
         }
         if height - elevations[1] <= clearance {
             return Err(GeometryError::UnresolvedIntersection(
-                "circular-wall opening head clearance is below geometric resolution".into(),
+                "annular sector opening upper clearance is below geometric resolution".into(),
             ));
         }
         if elevations[0] == -0.0 {
@@ -1952,7 +2704,7 @@ pub fn circular_wall_with_openings(
                 && vertical_overlap > -4.0 * accuracy.geometric
             {
                 return Err(GeometryError::UnsupportedGeometry(
-                    "circular-wall openings overlap or are below geometric separation".into(),
+                    "annular sector openings overlap or are below geometric separation".into(),
                 ));
             }
         }
@@ -2141,7 +2893,7 @@ pub fn circular_wall_with_openings(
                 );
             }
         }
-        built_openings.push(BuiltCircularWallOpening {
+        built_openings.push(BuiltAnnularSectorOpening {
             source,
             outer_angles,
             inner_angles,
@@ -2178,10 +2930,10 @@ pub fn circular_wall_with_openings(
     if bottom_openings.is_empty() {
         bottom_spans.push(BottomSpan {
             outer_edge: ob.ok_or_else(|| {
-                GeometryError::InvalidTopology("circular-wall bottom edge missing".into())
+                GeometryError::InvalidTopology("annular sector bottom edge missing".into())
             })?,
             inner_edge: ib.ok_or_else(|| {
-                GeometryError::InvalidTopology("circular-wall bottom edge missing".into())
+                GeometryError::InvalidTopology("annular sector bottom edge missing".into())
             })?,
             outer_vertices: [ob0, ob1],
             inner_vertices: [ib0, ib1],
@@ -2244,7 +2996,7 @@ pub fn circular_wall_with_openings(
             Ok(vec![
                 boundary(
                     opening.lower_outer_arc.ok_or_else(|| {
-                        GeometryError::InvalidTopology("opening sill edge missing".into())
+                        GeometryError::InvalidTopology("opening lower_cap edge missing".into())
                     })?,
                     obr,
                     obl,
@@ -2335,7 +3087,7 @@ pub fn circular_wall_with_openings(
             Ok(vec![
                 boundary(
                     opening.lower_inner_arc.ok_or_else(|| {
-                        GeometryError::InvalidTopology("opening sill edge missing".into())
+                        GeometryError::InvalidTopology("opening lower_cap edge missing".into())
                     })?,
                     ibl,
                     ibr,
@@ -2607,29 +3359,33 @@ pub fn circular_wall_with_openings(
 
         if !opening.touches_bottom() {
             let lower_outer_arc = opening.lower_outer_arc.ok_or_else(|| {
-                GeometryError::InvalidTopology("opening sill edge missing".into())
+                GeometryError::InvalidTopology("opening lower_cap edge missing".into())
             })?;
             let lower_inner_arc = opening.lower_inner_arc.ok_or_else(|| {
-                GeometryError::InvalidTopology("opening sill edge missing".into())
+                GeometryError::InvalidTopology("opening lower_cap edge missing".into())
             })?;
-            let mut sill_frame = frame;
-            sill_frame.origin = frame.point([0.0, 0.0, opening.elevations[0]]);
-            let sill_uses = [
+            let mut lower_cap_frame = frame;
+            lower_cap_frame.origin = frame.point([0.0, 0.0, opening.elevations[0]]);
+            let lower_cap_uses = [
                 (lower_outer_arc, obl, obr, F),
                 (opening.connectors[0][1], obr, ibr, R),
                 (lower_inner_arc, ibr, ibl, R),
                 (opening.connectors[0][0], ibl, obl, F),
             ]
             .into_iter()
-            .map(|(edge, from, to, sense)| plane_boundary(&b, sill_frame, edge, from, to, sense))
+            .map(|(edge, from, to, sense)| {
+                plane_boundary(&b, lower_cap_frame, edge, from, to, sense)
+            })
             .collect::<Result<Vec<_>, _>>()?;
             let face = b.brep.topology.faces.len() as u32;
             b.face(
-                &format!("opening-{opening_index}-sill"),
-                SurfaceGeometry::Plane { frame: sill_frame },
+                &format!("opening-{opening_index}-lower_cap"),
+                SurfaceGeometry::Plane {
+                    frame: lower_cap_frame,
+                },
                 curved_plane_bounds(
                     &b,
-                    sill_frame,
+                    lower_cap_frame,
                     [
                         lower_outer_arc,
                         opening.connectors[0][1],
@@ -2637,35 +3393,35 @@ pub fn circular_wall_with_openings(
                         opening.connectors[0][0],
                     ],
                 )?,
-                sill_uses,
+                lower_cap_uses,
             )?;
-            mark_cut(&mut b, face, 0, "sill".into());
+            mark_cut(&mut b, face, 0, "lower_cap".into());
         }
 
-        let header_frame = Frame3 {
+        let upper_cap_frame = Frame3 {
             origin: frame.point([0.0, 0.0, opening.elevations[1]]),
             y: scale(frame.y, -1.0),
             z: scale(frame.z, -1.0),
             ..frame
         };
-        let header_uses = [
+        let upper_cap_uses = [
             (opening.upper_outer_arc, otr, otl, R),
             (opening.connectors[1][0], otl, itl, R),
             (opening.upper_inner_arc, itl, itr, F),
             (opening.connectors[1][1], itr, otr, F),
         ]
         .into_iter()
-        .map(|(edge, from, to, sense)| plane_boundary(&b, header_frame, edge, from, to, sense))
+        .map(|(edge, from, to, sense)| plane_boundary(&b, upper_cap_frame, edge, from, to, sense))
         .collect::<Result<Vec<_>, _>>()?;
         let face = b.brep.topology.faces.len() as u32;
         b.face(
-            &format!("opening-{opening_index}-header"),
+            &format!("opening-{opening_index}-upper_cap"),
             SurfaceGeometry::Plane {
-                frame: header_frame,
+                frame: upper_cap_frame,
             },
             curved_plane_bounds(
                 &b,
-                header_frame,
+                upper_cap_frame,
                 [
                     opening.upper_outer_arc,
                     opening.connectors[1][0],
@@ -2673,9 +3429,9 @@ pub fn circular_wall_with_openings(
                     opening.connectors[1][1],
                 ],
             )?,
-            header_uses,
+            upper_cap_uses,
         )?;
-        mark_cut(&mut b, face, 1, "header".into());
+        mark_cut(&mut b, face, 1, "upper_cap".into());
 
         let center_tangent = frame.vector([
             -((opening.inner_angles[0] + opening.inner_angles[1]) * 0.5).sin(),
@@ -2701,12 +3457,12 @@ pub fn circular_wall_with_openings(
         .collect::<Result<Vec<_>, _>>()?;
         let face = b.brep.topology.faces.len() as u32;
         b.face(
-            &format!("opening-{opening_index}-jamb-lower"),
+            &format!("opening-{opening_index}-side-left"),
             SurfaceGeometry::Plane { frame: left_frame },
             plane_bounds(&b, left_frame, [obl, ibl, itl, otl]),
             left_uses,
         )?;
-        mark_cut(&mut b, face, 2, "jamb-lower".into());
+        mark_cut(&mut b, face, 2, "side-left".into());
 
         let right_frame = Frame3::from_axis(
             b.brep.topology.vertices[ibr as usize].position,
@@ -2727,12 +3483,12 @@ pub fn circular_wall_with_openings(
         .collect::<Result<Vec<_>, _>>()?;
         let face = b.brep.topology.faces.len() as u32;
         b.face(
-            &format!("opening-{opening_index}-jamb-upper"),
+            &format!("opening-{opening_index}-side-right"),
             SurfaceGeometry::Plane { frame: right_frame },
             plane_bounds(&b, right_frame, [ibr, obr, otr, itr]),
             right_uses,
         )?;
-        mark_cut(&mut b, face, 3, "jamb-upper".into());
+        mark_cut(&mut b, face, 3, "side-right".into());
     }
     if !built_openings.is_empty() {
         b.brep.topology.faces[0].provenance.role = FaceRole::Split;
@@ -2801,7 +3557,7 @@ fn arched_opening_top_edge(
         }
     }
     Err(GeometryError::InvalidTopology(
-        "arched opening header edge is missing".into(),
+        "arched opening cap edge is missing".into(),
     ))
 }
 
@@ -2976,7 +3732,7 @@ fn upper_intersection_definition(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn circular_wall_with_arched_opening(
+pub fn annular_sector_extrusion_with_arched_opening(
     id: String,
     frame: Frame3,
     radius: f64,
@@ -2984,7 +3740,7 @@ pub fn circular_wall_with_arched_opening(
     height: f64,
     start_angle: f64,
     sweep_angle: f64,
-    opening: CircularWallOpening,
+    opening: AnnularSectorOpening,
     accuracy: Accuracy,
 ) -> Result<BrepEnvelope, GeometryError> {
     let arch_radius = opening.width * 0.5;
@@ -2995,7 +3751,7 @@ pub fn circular_wall_with_arched_opening(
         ));
     }
     let spring_elevation = opening.bottom + lower_height;
-    let mut result = circular_wall_with_openings(
+    let mut result = annular_sector_extrusion_with_openings(
         id,
         frame,
         radius,
@@ -3003,13 +3759,13 @@ pub fn circular_wall_with_arched_opening(
         height,
         start_angle,
         sweep_angle,
-        vec![CircularWallOpening {
+        vec![AnnularSectorOpening {
             height: lower_height,
             ..opening.clone()
         }],
         accuracy,
     )?;
-    let plain = circular_wall(
+    let plain = annular_sector_extrusion(
         "arched-opening-support".into(),
         frame,
         radius,
@@ -3059,15 +3815,13 @@ pub fn circular_wall_with_arched_opening(
 
     let outer_edge = arched_opening_top_edge(&result, 0, frame, spring_elevation)?;
     let inner_edge = arched_opening_top_edge(&result, 1, frame, spring_elevation)?;
-    let header = result
+    let upper_cap = result
         .topology
         .faces
         .iter()
-        .find(|face| face.key == "opening-0-header")
+        .find(|face| face.key == "opening-0-upper_cap")
         .map(|face| face.id)
-        .ok_or_else(|| {
-            GeometryError::InvalidTopology("arched opening header face missing".into())
-        })?;
+        .ok_or_else(|| GeometryError::InvalidTopology("arched opening cap face missing".into()))?;
     let cutter_surface = result.geometry.surfaces.len() as u32;
     result
         .geometry
@@ -3122,7 +3876,7 @@ pub fn circular_wall_with_arched_opening(
             .curves
             .push(CurveGeometry::Intersection { definition });
         result.topology.edges[edge_id as usize].geometry = EdgeGeometry::Curve { curve, range };
-        let wall_pcurve = result.geometry.pcurves.len() as u32;
+        let support_pcurve = result.geometry.pcurves.len() as u32;
         result
             .geometry
             .pcurves
@@ -3141,8 +3895,8 @@ pub fn circular_wall_with_arched_opening(
         for halfedge in &mut result.topology.halfedges {
             if halfedge.edge == edge_id {
                 halfedge.geometry_use.pcurve = Some(if halfedge.face == Some(side as u32) {
-                    wall_pcurve
-                } else if halfedge.face == Some(header) {
+                    support_pcurve
+                } else if halfedge.face == Some(upper_cap) {
                     cutter_pcurve
                 } else {
                     return Err(GeometryError::InvalidTopology(
@@ -3154,9 +3908,10 @@ pub fn circular_wall_with_arched_opening(
     }
 
     let cutter_surface_geometry = result.geometry.surfaces[cutter_surface as usize].clone();
-    for halfedge_id in
-        loop_halfedges_for_primitive(&result, result.topology.faces[header as usize].trim.outer)?
-    {
+    for halfedge_id in loop_halfedges_for_primitive(
+        &result,
+        result.topology.faces[upper_cap as usize].trim.outer,
+    )? {
         let halfedge = result.topology.halfedges[halfedge_id as usize].clone();
         if halfedge.edge == outer_edge || halfedge.edge == inner_edge {
             continue;
@@ -3214,16 +3969,17 @@ pub fn circular_wall_with_arched_opening(
             .geometry_use
             .pcurve = Some(pcurve);
     }
-    result.topology.faces[header as usize].surface = cutter_surface;
-    result.topology.faces[header as usize].sense = Orientation::Reverse;
-    result.topology.faces[header as usize].key = "opening-0-arch".into();
+    result.topology.faces[upper_cap as usize].surface = cutter_surface;
+    result.topology.faces[upper_cap as usize].sense = Orientation::Reverse;
+    result.topology.faces[upper_cap as usize].key = "opening-0-arch".into();
     let mut bounds = [
         [f64::INFINITY, f64::NEG_INFINITY],
         [f64::INFINITY, f64::NEG_INFINITY],
     ];
-    for halfedge_id in
-        loop_halfedges_for_primitive(&result, result.topology.faces[header as usize].trim.outer)?
-    {
+    for halfedge_id in loop_halfedges_for_primitive(
+        &result,
+        result.topology.faces[upper_cap as usize].trim.outer,
+    )? {
         let halfedge = &result.topology.halfedges[halfedge_id as usize];
         let pcurve = halfedge.geometry_use.pcurve.unwrap();
         let range = result.topology.edges[halfedge.edge as usize]
@@ -3238,7 +3994,7 @@ pub fn circular_wall_with_arched_opening(
             }
         }
     }
-    result.topology.faces[header as usize].trim.uv_bounds = [
+    result.topology.faces[upper_cap as usize].trim.uv_bounds = [
         Interval::new(bounds[0][0], bounds[0][1])?,
         Interval::new(bounds[1][0], bounds[1][1])?,
     ];
@@ -3479,6 +4235,296 @@ mod tests {
     }
 
     #[test]
+    fn arc_edged_extrusion_preserves_cylindrical_sides_for_both_sweep_signs() {
+        for sign in [1.0, -1.0] {
+            let sweep = sign * std::f64::consts::FRAC_PI_2;
+            let outer = 2.0;
+            let inner = 1.5;
+            let point = |radius: f64, angle: f64| [radius * angle.cos(), radius * angle.sin()];
+            let edges = vec![
+                ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: outer,
+                    start_angle: 0.0,
+                    sweep_angle: sweep,
+                },
+                ProfileEdge::Line {
+                    from: point(outer, sweep),
+                    to: point(inner, sweep),
+                },
+                ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: inner,
+                    start_angle: sweep,
+                    sweep_angle: -sweep,
+                },
+                ProfileEdge::Line {
+                    from: point(inner, 0.0),
+                    to: point(outer, 0.0),
+                },
+            ];
+            let body = arc_edged_extrusion(
+                format!("arc-strip-{sign}"),
+                Frame3::IDENTITY,
+                edges,
+                3.0,
+                accuracy(),
+            )
+            .unwrap();
+            body.validate().unwrap();
+            assert_eq!(body.topology.faces.len(), 6);
+            assert_eq!(body.topology.shells.len(), 1);
+            assert_eq!(body.solids.len(), 1);
+            assert_eq!(
+                body.geometry
+                    .surfaces
+                    .iter()
+                    .filter(|surface| matches!(surface, SurfaceGeometry::Cylinder { .. }))
+                    .count(),
+                2
+            );
+            assert_eq!(
+                body.geometry
+                    .curves
+                    .iter()
+                    .filter(|curve| matches!(curve, CurveGeometry::Circle { .. }))
+                    .count(),
+                4
+            );
+            let middle = sweep * 0.5;
+            assert_eq!(
+                crate::analytic::query::classify_point(
+                    &body,
+                    [1.75 * middle.cos(), 1.75 * middle.sin(), 1.0],
+                )
+                .unwrap(),
+                crate::analytic::query::PointClassification::Inside,
+            );
+            assert_eq!(
+                crate::analytic::query::classify_point(
+                    &body,
+                    [1.0 * middle.cos(), 1.0 * middle.sin(), 1.0],
+                )
+                .unwrap(),
+                crate::analytic::query::PointClassification::Outside,
+            );
+            let mesh = crate::analytic::tessellation::tessellate(&body, 0.01, 100_000).unwrap();
+            assert!(!mesh.indices.is_empty());
+        }
+    }
+
+    #[test]
+    fn arc_edged_extrusion_preserves_an_analytic_profile_hole() {
+        let quarter = std::f64::consts::FRAC_PI_2;
+        let outer = vec![
+            ProfileEdge::Arc {
+                center: [0.0, 0.0],
+                radius: 2.0,
+                start_angle: 0.0,
+                sweep_angle: quarter,
+            },
+            ProfileEdge::Line {
+                from: [0.0, 2.0],
+                to: [0.0, 1.0],
+            },
+            ProfileEdge::Arc {
+                center: [0.0, 0.0],
+                radius: 1.0,
+                start_angle: quarter,
+                sweep_angle: -quarter,
+            },
+            ProfileEdge::Line {
+                from: [1.0, 0.0],
+                to: [2.0, 0.0],
+            },
+        ];
+        let hole = vec![
+            ProfileEdge::Arc {
+                center: [1.2, 1.2],
+                radius: 0.1,
+                start_angle: 0.0,
+                sweep_angle: -std::f64::consts::PI,
+            },
+            ProfileEdge::Arc {
+                center: [1.2, 1.2],
+                radius: 0.1,
+                start_angle: -std::f64::consts::PI,
+                sweep_angle: -std::f64::consts::PI,
+            },
+        ];
+        let body = arc_edged_extrusion_with_holes(
+            "arc-profile-hole".into(),
+            Frame3::IDENTITY,
+            outer,
+            vec![hole],
+            3.0,
+            accuracy(),
+        )
+        .unwrap();
+        body.validate().unwrap();
+        assert_eq!(body.topology.faces[0].trim.holes.len(), 1);
+        assert_eq!(body.topology.faces[1].trim.holes.len(), 1);
+        assert_eq!(body.topology.shells.len(), 1);
+        assert_eq!(body.solids.len(), 1);
+        assert_eq!(
+            crate::analytic::query::classify_point(&body, [1.2, 1.2, 1.0]).unwrap(),
+            crate::analytic::query::PointClassification::Outside
+        );
+        assert_eq!(
+            crate::analytic::query::classify_point(&body, [1.4, 1.0, 1.0]).unwrap(),
+            crate::analytic::query::PointClassification::Inside
+        );
+        assert!(
+            !crate::analytic::tessellation::tessellate(&body, 0.01, 100_000)
+                .unwrap()
+                .indices
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn arc_edged_extrusion_rejects_holes_outside_or_crossing_its_profile() {
+        let quarter = std::f64::consts::FRAC_PI_2;
+        let outer = vec![
+            ProfileEdge::Arc {
+                center: [0.0, 0.0],
+                radius: 2.0,
+                start_angle: 0.0,
+                sweep_angle: quarter,
+            },
+            ProfileEdge::Line {
+                from: [0.0, 2.0],
+                to: [0.0, 1.0],
+            },
+            ProfileEdge::Arc {
+                center: [0.0, 0.0],
+                radius: 1.0,
+                start_angle: quarter,
+                sweep_angle: -quarter,
+            },
+            ProfileEdge::Line {
+                from: [1.0, 0.0],
+                to: [2.0, 0.0],
+            },
+        ];
+        let square = |x0, y0, x1, y1| {
+            let points = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+            (0..4)
+                .map(|index| ProfileEdge::Line {
+                    from: points[index],
+                    to: points[(index + 1) % 4],
+                })
+                .collect::<Vec<_>>()
+        };
+        for hole in [square(3.0, 3.0, 3.2, 3.2), square(1.9, 0.1, 2.1, 0.3)] {
+            assert!(arc_edged_extrusion_with_holes(
+                "invalid-arc-hole".into(),
+                Frame3::IDENTITY,
+                outer.clone(),
+                vec![hole],
+                3.0,
+                accuracy(),
+            )
+            .is_err());
+        }
+    }
+
+    #[test]
+    fn arc_edged_extrusion_rejects_exact_line_arc_crossings_and_overlap() {
+        let crossing = vec![
+            ProfileEdge::Arc {
+                center: [0.0, 0.0],
+                radius: 1.0,
+                start_angle: 0.0,
+                sweep_angle: std::f64::consts::PI,
+            },
+            ProfileEdge::Line {
+                from: [-1.0, 0.0],
+                to: [0.0, 1.2],
+            },
+            ProfileEdge::Line {
+                from: [0.0, 1.2],
+                to: [1.0, 0.0],
+            },
+        ];
+        assert!(arc_edged_extrusion(
+            "crossing".into(),
+            Frame3::IDENTITY,
+            crossing,
+            2.0,
+            accuracy(),
+        )
+        .is_err());
+        let overlapping = vec![
+            ProfileEdge::Arc {
+                center: [0.0, 0.0],
+                radius: 1.0,
+                start_angle: 0.0,
+                sweep_angle: std::f64::consts::PI,
+            },
+            ProfileEdge::Arc {
+                center: [0.0, 0.0],
+                radius: 1.0,
+                start_angle: std::f64::consts::PI,
+                sweep_angle: -std::f64::consts::FRAC_PI_2,
+            },
+            ProfileEdge::Line {
+                from: [0.0, 1.0],
+                to: [1.0, 0.0],
+            },
+        ];
+        assert!(arc_edged_extrusion(
+            "overlap".into(),
+            Frame3::IDENTITY,
+            overlapping,
+            2.0,
+            accuracy(),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn arc_edged_extrusion_accepts_nonradial_join_caps() {
+        let outer_end = std::f64::consts::FRAC_PI_2;
+        let inner_start = outer_end - 0.1;
+        let inner_end = 0.1;
+        let point = |radius: f64, angle: f64| [radius * angle.cos(), radius * angle.sin()];
+        let profile = vec![
+            ProfileEdge::Arc {
+                center: [0.0, 0.0],
+                radius: 2.0,
+                start_angle: 0.0,
+                sweep_angle: outer_end,
+            },
+            ProfileEdge::Line {
+                from: point(2.0, outer_end),
+                to: point(1.5, inner_start),
+            },
+            ProfileEdge::Arc {
+                center: [0.0, 0.0],
+                radius: 1.5,
+                start_angle: inner_start,
+                sweep_angle: inner_end - inner_start,
+            },
+            ProfileEdge::Line {
+                from: point(1.5, inner_end),
+                to: point(2.0, 0.0),
+            },
+        ];
+        let body = arc_edged_extrusion(
+            "curved-join".into(),
+            Frame3::IDENTITY,
+            profile,
+            2.4,
+            accuracy(),
+        )
+        .unwrap();
+        body.validate().unwrap();
+        assert_eq!(body.topology.faces.len(), 6);
+        assert_eq!(body.solids.len(), 1);
+    }
+
+    #[test]
     fn linear_extrusion_rejects_invalid_profile_relationships() {
         let square = vec![[0.0, 0.0], [4.0, 0.0], [4.0, 4.0], [0.0, 4.0]];
         let crossing = vec![[1.0, 1.0], [3.0, 3.0], [1.0, 3.0], [3.0, 1.0]];
@@ -3576,7 +4622,7 @@ mod tests {
         assert!(cylinder("c".into(), Frame3::IDENTITY, 1.0, 0.0, accuracy()).is_err());
     }
     #[test]
-    fn gallery_and_arbitrary_wall_parameters_round_trip_without_changing_geometry() {
+    fn gallery_and_arbitrary_host_parameters_round_trip_without_changing_geometry() {
         let frame = Frame3 {
             y: [0.0, 0.0, -1.0],
             z: [0.0, 1.0, 0.0],
@@ -3592,8 +4638,8 @@ mod tests {
         for start in [0.15, 0.7, -2.3] {
             for sweep in [1.8, -1.8, 0.33] {
                 bodies.push(
-                    circular_wall(
-                        "wall".into(),
+                    annular_sector_extrusion(
+                        "host".into(),
                         frame,
                         2.4,
                         0.3,
@@ -3614,11 +4660,20 @@ mod tests {
         }
     }
     #[test]
-    fn circular_walls_preserve_analytic_boundaries_and_authored_end_identity() {
+    fn annular_sector_extrusions_preserve_analytic_boundaries_and_authored_end_identity() {
         let frame = Frame3::from_axis([10.0, -4.0, 6.0], [1.0, 2.0, 3.0], [1.0, 0.0, 0.0]).unwrap();
         for sweep in [1.8, -1.8] {
-            let b =
-                circular_wall("wall".into(), frame, 3.0, 0.4, 2.5, 0.7, sweep, accuracy()).unwrap();
+            let b = annular_sector_extrusion(
+                "host".into(),
+                frame,
+                3.0,
+                0.4,
+                2.5,
+                0.7,
+                sweep,
+                accuracy(),
+            )
+            .unwrap();
             assert_eq!(b.topology.faces.len(), 6);
             assert_eq!(b.topology.vertices.len(), 8);
             assert_eq!(b.topology.edges.len(), 12);
@@ -3646,9 +4701,19 @@ mod tests {
             assert!((dot(normal, tangent) + sweep.signum()).abs() < 1e-12);
             BrepEnvelope::from_json(&b.to_json().unwrap()).unwrap();
         }
-        assert!(circular_wall("wall".into(), frame, 1.0, 2.0, 1.0, 0.0, 1.0, accuracy()).is_err());
-        assert!(circular_wall(
-            "wall".into(),
+        assert!(annular_sector_extrusion(
+            "host".into(),
+            frame,
+            1.0,
+            2.0,
+            1.0,
+            0.0,
+            1.0,
+            accuracy()
+        )
+        .is_err());
+        assert!(annular_sector_extrusion(
+            "host".into(),
             frame,
             1.0,
             0.2,
@@ -3660,25 +4725,25 @@ mod tests {
         .is_err());
     }
     #[test]
-    fn circular_wall_openings_are_exact_trimmed_cylinder_holes() {
+    fn annular_sector_extrusion_openings_are_exact_trimmed_cylinder_holes() {
         let openings = vec![
-            CircularWallOpening {
-                id: "window-a".into(),
+            AnnularSectorOpening {
+                id: "raised_cutout-a".into(),
                 angle: 0.65,
                 width: 0.9,
                 bottom: 0.7,
                 height: 1.2,
             },
-            CircularWallOpening {
-                id: "window-b".into(),
+            AnnularSectorOpening {
+                id: "raised_cutout-b".into(),
                 angle: 1.45,
                 width: 0.6,
                 bottom: 1.4,
                 height: 0.8,
             },
         ];
-        let wall = circular_wall_with_openings(
-            "wall".into(),
+        let host = annular_sector_extrusion_with_openings(
+            "host".into(),
             Frame3::IDENTITY,
             3.0,
             0.4,
@@ -3689,26 +4754,26 @@ mod tests {
             accuracy(),
         )
         .unwrap();
-        wall.validate().unwrap();
-        assert_eq!(wall.topology.faces.len(), 14);
-        assert_eq!(wall.topology.faces[0].trim.holes.len(), 2);
-        assert_eq!(wall.topology.faces[1].trim.holes.len(), 2);
-        assert_eq!(wall.topology.faces[0].provenance.role, FaceRole::Split);
-        assert_eq!(wall.topology.faces[1].provenance.role, FaceRole::Split);
+        host.validate().unwrap();
+        assert_eq!(host.topology.faces.len(), 14);
+        assert_eq!(host.topology.faces[0].trim.holes.len(), 2);
+        assert_eq!(host.topology.faces[1].trim.holes.len(), 2);
+        assert_eq!(host.topology.faces[0].provenance.role, FaceRole::Split);
+        assert_eq!(host.topology.faces[1].provenance.role, FaceRole::Split);
         assert_eq!(
-            wall.topology
+            host.topology
                 .faces
                 .iter()
                 .filter(|face| face.provenance.role == FaceRole::Cut)
                 .count(),
             8
         );
-        assert!(wall.geometry.surfaces.iter().all(|surface| matches!(
+        assert!(host.geometry.surfaces.iter().all(|surface| matches!(
             surface,
             SurfaceGeometry::Cylinder { .. } | SurfaceGeometry::Plane { .. }
         )));
-        let coarse = crate::analytic::tessellation::tessellate(&wall, 0.04, 100_000).unwrap();
-        let mesh = crate::analytic::tessellation::tessellate(&wall, 0.01, 100_000).unwrap();
+        let coarse = crate::analytic::tessellation::tessellate(&host, 0.04, 100_000).unwrap();
+        let mesh = crate::analytic::tessellation::tessellate(&host, 0.01, 100_000).unwrap();
         assert!(mesh.indices.len() > coarse.indices.len());
         let positions = mesh
             .positions
@@ -3723,18 +4788,18 @@ mod tests {
                 point[1].to_bits(),
                 point[2].to_bits(),
             ])));
-        BrepEnvelope::from_json(&wall.to_json().unwrap()).unwrap();
+        BrepEnvelope::from_json(&host.to_json().unwrap()).unwrap();
 
-        let door = circular_wall_with_openings(
-            "wall".into(),
+        let lower_cutout = annular_sector_extrusion_with_openings(
+            "host".into(),
             Frame3::IDENTITY,
             3.0,
             0.4,
             3.0,
             0.0,
             2.1,
-            vec![CircularWallOpening {
-                id: "door".into(),
+            vec![AnnularSectorOpening {
+                id: "lower_cutout".into(),
                 angle: 1.0,
                 width: 0.9,
                 bottom: 0.0,
@@ -3743,11 +4808,12 @@ mod tests {
             accuracy(),
         )
         .unwrap();
-        door.validate().unwrap();
-        assert_eq!(door.topology.faces[0].trim.holes.len(), 0);
-        assert_eq!(door.topology.faces[1].trim.holes.len(), 0);
+        lower_cutout.validate().unwrap();
+        assert_eq!(lower_cutout.topology.faces[0].trim.holes.len(), 0);
+        assert_eq!(lower_cutout.topology.faces[1].trim.holes.len(), 0);
         assert_eq!(
-            door.topology
+            lower_cutout
+                .topology
                 .faces
                 .iter()
                 .filter(|face| face.key.starts_with("bottom-"))
@@ -3755,22 +4821,23 @@ mod tests {
             2
         );
         assert_eq!(
-            door.topology
+            lower_cutout
+                .topology
                 .faces
                 .iter()
                 .filter(|face| face.provenance.role == FaceRole::Cut)
                 .count(),
             3
         );
-        crate::analytic::tessellation::tessellate(&door, 0.01, 100_000).unwrap();
-        BrepEnvelope::from_json(&door.to_json().unwrap()).unwrap();
+        crate::analytic::tessellation::tessellate(&lower_cutout, 0.01, 100_000).unwrap();
+        BrepEnvelope::from_json(&lower_cutout.to_json().unwrap()).unwrap();
     }
 
     #[test]
-    fn circular_wall_horizontal_opening_faces_bound_curved_edges() {
+    fn annular_sector_extrusion_horizontal_opening_faces_bound_curved_edges() {
         let sweep = -std::f64::consts::TAU / 3.0;
-        let wall = circular_wall_with_openings(
-            "example-wall".into(),
+        let host = annular_sector_extrusion_with_openings(
+            "example-host".into(),
             Frame3::IDENTITY,
             2.4,
             0.3,
@@ -3778,15 +4845,15 @@ mod tests {
             0.0,
             sweep,
             vec![
-                CircularWallOpening {
-                    id: "door".into(),
+                AnnularSectorOpening {
+                    id: "lower_cutout".into(),
                     angle: sweep * 0.22,
                     width: 0.7,
                     bottom: 0.0,
                     height: 1.05,
                 },
-                CircularWallOpening {
-                    id: "window".into(),
+                AnnularSectorOpening {
+                    id: "raised_cutout".into(),
                     angle: sweep * 0.76,
                     width: 0.7,
                     bottom: 0.35,
@@ -3796,8 +4863,8 @@ mod tests {
             accuracy(),
         )
         .unwrap();
-        wall.validate().unwrap();
-        crate::analytic::tessellation::tessellate(&wall, 0.01, 100_000).unwrap();
+        host.validate().unwrap();
+        crate::analytic::tessellation::tessellate(&host, 0.01, 100_000).unwrap();
     }
     #[test]
     fn body_bounds_cover_curved_extrema_absent_from_vertices() {

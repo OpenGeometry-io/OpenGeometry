@@ -20,13 +20,17 @@ export interface AnalyticAccuracy {
   exchange: number;
 }
 
-export interface AnalyticCircularWallOpening {
+export interface AnalyticAnnularSectorOpening {
   id: string;
   angle: number;
   width: number;
   bottom: number;
   height: number;
 }
+
+export type AnalyticProfileEdge =
+  | { kind: "line"; from: [number, number]; to: [number, number] }
+  | { kind: "arc"; center: [number, number]; radius: number; startAngle: number; sweepAngle: number };
 
 export type AnalyticPolygonLoftAlignment = "auto" | {
   upperStartIndex: number;
@@ -56,17 +60,18 @@ interface AnalyticOptions {
 export type AnalyticPrimitiveOptions = AnalyticOptions & (
   | { kind: "cuboid"; width: number; depth: number; height: number }
   | { kind: "linearExtrusion"; outer: [number, number][]; holes: [number, number][][]; height: number }
+  | { kind: "arcEdgedExtrusion"; outer: AnalyticProfileEdge[]; holes?: AnalyticProfileEdge[][]; height: number }
   | { kind: "polygonLoft"; lower: [number, number, number][]; upper: [number, number, number][]; alignment?: AnalyticPolygonLoftAlignment }
-  | { kind: "straightWallWithArchedOpening"; width: number; depth: number; height: number; opening: { id: string; station: number; width: number; bottom: number; height: number } }
+  | { kind: "boxWithArchedOpening"; width: number; depth: number; height: number; opening: { id: string; station: number; width: number; bottom: number; height: number } }
   | { kind: "planarPolyhedron"; vertices: [number, number, number][]; faces: number[][] }
   | { kind: "cylinder" | "cone"; radius: number; height: number }
   | { kind: "cylinderSector"; radius: number; height: number; startAngle: number; sweepAngle: number }
   | { kind: "sphere"; radius: number }
   | { kind: "frustum"; lowerRadius: number; upperRadius: number; height: number }
   | { kind: "torus"; majorRadius: number; minorRadius: number }
-  | { kind: "circularWall"; radius: number; thickness: number; height: number; startAngle: number; sweepAngle: number }
-  | { kind: "circularWallWithOpenings"; radius: number; thickness: number; height: number; startAngle: number; sweepAngle: number; openings: AnalyticCircularWallOpening[] }
-  | { kind: "circularWallWithArchedOpening"; radius: number; thickness: number; height: number; startAngle: number; sweepAngle: number; opening: AnalyticCircularWallOpening }
+  | { kind: "annularSectorExtrusion"; radius: number; thickness: number; height: number; startAngle: number; sweepAngle: number }
+  | { kind: "annularSectorExtrusionWithOpenings"; radius: number; thickness: number; height: number; startAngle: number; sweepAngle: number; openings: AnalyticAnnularSectorOpening[] }
+  | { kind: "annularSectorExtrusionWithArchedOpening"; radius: number; thickness: number; height: number; startAngle: number; sweepAngle: number; opening: AnalyticAnnularSectorOpening }
   | { kind: "coaxialCircleLoft"; lowerRadius: number; upperRadius: number; height: number }
   | { kind: "revolvedRectangle"; innerRadius: number; outerRadius: number; height: number }
   | { kind: "chamferedCuboid"; width: number; depth: number; height: number; chamfer: number }
@@ -233,13 +238,49 @@ export class AnalyticSolid extends THREE.Group {
     if (!Array.isArray(cutters) || cutters.length === 0 || cutters.some((cutter) => !(cutter instanceof AnalyticSolid))) {
       throw new Error("Analytic subtraction requires a nonempty AnalyticSolid array");
     }
-    let result = this.boolean(cutters[0], "subtraction", options);
-    for (const cutter of cutters.slice(1)) {
-      const next = result.boolean(cutter, "subtraction", options);
-      result.dispose();
-      result = next;
+    if (cutters.length > 1) {
+      const host = this.worldKernel();
+      const cutterKernels: OGAnalyticBrep[] = [];
+      let result: OGAnalyticBrep | undefined;
+      try {
+        for (const cutter of cutters) cutterKernels.push(cutter.worldKernel());
+        const payload = `[${cutterKernels.map((cutter) => cutter.get_brep_serialized()).join(",")}]`;
+        result = host.subtract_planar_cutters(payload, getUUID());
+        const report = result.get_boolean_report_serialized();
+        const solid = AnalyticSolid.fromBrep(result.get_brep_serialized(), {
+          deflection: options.deflection ?? this.lastDeflection,
+          color: options.color ?? this.surface.material.color,
+        });
+        solid.booleanReport = report ? JSON.parse(report) as AnalyticBooleanReport : undefined;
+        solid.name = this.name;
+        solid.userData = { ...this.userData };
+        solid.outline = this.outline;
+        return solid;
+      } catch (error) {
+        const parsed = parseAnalyticGeometryError(error);
+        // The native mixed-cutter path already chose a safe cutter order and
+        // checked spatial overlap. A serial fallback may drop an earlier
+        // cylindrical void or accept an invalid arched profile.
+        if (parsed.code !== "coverage_gap"
+          || parsed.families?.[0]?.includes("mixed cutter batch")) throw parsed;
+      } finally {
+        result?.free();
+        cutterKernels.forEach((cutter) => cutter.free());
+        host.free();
+      }
     }
-    return result;
+    let result: AnalyticSolid | undefined;
+    try {
+      for (const cutter of cutters) {
+        const next = (result ?? this).boolean(cutter, "subtraction", options);
+        result?.dispose();
+        result = next;
+      }
+      return result!;
+    } catch (error) {
+      result?.dispose();
+      throw error;
+    }
   }
 
   shell(thickness: number, options: { deflection?: number; color?: THREE.ColorRepresentation } = {}): AnalyticSolid {
@@ -604,6 +645,10 @@ function createPrimitiveKernel(options: AnalyticPrimitiveOptions, ogid: string):
       ? [options.outer, ...options.holes].reduce((extent, loop) => (
         loop.reduce((loopExtent, point) => Math.max(loopExtent, Math.abs(point[0]), Math.abs(point[1])), extent)
       ), 0)
+      : options.kind === "arcEdgedExtrusion"
+        ? [options.outer, ...(options.holes ?? [])].reduce((extent, ring) => ring.reduce((loopExtent, edge) => edge.kind === "line"
+          ? Math.max(loopExtent, ...edge.from.map(Math.abs), ...edge.to.map(Math.abs))
+          : Math.max(loopExtent, Math.abs(edge.center[0]) + edge.radius, Math.abs(edge.center[1]) + edge.radius), extent), 0)
       : 0;
     const loftExtent = options.kind === "polygonLoft"
       ? [...options.lower, ...options.upper].reduce((extent, point) => Math.max(extent, ...point.map(Math.abs)), 0)
@@ -619,17 +664,17 @@ function createPrimitiveKernel(options: AnalyticPrimitiveOptions, ogid: string):
         ? Math.max(2 * options.outerRadius, options.height)
       : options.kind === "chamferedCuboid"
         ? Math.max(options.width, options.depth, options.height)
-      : options.kind === "linearExtrusion"
+      : options.kind === "linearExtrusion" || options.kind === "arcEdgedExtrusion"
         ? Math.max(options.height, profileExtent)
       : options.kind === "polygonLoft"
         ? loftExtent
-      : options.kind === "straightWallWithArchedOpening"
+      : options.kind === "boxWithArchedOpening"
         ? Math.max(options.width, options.depth, options.height)
       : options.kind === "planarPolyhedron"
         ? polyhedronExtent
       : options.kind === "frustum"
         ? Math.max(2 * options.lowerRadius, 2 * options.upperRadius, options.height)
-        : options.kind === "circularWall" || options.kind === "circularWallWithOpenings" || options.kind === "circularWallWithArchedOpening"
+        : options.kind === "annularSectorExtrusion" || options.kind === "annularSectorExtrusionWithOpenings" || options.kind === "annularSectorExtrusionWithArchedOpening"
           ? Math.max(2 * options.radius + options.thickness, options.height)
         : options.kind === "cuboid"
           ? Math.max(options.width, options.depth, options.height)
@@ -653,6 +698,14 @@ function createPrimitiveKernel(options: AnalyticPrimitiveOptions, ogid: string):
         ? { radius: options.radius, height: options.height, fillet_radius: options.filletRadius }
       : options.kind === "linearExtrusion"
         ? { outer: options.outer, holes: options.holes, height: options.height }
+      : options.kind === "arcEdgedExtrusion"
+        ? { outer: options.outer.map((edge) => edge.kind === "line" ? edge : {
+            kind: "arc", center: edge.center, radius: edge.radius,
+            start_angle: edge.startAngle, sweep_angle: edge.sweepAngle,
+          }), holes: (options.holes ?? []).map((ring) => ring.map((edge) => edge.kind === "line" ? edge : {
+            kind: "arc", center: edge.center, radius: edge.radius,
+            start_angle: edge.startAngle, sweep_angle: edge.sweepAngle,
+          })), height: options.height }
       : options.kind === "polygonLoft"
         ? {
             lower: options.lower,
@@ -665,14 +718,14 @@ function createPrimitiveKernel(options: AnalyticPrimitiveOptions, ogid: string):
                   reverse_upper: options.alignment.reverseUpper ?? false,
                 },
           }
-      : options.kind === "straightWallWithArchedOpening"
+      : options.kind === "boxWithArchedOpening"
         ? { width: options.width, depth: options.depth, height: options.height, opening: options.opening }
       : options.kind === "planarPolyhedron"
         ? { vertices: options.vertices, faces: options.faces }
       : options.kind === "frustum"
         ? { lower_radius: options.lowerRadius, upper_radius: options.upperRadius, height: options.height }
-        : options.kind === "circularWall" || options.kind === "circularWallWithOpenings" || options.kind === "circularWallWithArchedOpening"
-          ? { radius: options.radius, thickness: options.thickness, height: options.height, start_angle: options.startAngle, sweep_angle: options.sweepAngle, ...(options.kind === "circularWallWithOpenings" ? { openings: options.openings.map((opening) => ({ id: opening.id, angle: opening.angle, width: opening.width, bottom: opening.bottom, height: opening.height })) } : options.kind === "circularWallWithArchedOpening" ? { opening: { id: options.opening.id, angle: options.opening.angle, width: options.opening.width, bottom: options.opening.bottom, height: options.opening.height } } : {}) }
+        : options.kind === "annularSectorExtrusion" || options.kind === "annularSectorExtrusionWithOpenings" || options.kind === "annularSectorExtrusionWithArchedOpening"
+          ? { radius: options.radius, thickness: options.thickness, height: options.height, start_angle: options.startAngle, sweep_angle: options.sweepAngle, ...(options.kind === "annularSectorExtrusionWithOpenings" ? { openings: options.openings.map((opening) => ({ id: opening.id, angle: opening.angle, width: opening.width, bottom: opening.bottom, height: opening.height })) } : options.kind === "annularSectorExtrusionWithArchedOpening" ? { opening: { id: options.opening.id, angle: options.opening.angle, width: options.opening.width, bottom: options.opening.bottom, height: options.opening.height } } : {}) }
         : options.kind === "cylinderSector"
           ? { radius: options.radius, height: options.height, start_angle: options.startAngle, sweep_angle: options.sweepAngle }
         : options.kind === "cuboid"
@@ -681,12 +734,12 @@ function createPrimitiveKernel(options: AnalyticPrimitiveOptions, ogid: string):
           ? { radius: options.radius }
           : { radius: options.radius, height: options.height };
     return OGAnalyticBrep.from_primitive(JSON.stringify({
-      kind: options.kind === "circularWall"
-        ? "circular_wall"
-        : options.kind === "circularWallWithOpenings"
-          ? "circular_wall_with_openings"
-        : options.kind === "circularWallWithArchedOpening"
-          ? "circular_wall_with_arched_opening"
+      kind: options.kind === "annularSectorExtrusion"
+        ? "annular_sector_extrusion"
+        : options.kind === "annularSectorExtrusionWithOpenings"
+          ? "annular_sector_extrusion_with_openings"
+        : options.kind === "annularSectorExtrusionWithArchedOpening"
+          ? "annular_sector_extrusion_with_arched_opening"
         : options.kind === "coaxialCircleLoft"
           ? "coaxial_circle_loft"
         : options.kind === "revolvedRectangle"
@@ -697,10 +750,12 @@ function createPrimitiveKernel(options: AnalyticPrimitiveOptions, ogid: string):
           ? "filleted_cylinder"
         : options.kind === "linearExtrusion"
           ? "linear_extrusion"
+        : options.kind === "arcEdgedExtrusion"
+          ? "arc_edged_extrusion"
         : options.kind === "polygonLoft"
           ? "polygon_loft"
-        : options.kind === "straightWallWithArchedOpening"
-          ? "straight_wall_with_arched_opening"
+        : options.kind === "boxWithArchedOpening"
+          ? "box_with_arched_opening"
         : options.kind === "planarPolyhedron"
           ? "planar_polyhedron"
         : options.kind === "cylinderSector"

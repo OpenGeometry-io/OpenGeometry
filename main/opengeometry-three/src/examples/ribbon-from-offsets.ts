@@ -13,7 +13,7 @@ function areClose(a: Vector3, b: Vector3): boolean {
   return (dx * dx + dy * dy + dz * dz) <= EPSILON * EPSILON;
 }
 
-function buildWallOutline(left: Vector3[], right: Vector3[]): Vector3[] {
+function buildRibbonOutline(left: Vector3[], right: Vector3[]): Vector3[] {
   if (left.length === 0 || right.length === 0) {
     return [];
   }
@@ -29,13 +29,13 @@ function buildWallOutline(left: Vector3[], right: Vector3[]): Vector3[] {
   return outline;
 }
 
-export interface WallFromOffsetsOptions {
+export interface RibbonFromOffsetsOptions {
   /** Subtract one exact coextensive through slot. Default `false`. */
   cutThroughSlot?: boolean;
   /** Width of the through slot along its centerline segment. Default `0.6`. */
   slotWidth?: number;
   /**
-   * Wall extrusion height in meters. Default `2.6` to match the example HTML.
+   * Ribbon extrusion height in meters. Default `2.6` to match the example HTML.
    */
   height?: number;
 }
@@ -46,7 +46,7 @@ function midpoint(a: Vector3, b: Vector3): Vector3 {
 
 function buildThroughSlot(
   centerlinePoints: Vector3[],
-  wallThickness: number,
+  ribbonThickness: number,
   height: number,
   width: number,
 ): AnalyticSolid {
@@ -57,7 +57,7 @@ function buildThroughSlot(
   const tangent = [(b.x - a.x) / length, (b.z - a.z) / length];
   const normal = [-tangent[1], tangent[0]];
   const halfWidth = width * 0.5;
-  const halfDepth = wallThickness * 0.5 + 0.1;
+  const halfDepth = ribbonThickness * 0.5 + 0.1;
   const point = (along: number, across: number): [number, number] => [
     mid.x + tangent[0] * along + normal[0] * across,
     -(mid.z + tangent[1] * along + normal[1] * across),
@@ -82,16 +82,16 @@ function buildThroughSlot(
  * other thrown value). Used by the example HTML to surface kernel failures
  * in a status panel without losing the structured payload.
  */
-export function describeWallSubtractError(error: unknown): string {
+export function describeRibbonSubtractError(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
   return String(error);
 }
 
-export function createWallFromOffsetsExample(
+export function createRibbonFromOffsetsExample(
   scene: THREE.Scene,
-  options: WallFromOffsetsOptions = {}
+  options: RibbonFromOffsetsOptions = {}
 ) {
   const centerline = new Polyline({
     points: [
@@ -105,11 +105,11 @@ export function createWallFromOffsetsExample(
     color: 0x1f2937,
   });
 
-  const wallThickness = 0.45;
-  const half = wallThickness * 0.5;
+  const ribbonThickness = 0.45;
+  const half = ribbonThickness * 0.5;
   const acuteThreshold = 35.0;
   const bevel = true;
-  const wallHeight = options.height ?? 2.6;
+  const ribbonHeight = options.height ?? 2.6;
 
   const leftOffset = centerline.getOffset(half, acuteThreshold, bevel);
   const rightOffset = centerline.getOffset(-half, acuteThreshold, bevel);
@@ -124,32 +124,32 @@ export function createWallFromOffsetsExample(
     color: 0xf97316,
   });
 
-  const wallOutline = buildWallOutline(leftOffset.points, rightOffset.points);
-  if (wallOutline.length < 3) {
-    throw new Error("Failed to create wall polygon from offsets.");
+  const ribbonOutline = buildRibbonOutline(leftOffset.points, rightOffset.points);
+  if (ribbonOutline.length < 3) {
+    throw new Error("Failed to create ribbon polygon from offsets.");
   }
 
-  const wallPolygon = new Polygon({
-    vertices: wallOutline,
+  const ribbonPolygon = new Polygon({
+    vertices: ribbonOutline,
     color: 0x3b82f6,
   });
 
-  wallPolygon.position.y = 0.01;
+  ribbonPolygon.position.y = 0.01;
 
   scene.add(centerline);
   scene.add(leftOffsetPolyline);
   scene.add(rightOffsetPolyline);
-  scene.add(wallPolygon);
+  scene.add(ribbonPolygon);
 
-  let cutResult: { wall: THREE.Object3D; cutters: AnalyticSolid[] } | null = null;
+  let cutResult: { ribbon: THREE.Object3D; cutters: AnalyticSolid[] } | null = null;
   let cutError: unknown = null;
 
   if (options.cutThroughSlot ?? false) {
-    const wallSolid = new AnalyticSolid({
+    const ribbonSolid = new AnalyticSolid({
       kind: "linearExtrusion",
-      outer: wallOutline.map((point) => [point.x, -point.z]),
+      outer: ribbonOutline.map((point) => [point.x, -point.z]),
       holes: [],
-      height: wallHeight,
+      height: ribbonHeight,
       color: 0x3b82f6,
       deflection: 0.01,
     });
@@ -162,20 +162,20 @@ export function createWallFromOffsetsExample(
         new Vector3(0.1, 0.0, 1.0),
         new Vector3(2.6, 0.0, 2.0),
       ],
-      wallThickness,
-      wallHeight,
+      ribbonThickness,
+      ribbonHeight,
       options.slotWidth ?? 0.6,
     );
     const cutters = [cutter];
 
     try {
-      const cutWall = wallSolid.subtract(cutters, { color: 0x3b82f6 });
-      scene.add(cutWall);
-      cutResult = { wall: cutWall, cutters };
+      const cutRibbon = ribbonSolid.subtract(cutters, { color: 0x3b82f6 });
+      scene.add(cutRibbon);
+      cutResult = { ribbon: cutRibbon, cutters };
     } catch (error) {
       cutError = error;
-      scene.add(wallSolid);
-      cutResult = { wall: wallSolid, cutters };
+      scene.add(ribbonSolid);
+      cutResult = { ribbon: ribbonSolid, cutters };
     }
   }
 
@@ -183,7 +183,7 @@ export function createWallFromOffsetsExample(
     centerline,
     leftOffsetPolyline,
     rightOffsetPolyline,
-    wallPolygon,
+    ribbonPolygon,
     leftOffset,
     rightOffset,
     cutResult,

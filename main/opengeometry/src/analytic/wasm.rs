@@ -1,5 +1,5 @@
 use super::{
-    booleans::{boolean_brep, shell_brep, BooleanOp, BooleanReport},
+    booleans::{boolean_brep, shell_brep, subtract_planar_cutters, BooleanOp, BooleanReport},
     primitives,
     query::{classify_point, PointClassification},
     tessellation::{Tessellation, TessellationCache},
@@ -21,7 +21,7 @@ struct TessellationOptions {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct CircularWallOpeningConfig {
+struct AnnularSectorOpeningConfig {
     id: String,
     angle: f64,
     width: f64,
@@ -31,7 +31,7 @@ struct CircularWallOpeningConfig {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct StraightWallArchedOpeningConfig {
+struct BoxArchedOpeningConfig {
     id: String,
     station: f64,
     width: f64,
@@ -97,6 +97,15 @@ enum PrimitiveConfig {
         holes: Vec<Vec<[f64; 2]>>,
         height: f64,
     },
+    ArcEdgedExtrusion {
+        id: String,
+        frame: Frame3,
+        accuracy: Accuracy,
+        outer: Vec<primitives::ProfileEdge>,
+        #[serde(default)]
+        holes: Vec<Vec<primitives::ProfileEdge>>,
+        height: f64,
+    },
     PolygonLoft {
         id: String,
         frame: Frame3,
@@ -105,14 +114,14 @@ enum PrimitiveConfig {
         upper: Vec<[f64; 3]>,
         alignment: PolygonLoftAlignmentConfig,
     },
-    StraightWallWithArchedOpening {
+    BoxWithArchedOpening {
         id: String,
         frame: Frame3,
         accuracy: Accuracy,
         width: f64,
         depth: f64,
         height: f64,
-        opening: StraightWallArchedOpeningConfig,
+        opening: BoxArchedOpeningConfig,
     },
     PlanarPolyhedron {
         id: String,
@@ -182,7 +191,7 @@ enum PrimitiveConfig {
         major_radius: f64,
         minor_radius: f64,
     },
-    CircularWall {
+    AnnularSectorExtrusion {
         id: String,
         frame: Frame3,
         accuracy: Accuracy,
@@ -192,7 +201,7 @@ enum PrimitiveConfig {
         start_angle: f64,
         sweep_angle: f64,
     },
-    CircularWallWithOpenings {
+    AnnularSectorExtrusionWithOpenings {
         id: String,
         frame: Frame3,
         accuracy: Accuracy,
@@ -201,9 +210,9 @@ enum PrimitiveConfig {
         height: f64,
         start_angle: f64,
         sweep_angle: f64,
-        openings: Vec<CircularWallOpeningConfig>,
+        openings: Vec<AnnularSectorOpeningConfig>,
     },
-    CircularWallWithArchedOpening {
+    AnnularSectorExtrusionWithArchedOpening {
         id: String,
         frame: Frame3,
         accuracy: Accuracy,
@@ -212,7 +221,7 @@ enum PrimitiveConfig {
         height: f64,
         start_angle: f64,
         sweep_angle: f64,
-        opening: CircularWallOpeningConfig,
+        opening: AnnularSectorOpeningConfig,
     },
     CoaxialCircleLoft {
         id: String,
@@ -263,6 +272,16 @@ impl PrimitiveConfig {
                 holes,
                 height,
             } => primitives::linear_extrusion(id, frame, outer, holes, height, accuracy),
+            Self::ArcEdgedExtrusion {
+                id,
+                frame,
+                accuracy,
+                outer,
+                holes,
+                height,
+            } => primitives::arc_edged_extrusion_with_holes(
+                id, frame, outer, holes, height, accuracy,
+            ),
             Self::PolygonLoft {
                 id,
                 frame,
@@ -286,7 +305,7 @@ impl PrimitiveConfig {
                 },
                 accuracy,
             ),
-            Self::StraightWallWithArchedOpening {
+            Self::BoxWithArchedOpening {
                 id,
                 frame,
                 accuracy,
@@ -294,13 +313,13 @@ impl PrimitiveConfig {
                 depth,
                 height,
                 opening,
-            } => primitives::straight_wall_with_arched_opening(
+            } => primitives::box_with_arched_opening(
                 id,
                 frame,
                 width,
                 depth,
                 height,
-                primitives::StraightWallArchedOpening {
+                primitives::BoxArchedOpening {
                     id: opening.id,
                     station: opening.station,
                     width: opening.width,
@@ -412,7 +431,7 @@ impl PrimitiveConfig {
                 major_radius,
                 minor_radius,
             } => primitives::torus(id, frame, major_radius, minor_radius, accuracy),
-            Self::CircularWall {
+            Self::AnnularSectorExtrusion {
                 id,
                 frame,
                 accuracy,
@@ -421,7 +440,7 @@ impl PrimitiveConfig {
                 height,
                 start_angle,
                 sweep_angle,
-            } => primitives::circular_wall(
+            } => primitives::annular_sector_extrusion(
                 id,
                 frame,
                 radius,
@@ -431,7 +450,7 @@ impl PrimitiveConfig {
                 sweep_angle,
                 accuracy,
             ),
-            Self::CircularWallWithOpenings {
+            Self::AnnularSectorExtrusionWithOpenings {
                 id,
                 frame,
                 accuracy,
@@ -441,7 +460,7 @@ impl PrimitiveConfig {
                 start_angle,
                 sweep_angle,
                 openings,
-            } => primitives::circular_wall_with_openings(
+            } => primitives::annular_sector_extrusion_with_openings(
                 id,
                 frame,
                 radius,
@@ -451,7 +470,7 @@ impl PrimitiveConfig {
                 sweep_angle,
                 openings
                     .into_iter()
-                    .map(|opening| primitives::CircularWallOpening {
+                    .map(|opening| primitives::AnnularSectorOpening {
                         id: opening.id,
                         angle: opening.angle,
                         width: opening.width,
@@ -461,7 +480,7 @@ impl PrimitiveConfig {
                     .collect(),
                 accuracy,
             ),
-            Self::CircularWallWithArchedOpening {
+            Self::AnnularSectorExtrusionWithArchedOpening {
                 id,
                 frame,
                 accuracy,
@@ -471,7 +490,7 @@ impl PrimitiveConfig {
                 start_angle,
                 sweep_angle,
                 opening,
-            } => primitives::circular_wall_with_arched_opening(
+            } => primitives::annular_sector_extrusion_with_arched_opening(
                 id,
                 frame,
                 radius,
@@ -479,7 +498,7 @@ impl PrimitiveConfig {
                 height,
                 start_angle,
                 sweep_angle,
-                primitives::CircularWallOpening {
+                primitives::AnnularSectorOpening {
                     id: opening.id,
                     angle: opening.angle,
                     width: opening.width,
@@ -709,6 +728,25 @@ impl OGAnalyticBrep {
         })
     }
 
+    pub fn subtract_planar_cutters(
+        &self,
+        cutters_json: &str,
+        id: &str,
+    ) -> Result<OGAnalyticBrep, JsValue> {
+        if cutters_json.len() > 16 * 1024 * 1024 {
+            return Err(js_error(GeometryError::LimitExceeded(
+                "planar cutter payload exceeds 16 MiB".into(),
+            )));
+        }
+        let cutters: Vec<BrepEnvelope> = serde_json::from_str(cutters_json)
+            .map_err(|error| js_error(GeometryError::InvalidGeometry(error.to_string())))?;
+        let result = subtract_planar_cutters(&self.brep, &cutters, id.into()).map_err(js_error)?;
+        Ok(Self {
+            brep: result.brep,
+            boolean_report: Some(result.report),
+        })
+    }
+
     pub fn shell(&self, thickness: f64, id: &str) -> Result<OGAnalyticBrep, JsValue> {
         let result = shell_brep(&self.brep, thickness, id.into()).map_err(js_error)?;
         Ok(Self {
@@ -830,6 +868,44 @@ mod tests {
     }
 
     #[test]
+    fn arc_edged_extrusion_config_preserves_circle_edges() {
+        let config = serde_json::json!({
+            "kind": "arc_edged_extrusion",
+            "id": "curved-profile",
+            "frame": Frame3::IDENTITY,
+            "accuracy": {
+                "geometric": 1e-9,
+                "intersection": 1e-10,
+                "tessellation": 0.001,
+                "exchange": 1e-5
+            },
+            "outer": [
+                {"kind":"arc","center":[0.0,0.0],"radius":2.0,"start_angle":0.0,"sweep_angle":1.5707963267948966},
+                {"kind":"line","from":[0.0,2.0],"to":[0.0,1.5]},
+                {"kind":"arc","center":[0.0,0.0],"radius":1.5,"start_angle":1.5707963267948966,"sweep_angle":-1.5707963267948966},
+                {"kind":"line","from":[1.5,0.0],"to":[2.0,0.0]}
+            ],
+            "height": 3.0
+        });
+        let body = serde_json::from_value::<PrimitiveConfig>(config)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(body.topology.faces.len(), 6);
+        assert_eq!(
+            body.geometry
+                .surfaces
+                .iter()
+                .filter(|surface| matches!(
+                    surface,
+                    crate::analytic::SurfaceGeometry::Cylinder { .. }
+                ))
+                .count(),
+            2
+        );
+    }
+
+    #[test]
     fn polygon_loft_config_builds_capped_planar_brep() {
         let config = serde_json::json!({
             "kind": "polygon_loft",
@@ -854,10 +930,10 @@ mod tests {
     }
 
     #[test]
-    fn circular_wall_opening_config_is_strict_and_analytic() {
+    fn annular_sector_extrusion_opening_config_is_strict_and_analytic() {
         let config = serde_json::json!({
-            "kind": "circular_wall_with_openings",
-            "id": "wall",
+            "kind": "annular_sector_extrusion_with_openings",
+            "id": "host",
             "frame": Frame3::IDENTITY,
             "accuracy": {
                 "geometric": 1e-9,
@@ -871,7 +947,7 @@ mod tests {
             "start_angle": 0.0,
             "sweep_angle": 2.0,
             "openings": [{
-                "id": "window",
+                "id": "raised_cutout",
                 "angle": 1.0,
                 "width": 0.8,
                 "bottom": 0.9,

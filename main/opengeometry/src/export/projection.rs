@@ -914,7 +914,7 @@ mod tests {
     #[test]
     fn analytic_projection_uses_v2_edges_and_face_normals() {
         let brep = crate::analytic::primitives::cuboid(
-            "wall-volume".into(),
+            "prism-volume".into(),
             crate::analytic::Frame3::IDENTITY,
             [4.0, 0.2, 3.0],
             crate::analytic::topology::Accuracy {
@@ -941,7 +941,7 @@ mod tests {
             .iter()
             .any(|segment| segment.class == EdgeClass::VisibleOutline));
         assert!(projected.segments.iter().all(|segment| {
-            segment.source_entity_id.as_deref() == Some("wall-volume")
+            segment.source_entity_id.as_deref() == Some("prism-volume")
                 && matches!(segment.geometry, Segment2D::Line { .. })
         }));
     }

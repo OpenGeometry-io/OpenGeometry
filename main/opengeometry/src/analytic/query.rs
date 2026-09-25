@@ -53,7 +53,20 @@ fn trim_samples(brep: &BrepEnvelope, face: &Face, loop_id: u32) -> Result<Vec<UV
             GeometryError::InvalidTopology("trim query halfedge has no pcurve".into())
         })?;
         let subdivisions = match brep.geometry.pcurves[pcurve as usize] {
-            PcurveGeometry::Line2 { .. } => 1,
+            PcurveGeometry::Line2 { direction, .. } => {
+                let periods =
+                    brep.geometry.surface(face.surface)?.charts()[face.trim.chart as usize].periods;
+                if periods.iter().enumerate().any(|(axis, period)| {
+                    period.is_some_and(|period| {
+                        ((direction[axis] * range.width()).abs() - period).abs()
+                            <= 4.0 * brep.accuracy.geometric
+                    })
+                }) {
+                    64
+                } else {
+                    1
+                }
+            }
             PcurveGeometry::Conic2 { .. } => 64,
             PcurveGeometry::ProjectedCurve { .. } | PcurveGeometry::IntersectionSide { .. } => 128,
         };
@@ -128,6 +141,36 @@ fn lift_to_face(surface: &SurfaceGeometry, face: &Face, mut uv: UV) -> UV {
     uv
 }
 
+fn periodic_cylinder_band_limit(
+    brep: &BrepEnvelope,
+    face: &Face,
+    loop_id: u32,
+) -> Result<Option<f64>, GeometryError> {
+    let loop_ = &brep.topology.loops[loop_id as usize];
+    let use_ = &brep.topology.halfedges[loop_.start_halfedge as usize];
+    if use_.next != Some(loop_.start_halfedge) || use_.from != use_.to {
+        return Ok(None);
+    }
+    let edge = &brep.topology.edges[use_.edge as usize];
+    let range = edge.geometry.range();
+    let Some(pcurve) = use_.geometry_use.pcurve else {
+        return Ok(None);
+    };
+    let PcurveGeometry::Line2 { direction, .. } = brep.geometry.pcurves[pcurve as usize] else {
+        return Ok(None);
+    };
+    let period = brep.geometry.surface(face.surface)?.charts()[face.trim.chart as usize].periods[0];
+    let Some(period) = period else {
+        return Ok(None);
+    };
+    if direction[1].abs() * range.width() > brep.accuracy.geometric
+        || ((direction[0] * range.width()).abs() - period).abs() > 4.0 * brep.accuracy.geometric
+    {
+        return Ok(None);
+    }
+    Ok(Some(lifted_uv(brep, loop_.start_halfedge, range.lo)?[1]))
+}
+
 pub(crate) fn face_contains_uv(
     brep: &BrepEnvelope,
     face: &Face,
@@ -144,6 +187,19 @@ pub(crate) fn face_contains_uv(
     };
     if !face.trim.uv_bounds[0].contains(uv[0]) || !face.trim.uv_bounds[1].contains(uv[1]) {
         return Ok(Some(false));
+    }
+    if matches!(surface, SurfaceGeometry::Cylinder { .. }) && face.trim.holes.len() == 1 {
+        if let (Some(outer), Some(inner)) = (
+            periodic_cylinder_band_limit(brep, face, face.trim.outer)?,
+            periodic_cylinder_band_limit(brep, face, face.trim.holes[0])?,
+        ) {
+            let lo = outer.min(inner);
+            let hi = outer.max(inner);
+            if (uv[1] - lo).abs() <= uv_tolerance || (uv[1] - hi).abs() <= uv_tolerance {
+                return Ok(None);
+            }
+            return Ok(Some(uv[1] > lo && uv[1] < hi));
+        }
     }
     let outer = trim_samples(brep, face, face.trim.outer)?;
     let Some(mut inside) = in_loop(uv, &outer, uv_tolerance) else {
@@ -299,7 +355,7 @@ fn ray_box_domain(
     origin: Point3,
     direction: Point3,
 ) -> Result<Option<Interval>, GeometryError> {
-    let Some(bounds) = brep.bounds()? else {
+    let Some(bounds) = brep.bounds_unchecked()? else {
         return Ok(None);
     };
     let mut lo: f64 = 0.0;
@@ -326,16 +382,17 @@ fn ray_box_domain(
     }
 }
 
-fn classify_with_ray(
+fn classify_with_ray<'a>(
     brep: &BrepEnvelope,
     point: Point3,
     direction: Point3,
+    faces: impl Iterator<Item = &'a Face>,
 ) -> Result<PointClassification, GeometryError> {
     let Some(domain) = ray_box_domain(brep, point, direction)? else {
         return Ok(PointClassification::Outside);
     };
     let mut hits: Vec<(f64, Point3)> = Vec::new();
-    for face in &brep.topology.faces {
+    for face in faces {
         let surface = brep.geometry.surface(face.surface)?;
         let Some(roots) = support_roots(
             surface,
@@ -395,6 +452,13 @@ pub fn classify_point(
     point: Point3,
 ) -> Result<PointClassification, GeometryError> {
     brep.validate()?;
+    classify_point_validated(brep, point)
+}
+
+pub(crate) fn classify_point_validated(
+    brep: &BrepEnvelope,
+    point: Point3,
+) -> Result<PointClassification, GeometryError> {
     if point.into_iter().any(|value| !value.is_finite()) {
         return Err(GeometryError::InvalidGeometry(
             "point classification requires finite coordinates".into(),
@@ -406,7 +470,32 @@ pub fn classify_point(
         unit([0.311, 0.233, 1.0])?,
     ];
     for direction in directions {
-        let result = classify_with_ray(brep, point, direction)?;
+        let result = classify_with_ray(brep, point, direction, brep.topology.faces.iter())?;
+        if result != PointClassification::Unknown {
+            return Ok(result);
+        }
+    }
+    Ok(PointClassification::Unknown)
+}
+
+pub(crate) fn classify_point_in_shell(
+    brep: &BrepEnvelope,
+    faces: &[u32],
+    point: Point3,
+) -> Result<PointClassification, GeometryError> {
+    for direction in [
+        unit([1.0, 0.371, 0.127])?,
+        unit([0.193, 1.0, 0.419])?,
+        unit([0.311, 0.233, 1.0])?,
+    ] {
+        let result = classify_with_ray(
+            brep,
+            point,
+            direction,
+            faces
+                .iter()
+                .map(|face| &brep.topology.faces[*face as usize]),
+        )?;
         if result != PointClassification::Unknown {
             return Ok(result);
         }

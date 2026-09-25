@@ -455,6 +455,10 @@ impl BrepEnvelope {
 
     pub fn bounds(&self) -> Result<Option<PatchBounds>, GeometryError> {
         self.validate()?;
+        self.bounds_unchecked()
+    }
+
+    pub(crate) fn bounds_unchecked(&self) -> Result<Option<PatchBounds>, GeometryError> {
         let mut result: Option<PatchBounds> = None;
         let mut include = |bounds: PatchBounds| {
             result = Some(match result {

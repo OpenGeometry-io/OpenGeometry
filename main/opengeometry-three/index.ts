@@ -119,7 +119,7 @@ export { AnalyticSolid } from "./src/shapes/analytic-solid";
 export { AnalyticPattern, circularPattern, linearPattern, rectangularPattern } from "./src/shapes/analytic-pattern";
 export type { AnalyticPatternHit, AnalyticPatternInstance } from "./src/shapes/analytic-pattern";
 export type {
-  AnalyticBooleanOp, AnalyticBooleanReport, AnalyticBrepOptions, AnalyticFrame, AnalyticAccuracy, AnalyticCircularWallOpening, AnalyticPolygonLoftAlignment, AnalyticProjectionCamera, AnalyticProjectionHlr, AnalyticPrimitiveOptions, AnalyticTessellationStats, AnalyticTessellationOptions, AnalyticStepExport, AnalyticStlExport,
+  AnalyticBooleanOp, AnalyticBooleanReport, AnalyticBrepOptions, AnalyticFrame, AnalyticAccuracy, AnalyticAnnularSectorOpening, AnalyticProfileEdge, AnalyticPolygonLoftAlignment, AnalyticProjectionCamera, AnalyticProjectionHlr, AnalyticPrimitiveOptions, AnalyticTessellationStats, AnalyticTessellationOptions, AnalyticStepExport, AnalyticStlExport,
 } from "./src/shapes/analytic-solid";
 
 /**
