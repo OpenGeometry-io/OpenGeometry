@@ -883,7 +883,10 @@ fn separate_boolean(
     })
 }
 
-fn analytic_face_mappings(out: &BrepEnvelope, inputs: [&BrepEnvelope; 2]) -> Vec<FaceMapping> {
+pub(super) fn analytic_face_mappings<'a>(
+    out: &BrepEnvelope,
+    inputs: impl IntoIterator<Item = &'a BrepEnvelope>,
+) -> Vec<FaceMapping> {
     inputs
         .into_iter()
         .flat_map(|input| {
@@ -924,11 +927,11 @@ struct PrismaticSide {
     source: FaceSource,
 }
 
-struct PrismaticInput<'a> {
-    brep: &'a BrepEnvelope,
-    frame: Frame3,
-    height: f64,
-    contours: Vec<Vec<Point3>>,
+pub(super) struct PrismaticInput<'a> {
+    pub(super) brep: &'a BrepEnvelope,
+    pub(super) frame: Frame3,
+    pub(super) height: f64,
+    pub(super) contours: Vec<Vec<Point3>>,
     sides: Vec<PrismaticSide>,
 }
 
@@ -941,7 +944,7 @@ fn prismatic_gap() -> GeometryError {
     }
 }
 
-fn brep_face_source(brep: &BrepEnvelope, face: u32) -> FaceSource {
+pub(super) fn brep_face_source(brep: &BrepEnvelope, face: u32) -> FaceSource {
     FaceSource {
         entity: brep.id.clone(),
         body: brep.id.clone(),
@@ -1118,7 +1121,9 @@ fn planar_extrusion_topology_matches(
     Ok(comparable(&normalized)? == comparable(expected)?)
 }
 
-fn full_planar_extrusion(brep: &BrepEnvelope) -> Result<PrismaticInput<'_>, GeometryError> {
+pub(super) fn full_planar_extrusion(
+    brep: &BrepEnvelope,
+) -> Result<PrismaticInput<'_>, GeometryError> {
     brep.validate()?;
     if !matches!(brep.quality, GeometryQuality::Analytic)
         || brep.topology.faces.len() < 5
@@ -1354,7 +1359,7 @@ fn projected_segment_contains(
     })
 }
 
-fn prismatic_profile_sources(
+pub(super) fn prismatic_profile_sources(
     input: &PrismaticInput<'_>,
     common_frame: Frame3,
     from: Pt2,
@@ -1933,6 +1938,65 @@ fn remap_closed_loop_pcurve(
     })
 }
 
+fn exact_closed_circle_pcurve(
+    source_geometry: &GeometryStore,
+    target_geometry: &GeometryStore,
+    source_pcurve: u32,
+    circle: &CurveGeometry,
+    surface: u32,
+    tolerance: f64,
+) -> Result<Option<PcurveGeometry>, GeometryError> {
+    if !matches!(
+        source_geometry.pcurves.get(source_pcurve as usize),
+        Some(PcurveGeometry::ProjectedCurve { .. })
+    ) {
+        return Ok(None);
+    }
+    let CurveGeometry::Circle {
+        frame: circle,
+        radius,
+    } = circle
+    else {
+        return Ok(None);
+    };
+    let support = target_geometry.surface(surface)?;
+    let frame = support.frame();
+    let centre = frame.local(circle.origin);
+    let axis_x = [dot(circle.x, frame.x), dot(circle.x, frame.y)];
+    let axis_y = [dot(circle.y, frame.x), dot(circle.y, frame.y)];
+    match support {
+        SurfaceGeometry::Plane { .. }
+            if centre[2].abs() <= tolerance
+                && dot(circle.x, frame.z).abs() * radius <= tolerance
+                && dot(circle.y, frame.z).abs() * radius <= tolerance =>
+        {
+            Ok(Some(PcurveGeometry::Conic2 {
+                origin: [centre[0], centre[1]],
+                axis_a: axis_x.map(|value| value * radius),
+                axis_b: axis_y.map(|value| value * radius),
+            }))
+        }
+        SurfaceGeometry::Cylinder {
+            radius: support_radius,
+            ..
+        } if centre[0].hypot(centre[1]) <= tolerance
+            && (radius - support_radius).abs() <= tolerance
+            && (dot(circle.z, frame.z).abs() - 1.0).abs() <= 1.0e-10 =>
+        {
+            let rate = dot(cross(circle.x, circle.y), frame.z).signum();
+            let phase = axis_x[1].atan2(axis_x[0]);
+            let original = source_geometry.pcurve_at(source_pcurve, 0.0)?;
+            let lifted_phase = phase
+                + ((original[0] - phase) / std::f64::consts::TAU).round() * std::f64::consts::TAU;
+            Ok(Some(PcurveGeometry::Line2 {
+                origin: [lifted_phase, centre[2]],
+                direction: [rate, 0.0],
+            }))
+        }
+        _ => Ok(None),
+    }
+}
+
 fn pcurve_winding(
     geometry: &GeometryStore,
     surface: u32,
@@ -2308,9 +2372,19 @@ fn generic_single_closed_loop_boolean(
                 })?
         }
         curve_geometry => {
-            out.geometry.curves.push(curve_geometry);
+            out.geometry.curves.push(curve_geometry.clone());
             [0, 1]
                 .map(|side| {
+                    if let Some(exact) = exact_closed_circle_pcurve(
+                        &graph.geometry,
+                        &out.geometry,
+                        branch.pcurves[side],
+                        &curve_geometry,
+                        selected_surfaces[side].unwrap(),
+                        out.accuracy.geometric,
+                    )? {
+                        return Ok(exact);
+                    }
                     remap_closed_loop_pcurve(
                         &graph.geometry.pcurves[branch.pcurves[side] as usize],
                         curve,
@@ -2700,6 +2774,7 @@ fn generic_two_sided_cutter_band_subtraction(
     {
         return Ok(None);
     }
+    let mut closed_branches = Vec::with_capacity(2);
     for pair in &body_graph.pairs {
         if pair.graph.coincident
             || !pair.graph.contacts.is_empty()
@@ -2708,20 +2783,46 @@ fn generic_two_sided_cutter_band_subtraction(
             return Ok(None);
         }
         let branch = &pair.graph.branches[0];
-        if norm(sub(branch.endpoints[0], branch.endpoints[1]))
-            > host.accuracy.intersection.max(cutter.accuracy.intersection)
+        let closure = norm(sub(branch.endpoints[0], branch.endpoints[1]));
+        let intersection = host.accuracy.intersection.max(cutter.accuracy.intersection);
+        let geometric = host.accuracy.geometric.max(cutter.accuracy.geometric);
+        let closed = if closure <= intersection {
+            super::face_intersection::IntersectionBranch {
+                curve: branch.curve,
+                pcurves: branch.pcurves,
+                range: branch.range,
+                endpoints: branch.endpoints,
+            }
+        } else if let Some(CurveGeometry::Circle { frame, radius }) =
+            pair.graph.geometry.curves.get(branch.curve as usize)
         {
+            let tau = std::f64::consts::TAU;
+            if closure > 4.0 * geometric
+                || branch.range.lo.abs() * radius > 4.0 * geometric
+                || (branch.range.hi - tau).abs() * radius > 4.0 * geometric
+            {
+                return Ok(None);
+            }
+            let point = add(frame.origin, scale(frame.x, *radius));
+            super::face_intersection::IntersectionBranch {
+                curve: branch.curve,
+                pcurves: branch.pcurves,
+                range: Interval::new(0.0, tau)?,
+                endpoints: [point, point],
+            }
+        } else {
             return Ok(None);
-        }
+        };
         if pcurve_winding(
             &pair.graph.geometry,
-            pcurve_support_surface(&pair.graph.geometry, branch.pcurves[0])?,
-            branch.pcurves[0],
-            branch.range,
+            pcurve_support_surface(&pair.graph.geometry, closed.pcurves[0])?,
+            closed.pcurves[0],
+            closed.range,
         )? != [0, 0]
         {
             return Ok(None);
         }
+        closed_branches.push(closed);
     }
 
     let accuracy = Accuracy {
@@ -2739,10 +2840,9 @@ fn generic_two_sided_cutter_band_subtraction(
     let cut_face = out.topology.faces.len() as u32;
     let mut cut_loops = Vec::with_capacity(2);
     let mut cut_bounds: Option<[Interval; 2]> = None;
-    for pair in &body_graph.pairs {
+    for (pair, branch) in body_graph.pairs.iter().zip(&closed_branches) {
         let host_face = pair.faces[0];
         let host_surface = out.topology.faces[host_face as usize].surface;
-        let branch = &pair.graph.branches[0];
         let (edge, vertex, pcurves) = append_closed_branch_geometry(
             &mut out,
             &pair.graph,
@@ -2901,9 +3001,19 @@ fn append_closed_branch_geometry(
                 })?
         }
         curve_geometry => {
-            out.geometry.curves.push(curve_geometry);
+            out.geometry.curves.push(curve_geometry.clone());
             [0, 1]
                 .map(|side| {
+                    if let Some(exact) = exact_closed_circle_pcurve(
+                        &graph.geometry,
+                        &out.geometry,
+                        branch.pcurves[side],
+                        &curve_geometry,
+                        selected_surfaces[side],
+                        out.accuracy.geometric,
+                    )? {
+                        return Ok(exact);
+                    }
                     remap_closed_loop_pcurve(
                         &graph.geometry.pcurves[branch.pcurves[side] as usize],
                         curve,
@@ -8219,7 +8329,39 @@ pub fn boolean_brep(
             return match super::box_booleans::boolean_boxes(a, b, operation, id.clone()) {
                 Ok(result) => Ok(result),
                 Err(GeometryError::CoverageGap { .. }) => {
-                    boolean_planar_extrusions(a, b, operation, id.clone())
+                    match boolean_planar_extrusions(a, b, operation, id.clone()) {
+                        Ok(result) => Ok(result),
+                        Err(GeometryError::CoverageGap { .. }) => {
+                            match super::box_booleans::boolean_rectilinear(
+                                a,
+                                b,
+                                operation,
+                                id.clone(),
+                            ) {
+                                Ok(result) => Ok(result),
+                                Err(GeometryError::CoverageGap { .. })
+                                    if operation == BooleanOp::Subtraction =>
+                                {
+                                    match super::planar_booleans::subtract_layered_extrusions(
+                                        a,
+                                        b,
+                                        id.clone(),
+                                    ) {
+                                        Err(GeometryError::CoverageGap { .. }) => {
+                                            super::planar_booleans::subtract_planar_polyhedra(
+                                                a,
+                                                b,
+                                                id.clone(),
+                                            )
+                                        }
+                                        result => result,
+                                    }
+                                }
+                                Err(error) => Err(error),
+                            }
+                        }
+                        Err(error) => Err(error),
+                    }
                 }
                 Err(error) => Err(error),
             };
@@ -8228,6 +8370,26 @@ pub fn boolean_brep(
     })();
     match specialized {
         Err(GeometryError::CoverageGap { .. }) => {
+            if operation == BooleanOp::Subtraction
+                && b.geometry
+                    .surfaces
+                    .iter()
+                    .all(|surface| matches!(surface, SurfaceGeometry::Plane { .. }))
+                && a.geometry
+                    .surfaces
+                    .iter()
+                    .any(|surface| matches!(surface, SurfaceGeometry::Cylinder { .. }))
+            {
+                match super::curved_layered_boolean::subtract_vertical_arc_extrusion(
+                    a,
+                    b,
+                    id.clone(),
+                ) {
+                    Ok(result) => return Ok(result),
+                    Err(GeometryError::CoverageGap { .. }) => {}
+                    Err(error) => return Err(error),
+                }
+            }
             if let Some(result) =
                 generic_two_sided_cutter_band_subtraction(a, b, operation, id.clone())?
             {
@@ -8254,6 +8416,502 @@ pub fn boolean_brep(
         }
         result => result,
     }
+}
+
+/// Subtract through-depth planar and circular profiles from a rectangular
+/// prism in one analytic arrangement. This avoids making a later circle cut
+/// through the coplanar face tiles created by an earlier rectangular cut.
+fn subtract_prismatic_profile_batch(
+    host: &BrepEnvelope,
+    cutters: &[BrepEnvelope],
+    id: String,
+) -> Result<Option<BooleanResult>, GeometryError> {
+    use crate::geometry::curved_boolean2d::{boolean_curved_regions, CurveEdge2, CurveRegion2};
+
+    let Ok(prism) = full_planar_extrusion(host) else {
+        return Ok(None);
+    };
+    if prism.contours.len() != 1
+        || prism.contours[0].len() != 4
+        || host.topology.vertices.len() != 8
+    {
+        return Ok(None);
+    }
+    let first_axis = cutters.iter().find_map(|cutter| {
+        full_planar_extrusion(cutter)
+            .ok()
+            .map(|input| input.frame.z)
+            .or_else(|| full_cylinder(cutter).ok().map(|input| input.frame.z))
+    });
+    let Some(across) = first_axis else {
+        return Ok(None);
+    };
+    let up = prism.frame.z;
+    if dot(up, across).abs() > 1.0e-10 {
+        return Ok(None);
+    }
+    let along = unit(cross(up, across))?;
+    let basis = [along, up, across];
+    let mut ranges = [[f64::INFINITY, f64::NEG_INFINITY]; 3];
+    for vertex in &host.topology.vertices {
+        for axis in 0..3 {
+            let value = dot(vertex.position, basis[axis]);
+            ranges[axis][0] = ranges[axis][0].min(value);
+            ranges[axis][1] = ranges[axis][1].max(value);
+        }
+    }
+    let geometric = std::iter::once(host)
+        .chain(cutters.iter())
+        .map(|brep| brep.accuracy.geometric)
+        .fold(0.0_f64, f64::max);
+    let dimensions = ranges.map(|range| range[1] - range[0]);
+    if dimensions.iter().any(|value| *value <= 4.0 * geometric)
+        || host.topology.vertices.iter().any(|vertex| {
+            (0..3).any(|axis| {
+                let value = dot(vertex.position, basis[axis]);
+                (value - ranges[axis][0]).abs() > geometric
+                    && (value - ranges[axis][1]).abs() > geometric
+            })
+        })
+    {
+        return Ok(None);
+    }
+    let frame = Frame3 {
+        origin: add(
+            add(scale(along, ranges[0][0]), scale(up, ranges[1][0])),
+            scale(across, ranges[2][0]),
+        ),
+        x: along,
+        y: up,
+        z: across,
+    };
+    frame.validate()?;
+    let line_ring = |points: &[[f64; 2]]| -> Vec<CurveEdge2> {
+        points
+            .iter()
+            .enumerate()
+            .map(|(index, point)| CurveEdge2::Line {
+                from: *point,
+                to: points[(index + 1) % points.len()],
+            })
+            .collect()
+    };
+    let reverse_ring = |ring: &mut Vec<CurveEdge2>| {
+        *ring = ring.iter().rev().map(CurveEdge2::reverse).collect();
+    };
+    let winding_ring = |mut ring: Vec<CurveEdge2>, positive: bool| {
+        let area = ring.iter().map(CurveEdge2::twice_area).sum::<f64>();
+        if (area > 0.0) != positive {
+            reverse_ring(&mut ring);
+        }
+        ring
+    };
+    let host_region = CurveRegion2 {
+        outer: line_ring(&[
+            [0.0, 0.0],
+            [0.0, dimensions[1]],
+            [dimensions[0], dimensions[1]],
+            [dimensions[0], 0.0],
+        ]),
+        holes: Vec::new(),
+    };
+    let mut cut_regions = Vec::with_capacity(cutters.len());
+    for cutter in cutters {
+        let vertices_cover_depth = || {
+            let mut lo = f64::INFINITY;
+            let mut hi = f64::NEG_INFINITY;
+            for vertex in &cutter.topology.vertices {
+                let value = frame.local(vertex.position)[2];
+                lo = lo.min(value);
+                hi = hi.max(value);
+            }
+            lo <= geometric && hi >= dimensions[2] - geometric
+        };
+        if !vertices_cover_depth() {
+            return Ok(None);
+        }
+        if let Ok(input) = full_planar_extrusion(cutter) {
+            if dot(input.frame.z, across).abs() < 1.0 - 1.0e-10 {
+                return Ok(None);
+            }
+            let mut rings = input.contours.iter().map(|contour| {
+                line_ring(
+                    &contour
+                        .iter()
+                        .map(|point| {
+                            let local = frame.local(*point);
+                            [local[0], local[1]]
+                        })
+                        .collect::<Vec<_>>(),
+                )
+            });
+            let outer = winding_ring(
+                rings.next().ok_or_else(|| {
+                    GeometryError::InvalidTopology("profile cutter has no outer ring".into())
+                })?,
+                false,
+            );
+            let holes = rings.map(|ring| winding_ring(ring, true)).collect();
+            cut_regions.push(CurveRegion2 { outer, holes });
+        } else if let Ok(input) = full_cylinder(cutter) {
+            if dot(input.frame.z, across).abs() < 1.0 - 1.0e-10 {
+                return Ok(None);
+            }
+            let center = frame.local(input.frame.origin);
+            cut_regions.push(CurveRegion2 {
+                outer: vec![
+                    CurveEdge2::Arc {
+                        center: [center[0], center[1]],
+                        radius: input.radius,
+                        start_angle: 0.0,
+                        sweep_angle: -std::f64::consts::PI,
+                    },
+                    CurveEdge2::Arc {
+                        center: [center[0], center[1]],
+                        radius: input.radius,
+                        start_angle: -std::f64::consts::PI,
+                        sweep_angle: -std::f64::consts::PI,
+                    },
+                ],
+                holes: Vec::new(),
+            });
+        } else {
+            return Ok(None);
+        }
+    }
+    let regions = boolean_curved_regions(
+        &[host_region],
+        &cut_regions,
+        PlanarBooleanOp::Subtraction,
+        geometric,
+    )
+    .map_err(|reason| {
+        GeometryError::UnresolvedIntersection(format!("mixed profile batch arrangement: {reason}"))
+    })?;
+    if regions.is_empty() {
+        return Ok(None);
+    }
+    let convert = |ring: Vec<CurveEdge2>| -> Vec<primitives::ProfileEdge> {
+        ring.into_iter()
+            .map(|edge| match edge {
+                CurveEdge2::Line { from, to } => primitives::ProfileEdge::Line { from, to },
+                CurveEdge2::Arc {
+                    center,
+                    radius,
+                    start_angle,
+                    sweep_angle,
+                } => primitives::ProfileEdge::Arc {
+                    center,
+                    radius,
+                    start_angle,
+                    sweep_angle,
+                },
+            })
+            .collect()
+    };
+    let accuracy = Accuracy {
+        geometric,
+        intersection: std::iter::once(host)
+            .chain(cutters.iter())
+            .map(|brep| brep.accuracy.intersection)
+            .fold(0.0_f64, f64::max),
+        tessellation: std::iter::once(host)
+            .chain(cutters.iter())
+            .map(|brep| brep.accuracy.tessellation)
+            .fold(0.0_f64, f64::max),
+        exchange: std::iter::once(host)
+            .chain(cutters.iter())
+            .map(|brep| brep.accuracy.exchange)
+            .fold(0.0_f64, f64::max),
+    };
+    let single_region = regions.len() == 1;
+    let mut parts = Vec::with_capacity(regions.len());
+    for (index, region) in regions.into_iter().enumerate() {
+        parts.push(primitives::arc_edged_extrusion_with_holes(
+            if single_region {
+                id.clone()
+            } else {
+                format!("{id}:part:{index}")
+            },
+            frame,
+            convert(region.outer),
+            region.holes.into_iter().map(convert).collect(),
+            dimensions[2],
+            accuracy,
+        )?);
+    }
+    let mut out = if single_region {
+        parts.pop().ok_or_else(|| {
+            GeometryError::InvalidTopology("profile batch produced no material region".into())
+        })?
+    } else {
+        let mut compound = BrepEnvelope::new(id, accuracy)?;
+        for part in &parts {
+            append_analytic_input(&mut compound, part)?;
+        }
+        compound
+    };
+    let inputs = std::iter::once(host)
+        .chain(cutters.iter())
+        .collect::<Vec<_>>();
+    for result_face in &mut out.topology.faces {
+        let surface = out.geometry.surface(result_face.surface)?;
+        let mut sources = Vec::new();
+        let cap = matches!(surface, SurfaceGeometry::Plane { frame: plane }
+            if dot(plane.z, across).abs() > 1.0 - 1.0e-10);
+        if cap {
+            let position = dot(surface.frame().origin, across);
+            for face in &host.topology.faces {
+                let SurfaceGeometry::Plane {
+                    frame: source_frame,
+                } = host.geometry.surface(face.surface)?
+                else {
+                    continue;
+                };
+                if dot(source_frame.z, across).abs() > 1.0 - 1.0e-10
+                    && (dot(source_frame.origin, across) - position).abs() <= geometric
+                {
+                    sources.push(brep_face_source(host, face.id));
+                }
+            }
+        } else {
+            let uv = result_face.trim.uv_bounds.map(Interval::midpoint);
+            let sample = surface.point_at(uv)?;
+            for input in &inputs {
+                for face in &input.topology.faces {
+                    let source_surface = input.geometry.surface(face.surface)?;
+                    let on = match source_surface {
+                        SurfaceGeometry::Plane {
+                            frame: source_frame,
+                        } => {
+                            source_frame.local(sample)[2].abs() <= geometric
+                                && dot(source_frame.z, across).abs() < 1.0 - 1.0e-10
+                        }
+                        SurfaceGeometry::Cylinder {
+                            frame: source_frame,
+                            radius,
+                        } => {
+                            let local = source_frame.local(sample);
+                            (local[0].hypot(local[1]) - radius).abs() <= geometric
+                        }
+                        _ => false,
+                    };
+                    if !on {
+                        continue;
+                    }
+                    let hint = face.trim.uv_bounds.map(Interval::midpoint);
+                    let source_uv = source_surface.project(sample, Some(hint))?;
+                    if face_contains_uv(input, face, source_uv)? == Some(true) {
+                        sources.push(brep_face_source(input, face.id));
+                    }
+                }
+            }
+        }
+        if sources.is_empty() {
+            return Err(GeometryError::InvalidTopology(format!(
+                "profile batch output face {} has no source",
+                result_face.key
+            )));
+        }
+        let cut = sources
+            .iter()
+            .any(|source| cutters.iter().any(|cutter| cutter.id == source.entity));
+        result_face.provenance = FaceProvenance {
+            sources: unique_sources(sources),
+            role: if cut { FaceRole::Cut } else { FaceRole::Split },
+            reversed: cut,
+        };
+    }
+    out.revision = std::iter::once(host)
+        .chain(cutters.iter())
+        .map(|brep| brep.revision)
+        .max()
+        .unwrap_or(0)
+        .checked_add(1)
+        .ok_or_else(|| GeometryError::LimitExceeded("boolean revision overflow".into()))?;
+    out.validate()?;
+    Ok(Some(BooleanResult {
+        report: BooleanReport {
+            operation: BooleanOp::Subtraction,
+            quality: GeometryQuality::Analytic,
+            contacts: Vec::new(),
+            coincident: false,
+            face_mappings: analytic_face_mappings(&out, inputs),
+        },
+        brep: out,
+    }))
+}
+
+pub fn subtract_planar_cutters(
+    host: &BrepEnvelope,
+    cutters: &[BrepEnvelope],
+    id: String,
+) -> Result<BooleanResult, GeometryError> {
+    if cutters.is_empty() || cutters.len() > 100 {
+        return Err(GeometryError::InvalidGeometry(
+            "planar batch subtraction requires between one and 100 cutters".into(),
+        ));
+    }
+    if cutters.len() == 1 {
+        return boolean_brep(host, &cutters[0], BooleanOp::Subtraction, id);
+    }
+    let mut accuracy = host.accuracy;
+    let mut bounds = Vec::with_capacity(cutters.len());
+    for cutter in cutters {
+        cutter.validate()?;
+        accuracy.geometric = accuracy.geometric.max(cutter.accuracy.geometric);
+        accuracy.intersection = accuracy.intersection.max(cutter.accuracy.intersection);
+        accuracy.tessellation = accuracy.tessellation.max(cutter.accuracy.tessellation);
+        accuracy.exchange = accuracy.exchange.max(cutter.accuracy.exchange);
+        bounds.push(
+            cutter.bounds()?.ok_or_else(|| {
+                GeometryError::InvalidGeometry("planar cutter has no bounds".into())
+            })?,
+        );
+    }
+    let planar = cutters
+        .iter()
+        .filter(|cutter| {
+            cutter
+                .geometry
+                .surfaces
+                .iter()
+                .all(|surface| matches!(surface, SurfaceGeometry::Plane { .. }))
+        })
+        .collect::<Vec<_>>();
+    let cylinders = if planar.len() == cutters.len() {
+        Vec::new()
+    } else {
+        cutters
+            .iter()
+            .filter(|cutter| full_cylinder(cutter).is_ok())
+            .collect::<Vec<_>>()
+    };
+    if !cylinders.is_empty() && planar.len() + cylinders.len() == cutters.len() {
+        if let Some(result) = subtract_prismatic_profile_batch(host, cutters, id.clone())? {
+            return Ok(result);
+        }
+    }
+    if !planar.is_empty()
+        && !cylinders.is_empty()
+        && planar.len() + cylinders.len() == cutters.len()
+    {
+        // Reconstruct planar voids first, then subtract transverse cylinders.
+        // Cutters may overlap outside the host, so their world bounds cannot
+        // decide whether the host cut is valid. Each chained Boolean must
+        // validate its exact B-rep or return a coverage error.
+        let planar_cutters = planar.into_iter().cloned().collect::<Vec<_>>();
+        let mut result = subtract_planar_cutters(host, &planar_cutters, format!("{id}:planar"))
+            .map_err(|error| match error {
+                GeometryError::CoverageGap { .. } => GeometryError::CoverageGap {
+                    families: ["mixed cutter batch".into(), "planar stage".into()],
+                },
+                other => other,
+            })?;
+        let count = cylinders.len();
+        for (index, cylinder) in cylinders.into_iter().enumerate() {
+            let prior = result;
+            let mut next = boolean_brep(
+                &prior.brep,
+                cylinder,
+                BooleanOp::Subtraction,
+                if index + 1 == count {
+                    id.clone()
+                } else {
+                    format!("{id}:round-{index}")
+                },
+            )
+            .map_err(|error| match error {
+                GeometryError::CoverageGap { .. } => GeometryError::CoverageGap {
+                    families: ["mixed cutter batch".into(), "cylindrical stage".into()],
+                },
+                other => other,
+            })?;
+            // The generic two-sided builder records its immediate input as
+            // the source of every copied face. Replace that intermediate
+            // reference with the face's original ancestry so a mixed batch
+            // still identifies the authored host and planar cutter.
+            for face in &mut next.brep.topology.faces {
+                let mut lineage = Vec::new();
+                for source in std::mem::take(&mut face.provenance.sources) {
+                    if source.entity == prior.brep.id && source.body == prior.brep.id {
+                        let previous = prior
+                            .brep
+                            .topology
+                            .faces
+                            .get(source.face as usize)
+                            .ok_or_else(|| {
+                                GeometryError::InvalidTopology(
+                                    "mixed cut source face is missing".into(),
+                                )
+                            })?;
+                        if previous.provenance.sources.is_empty() {
+                            lineage.push(source);
+                        } else {
+                            lineage.extend(previous.provenance.sources.iter().cloned());
+                        }
+                    } else {
+                        lineage.push(source);
+                    }
+                }
+                face.provenance.sources = unique_sources(lineage);
+            }
+            next.brep.validate()?;
+            result = next;
+        }
+        result.report.face_mappings =
+            analytic_face_mappings(&result.brep, std::iter::once(host).chain(cutters.iter()));
+        return Ok(result);
+    }
+    if host
+        .geometry
+        .surfaces
+        .iter()
+        .any(|surface| matches!(surface, SurfaceGeometry::Cylinder { .. }))
+        && cutters.iter().all(|cutter| {
+            cutter
+                .geometry
+                .surfaces
+                .iter()
+                .all(|surface| matches!(surface, SurfaceGeometry::Plane { .. }))
+        })
+    {
+        match super::curved_layered_boolean::subtract_vertical_arc_extrusion_batch(
+            host,
+            &cutters.iter().collect::<Vec<_>>(),
+            id.clone(),
+        ) {
+            Ok(result) => return Ok(result),
+            Err(GeometryError::CoverageGap { .. }) => {}
+            Err(error) => return Err(error),
+        }
+    }
+    for first in 0..cutters.len() {
+        for second in first + 1..cutters.len() {
+            if (0..3).all(|axis| {
+                bounds[first].axes[axis]
+                    .hi
+                    .min(bounds[second].axes[axis].hi)
+                    - bounds[first].axes[axis]
+                        .lo
+                        .max(bounds[second].axes[axis].lo)
+                    > 4.0 * accuracy.geometric
+            }) {
+                return Err(GeometryError::CoverageGap {
+                    families: [
+                        "overlapping planar batch cutters".into(),
+                        "overlapping planar batch cutters".into(),
+                    ],
+                });
+            }
+        }
+    }
+    let mut combined = BrepEnvelope::new(format!("{id}:cutters"), accuracy)?;
+    for cutter in cutters {
+        append_analytic_input(&mut combined, cutter)?;
+    }
+    combined.validate()?;
+    super::box_booleans::boolean_rectilinear(host, &combined, BooleanOp::Subtraction, id)
 }
 
 pub fn boolean_spheres(
@@ -8527,7 +9185,10 @@ mod tests {
         .unwrap()
     }
     fn volume(brep: &BrepEnvelope) -> f64 {
-        let mesh = tessellate(brep, 0.02, 2_000_000).unwrap();
+        volume_at_deflection(brep, 0.02)
+    }
+    fn volume_at_deflection(brep: &BrepEnvelope, deflection: f64) -> f64 {
+        let mesh = tessellate(brep, deflection, 2_000_000).unwrap();
         mesh.indices
             .chunks_exact(3)
             .map(|ids| {
@@ -10462,6 +11123,430 @@ mod tests {
     }
 
     #[test]
+    fn planar_extrusion_round_through_cutter_keeps_analytic_brep() {
+        let host = extrusion(
+            "round-host",
+            vec![[0.0, 0.0], [4.0, 0.0], [4.0, 0.3], [0.0, 0.3]],
+            Vec::new(),
+        );
+        let cutter = primitives::cylinder(
+            "round-opening".into(),
+            Frame3 {
+                origin: [2.0, -0.5, 1.5],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, -1.0],
+                z: [0.0, 1.0, 0.0],
+            },
+            0.5,
+            1.3,
+            host.accuracy,
+        )
+        .unwrap();
+        let result = boolean_brep(
+            &host,
+            &cutter,
+            BooleanOp::Subtraction,
+            "round-host-cut".into(),
+        )
+        .unwrap();
+        assert_eq!(result.brep.solids.len(), 1);
+        result.brep.validate().unwrap();
+        assert_eq!(
+            classify_point(&result.brep, [2.0, 0.15, 1.5]).unwrap(),
+            PointClassification::Outside
+        );
+        assert_eq!(
+            classify_point(&result.brep, [2.0, 0.15, 2.2]).unwrap(),
+            PointClassification::Inside
+        );
+        let cut_face = result
+            .brep
+            .topology
+            .faces
+            .iter()
+            .find(|face| face.provenance.role == FaceRole::Cut)
+            .unwrap();
+        assert_eq!(
+            face_contains_uv(&result.brep, cut_face, [0.0, 0.65]).unwrap(),
+            Some(true)
+        );
+        tessellate(&result.brep, 0.01, 2_000_000).unwrap();
+        crate::analytic::exchange::export_step(&result.brep, "metre").unwrap();
+    }
+
+    #[test]
+    fn rectangular_cut_after_round_cut_never_loses_the_cylindrical_cap() {
+        let host = extrusion(
+            "arched-host",
+            vec![[0.0, 0.0], [4.0, 0.0], [4.0, 0.3], [0.0, 0.3]],
+            Vec::new(),
+        );
+        let round = primitives::cylinder(
+            "arched-cap".into(),
+            Frame3 {
+                origin: [2.0, -0.5, 2.0],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, -1.0],
+                z: [0.0, 1.0, 0.0],
+            },
+            0.5,
+            1.3,
+            host.accuracy,
+        )
+        .unwrap();
+        let lower = primitives::linear_extrusion(
+            "arched-lower".into(),
+            Frame3 {
+                origin: [0.0, 0.8, 0.0],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, 1.0],
+                z: [0.0, -1.0, 0.0],
+            },
+            vec![[1.5, 0.5], [2.5, 0.5], [2.5, 2.0], [1.5, 2.0]],
+            Vec::new(),
+            1.3,
+            host.accuracy,
+        )
+        .unwrap();
+        let batch = subtract_planar_cutters(
+            &host,
+            &[round.clone(), lower.clone()],
+            "arched-batch".into(),
+        )
+        .unwrap();
+        batch.brep.validate().unwrap();
+        assert_eq!(
+            classify_point(&batch.brep, [2.0, 0.15, 2.2]).unwrap(),
+            PointClassification::Outside
+        );
+        assert_eq!(
+            classify_point(&batch.brep, [2.0, 0.15, 1.0]).unwrap(),
+            PointClassification::Outside
+        );
+        assert!(batch.brep.topology.faces.iter().any(|face| {
+            matches!(
+                batch.brep.geometry.surfaces[face.surface as usize],
+                SurfaceGeometry::Cylinder { .. }
+            )
+        }));
+        for source in ["arched-cap", "arched-lower"] {
+            assert!(batch.report.face_mappings.iter().any(|mapping| {
+                mapping.source.entity == source && !mapping.result_faces.is_empty()
+            }));
+        }
+        let expected = 4.0 * 0.3 * 3.0 - (1.0 * 1.5 + std::f64::consts::PI * 0.5 * 0.5 / 2.0) * 0.3;
+        assert!((volume_at_deflection(&batch.brep, 0.0001).abs() - expected).abs() < 1.0e-4);
+        crate::analytic::exchange::export_step(&batch.brep, "metre").unwrap();
+        let cap = boolean_brep(&host, &round, BooleanOp::Subtraction, "cap".into()).unwrap();
+        match boolean_brep(&cap.brep, &lower, BooleanOp::Subtraction, "arch".into()) {
+            Ok(result) => {
+                result.brep.validate().unwrap();
+                assert!(result.brep.topology.faces.iter().any(|face| {
+                    matches!(
+                        result.brep.geometry.surfaces[face.surface as usize],
+                        SurfaceGeometry::Cylinder { .. }
+                    )
+                }));
+                assert_eq!(
+                    classify_point(&result.brep, [2.0, 0.15, 2.2]).unwrap(),
+                    PointClassification::Outside
+                );
+                assert_eq!(
+                    classify_point(&result.brep, [2.0, 0.15, 1.0]).unwrap(),
+                    PointClassification::Outside
+                );
+            }
+            Err(GeometryError::CoverageGap { .. }) => {}
+            Err(error) => panic!("unexpected chained arch failure: {error:?}"),
+        }
+    }
+
+    #[test]
+    fn disjoint_mixed_cutter_batch_preserves_both_openings_in_any_order() {
+        let host = extrusion(
+            "mixed-host",
+            vec![[0.0, 0.0], [6.0, 0.0], [6.0, 0.3], [0.0, 0.3]],
+            Vec::new(),
+        );
+        let round = primitives::cylinder(
+            "round".into(),
+            Frame3 {
+                origin: [1.5, -0.5, 1.5],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, -1.0],
+                z: [0.0, 1.0, 0.0],
+            },
+            0.4,
+            1.3,
+            host.accuracy,
+        )
+        .unwrap();
+        let rect = primitives::linear_extrusion(
+            "rectangle".into(),
+            Frame3 {
+                origin: [0.0, 0.8, 0.0],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, 1.0],
+                z: [0.0, -1.0, 0.0],
+            },
+            vec![[3.5, 0.7], [4.5, 0.7], [4.5, 2.2], [3.5, 2.2]],
+            Vec::new(),
+            1.3,
+            host.accuracy,
+        )
+        .unwrap();
+        for cutters in [[round.clone(), rect.clone()], [rect.clone(), round.clone()]] {
+            let result = subtract_planar_cutters(&host, &cutters, "mixed".into()).unwrap();
+            result.brep.validate().unwrap();
+            assert_eq!(
+                classify_point(&result.brep, [1.5, 0.15, 1.5]).unwrap(),
+                PointClassification::Outside
+            );
+            assert_eq!(
+                classify_point(&result.brep, [4.0, 0.15, 1.5]).unwrap(),
+                PointClassification::Outside
+            );
+            assert_eq!(
+                classify_point(&result.brep, [2.5, 0.15, 1.5]).unwrap(),
+                PointClassification::Inside
+            );
+            let expected_volume =
+                6.0 * 0.3 * 3.0 - 1.0 * 0.3 * 1.5 - std::f64::consts::PI * 0.4 * 0.4 * 0.3;
+            let measured_volume = volume_at_deflection(&result.brep, 0.0001).abs();
+            assert!(
+                (measured_volume - expected_volume).abs() < 1.0e-4,
+                "mixed volume {measured_volume} differs from expected {expected_volume}",
+            );
+            assert!(result.brep.topology.faces.iter().any(|face| {
+                matches!(
+                    result.brep.geometry.surfaces[face.surface as usize],
+                    SurfaceGeometry::Cylinder { .. }
+                )
+            }));
+            for source in ["round", "rectangle"] {
+                assert!(
+                    result.brep.topology.faces.iter().any(|face| {
+                        face.provenance
+                            .sources
+                            .iter()
+                            .any(|origin| origin.entity == source)
+                    }),
+                    "missing source {source}: {:?}",
+                    result
+                        .brep
+                        .topology
+                        .faces
+                        .iter()
+                        .flat_map(|face| face
+                            .provenance
+                            .sources
+                            .iter()
+                            .map(|origin| &origin.entity))
+                        .collect::<Vec<_>>()
+                );
+                assert!(result.report.face_mappings.iter().any(|mapping| {
+                    mapping.source.entity == source && !mapping.result_faces.is_empty()
+                }));
+            }
+            crate::analytic::exchange::export_step(&result.brep, "metre").unwrap();
+        }
+    }
+
+    #[test]
+    fn two_round_cutter_batch_keeps_both_analytic_voids() {
+        let host = extrusion(
+            "two-round-host",
+            vec![[0.0, 0.0], [6.0, 0.0], [6.0, 0.3], [0.0, 0.3]],
+            Vec::new(),
+        );
+        let make_round = |name: &str, station: f64| {
+            primitives::cylinder(
+                name.into(),
+                Frame3 {
+                    origin: [station, 0.0, 1.5],
+                    x: [1.0, 0.0, 0.0],
+                    y: [0.0, 0.0, -1.0],
+                    z: [0.0, 1.0, 0.0],
+                },
+                0.4,
+                0.3,
+                host.accuracy,
+            )
+            .unwrap()
+        };
+        let first = make_round("round-a", 1.5);
+        let second = make_round("round-b", 4.5);
+        for cutters in [
+            [first.clone(), second.clone()],
+            [second.clone(), first.clone()],
+        ] {
+            let result = subtract_planar_cutters(&host, &cutters, "two-round".into()).unwrap();
+            result.brep.validate().unwrap();
+            assert_eq!(result.brep.solids.len(), 1);
+            for station in [1.5, 4.5] {
+                assert_eq!(
+                    classify_point(&result.brep, [station, 0.15, 1.5]).unwrap(),
+                    PointClassification::Outside
+                );
+            }
+            assert_eq!(
+                classify_point(&result.brep, [3.0, 0.15, 1.5]).unwrap(),
+                PointClassification::Inside
+            );
+            let expected = 6.0 * 0.3 * 3.0 - 2.0 * std::f64::consts::PI * 0.4 * 0.4 * 0.3;
+            assert!((volume_at_deflection(&result.brep, 0.0001).abs() - expected).abs() < 1.0e-4);
+            for source in ["round-a", "round-b"] {
+                assert!(result
+                    .report
+                    .face_mappings
+                    .iter()
+                    .any(|mapping| mapping.source.entity == source
+                        && !mapping.result_faces.is_empty()));
+            }
+            let (_, report) =
+                crate::analytic::exchange::export_step(&result.brep, "metre").unwrap();
+            assert_eq!(report.solids, 1);
+        }
+    }
+
+    #[test]
+    fn mixed_profile_batch_preserves_disconnected_full_height_host_parts() {
+        let host = extrusion(
+            "split-mixed-host",
+            vec![[0.0, 0.0], [6.0, 0.0], [6.0, 0.3], [0.0, 0.3]],
+            Vec::new(),
+        );
+        let round = primitives::cylinder(
+            "split-round".into(),
+            Frame3 {
+                origin: [1.5, -0.5, 1.5],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, -1.0],
+                z: [0.0, 1.0, 0.0],
+            },
+            0.4,
+            1.3,
+            host.accuracy,
+        )
+        .unwrap();
+        let through = primitives::linear_extrusion(
+            "full-height".into(),
+            Frame3 {
+                origin: [0.0, 0.3, 0.0],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, 1.0],
+                z: [0.0, -1.0, 0.0],
+            },
+            vec![[2.5, 0.0], [3.5, 0.0], [3.5, 3.0], [2.5, 3.0]],
+            Vec::new(),
+            0.3,
+            host.accuracy,
+        )
+        .unwrap();
+        for cutters in [
+            [round.clone(), through.clone()],
+            [through.clone(), round.clone()],
+        ] {
+            let result = subtract_planar_cutters(&host, &cutters, "split-mixed".into()).unwrap();
+            result.brep.validate().unwrap();
+            assert_eq!(result.brep.solids.len(), 2);
+            for point in [[1.5, 0.15, 1.5], [3.0, 0.15, 1.5]] {
+                assert_eq!(
+                    classify_point(&result.brep, point).unwrap(),
+                    PointClassification::Outside
+                );
+            }
+            for point in [[0.5, 0.15, 1.5], [5.0, 0.15, 1.5]] {
+                assert_eq!(
+                    classify_point(&result.brep, point).unwrap(),
+                    PointClassification::Inside
+                );
+            }
+            let expected =
+                6.0 * 0.3 * 3.0 - 1.0 * 0.3 * 3.0 - std::f64::consts::PI * 0.4 * 0.4 * 0.3;
+            assert!((volume_at_deflection(&result.brep, 0.0001).abs() - expected).abs() < 1.0e-4);
+            for source in ["split-round", "full-height"] {
+                assert!(result
+                    .report
+                    .face_mappings
+                    .iter()
+                    .any(|mapping| mapping.source.entity == source
+                        && !mapping.result_faces.is_empty()));
+            }
+            let (_, report) =
+                crate::analytic::exchange::export_step(&result.brep, "metre").unwrap();
+            assert_eq!(report.solids, 2);
+        }
+    }
+
+    #[test]
+    fn flush_mixed_cutters_cross_a_prior_planar_face_split_without_losing_the_round_hole() {
+        let host = extrusion(
+            "flush-mixed-host",
+            vec![[0.0, 0.0], [6.0, 0.0], [6.0, 0.3], [0.0, 0.3]],
+            Vec::new(),
+        );
+        let round = primitives::cylinder(
+            "flush-round".into(),
+            Frame3 {
+                origin: [1.5, 0.0, 1.5],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, -1.0],
+                z: [0.0, 1.0, 0.0],
+            },
+            0.4,
+            0.3,
+            host.accuracy,
+        )
+        .unwrap();
+        let rectangle = primitives::linear_extrusion(
+            "flush-rectangle".into(),
+            Frame3 {
+                origin: [0.0, 0.3, 0.0],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, 1.0],
+                z: [0.0, -1.0, 0.0],
+            },
+            vec![[3.5, 0.7], [4.5, 0.7], [4.5, 1.5], [3.5, 1.5]],
+            Vec::new(),
+            0.3,
+            host.accuracy,
+        )
+        .unwrap();
+        for cutters in [
+            [round.clone(), rectangle.clone()],
+            [rectangle.clone(), round.clone()],
+        ] {
+            let result = subtract_planar_cutters(&host, &cutters, "flush-mixed".into()).unwrap();
+            result.brep.validate().unwrap();
+            assert_eq!(
+                classify_point(&result.brep, [1.5, 0.15, 1.5]).unwrap(),
+                PointClassification::Outside
+            );
+            assert_eq!(
+                classify_point(&result.brep, [4.0, 0.15, 1.4]).unwrap(),
+                PointClassification::Outside
+            );
+            assert_eq!(
+                classify_point(&result.brep, [2.5, 0.15, 1.5]).unwrap(),
+                PointClassification::Inside
+            );
+            assert!(result.brep.topology.faces.iter().any(|face| {
+                matches!(
+                    result.brep.geometry.surfaces[face.surface as usize],
+                    SurfaceGeometry::Cylinder { .. }
+                )
+            }));
+            for source in ["flush-round", "flush-rectangle"] {
+                assert!(result.report.face_mappings.iter().any(|mapping| {
+                    mapping.source.entity == source && !mapping.result_faces.is_empty()
+                }));
+            }
+            crate::analytic::exchange::export_step(&result.brep, "metre").unwrap();
+        }
+    }
+
+    #[test]
     fn coextensive_profile_extrusions_use_exact_planar_arrangements() {
         let a = extrusion(
             "a",
@@ -10574,6 +11659,743 @@ mod tests {
         let intersection =
             boolean_brep(&a, &disjoint, BooleanOp::Intersection, "axial-empty".into()).unwrap();
         assert!(intersection.brep.solids.is_empty());
+    }
+
+    #[test]
+    fn different_height_planar_openings_support_chained_flush_cuts() {
+        let host = extrusion(
+            "host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 0.3], [0.0, 0.3]],
+            Vec::new(),
+        );
+        let first = extrusion_span(
+            "lower_cutout",
+            0.0,
+            2.1,
+            vec![[2.0, 0.0], [3.0, 0.0], [3.0, 0.3], [2.0, 0.3]],
+            Vec::new(),
+        );
+        let cut = boolean_brep(
+            &host,
+            &first,
+            BooleanOp::Subtraction,
+            "one-lower_cutout".into(),
+        )
+        .unwrap();
+        cut.brep.validate().unwrap();
+        assert!((volume(&cut.brep).abs() - 8.37).abs() < 1.0e-6);
+        assert_eq!(
+            super::super::query::classify_point(&cut.brep, [2.5, 0.15, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&cut.brep, [2.5, 0.15, 2.5]).unwrap(),
+            super::super::query::PointClassification::Inside
+        );
+        let second = extrusion_span(
+            "raised_cutout",
+            0.8,
+            1.2,
+            vec![[6.0, 0.0], [7.0, 0.0], [7.0, 0.3], [6.0, 0.3]],
+            Vec::new(),
+        );
+        let chained = boolean_brep(
+            &cut.brep,
+            &second,
+            BooleanOp::Subtraction,
+            "lower_cutout-raised_cutout".into(),
+        )
+        .unwrap();
+        chained.brep.validate().unwrap();
+        assert!((volume(&chained.brep).abs() - 8.01).abs() < 1.0e-6);
+        assert_eq!(
+            super::super::query::classify_point(&chained.brep, [6.5, 0.15, 1.2]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+    }
+
+    #[test]
+    fn chained_mitered_host_openings_keep_top_cap_provenance() {
+        let host = extrusion_span(
+            "mitered-host",
+            0.0,
+            3.8,
+            vec![
+                [-0.16, -0.14],
+                [0.16, -0.46],
+                [13.84, -0.46],
+                [14.16, -0.14],
+            ],
+            Vec::new(),
+        );
+        let lower_cutout = extrusion_span(
+            "lower_cutout",
+            0.0,
+            2.45,
+            vec![[1.2, -0.14], [2.8, -0.14], [2.8, -0.46], [1.2, -0.46]],
+            Vec::new(),
+        );
+        let raised_cutout = extrusion_span(
+            "raised_cutout",
+            0.3,
+            2.8,
+            vec![
+                [3.625, -0.14],
+                [5.175, -0.14],
+                [5.175, -0.46],
+                [3.625, -0.46],
+            ],
+            Vec::new(),
+        );
+        let first = boolean_brep(
+            &host,
+            &lower_cutout,
+            BooleanOp::Subtraction,
+            "lower_cutout-cut".into(),
+        )
+        .unwrap();
+        let second = boolean_brep(
+            &first.brep,
+            &raised_cutout,
+            BooleanOp::Subtraction,
+            "raised_cutout-cut".into(),
+        )
+        .unwrap();
+        second.brep.validate().unwrap();
+        assert_eq!(
+            super::super::query::classify_point(&second.brep, [2.0, -0.3, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside,
+        );
+        assert_eq!(
+            super::super::query::classify_point(&second.brep, [4.4, -0.3, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside,
+        );
+    }
+
+    #[test]
+    fn ten_flush_planar_cutters_use_one_rectilinear_arrangement() {
+        let host = extrusion(
+            "host",
+            vec![[0.0, 0.0], [20.0, 0.0], [20.0, 0.3], [0.0, 0.3]],
+            Vec::new(),
+        );
+        let cutters = (0..10)
+            .map(|index| {
+                let left = 1.0 + index as f64 * 1.8;
+                extrusion_span(
+                    &format!("opening-{index}"),
+                    0.0,
+                    2.1,
+                    vec![
+                        [left, 0.0],
+                        [left + 0.5, 0.0],
+                        [left + 0.5, 0.3],
+                        [left, 0.3],
+                    ],
+                    Vec::new(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let result = subtract_planar_cutters(&host, &cutters, "batch".into()).unwrap();
+        result.brep.validate().unwrap();
+        assert!((volume(&result.brep).abs() - 14.85).abs() < 1.0e-6);
+        for index in 0..10 {
+            let station = 1.25 + index as f64 * 1.8;
+            assert_eq!(
+                super::super::query::classify_point(&result.brep, [station, 0.15, 1.0]).unwrap(),
+                super::super::query::PointClassification::Outside,
+            );
+        }
+        assert!(result
+            .report
+            .face_mappings
+            .iter()
+            .any(|mapping| mapping.source.entity == "opening-9"));
+    }
+
+    #[test]
+    fn angled_host_cap_accepts_flush_lower_cutout_cutter() {
+        let host = extrusion(
+            "angled-host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 0.3], [0.3, 0.3], [0.0, 0.1]],
+            Vec::new(),
+        );
+        let cutter = extrusion_span(
+            "lower_cutout",
+            0.0,
+            2.1,
+            vec![[2.0, 0.0], [3.0, 0.0], [3.0, 0.3], [2.0, 0.3]],
+            Vec::new(),
+        );
+        let result =
+            boolean_brep(&host, &cutter, BooleanOp::Subtraction, "angled-cut".into()).unwrap();
+        result.brep.validate().unwrap();
+        assert!((volume(&result.brep).abs() - (volume(&host).abs() - 0.63)).abs() < 1.0e-6);
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [2.5, 0.15, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        let raised_cutout = extrusion_span(
+            "raised_cutout",
+            0.8,
+            1.2,
+            vec![[6.0, 0.0], [7.0, 0.0], [7.0, 0.3], [6.0, 0.3]],
+            Vec::new(),
+        );
+        let chained = boolean_brep(
+            &result.brep,
+            &raised_cutout,
+            BooleanOp::Subtraction,
+            "angled-chain".into(),
+        )
+        .unwrap();
+        chained.brep.validate().unwrap();
+        assert!((volume(&chained.brep).abs() - (volume(&host).abs() - 0.99)).abs() < 1.0e-6);
+        assert_eq!(
+            super::super::query::classify_point(&chained.brep, [6.5, 0.15, 1.2]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&chained.brep, [6.5, 0.15, 2.5]).unwrap(),
+            super::super::query::PointClassification::Inside
+        );
+    }
+
+    #[test]
+    fn full_height_planar_opening_splits_angled_host_into_two_solids() {
+        let host = extrusion(
+            "angled-host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 0.3], [0.3, 0.3], [0.0, 0.1]],
+            Vec::new(),
+        );
+        let cutter = extrusion(
+            "through-lower_cutout",
+            vec![[4.0, 0.0], [5.0, 0.0], [5.0, 0.3], [4.0, 0.3]],
+            Vec::new(),
+        );
+        let result = boolean_brep(
+            &host,
+            &cutter,
+            BooleanOp::Subtraction,
+            "split-angled".into(),
+        )
+        .unwrap();
+        result.brep.validate().unwrap();
+        assert_eq!(result.brep.solids.len(), 2);
+        assert!((volume(&result.brep).abs() - (volume(&host).abs() - 0.9)).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn overlapping_flush_openings_on_angled_host_remove_the_union_once() {
+        let host = extrusion(
+            "angled-host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 0.3], [0.3, 0.3], [0.0, 0.1]],
+            Vec::new(),
+        );
+        let first = extrusion_span(
+            "first",
+            0.0,
+            2.1,
+            vec![[2.0, 0.0], [3.0, 0.0], [3.0, 0.3], [2.0, 0.3]],
+            Vec::new(),
+        );
+        let second = extrusion_span(
+            "second",
+            0.0,
+            2.1,
+            vec![[2.5, 0.0], [3.5, 0.0], [3.5, 0.3], [2.5, 0.3]],
+            Vec::new(),
+        );
+        let once = boolean_brep(&host, &first, BooleanOp::Subtraction, "once".into()).unwrap();
+        let twice =
+            boolean_brep(&once.brep, &second, BooleanOp::Subtraction, "twice".into()).unwrap();
+        twice.brep.validate().unwrap();
+        assert!((volume(&twice.brep).abs() - (volume(&host).abs() - 0.945)).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn layered_planar_cut_supports_an_internal_cavity_shell() {
+        let host = extrusion(
+            "angled-host",
+            vec![
+                [0.0, 0.0],
+                [10.0, 0.0],
+                [10.0, 10.0],
+                [0.3, 10.0],
+                [0.0, 9.8],
+            ],
+            Vec::new(),
+        );
+        let cutter = extrusion_span(
+            "cavity",
+            1.0,
+            1.0,
+            vec![[4.0, 4.0], [6.0, 4.0], [6.0, 6.0], [4.0, 6.0]],
+            Vec::new(),
+        );
+        let result = boolean_brep(
+            &host,
+            &cutter,
+            BooleanOp::Subtraction,
+            "cavity-result".into(),
+        )
+        .unwrap();
+        result.brep.validate().unwrap();
+        assert_eq!(result.brep.solids.len(), 1);
+        assert_eq!(result.brep.solids[0].cavity_shells.len(), 1);
+        assert!((volume(&result.brep).abs() - (volume(&host).abs() - 4.0)).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn angled_host_accepts_rotated_planar_cutter_frame() {
+        let host = extrusion(
+            "angled-host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 0.3], [0.3, 0.3], [0.0, 0.1]],
+            Vec::new(),
+        );
+        let angle = std::f64::consts::FRAC_PI_6;
+        let cutter = primitives::linear_extrusion(
+            "rotated-cutter".into(),
+            Frame3 {
+                origin: [2.5, 0.15, 0.0],
+                x: [angle.cos(), angle.sin(), 0.0],
+                y: [-angle.sin(), angle.cos(), 0.0],
+                z: [0.0, 0.0, 1.0],
+            },
+            vec![[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]],
+            Vec::new(),
+            2.1,
+            host.accuracy,
+        )
+        .unwrap();
+        let result =
+            boolean_brep(&host, &cutter, BooleanOp::Subtraction, "rotated-cut".into()).unwrap();
+        result.brep.validate().unwrap();
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [2.5, 0.15, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [2.5, 0.15, 2.5]).unwrap(),
+            super::super::query::PointClassification::Inside
+        );
+        assert!(volume(&result.brep).abs() < volume(&host).abs());
+    }
+
+    #[test]
+    fn oblique_planar_cutter_crosses_a_host_without_tessellating_the_boolean() {
+        let host = extrusion(
+            "oblique-host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 0.3], [0.3, 0.3], [0.0, 0.1]],
+            Vec::new(),
+        );
+        let angle = std::f64::consts::PI / 12.0;
+        let cutter = primitives::linear_extrusion(
+            "oblique-cutter".into(),
+            Frame3 {
+                origin: [2.5, 0.15, 0.0],
+                x: [angle.cos(), 0.0, -angle.sin()],
+                y: [0.0, 1.0, 0.0],
+                z: [angle.sin(), 0.0, angle.cos()],
+            },
+            vec![[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]],
+            Vec::new(),
+            2.1,
+            host.accuracy,
+        )
+        .unwrap();
+        let result =
+            boolean_brep(&host, &cutter, BooleanOp::Subtraction, "oblique-cut".into()).unwrap();
+        result.brep.validate().unwrap();
+        assert!(matches!(result.report.quality, GeometryQuality::Analytic));
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [2.8, 0.15, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [2.8, 0.15, 2.5]).unwrap(),
+            super::super::query::PointClassification::Inside
+        );
+        assert!(volume(&result.brep).abs() < volume(&host).abs());
+    }
+
+    #[test]
+    fn chained_oblique_planar_cuts_keep_both_voids_and_analytic_faces() {
+        let host = extrusion(
+            "chained-oblique-host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 0.3], [0.3, 0.3], [0.0, 0.1]],
+            Vec::new(),
+        );
+        let angle = std::f64::consts::PI / 12.0;
+        let cutter = |name: &str, station: f64, sign: f64| {
+            primitives::linear_extrusion(
+                name.into(),
+                Frame3 {
+                    origin: [station, 0.15, 0.0],
+                    x: [angle.cos(), 0.0, -sign * angle.sin()],
+                    y: [0.0, 1.0, 0.0],
+                    z: [sign * angle.sin(), 0.0, angle.cos()],
+                },
+                vec![[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]],
+                Vec::new(),
+                2.1,
+                host.accuracy,
+            )
+            .unwrap()
+        };
+        let first = cutter("first-oblique", 2.5, 1.0);
+        let second = cutter("second-oblique", 5.0, -1.0);
+        let once = boolean_brep(&host, &first, BooleanOp::Subtraction, "once".into()).unwrap();
+        let twice =
+            boolean_brep(&once.brep, &second, BooleanOp::Subtraction, "twice".into()).unwrap();
+        twice.brep.validate().unwrap();
+        assert!(matches!(twice.report.quality, GeometryQuality::Analytic));
+        for point in [[2.8, 0.15, 1.0], [4.7, 0.15, 1.0]] {
+            assert_eq!(
+                super::super::query::classify_point(&twice.brep, point).unwrap(),
+                super::super::query::PointClassification::Outside
+            );
+        }
+        assert_eq!(
+            super::super::query::classify_point(&twice.brep, [3.8, 0.15, 1.0]).unwrap(),
+            super::super::query::PointClassification::Inside
+        );
+        assert!(volume(&twice.brep).abs() < volume(&once.brep).abs());
+    }
+
+    #[test]
+    fn oblique_cut_accepts_a_disconnected_planar_host() {
+        let host = extrusion(
+            "split-host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 0.3], [0.0, 0.3]],
+            Vec::new(),
+        );
+        let through = extrusion_span(
+            "through",
+            -1.0,
+            5.0,
+            vec![[3.0, -1.0], [4.0, -1.0], [4.0, 1.0], [3.0, 1.0]],
+            Vec::new(),
+        );
+        let split = boolean_brep(&host, &through, BooleanOp::Subtraction, "split".into()).unwrap();
+        assert_eq!(split.brep.solids.len(), 2);
+        let angle = std::f64::consts::PI / 12.0;
+        let oblique = primitives::linear_extrusion(
+            "split-oblique".into(),
+            Frame3 {
+                origin: [6.0, 0.15, 0.0],
+                x: [angle.cos(), 0.0, -angle.sin()],
+                y: [0.0, 1.0, 0.0],
+                z: [angle.sin(), 0.0, angle.cos()],
+            },
+            vec![[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]],
+            Vec::new(),
+            2.1,
+            host.accuracy,
+        )
+        .unwrap();
+        let result = boolean_brep(
+            &split.brep,
+            &oblique,
+            BooleanOp::Subtraction,
+            "split-oblique-result".into(),
+        )
+        .unwrap();
+        result.brep.validate().unwrap();
+        assert_eq!(result.brep.solids.len(), 2);
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [6.3, 0.15, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [1.0, 0.15, 1.0]).unwrap(),
+            super::super::query::PointClassification::Inside
+        );
+    }
+
+    #[test]
+    fn planar_cutter_tilts_about_both_host_axes_keep_exact_occupancy() {
+        let host = extrusion(
+            "tilt-sweep-host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 0.3], [0.0, 0.3]],
+            Vec::new(),
+        );
+        for axis in 0..2 {
+            for degrees in [-25.0_f64, -15.0, -5.0, 5.0, 15.0, 25.0] {
+                let angle = degrees.to_radians();
+                let frame = if axis == 0 {
+                    Frame3 {
+                        origin: [2.5, 0.15, 0.0],
+                        x: [angle.cos(), 0.0, -angle.sin()],
+                        y: [0.0, 1.0, 0.0],
+                        z: [angle.sin(), 0.0, angle.cos()],
+                    }
+                } else {
+                    Frame3 {
+                        origin: [2.5, 0.15, 0.0],
+                        x: [1.0, 0.0, 0.0],
+                        y: [0.0, angle.cos(), -angle.sin()],
+                        z: [0.0, angle.sin(), angle.cos()],
+                    }
+                };
+                let cutter = primitives::linear_extrusion(
+                    format!("tilt-{axis}-{degrees}"),
+                    frame,
+                    vec![[-0.8, -0.8], [0.8, -0.8], [0.8, 0.8], [-0.8, 0.8]],
+                    Vec::new(),
+                    2.1,
+                    host.accuracy,
+                )
+                .unwrap();
+                let result = boolean_brep(
+                    &host,
+                    &cutter,
+                    BooleanOp::Subtraction,
+                    format!("tilt-result-{axis}-{degrees}"),
+                )
+                .unwrap();
+                result.brep.validate().unwrap();
+                assert_eq!(
+                    super::super::query::classify_point(&result.brep, [2.5, 0.15, 1.0]).unwrap(),
+                    super::super::query::PointClassification::Outside,
+                    "axis={axis}, degrees={degrees}"
+                );
+                assert_eq!(
+                    super::super::query::classify_point(&result.brep, [8.0, 0.15, 1.0]).unwrap(),
+                    super::super::query::PointClassification::Inside,
+                    "axis={axis}, degrees={degrees}"
+                );
+                assert!(volume(&result.brep).abs() < volume(&host).abs());
+            }
+        }
+    }
+
+    #[test]
+    fn oblique_cut_preserves_a_planar_host_with_profile_hole_loops() {
+        let host = extrusion(
+            "profile-hole-host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 3.0], [0.0, 3.0]],
+            vec![vec![[2.0, 1.0], [3.0, 1.0], [3.0, 2.0], [2.0, 2.0]]],
+        );
+        assert!(host
+            .topology
+            .faces
+            .iter()
+            .any(|face| !face.trim.holes.is_empty()));
+        let angle = std::f64::consts::PI / 12.0;
+        let oblique = primitives::linear_extrusion(
+            "pocket-oblique".into(),
+            Frame3 {
+                origin: [6.0, 1.5, 0.0],
+                x: [angle.cos(), 0.0, -angle.sin()],
+                y: [0.0, 1.0, 0.0],
+                z: [angle.sin(), 0.0, angle.cos()],
+            },
+            vec![[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]],
+            Vec::new(),
+            2.1,
+            host.accuracy,
+        )
+        .unwrap();
+        let result =
+            boolean_brep(&host, &oblique, BooleanOp::Subtraction, "two-voids".into()).unwrap();
+        result.brep.validate().unwrap();
+        for point in [[2.5, 1.5, 1.5], [6.3, 1.5, 1.0]] {
+            assert_eq!(
+                super::super::query::classify_point(&result.brep, point).unwrap(),
+                super::super::query::PointClassification::Outside
+            );
+        }
+        for point in [[4.0, 1.5, 1.0], [6.3, 1.5, 2.5]] {
+            assert_eq!(
+                super::super::query::classify_point(&result.brep, point).unwrap(),
+                super::super::query::PointClassification::Inside
+            );
+        }
+    }
+
+    #[test]
+    fn oblique_nonconvex_planar_cutter_keeps_exact_host_material() {
+        let host = extrusion(
+            "nonconvex-host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 0.3], [0.0, 0.3]],
+            Vec::new(),
+        );
+        let angle = std::f64::consts::PI / 12.0;
+        let cutter = primitives::linear_extrusion(
+            "nonconvex-cutter".into(),
+            Frame3 {
+                origin: [5.0, 0.15, 0.0],
+                x: [angle.cos(), 0.0, -angle.sin()],
+                y: [0.0, 1.0, 0.0],
+                z: [angle.sin(), 0.0, angle.cos()],
+            },
+            vec![
+                [-1.0, -1.0],
+                [1.0, -1.0],
+                [1.0, -0.05],
+                [0.0, -0.05],
+                [0.0, 1.0],
+                [-1.0, 1.0],
+            ],
+            Vec::new(),
+            2.1,
+            host.accuracy,
+        )
+        .unwrap();
+        let result = boolean_brep(
+            &host,
+            &cutter,
+            BooleanOp::Subtraction,
+            "nonconvex-oblique-cut".into(),
+        )
+        .unwrap();
+        result.brep.validate().unwrap();
+        assert!(matches!(result.report.quality, GeometryQuality::Analytic));
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [4.5, 0.15, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [5.5, 0.15, 1.0]).unwrap(),
+            super::super::query::PointClassification::Inside
+        );
+    }
+
+    #[test]
+    fn oblique_planar_cut_preserves_an_existing_internal_cavity_shell() {
+        let host = extrusion(
+            "cavity-host",
+            vec![[0.0, 0.0], [10.0, 0.0], [10.0, 3.0], [0.0, 3.0]],
+            Vec::new(),
+        );
+        let cavity = extrusion_span(
+            "internal-cavity",
+            1.0,
+            1.0,
+            vec![[2.0, 1.0], [3.0, 1.0], [3.0, 2.0], [2.0, 2.0]],
+            Vec::new(),
+        );
+        let host = boolean_brep(&host, &cavity, BooleanOp::Subtraction, "cavity-host".into())
+            .unwrap()
+            .brep;
+        assert_eq!(host.solids[0].cavity_shells.len(), 1);
+        let angle = std::f64::consts::PI / 12.0;
+        let cutter = primitives::linear_extrusion(
+            "oblique-after-cavity".into(),
+            Frame3 {
+                origin: [6.0, 1.5, 0.0],
+                x: [angle.cos(), 0.0, -angle.sin()],
+                y: [0.0, 1.0, 0.0],
+                z: [angle.sin(), 0.0, angle.cos()],
+            },
+            vec![[-0.5, -2.0], [0.5, -2.0], [0.5, 2.0], [-0.5, 2.0]],
+            Vec::new(),
+            2.1,
+            host.accuracy,
+        )
+        .unwrap();
+        let result = boolean_brep(
+            &host,
+            &cutter,
+            BooleanOp::Subtraction,
+            "oblique-cavity-cut".into(),
+        )
+        .unwrap();
+        result.brep.validate().unwrap();
+        assert_eq!(result.brep.solids.len(), 1);
+        assert_eq!(result.brep.solids[0].cavity_shells.len(), 1);
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [2.5, 1.5, 1.5]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [6.2, 1.5, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [6.2, 1.5, 2.6]).unwrap(),
+            super::super::query::PointClassification::Inside
+        );
+    }
+
+    #[test]
+    fn oblique_cut_assigns_a_remote_cavity_to_its_original_material_component() {
+        let left = extrusion(
+            "left-cavity-host",
+            vec![[0.0, 0.0], [4.0, 0.0], [4.0, 3.0], [0.0, 3.0]],
+            Vec::new(),
+        );
+        let cavity = extrusion_span(
+            "left-cavity",
+            1.0,
+            1.0,
+            vec![[1.0, 1.0], [2.0, 1.0], [2.0, 2.0], [1.0, 2.0]],
+            Vec::new(),
+        );
+        let left_with_cavity = boolean_brep(
+            &left,
+            &cavity,
+            BooleanOp::Subtraction,
+            "left-with-cavity".into(),
+        )
+        .unwrap()
+        .brep;
+        let right = extrusion(
+            "right-host",
+            vec![[6.0, 0.0], [10.0, 0.0], [10.0, 3.0], [6.0, 3.0]],
+            Vec::new(),
+        );
+        let host = boolean_brep(
+            &left_with_cavity,
+            &right,
+            BooleanOp::Union,
+            "two-components".into(),
+        )
+        .unwrap()
+        .brep;
+        assert_eq!(host.solids.len(), 2);
+        let angle = std::f64::consts::PI / 12.0;
+        let cutter = primitives::linear_extrusion(
+            "right-oblique-cutter".into(),
+            Frame3 {
+                origin: [8.5, 1.5, 0.0],
+                x: [angle.cos(), 0.0, -angle.sin()],
+                y: [0.0, 1.0, 0.0],
+                z: [angle.sin(), 0.0, angle.cos()],
+            },
+            vec![[-0.5, -2.0], [0.5, -2.0], [0.5, 2.0], [-0.5, 2.0]],
+            Vec::new(),
+            2.1,
+            host.accuracy,
+        )
+        .unwrap();
+        let result = boolean_brep(
+            &host,
+            &cutter,
+            BooleanOp::Subtraction,
+            "remote-cavity-cut".into(),
+        )
+        .unwrap();
+        result.brep.validate().unwrap();
+        assert_eq!(result.brep.solids.len(), 2);
+        assert_eq!(
+            result
+                .brep
+                .solids
+                .iter()
+                .map(|solid| solid.cavity_shells.len())
+                .sum::<usize>(),
+            1
+        );
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [1.5, 1.5, 1.5]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [8.5, 1.5, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
     }
 
     #[test]
@@ -10928,8 +12750,8 @@ mod tests {
     #[test]
     fn identical_general_analytic_body_uses_coincident_ownership() {
         let accuracy = sphere("accuracy", [0.0; 3], 1.0).accuracy;
-        let wall = primitives::circular_wall(
-            "wall".into(),
+        let host = primitives::annular_sector_extrusion(
+            "host".into(),
             Frame3::IDENTITY,
             3.0,
             0.4,
@@ -10939,16 +12761,16 @@ mod tests {
             accuracy,
         )
         .unwrap();
-        let union = boolean_brep(&wall, &wall, BooleanOp::Union, "same".into()).unwrap();
+        let union = boolean_brep(&host, &host, BooleanOp::Union, "same".into()).unwrap();
         assert!(union.report.coincident);
-        assert_eq!(union.brep.topology.faces.len(), wall.topology.faces.len());
+        assert_eq!(union.brep.topology.faces.len(), host.topology.faces.len());
         assert!(union
             .brep
             .topology
             .faces
             .iter()
             .all(|face| face.provenance.role == FaceRole::Coincident));
-        let empty = boolean_brep(&wall, &wall, BooleanOp::Subtraction, "empty".into()).unwrap();
+        let empty = boolean_brep(&host, &host, BooleanOp::Subtraction, "empty".into()).unwrap();
         assert!(empty.brep.solids.is_empty());
     }
 
@@ -11000,5 +12822,645 @@ mod tests {
         assert_eq!(subtraction.brep.solids[0].cavity_shells.len(), 1);
         subtraction.brep.validate().unwrap();
         tessellate(&subtraction.brep, 0.01, 2_000_000).unwrap();
+    }
+
+    #[test]
+    fn annular_sector_accepts_an_exact_vertical_sector_opening() {
+        let accuracy = sphere("accuracy", [0.0; 3], 1.0).accuracy;
+        let host = primitives::annular_cylinder(
+            "ring-host".into(),
+            Frame3::IDENTITY,
+            1.9,
+            2.1,
+            3.0,
+            accuracy,
+        )
+        .unwrap();
+        let reach = 2.3;
+        let cutter = primitives::linear_extrusion(
+            "ring-opening".into(),
+            Frame3 {
+                origin: [0.0, 0.0, 0.5],
+                ..Frame3::IDENTITY
+            },
+            vec![
+                [0.0, 0.0],
+                [reach * (-0.1_f64).cos(), reach * (-0.1_f64).sin()],
+                [reach * 0.1_f64.cos(), reach * 0.1_f64.sin()],
+            ],
+            vec![],
+            2.0,
+            accuracy,
+        )
+        .unwrap();
+        let cut = boolean_brep(&host, &cutter, BooleanOp::Subtraction, "ring-cut".into()).unwrap();
+        cut.brep.validate().unwrap();
+        tessellate(&cut.brep, 0.01, 2_000_000).unwrap();
+        assert_eq!(
+            super::super::query::classify_point(&cut.brep, [2.0, 0.0, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&cut.brep, [0.0, 2.0, 1.0]).unwrap(),
+            super::super::query::PointClassification::Inside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&cut.brep, [0.0, 0.0, 1.0]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        let second = primitives::linear_extrusion(
+            "second-ring-opening".into(),
+            Frame3 {
+                origin: [0.0, 0.0, 0.8],
+                ..Frame3::IDENTITY
+            },
+            vec![
+                [0.0, 0.0],
+                [
+                    reach * (std::f64::consts::FRAC_PI_2 - 0.1).cos(),
+                    reach * (std::f64::consts::FRAC_PI_2 - 0.1).sin(),
+                ],
+                [
+                    reach * (std::f64::consts::FRAC_PI_2 + 0.1).cos(),
+                    reach * (std::f64::consts::FRAC_PI_2 + 0.1).sin(),
+                ],
+            ],
+            vec![],
+            1.3,
+            accuracy,
+        )
+        .unwrap();
+        let chained = boolean_brep(
+            &cut.brep,
+            &second,
+            BooleanOp::Subtraction,
+            "ring-cut-chained".into(),
+        )
+        .unwrap();
+        chained.brep.validate().unwrap();
+        tessellate(&chained.brep, 0.01, 2_000_000).unwrap();
+        for point in [[2.0, 0.0, 1.0], [0.0, 2.0, 1.0]] {
+            assert_eq!(
+                super::super::query::classify_point(&chained.brep, point).unwrap(),
+                super::super::query::PointClassification::Outside
+            );
+        }
+        assert_eq!(
+            super::super::query::classify_point(&chained.brep, [-2.0, 0.0, 1.0]).unwrap(),
+            super::super::query::PointClassification::Inside
+        );
+    }
+
+    #[test]
+    fn arc_edged_host_accepts_a_vertical_rectangular_opening_cut() {
+        let accuracy = sphere("accuracy", [0.0; 3], 1.0).accuracy;
+        let quarter = std::f64::consts::FRAC_PI_2;
+        let host = primitives::arc_edged_extrusion(
+            "arc-host".into(),
+            Frame3::IDENTITY,
+            vec![
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 2.0,
+                    start_angle: 0.0,
+                    sweep_angle: quarter,
+                },
+                primitives::ProfileEdge::Line {
+                    from: [0.0, 2.0],
+                    to: [0.0, 1.5],
+                },
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 1.5,
+                    start_angle: quarter,
+                    sweep_angle: -quarter,
+                },
+                primitives::ProfileEdge::Line {
+                    from: [1.5, 0.0],
+                    to: [2.0, 0.0],
+                },
+            ],
+            3.0,
+            accuracy,
+        )
+        .unwrap();
+        let cutter = primitives::cuboid(
+            "opening".into(),
+            Frame3 {
+                origin: [1.1, 0.9, 0.5],
+                ..Frame3::IDENTITY
+            },
+            [1.0, 0.35, 1.5],
+            accuracy,
+        )
+        .unwrap();
+        let assert_curved_normals = |brep: &BrepEnvelope| {
+            for (radius, expected) in [(2.0, Orientation::Forward), (1.5, Orientation::Reverse)] {
+                let faces = brep.topology.faces.iter().filter(|face| {
+                    matches!(
+                        brep.geometry.surfaces[face.surface as usize],
+                        SurfaceGeometry::Cylinder { radius: value, .. } if (value - radius).abs() < 1e-9
+                    )
+                }).collect::<Vec<_>>();
+                assert!(!faces.is_empty(), "missing curved face at radius {radius}");
+                assert!(
+                    faces.iter().all(|face| face.sense == expected),
+                    "reconstructed curved face at radius {radius} points into material: {:?}",
+                    faces
+                        .iter()
+                        .map(|face| (&face.key, face.sense))
+                        .collect::<Vec<_>>()
+                );
+            }
+        };
+        let cut = boolean_brep(&host, &cutter, BooleanOp::Subtraction, "arc-cut".into()).unwrap();
+        cut.brep.validate().unwrap();
+        assert_curved_normals(&cut.brep);
+        tessellate(&cut.brep, 0.01, 2_000_000).unwrap();
+        assert_eq!(
+            super::super::query::classify_point(&cut.brep, [1.5, 1.1, 1.2]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        let second_cutter = primitives::cuboid(
+            "second-opening".into(),
+            Frame3 {
+                origin: [0.6, 1.3, 0.8],
+                ..Frame3::IDENTITY
+            },
+            [0.45, 0.8, 1.2],
+            accuracy,
+        )
+        .unwrap();
+        let batch = subtract_planar_cutters(
+            &host,
+            &[cutter, second_cutter.clone()],
+            "arc-cut-batch".into(),
+        )
+        .unwrap();
+        batch.brep.validate().unwrap();
+        tessellate(&batch.brep, 0.01, 2_000_000).unwrap();
+        assert_curved_normals(&batch.brep);
+        for point in [[1.5, 1.1, 1.2], [0.9, 1.65, 1.2]] {
+            assert_eq!(
+                super::super::query::classify_point(&batch.brep, point).unwrap(),
+                super::super::query::PointClassification::Outside
+            );
+        }
+        let chained = boolean_brep(
+            &cut.brep,
+            &second_cutter,
+            BooleanOp::Subtraction,
+            "arc-cut-chained".into(),
+        )
+        .unwrap();
+        chained.brep.validate().unwrap();
+        assert_curved_normals(&chained.brep);
+        for point in [[1.5, 1.1, 1.2], [0.9, 1.65, 1.2]] {
+            assert_eq!(
+                super::super::query::classify_point(&chained.brep, point).unwrap(),
+                super::super::query::PointClassification::Outside
+            );
+        }
+        let overlapping = primitives::cuboid(
+            "overlapping-opening".into(),
+            Frame3 {
+                origin: [1.4, 0.95, 0.2],
+                ..Frame3::IDENTITY
+            },
+            [0.5, 0.4, 2.2],
+            accuracy,
+        )
+        .unwrap();
+        let third = boolean_brep(
+            &chained.brep,
+            &overlapping,
+            BooleanOp::Subtraction,
+            "arc-cut-third".into(),
+        )
+        .unwrap();
+        third.brep.validate().unwrap();
+        tessellate(&third.brep, 0.01, 2_000_000).unwrap();
+        assert_curved_normals(&third.brep);
+        for point in [
+            [1.5, 1.1, 1.2],
+            [0.9, 1.65, 1.2],
+            [1.45, 1.2, 0.3],
+            [1.45, 1.2, 2.2],
+        ] {
+            assert_eq!(
+                super::super::query::classify_point(&third.brep, point).unwrap(),
+                super::super::query::PointClassification::Outside
+            );
+        }
+    }
+
+    #[test]
+    fn curved_internal_cut_creates_one_cavity_shell_in_its_host_solid() {
+        let accuracy = sphere("accuracy", [0.0; 3], 1.0).accuracy;
+        let quarter = std::f64::consts::FRAC_PI_2;
+        let host = primitives::arc_edged_extrusion(
+            "curved-cavity-host".into(),
+            Frame3::IDENTITY,
+            vec![
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 2.0,
+                    start_angle: 0.0,
+                    sweep_angle: quarter,
+                },
+                primitives::ProfileEdge::Line {
+                    from: [0.0, 2.0],
+                    to: [0.0, 1.0],
+                },
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 1.0,
+                    start_angle: quarter,
+                    sweep_angle: -quarter,
+                },
+                primitives::ProfileEdge::Line {
+                    from: [1.0, 0.0],
+                    to: [2.0, 0.0],
+                },
+            ],
+            3.0,
+            accuracy,
+        )
+        .unwrap();
+        let cutter = primitives::linear_extrusion(
+            "curved-interior-cutter".into(),
+            Frame3 {
+                origin: [0.0, 0.0, 1.0],
+                ..Frame3::IDENTITY
+            },
+            vec![[1.0, 1.0], [1.2, 1.0], [1.2, 1.2], [1.0, 1.2]],
+            vec![],
+            1.0,
+            accuracy,
+        )
+        .unwrap();
+        let result = boolean_brep(
+            &host,
+            &cutter,
+            BooleanOp::Subtraction,
+            "curved-cavity".into(),
+        )
+        .unwrap();
+        result.brep.validate().unwrap();
+        tessellate(&result.brep, 0.01, 2_000_000).unwrap();
+        assert_eq!(result.brep.solids.len(), 1);
+        assert_eq!(result.brep.topology.shells.len(), 2);
+        assert_eq!(result.brep.solids[0].cavity_shells.len(), 1);
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [1.1, 1.1, 1.5]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+        assert_eq!(
+            super::super::query::classify_point(&result.brep, [1.5, 0.5, 1.5]).unwrap(),
+            super::super::query::PointClassification::Inside
+        );
+
+        let split_sector = primitives::linear_extrusion(
+            "curved-split-sector".into(),
+            Frame3 {
+                origin: [0.0, 0.0, -1.0],
+                ..Frame3::IDENTITY
+            },
+            vec![
+                [0.0, 0.0],
+                [3.0 * 0.2_f64.cos(), 3.0 * 0.2_f64.sin()],
+                [3.0 * 0.3_f64.cos(), 3.0 * 0.3_f64.sin()],
+            ],
+            vec![],
+            5.0,
+            accuracy,
+        )
+        .unwrap();
+        let split = boolean_brep(
+            &host,
+            &split_sector,
+            BooleanOp::Subtraction,
+            "curved-split".into(),
+        )
+        .unwrap();
+        assert_eq!(split.brep.solids.len(), 2);
+        let split_with_cavity = boolean_brep(
+            &split.brep,
+            &cutter,
+            BooleanOp::Subtraction,
+            "curved-split-with-cavity".into(),
+        )
+        .unwrap();
+        split_with_cavity.brep.validate().unwrap();
+        assert_eq!(split_with_cavity.brep.solids.len(), 2);
+        assert_eq!(split_with_cavity.brep.topology.shells.len(), 3);
+        assert_eq!(
+            split_with_cavity
+                .brep
+                .solids
+                .iter()
+                .map(|solid| solid.cavity_shells.len())
+                .sum::<usize>(),
+            1
+        );
+        assert_eq!(
+            super::super::query::classify_point(&split_with_cavity.brep, [1.1, 1.1, 1.5]).unwrap(),
+            super::super::query::PointClassification::Outside
+        );
+
+        let second_cutter = primitives::linear_extrusion(
+            "curved-other-component-cutter".into(),
+            Frame3 {
+                origin: [0.0, 0.0, 1.1],
+                ..Frame3::IDENTITY
+            },
+            vec![[1.55, 0.1], [1.67, 0.1], [1.67, 0.22], [1.55, 0.22]],
+            vec![],
+            0.8,
+            accuracy,
+        )
+        .unwrap();
+        let same_component_cavities = boolean_brep(
+            &result.brep,
+            &second_cutter,
+            BooleanOp::Subtraction,
+            "curved-same-component-cavities".into(),
+        )
+        .unwrap();
+        same_component_cavities.brep.validate().unwrap();
+        assert_eq!(same_component_cavities.brep.solids.len(), 1);
+        assert_eq!(same_component_cavities.brep.topology.shells.len(), 3);
+        assert_eq!(
+            same_component_cavities.brep.solids[0].cavity_shells.len(),
+            2
+        );
+        let two_cavities = boolean_brep(
+            &split_with_cavity.brep,
+            &second_cutter,
+            BooleanOp::Subtraction,
+            "curved-two-cavities".into(),
+        )
+        .unwrap();
+        two_cavities.brep.validate().unwrap();
+        assert_eq!(two_cavities.brep.solids.len(), 2);
+        assert_eq!(two_cavities.brep.topology.shells.len(), 4);
+        assert!(two_cavities
+            .brep
+            .solids
+            .iter()
+            .all(|solid| solid.cavity_shells.len() == 1));
+        for point in [[1.1, 1.1, 1.5], [1.6, 0.16, 1.5]] {
+            assert_eq!(
+                super::super::query::classify_point(&two_cavities.brep, point).unwrap(),
+                super::super::query::PointClassification::Outside
+            );
+        }
+    }
+
+    #[test]
+    fn curved_cut_provenance_selects_the_trimmed_coaxial_source_face() {
+        let accuracy = sphere("accuracy", [0.0; 3], 1.0).accuracy;
+        let quarter = std::f64::consts::FRAC_PI_2;
+        let host = primitives::arc_edged_extrusion(
+            "split-arc-host".into(),
+            Frame3::IDENTITY,
+            vec![
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 2.0,
+                    start_angle: 0.0,
+                    sweep_angle: quarter / 2.0,
+                },
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 2.0,
+                    start_angle: quarter / 2.0,
+                    sweep_angle: quarter / 2.0,
+                },
+                primitives::ProfileEdge::Line {
+                    from: [0.0, 2.0],
+                    to: [0.0, 1.5],
+                },
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 1.5,
+                    start_angle: quarter,
+                    sweep_angle: -quarter,
+                },
+                primitives::ProfileEdge::Line {
+                    from: [1.5, 0.0],
+                    to: [2.0, 0.0],
+                },
+            ],
+            3.0,
+            accuracy,
+        )
+        .unwrap();
+        let cutter = primitives::cuboid(
+            "split-arc-opening".into(),
+            Frame3 {
+                origin: [1.1, 0.9, 0.5],
+                ..Frame3::IDENTITY
+            },
+            [1.0, 0.35, 1.5],
+            accuracy,
+        )
+        .unwrap();
+        let cut = boolean_brep(
+            &host,
+            &cutter,
+            BooleanOp::Subtraction,
+            "split-arc-cut".into(),
+        )
+        .unwrap();
+        cut.brep.validate().unwrap();
+        let mut outer_faces = 0;
+        for face in &cut.brep.topology.faces {
+            let SurfaceGeometry::Cylinder { radius, .. } =
+                &cut.brep.geometry.surfaces[face.surface as usize]
+            else {
+                continue;
+            };
+            if (*radius - 2.0).abs() > accuracy.geometric {
+                continue;
+            }
+            outer_faces += 1;
+            assert_eq!(
+                face.provenance
+                    .sources
+                    .iter()
+                    .filter(|source| source.entity == host.id)
+                    .count(),
+                1,
+                "output face {} should belong to exactly one trimmed outer arc",
+                face.id
+            );
+        }
+        assert!(outer_faces >= 2);
+    }
+
+    #[test]
+    fn chained_curved_cut_keeps_each_split_top_cap_on_its_source_region() {
+        let accuracy = sphere("accuracy", [0.0; 3], 1.0).accuracy;
+        let quarter = std::f64::consts::FRAC_PI_2;
+        let host = primitives::arc_edged_extrusion(
+            "split-cap-arc-host".into(),
+            Frame3::IDENTITY,
+            vec![
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 2.0,
+                    start_angle: 0.0,
+                    sweep_angle: quarter,
+                },
+                primitives::ProfileEdge::Line {
+                    from: [0.0, 2.0],
+                    to: [0.0, 1.5],
+                },
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 1.5,
+                    start_angle: quarter,
+                    sweep_angle: -quarter,
+                },
+                primitives::ProfileEdge::Line {
+                    from: [1.5, 0.0],
+                    to: [2.0, 0.0],
+                },
+            ],
+            3.0,
+            accuracy,
+        )
+        .unwrap();
+        let sector = |id: &str, start: f64, end: f64, bottom: f64, height: f64| {
+            let reach = 3.0;
+            primitives::linear_extrusion(
+                id.into(),
+                Frame3 {
+                    origin: [0.0, 0.0, bottom],
+                    ..Frame3::IDENTITY
+                },
+                vec![
+                    [0.0, 0.0],
+                    [reach * start.cos(), reach * start.sin()],
+                    [reach * end.cos(), reach * end.sin()],
+                ],
+                Vec::new(),
+                height,
+                accuracy,
+            )
+            .unwrap()
+        };
+        let first_cutter = sector("full-height-sector", 0.7, 0.9, -1.0, 5.0);
+        let first = boolean_brep(
+            &host,
+            &first_cutter,
+            BooleanOp::Subtraction,
+            "split-cap-first".into(),
+        )
+        .unwrap();
+        first.brep.validate().unwrap();
+        assert_eq!(first.brep.solids.len(), 2);
+        let second_cutter = sector("lower_cutout-sector", 0.2, 0.3, 0.5, 1.5);
+        let second = boolean_brep(
+            &first.brep,
+            &second_cutter,
+            BooleanOp::Subtraction,
+            "split-cap-second".into(),
+        )
+        .unwrap();
+        second.brep.validate().unwrap();
+        let mut caps = 0;
+        for face in &second.brep.topology.faces {
+            let SurfaceGeometry::Plane { frame } =
+                &second.brep.geometry.surfaces[face.surface as usize]
+            else {
+                continue;
+            };
+            if dot(frame.z, [0.0, 0.0, 1.0]) < 1.0 - 1.0e-10
+                || (frame.origin[2] - 3.0).abs() > accuracy.intersection
+            {
+                continue;
+            }
+            caps += 1;
+            assert_eq!(
+                face.provenance
+                    .sources
+                    .iter()
+                    .filter(|source| source.entity == first.brep.id)
+                    .count(),
+                1,
+                "top cap {} should come from one prior top region",
+                face.id
+            );
+        }
+        assert_eq!(caps, 2);
+    }
+
+    #[test]
+    fn wide_curved_opening_uses_multiple_planar_sector_cutters() {
+        let accuracy = sphere("accuracy", [0.0; 3], 1.0).accuracy;
+        let start = -std::f64::consts::FRAC_PI_2;
+        let sweep = 3.0 * std::f64::consts::FRAC_PI_2;
+        let point = |radius: f64, angle: f64| [radius * angle.cos(), radius * angle.sin()];
+        let host = primitives::arc_edged_extrusion(
+            "wide-arc".into(),
+            Frame3::IDENTITY,
+            vec![
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 2.1,
+                    start_angle: start,
+                    sweep_angle: sweep,
+                },
+                primitives::ProfileEdge::Line {
+                    from: point(2.1, start + sweep),
+                    to: point(1.9, start + sweep),
+                },
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 1.9,
+                    start_angle: start + sweep,
+                    sweep_angle: -sweep,
+                },
+                primitives::ProfileEdge::Line {
+                    from: point(1.9, start),
+                    to: point(2.1, start),
+                },
+            ],
+            3.0,
+            accuracy,
+        )
+        .unwrap();
+        let opening_start = start + 1.2 / 2.0;
+        let opening_end = start + 8.2 / 2.0;
+        let cutters = (0..3)
+            .map(|index| {
+                let from = opening_start + (opening_end - opening_start) * index as f64 / 3.0;
+                let to = opening_start + (opening_end - opening_start) * (index + 1) as f64 / 3.0;
+                let reach = 2.1 / ((to - from) / 2.0).cos() + 0.2;
+                primitives::linear_extrusion(
+                    format!("sector-{index}"),
+                    Frame3::IDENTITY,
+                    vec![[0.0, 0.0], point(reach, from), point(reach, to)],
+                    vec![],
+                    2.0,
+                    accuracy,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let cut = subtract_planar_cutters(&host, &cutters, "wide-cut".into()).unwrap();
+        cut.brep.validate().unwrap();
+        tessellate(&cut.brep, 0.01, 2_000_000).unwrap();
+        let angle = start + 4.7 / 2.0;
+        assert_eq!(
+            super::super::query::classify_point(
+                &cut.brep,
+                [2.0 * angle.cos(), 2.0 * angle.sin(), 1.0]
+            )
+            .unwrap(),
+            super::super::query::PointClassification::Outside
+        );
     }
 }

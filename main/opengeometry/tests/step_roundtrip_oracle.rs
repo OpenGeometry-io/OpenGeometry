@@ -80,11 +80,11 @@ fn exported_cylinder_round_trips_as_one_analytic_cylinder() {
         );
     }
 
-    // No planar facet fan stands in for the curved wall: the cylinder is one
+    // No planar facet fan stands in for the curved surface: the cylinder is one
     // advanced face, so advanced faces are few (cylinder + 2 caps).
     assert!(
         text.matches("ADVANCED_FACE").count() <= 4,
-        "cylinder wall must not be a facet fan"
+        "cylindrical face must not be a facet fan"
     );
 }
 

@@ -774,8 +774,17 @@ mod tests {
             primitives::cone("c".into(), frame(), 1.0, 2.0, accuracy()).unwrap(),
             primitives::frustum("f".into(), frame(), 1.0, 0.4, 2.0, accuracy()).unwrap(),
             primitives::torus("t".into(), frame(), 2.0, 0.5, accuracy()).unwrap(),
-            primitives::circular_wall("w".into(), frame(), 2.0, 0.2, 1.5, 0.3, -2.1, accuracy())
-                .unwrap(),
+            primitives::annular_sector_extrusion(
+                "w".into(),
+                frame(),
+                2.0,
+                0.2,
+                1.5,
+                0.3,
+                -2.1,
+                accuracy(),
+            )
+            .unwrap(),
         ];
         for brep in bodies {
             let original = brep.to_json().unwrap();

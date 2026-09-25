@@ -1069,7 +1069,7 @@ mod tests {
         unique
     }
 
-    fn assert_window_frame_dimensions(
+    fn assert_rectangular_frame_dimensions(
         brep: &Brep,
         expected_outer_width: f64,
         expected_inner_width: f64,
@@ -1257,117 +1257,117 @@ mod tests {
     }
 
     #[test]
-    fn closed_window_frame_loop_preserves_expected_dimensions() {
-        let window_width = 1.2;
+    fn closed_rectangular_frame_loop_preserves_expected_dimensions() {
+        let aperture_width = 1.2;
         let frame_width = 0.12;
         let frame_depth = 0.12;
-        let window_height = 1.0;
-        let sill_height = 1.05;
-        let half_window_width = window_width * 0.5;
+        let aperture_height = 1.0;
+        let base_elevation = 1.05;
+        let half_aperture_width = aperture_width * 0.5;
         let half_frame_width = frame_width * 0.5;
 
         let path = vec![
             Vector3::new(
-                -(half_window_width + half_frame_width),
-                sill_height - half_frame_width,
+                -(half_aperture_width + half_frame_width),
+                base_elevation - half_frame_width,
                 0.0,
             ),
             Vector3::new(
-                -(half_window_width + half_frame_width),
-                sill_height + window_height + half_frame_width,
+                -(half_aperture_width + half_frame_width),
+                base_elevation + aperture_height + half_frame_width,
                 0.0,
             ),
             Vector3::new(
-                half_window_width + half_frame_width,
-                sill_height + window_height + half_frame_width,
+                half_aperture_width + half_frame_width,
+                base_elevation + aperture_height + half_frame_width,
                 0.0,
             ),
             Vector3::new(
-                half_window_width + half_frame_width,
-                sill_height - half_frame_width,
+                half_aperture_width + half_frame_width,
+                base_elevation - half_frame_width,
                 0.0,
             ),
             Vector3::new(
-                -(half_window_width + half_frame_width),
-                sill_height - half_frame_width,
+                -(half_aperture_width + half_frame_width),
+                base_elevation - half_frame_width,
                 0.0,
             ),
         ];
         let profile = rectangle_profile(frame_width, frame_depth);
 
         let brep = sweep_profile_along_path(&path, &profile, SweepOptions::default())
-            .expect("closed window frame sweep should succeed");
+            .expect("closed rectangular frame sweep should succeed");
         brep.validate_topology()
-            .expect("closed window frame topology should validate");
+            .expect("closed rectangular frame topology should validate");
 
-        assert_window_frame_dimensions(
+        assert_rectangular_frame_dimensions(
             &brep,
-            window_width + frame_width * 2.0,
-            window_width,
-            window_height + frame_width * 2.0,
-            window_height,
+            aperture_width + frame_width * 2.0,
+            aperture_width,
+            aperture_height + frame_width * 2.0,
+            aperture_height,
         );
     }
 
     #[test]
-    fn larger_closed_window_frame_loop_preserves_expected_dimensions() {
-        let window_width = 1.6;
+    fn larger_closed_rectangular_frame_loop_preserves_expected_dimensions() {
+        let aperture_width = 1.6;
         let frame_width = 0.14;
         let frame_depth = 0.2;
-        let window_height = 1.2;
-        let sill_height = 1.0;
-        let half_window_width = window_width * 0.5;
+        let aperture_height = 1.2;
+        let base_elevation = 1.0;
+        let half_aperture_width = aperture_width * 0.5;
         let half_frame_width = frame_width * 0.5;
 
         let path = vec![
             Vector3::new(
-                -(half_window_width + half_frame_width),
-                sill_height - half_frame_width,
+                -(half_aperture_width + half_frame_width),
+                base_elevation - half_frame_width,
                 0.0,
             ),
             Vector3::new(
-                -(half_window_width + half_frame_width),
-                sill_height + window_height + half_frame_width,
+                -(half_aperture_width + half_frame_width),
+                base_elevation + aperture_height + half_frame_width,
                 0.0,
             ),
             Vector3::new(
-                half_window_width + half_frame_width,
-                sill_height + window_height + half_frame_width,
+                half_aperture_width + half_frame_width,
+                base_elevation + aperture_height + half_frame_width,
                 0.0,
             ),
             Vector3::new(
-                half_window_width + half_frame_width,
-                sill_height - half_frame_width,
+                half_aperture_width + half_frame_width,
+                base_elevation - half_frame_width,
                 0.0,
             ),
             Vector3::new(
-                -(half_window_width + half_frame_width),
-                sill_height - half_frame_width,
+                -(half_aperture_width + half_frame_width),
+                base_elevation - half_frame_width,
                 0.0,
             ),
         ];
         let profile = rectangle_profile(frame_width, frame_depth);
 
         let brep = sweep_profile_along_path(&path, &profile, SweepOptions::default())
-            .expect("larger closed window frame sweep should succeed");
+            .expect("larger closed rectangular frame sweep should succeed");
         brep.validate_topology()
-            .expect("larger closed window frame topology should validate");
+            .expect("larger closed rectangular frame topology should validate");
 
-        assert_window_frame_dimensions(
+        assert_rectangular_frame_dimensions(
             &brep,
-            window_width + frame_width * 2.0,
-            window_width,
-            window_height + frame_width * 2.0,
-            window_height,
+            aperture_width + frame_width * 2.0,
+            aperture_width,
+            aperture_height + frame_width * 2.0,
+            aperture_height,
         );
     }
 
     #[test]
-    fn open_door_frame_path_keeps_requested_widths() {
+    fn open_u_frame_path_keeps_requested_widths() {
         let panel_width = 1.0;
         let frame_width = 0.2;
         let frame_depth = 0.3;
-        let door_height = 2.1;
+        let opening_height = 2.1;
         let half_panel_width = panel_width * 0.5;
         let half_frame_width = frame_width * 0.5;
 
@@ -1375,12 +1375,12 @@ mod tests {
             Vector3::new(-(half_panel_width + half_frame_width), 0.0, 0.0),
             Vector3::new(
                 -(half_panel_width + half_frame_width),
-                door_height + half_frame_width,
+                opening_height + half_frame_width,
                 0.0,
             ),
             Vector3::new(
                 half_panel_width + half_frame_width,
-                door_height + half_frame_width,
+                opening_height + half_frame_width,
                 0.0,
             ),
             Vector3::new(half_panel_width + half_frame_width, 0.0, 0.0),
@@ -1388,9 +1388,9 @@ mod tests {
         let profile = rectangle_profile(frame_width, frame_depth);
 
         let brep = sweep_profile_along_path(&path, &profile, SweepOptions::default())
-            .expect("open door frame sweep should succeed");
+            .expect("open open frame sweep should succeed");
         brep.validate_topology()
-            .expect("open door frame topology should validate");
+            .expect("open open frame topology should validate");
 
         let tolerance = 1.0e-6;
         let xs = unique_sorted_values(
@@ -1402,19 +1402,19 @@ mod tests {
             tolerance,
         );
 
-        assert_eq!(xs.len(), 4, "door frame should preserve four x bands");
-        assert_eq!(ys.len(), 3, "door frame should preserve three y bands");
+        assert_eq!(xs.len(), 4, "open frame should preserve four x bands");
+        assert_eq!(ys.len(), 3, "open frame should preserve three y bands");
         assert!(
             ((xs[xs.len() - 1] - xs[0]) - (panel_width + frame_width * 2.0)).abs() <= tolerance,
-            "door frame outer width changed unexpectedly"
+            "open frame outer width changed unexpectedly"
         );
         assert!(
             ((xs[xs.len() - 2] - xs[1]) - panel_width).abs() <= tolerance,
-            "door frame inner width changed unexpectedly"
+            "open frame inner width changed unexpectedly"
         );
         assert!(
-            ((ys[ys.len() - 1] - ys[0]) - (door_height + frame_width)).abs() <= tolerance,
-            "door frame outer height changed unexpectedly"
+            ((ys[ys.len() - 1] - ys[0]) - (opening_height + frame_width)).abs() <= tolerance,
+            "open frame outer height changed unexpectedly"
         );
     }
 

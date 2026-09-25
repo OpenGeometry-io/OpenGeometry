@@ -1,5 +1,7 @@
 use super::{
-    geometry::{add, cross, dot, norm, scale, sub, unit, PatchBounds, Surface, UVBox},
+    geometry::{
+        add, cross, dot, norm, scale, sub, unit, PatchBounds, Surface, SurfaceGeometry, UVBox,
+    },
     topology::GeometryStore,
     GeometryError, Point3, UV,
 };
@@ -64,6 +66,176 @@ pub struct IntersectionPoint {
     pub uv_b: UV,
     pub tangent: Point3,
     pub support_error: f64,
+}
+
+fn intersect_interval(a: Interval, b: Interval) -> Option<Interval> {
+    Interval::new(a.lo.max(b.lo), a.hi.min(b.hi)).ok()
+}
+
+fn interval_dot(
+    bounds: PatchBounds,
+    origin: Point3,
+    axis: Point3,
+) -> Result<Interval, GeometryError> {
+    let mut value = Interval::point(0.0)?;
+    for coordinate in 0..3 {
+        value = value.add(
+            bounds.axes[coordinate]
+                .sub(Interval::point(origin[coordinate])?)?
+                .mul(Interval::point(axis[coordinate])?)?,
+        )?;
+    }
+    Ok(value)
+}
+
+fn signed_root(radial: Interval, sign: Interval) -> Result<Option<Interval>, GeometryError> {
+    if radial.hi < 0.0 {
+        return Ok(None);
+    }
+    let root = Interval::new(radial.lo.max(0.0), radial.hi)?.sqrt()?;
+    Ok(Some(if sign.lo >= 0.0 {
+        root
+    } else if sign.hi <= 0.0 {
+        Interval::new(-root.hi, -root.lo)?
+    } else {
+        Interval::new(-root.hi, root.hi)?
+    }))
+}
+
+fn perpendicular_cylinder_enclosure(
+    definition: &IntersectionDefinition,
+    store: &GeometryStore,
+    segment: usize,
+    range: Interval,
+    parent: PatchBounds,
+) -> Result<Option<(PatchBounds, f64)>, GeometryError> {
+    let (
+        SurfaceGeometry::Cylinder {
+            frame: host,
+            radius: host_radius,
+        },
+        SurfaceGeometry::Cylinder {
+            frame: cutter,
+            radius: cutter_radius,
+        },
+    ) = (
+        store.surface(definition.surfaces[0])?,
+        store.surface(definition.surfaces[1])?,
+    )
+    else {
+        return Ok(None);
+    };
+    let u_axis = cutter.z;
+    let v_axis = host.z;
+    if dot(u_axis, v_axis).abs() > 1e-12 {
+        return Ok(None);
+    }
+    let w_axis = cross(u_axis, v_axis);
+    let host_to_cutter = sub(cutter.origin, host.origin);
+    let centre = add(host.origin, scale(v_axis, dot(host_to_cutter, v_axis)));
+    let residual = sub(
+        sub(centre, cutter.origin),
+        scale(u_axis, dot(sub(centre, cutter.origin), u_axis)),
+    );
+    if norm(residual) > 1e-12 {
+        return Ok(None);
+    }
+
+    let first = &definition.anchors[segment];
+    let last = &definition.anchors[segment + 1];
+    let guide_axis = unit(sub(last.point, first.point))?;
+    let certificate = definition.residual_tolerance * 8.0
+        + 128.0 * f64::EPSILON * host_radius.max(*cutter_radius).max(norm(centre)).max(1.0);
+    let theta_parent = definition.uv_tubes[segment][2];
+    if theta_parent.width() >= std::f64::consts::PI {
+        return Ok(None);
+    }
+    let u_parent = interval_dot(parent, centre, u_axis)?;
+    if u_parent.contains(0.0) {
+        return Ok(None);
+    }
+    let host_squared = Interval::new(
+        (host_radius - certificate).max(0.0).powi(2),
+        (host_radius + certificate).powi(2),
+    )?;
+    let v_cos = dot(cutter.x, v_axis);
+    let v_sin = dot(cutter.y, v_axis);
+    let w_cos = dot(cutter.x, w_axis);
+    let w_sin = dot(cutter.y, w_axis);
+    let trig = |cosine: Interval,
+                sine: Interval,
+                along_cosine: f64,
+                along_sine: f64|
+     -> Result<Interval, GeometryError> {
+        Ok(cosine
+            .mul(Interval::point(along_cosine)?)?
+            .add(sine.mul(Interval::point(along_sine)?)?)?
+            .mul(Interval::point(*cutter_radius)?)?)
+    };
+    let parent_cosine = theta_parent.cos()?;
+    let parent_sine = theta_parent.sin()?;
+    let parent_w = trig(parent_cosine, parent_sine, w_cos, w_sin)?;
+    let parent_dw = trig(parent_sine, parent_cosine, -w_cos, w_sin)?;
+    let parent_dv = trig(parent_sine, parent_cosine, -v_cos, v_sin)?;
+    let Some(parent_u) = signed_root(host_squared.sub(parent_w.square()?)?, u_parent)? else {
+        return Ok(None);
+    };
+    if parent_u.contains(0.0) {
+        return Ok(None);
+    }
+    let parent_du = Interval::point(-1.0)?
+        .mul(parent_w)?
+        .mul(parent_dw)?
+        .div(parent_u)?;
+    let derivative = parent_du
+        .mul(Interval::point(dot(guide_axis, u_axis))?)?
+        .add(parent_dv.mul(Interval::point(dot(guide_axis, v_axis))?)?)?
+        .add(parent_dw.mul(Interval::point(dot(guide_axis, w_axis))?)?)?;
+    if derivative.contains(0.0) {
+        return Ok(None);
+    }
+
+    let lo = definition.evaluate(range.lo, store)?.uv_b[0];
+    let hi = definition.evaluate(range.hi, store)?.uv_b[0];
+    let theta_pad = certificate / cutter_radius + 64.0 * f64::EPSILON;
+    let theta = Interval::new(lo.min(hi) - theta_pad, lo.max(hi) + theta_pad)?;
+    if theta.lo < theta_parent.lo - theta_pad || theta.hi > theta_parent.hi + theta_pad {
+        return Ok(None);
+    }
+    let cosine = theta.cos()?;
+    let sine = theta.sin()?;
+    let v = trig(cosine, sine, v_cos, v_sin)?;
+    let w = trig(cosine, sine, w_cos, w_sin)?;
+    let Some(u) = signed_root(host_squared.sub(w.square()?)?, u_parent)? else {
+        return Ok(None);
+    };
+    let local = [u, v, w];
+    let axes = [u_axis, v_axis, w_axis];
+
+    let mut world = [Interval::point(0.0)?; 3];
+    for coordinate in 0..3 {
+        let mut value = Interval::point(centre[coordinate])?;
+        for axis in 0..3 {
+            value = value.add(local[axis].mul(Interval::point(axes[axis][coordinate])?)?)?;
+        }
+        world[coordinate] = value.add(Interval::new(-certificate, certificate)?)?;
+    }
+    let minimum_u = ((host_radius - certificate).powi(2) - (cutter_radius + certificate).powi(2))
+        .max(0.0)
+        .sqrt();
+    if minimum_u <= certificate {
+        return Ok(None);
+    }
+    let radius = cutter_radius + certificate;
+    let axial_curvature = radius.powi(2) / minimum_u + radius.powi(4) / minimum_u.powi(3);
+    let host_angle_curvature = radius / minimum_u + radius.powi(3) / minimum_u.powi(3);
+    // The exported XYZ chord and both surface pcurves use the same linear
+    // parameter. Bound their support-space deviations over that parameter.
+    let host_support_curvature =
+        host_radius * (host_angle_curvature + (radius / minimum_u).powi(2));
+    let curvature = (radius + axial_curvature).max(host_support_curvature);
+    let chord_error = curvature * theta.width().powi(2) / 8.0 + certificate * 4.0;
+    Ok(Some((PatchBounds { axes: world }, chord_error)))
 }
 
 impl IntersectionDefinition {
@@ -291,6 +463,21 @@ impl IntersectionDefinition {
                     GeometryError::InvalidGeometry("disjoint trace support boxes".into())
                 })?;
             }
+            if let Some((tighter, _)) = perpendicular_cylinder_enclosure(
+                self,
+                store,
+                i,
+                Interval::new(
+                    range.lo.max(self.anchors[i].parameter),
+                    range.hi.min(self.anchors[i + 1].parameter),
+                )?,
+                PatchBounds { axes },
+            )? {
+                for axis in 0..3 {
+                    axes[axis] =
+                        intersect_interval(axes[axis], tighter.axes[axis]).unwrap_or(axes[axis]);
+                }
+            }
             result = Some(match result {
                 None => PatchBounds { axes },
                 Some(previous) => PatchBounds {
@@ -299,6 +486,37 @@ impl IntersectionDefinition {
             });
         }
         result.ok_or_else(|| GeometryError::InvalidGeometry("empty trace interval".into()))
+    }
+
+    pub fn certified_chord_deviation(
+        &self,
+        range: Interval,
+        store: &GeometryStore,
+    ) -> Result<Option<f64>, GeometryError> {
+        let Some(segment) = self
+            .anchors
+            .windows(2)
+            .position(|pair| range.lo >= pair[0].parameter && range.hi <= pair[1].parameter)
+        else {
+            return Ok(None);
+        };
+        let a = store.surface(self.surfaces[0])?;
+        let b = store.surface(self.surfaces[1])?;
+        let tube = self.uv_tubes[segment];
+        let box_a = a.enclose([tube[0], tube[1]])?;
+        let box_b = b.enclose([tube[2], tube[3]])?;
+        let mut axes = [Interval::point(0.0)?; 3];
+        for coordinate in 0..3 {
+            let Some(overlap) = intersect_interval(box_a.axes[coordinate], box_b.axes[coordinate])
+            else {
+                return Ok(None);
+            };
+            axes[coordinate] = overlap;
+        }
+        Ok(
+            perpendicular_cylinder_enclosure(self, store, segment, range, PatchBounds { axes })?
+                .map(|(_, error)| error),
+        )
     }
 }
 

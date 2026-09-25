@@ -520,7 +520,9 @@ fn clip_face_branch(
                 continue;
             }
             if let Some(previous) = intervals.last_mut() {
-                if start - previous.hi <= accuracy.intersection {
+                // Each trim transition can carry one geometric tolerance of
+                // correction, so their shared boundary may differ by two.
+                if start - previous.hi <= accuracy.intersection.max(2.0 * accuracy.geometric) {
                     *previous = Interval::new(previous.lo, end.max(previous.hi))?;
                     continue;
                 }
@@ -529,6 +531,51 @@ fn clip_face_branch(
         }
     }
     Ok(intervals)
+}
+
+fn bound_plane_cylinder_generator(
+    geometry: &GeometryStore,
+    branch: &SsiCurve,
+    faces: [&Face; 2],
+    accuracy: Accuracy,
+) -> Result<Option<Interval>, GeometryError> {
+    let super::CurveGeometry::Line { origin, direction } = geometry.curves[branch.curve as usize]
+    else {
+        return Err(GeometryError::CoverageGap {
+            families: ["plane/cylinder trim".into(), "nonlinear generator".into()],
+        });
+    };
+    let mut range = [-f64::MAX.sqrt(), f64::MAX.sqrt()];
+    for side in 0..2 {
+        let surface = geometry.surface(side as u32)?;
+        let start = surface.project(origin, None)?;
+        let next = surface.project(super::geometry::add(origin, direction), Some(start))?;
+        let periods = surface.charts()[0].periods;
+        for axis in 0..2 {
+            let bounds = faces[side].trim.uv_bounds[axis];
+            let initial = periodic_value(start[axis], bounds, periods[axis]);
+            let later = periodic_value(next[axis], bounds, periods[axis]);
+            let mut rate = later - initial;
+            if matches!(surface, SurfaceGeometry::Cylinder { .. })
+                && axis == 0
+                && rate.abs() > accuracy.intersection
+            {
+                return Err(GeometryError::CoverageGap {
+                    families: ["plane/cylinder trim".into(), "nonaxial generator".into()],
+                });
+            }
+            if matches!(surface, SurfaceGeometry::Cylinder { .. }) && axis == 0 {
+                rate = 0.0;
+            }
+            if !clip_coordinate(initial, rate, bounds, &mut range) {
+                return Ok(None);
+            }
+        }
+    }
+    if !range[0].is_finite() || !range[1].is_finite() || range[1] - range[0] <= accuracy.geometric {
+        return Ok(None);
+    }
+    Ok(Some(Interval::new(range[0], range[1])?))
 }
 
 fn intersect_bounded_surfaces(
@@ -541,7 +588,32 @@ fn intersect_bounded_surfaces(
         .iter()
         .take(2)
         .all(|surface| matches!(surface, SurfaceGeometry::Plane { .. }));
+    let plane_cylinder_pair = geometry.surfaces.len() >= 2
+        && matches!(
+            (&geometry.surfaces[0], &geometry.surfaces[1]),
+            (
+                SurfaceGeometry::Plane { .. },
+                SurfaceGeometry::Cylinder { .. }
+            ) | (
+                SurfaceGeometry::Cylinder { .. },
+                SurfaceGeometry::Plane { .. }
+            )
+        );
     match intersect_surfaces(geometry, 0, 1, accuracy) {
+        Ok(mut result) if plane_cylinder_pair => {
+            let mut bounded = Vec::new();
+            for mut branch in result.curves {
+                if branch.domain.is_none() {
+                    branch.domain =
+                        bound_plane_cylinder_generator(geometry, &branch, faces, accuracy)?;
+                }
+                if branch.domain.is_some() {
+                    bounded.push(branch);
+                }
+            }
+            result.curves = bounded;
+            Ok(result)
+        }
         Ok(result) if planar_pair || result.curves.iter().all(|curve| curve.domain.is_some()) => {
             Ok(result)
         }
@@ -785,6 +857,67 @@ mod tests {
             assert!((point[0] - 1.0).abs() <= accuracy().intersection);
             assert!((point[1] - expected_y).abs() <= accuracy().intersection);
             assert!((point[2] - 2.0).abs() <= accuracy().intersection);
+        }
+    }
+
+    #[test]
+    fn vertical_plane_cylinder_generators_remain_exact_and_bounded() {
+        let quarter = std::f64::consts::FRAC_PI_2;
+        let host = primitives::arc_edged_extrusion(
+            "arc-profile".into(),
+            Frame3::IDENTITY,
+            vec![
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 2.0,
+                    start_angle: 0.0,
+                    sweep_angle: quarter,
+                },
+                primitives::ProfileEdge::Line {
+                    from: [0.0, 2.0],
+                    to: [0.0, 1.5],
+                },
+                primitives::ProfileEdge::Arc {
+                    center: [0.0, 0.0],
+                    radius: 1.5,
+                    start_angle: quarter,
+                    sweep_angle: -quarter,
+                },
+                primitives::ProfileEdge::Line {
+                    from: [1.5, 0.0],
+                    to: [2.0, 0.0],
+                },
+            ],
+            3.0,
+            accuracy(),
+        )
+        .unwrap();
+        let cutter = primitives::cuboid(
+            "opening".into(),
+            Frame3 {
+                origin: [1.1, 0.9, 0.5],
+                ..Frame3::IDENTITY
+            },
+            [1.0, 0.35, 1.5],
+            accuracy(),
+        )
+        .unwrap();
+        let graph = intersect_breps(&host, &cutter).unwrap();
+        assert!(!graph.pairs.is_empty());
+        let branches = graph
+            .pairs
+            .iter()
+            .flat_map(|pair| &pair.graph.branches)
+            .collect::<Vec<_>>();
+        assert!(!branches.is_empty());
+        for pair in &graph.pairs {
+            for branch in &pair.graph.branches {
+                assert!(branch.range.lo.is_finite() && branch.range.hi.is_finite());
+                assert!(!matches!(
+                    pair.graph.geometry.curves[branch.curve as usize],
+                    CurveGeometry::Intersection { .. }
+                ));
+            }
         }
     }
 

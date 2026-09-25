@@ -32,7 +32,7 @@
 
 OpenGeometry is an **open-source, browser-native CAD kernel**. The geometry engine is written in **Rust**, compiled to **WebAssembly**, and paired with a **Three.js-friendly TypeScript layer** so you can build real CAD tools that run in the browser.
 
-OpenGeometry is best suited for **browser-based CAD, AEC/BIM, configurators, and geometry-heavy web tools**. Whether you're building a parametric modeler, a wall/opening workflow, a BIM viewer, or a custom Three.js modeling tool, OpenGeometry gives you deterministic, kernel-backed primitives and operations without leaving JavaScript.
+OpenGeometry is best suited for **browser-based CAD, configurators, and geometry-heavy web tools**. Whether you're building a parametric modeler, a solid modeling workflow, a geometry viewer, or a custom Three.js modeling tool, OpenGeometry gives you deterministic, kernel-backed primitives and operations without leaving JavaScript.
 
 It is the geometry engine layer, not a full CAD application. OpenPlans is a downstream application/toolkit built on top of OpenGeometry for AEC workflows. In this repository, OpenGeometry is the primary SDK and engine.
 
@@ -41,7 +41,7 @@ It is the geometry engine layer, not a full CAD application. OpenPlans is a down
 Use OpenGeometry when you need:
 
 - browser-based parametric modeling with Rust + WebAssembly performance
-- wall/opening subtraction and other solid boolean workflows
+- cutout subtraction and other solid boolean workflows
 - polygon extrusion into solids for CAD or AEC modeling
 - IFC, STEP, STL, and PDF-style export/projection in web apps
 - a Three.js-friendly CAD kernel instead of ad hoc mesh math
@@ -61,7 +61,7 @@ Good examples include:
 
 **Good fit**
 
-- browser CAD, AEC/BIM, Mechanical, and geometry-heavy web applications
+- browser CAD, mechanical design, and geometry-heavy web applications
 - Three.js-based modeling tools that need a real kernel behind them
 - AI first CAD frontends that need deterministic geometry execution in the browser
 
@@ -186,7 +186,7 @@ npm test
 
 ## Who is this for?
 
-- Teams building **browser-based CAD/BIM/geometry tools**
+- Teams building **browser-based CAD and geometry tools**
 - Developers evaluating **WebAssembly-powered 3D** for the web
 - Contributors interested in the **Rust → WASM geometry pipeline**
 - Anyone exploring **open-source CAD kernel internals**

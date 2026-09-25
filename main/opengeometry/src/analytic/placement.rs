@@ -254,7 +254,7 @@ mod tests {
             primitives::cone("cone".into(), Frame3::IDENTITY, 1.0, 2.0, accuracy()).unwrap(),
             primitives::sphere("s".into(), Frame3::IDENTITY, 1.0, accuracy()).unwrap(),
             primitives::torus("t".into(), Frame3::IDENTITY, 2.0, 0.5, accuracy()).unwrap(),
-            primitives::circular_wall(
+            primitives::annular_sector_extrusion(
                 "w".into(),
                 Frame3::IDENTITY,
                 2.0,

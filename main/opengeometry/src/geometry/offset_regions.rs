@@ -1,9 +1,10 @@
 //! Fixed-width polyline offset: centreline + width -> stroked region(s), plus a
 //! group offset that merges several overlapping strokes into one. Built on the
-//! generic `geometry` 2D toolkit. Domain-neutral (walls, roads, pipe routes,
-//! hatching, font strokes, etc.).
+//! generic `geometry` 2D toolkit. It accepts arbitrary planar paths and
+//! ring boundaries.
 
 use crate::geometry::boolean2d::*;
+use crate::geometry::curved_boolean2d::{boolean_curved_regions, CurveRegion2};
 use crate::geometry::offset2d::*;
 use crate::geometry::poly2d::*;
 use openmaths::Vector3;
@@ -12,6 +13,242 @@ use wasm_bindgen::prelude::*;
 /// One stroked region: a CW outer ring + its CCW inner-void holes (canonical).
 pub type OffsetRegion = (Vec<Vector3>, Vec<Vec<Vector3>>);
 
+pub fn boolean_offset_regions(
+    a: &[OffsetRegion],
+    b: &[OffsetRegion],
+    operation: PlanarBooleanOp,
+) -> Result<Vec<OffsetRegion>, String> {
+    let base_y = a
+        .iter()
+        .chain(b)
+        .find_map(|(outer, _)| outer.first().map(|point| point.y))
+        .unwrap_or(0.0);
+    let contours = |regions: &[OffsetRegion]| -> Result<Vec<Vec<Pt2>>, String> {
+        let mut loops = Vec::new();
+        for (outer, holes) in regions {
+            for (ring, outer_ring) in
+                std::iter::once((outer, true)).chain(holes.iter().map(|hole| (hole, false)))
+            {
+                if ring.len() < 3
+                    || ring.iter().any(|point| {
+                        !point.x.is_finite()
+                            || !point.y.is_finite()
+                            || !point.z.is_finite()
+                            || (point.y - base_y).abs() > DEFAULT_EPS
+                    })
+                {
+                    return Err(
+                        "Boolean region ring must contain at least three finite coplanar points"
+                            .into(),
+                    );
+                }
+                let area = signed_area_xz(ring);
+                if area.abs() <= DEFAULT_EPS * DEFAULT_EPS
+                    || (outer_ring && area >= 0.0)
+                    || (!outer_ring && area <= 0.0)
+                {
+                    return Err("Boolean region ring has degenerate or incorrect winding".into());
+                }
+                loops.push(ring.iter().map(xz).collect());
+            }
+        }
+        Ok(loops)
+    };
+    let a_contours = contours(a)?;
+    let b_contours = contours(b)?;
+    Ok(
+        boolean_oriented_regions(&a_contours, &b_contours, operation, DEFAULT_EPS)
+            .into_iter()
+            .map(|region| finalize_region(&region.outer, &region.holes, base_y))
+            .collect(),
+    )
+}
+
+#[derive(serde::Deserialize)]
+struct BooleanRegionJson {
+    outer: Vec<[f64; 3]>,
+    holes: Vec<Vec<[f64; 3]>>,
+}
+
+#[wasm_bindgen(js_name = booleanRegions2D)]
+pub fn boolean_regions_2d_wasm(
+    a_json: String,
+    b_json: String,
+    operation: String,
+) -> Result<OGOffsetRegionsResult, JsValue> {
+    let parse = |json: &str| -> Result<Vec<OffsetRegion>, JsValue> {
+        let regions: Vec<BooleanRegionJson> = serde_json::from_str(json).map_err(|error| {
+            JsValue::from_str(&format!("Invalid Boolean regions JSON: {error}"))
+        })?;
+        Ok(regions
+            .into_iter()
+            .map(|region| {
+                let points = |ring: Vec<[f64; 3]>| {
+                    ring.into_iter()
+                        .map(|point| Vector3::new(point[0], point[1], point[2]))
+                        .collect()
+                };
+                (
+                    points(region.outer),
+                    region.holes.into_iter().map(points).collect(),
+                )
+            })
+            .collect())
+    };
+    let operation = match operation.as_str() {
+        "union" => PlanarBooleanOp::Union,
+        "intersection" => PlanarBooleanOp::Intersection,
+        "subtraction" => PlanarBooleanOp::Subtraction,
+        _ => return Err(JsValue::from_str("Unknown 2D Boolean operation")),
+    };
+    let result = boolean_offset_regions(&parse(&a_json)?, &parse(&b_json)?, operation)
+        .map_err(|error| JsValue::from_str(&error))?;
+    OGOffsetRegionsResult::from_regions(result).map_err(|error| JsValue::from_str(&error))
+}
+
+/// Exact line/arc region Boolean. The JSON rings contain analytic edges rather
+/// than vertices, and the result keeps arcs as arcs. As with booleanRegions2D,
+/// outer rings are CW in XZ and holes are CCW.
+#[wasm_bindgen(js_name = booleanCurvedRegions2D)]
+pub fn boolean_curved_regions_2d_wasm(
+    a_json: String,
+    b_json: String,
+    operation: String,
+) -> Result<String, JsValue> {
+    let parse = |json: &str| -> Result<Vec<CurveRegion2>, JsValue> {
+        serde_json::from_str(json).map_err(|error| {
+            JsValue::from_str(&format!("Invalid curved Boolean regions JSON: {error}"))
+        })
+    };
+    let operation = match operation.as_str() {
+        "union" => PlanarBooleanOp::Union,
+        "intersection" => PlanarBooleanOp::Intersection,
+        "subtraction" => PlanarBooleanOp::Subtraction,
+        _ => return Err(JsValue::from_str("Unknown 2D Boolean operation")),
+    };
+    let result = boolean_curved_regions(&parse(&a_json)?, &parse(&b_json)?, operation, DEFAULT_EPS)
+        .map_err(|error| JsValue::from_str(&error))?;
+    serde_json::to_string(&result).map_err(|error| {
+        JsValue::from_str(&format!("Cannot serialize curved Boolean result: {error}"))
+    })
+}
+
+#[cfg(test)]
+mod planar_boolean_export_tests {
+    use super::*;
+
+    fn ring(points: &[(f64, f64)]) -> Vec<Vector3> {
+        points
+            .iter()
+            .map(|(x, z)| Vector3::new(*x, 0.0, *z))
+            .collect()
+    }
+
+    #[test]
+    fn exported_boolean_preserves_split_regions_and_winding() {
+        let a = vec![(
+            ring(&[(0.0, 0.0), (0.0, 4.0), (10.0, 4.0), (10.0, 0.0)]),
+            Vec::new(),
+        )];
+        let b = vec![(
+            ring(&[(4.0, -1.0), (4.0, 5.0), (6.0, 5.0), (6.0, -1.0)]),
+            Vec::new(),
+        )];
+        let out = boolean_offset_regions(&a, &b, PlanarBooleanOp::Subtraction).unwrap();
+        assert_eq!(out.len(), 2);
+        for (outer, holes) in out {
+            assert!(holes.is_empty());
+            assert!(signed_area_xz(&outer) < 0.0);
+        }
+    }
+
+    #[test]
+    fn exported_boolean_matches_random_rectangle_areas() {
+        let mut seed = 0x9e37_79b9_u64;
+        let mut random = || {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            ((seed >> 32) as f64) / (u32::MAX as f64)
+        };
+        let rectangle = |x0: f64, z0: f64, x1: f64, z1: f64| {
+            vec![(ring(&[(x0, z0), (x0, z1), (x1, z1), (x1, z0)]), Vec::new())]
+        };
+        let area = |regions: Vec<OffsetRegion>| {
+            regions
+                .iter()
+                .map(|(outer, holes)| {
+                    -signed_area_xz(outer)
+                        - holes.iter().map(|hole| signed_area_xz(hole)).sum::<f64>()
+                })
+                .sum::<f64>()
+        };
+        for _ in 0..100 {
+            let aw = 0.5 + random() * 4.0;
+            let ah = 0.5 + random() * 4.0;
+            let bx = -2.0 + random() * 6.0;
+            let bz = -2.0 + random() * 6.0;
+            let bw = 0.5 + random() * 4.0;
+            let bh = 0.5 + random() * 4.0;
+            let overlap = (aw.min(bx + bw) - 0.0_f64.max(bx)).max(0.0)
+                * (ah.min(bz + bh) - 0.0_f64.max(bz)).max(0.0);
+            let a = rectangle(0.0, 0.0, aw, ah);
+            let b = rectangle(bx, bz, bx + bw, bz + bh);
+            for (operation, expected) in [
+                (PlanarBooleanOp::Union, aw * ah + bw * bh - overlap),
+                (PlanarBooleanOp::Intersection, overlap),
+                (PlanarBooleanOp::Subtraction, aw * ah - overlap),
+            ] {
+                let result = boolean_offset_regions(&a, &b, operation).unwrap();
+                assert!(
+                    (area(result) - expected).abs() < 1.0e-5,
+                    "{operation:?}: expected {expected}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn exported_boolean_preserves_random_oblique_holes() {
+        let mut seed = 0x8bad_f00d_u64;
+        let mut random = || {
+            seed = seed
+                .wrapping_mul(2862933555777941757)
+                .wrapping_add(3037000493);
+            ((seed >> 32) as f64) / (u32::MAX as f64)
+        };
+        let host = vec![(
+            ring(&[(0.0, 0.0), (0.0, 4.0), (4.0, 4.0), (4.0, 0.0)]),
+            Vec::new(),
+        )];
+        for _ in 0..40 {
+            let width = 0.4 + random() * 1.6;
+            let depth = 0.4 + random() * 1.6;
+            let angle = random() * std::f64::consts::PI;
+            let (sin, cos) = angle.sin_cos();
+            let corners = [
+                (-width / 2.0, -depth / 2.0),
+                (-width / 2.0, depth / 2.0),
+                (width / 2.0, depth / 2.0),
+                (width / 2.0, -depth / 2.0),
+            ];
+            let cutter = vec![(
+                corners
+                    .iter()
+                    .map(|(x, z)| {
+                        Vector3::new(2.0 + x * cos - z * sin, 0.0, 2.0 + x * sin + z * cos)
+                    })
+                    .collect(),
+                Vec::new(),
+            )];
+            let output =
+                boolean_offset_regions(&host, &cutter, PlanarBooleanOp::Subtraction).unwrap();
+            assert_eq!(output.len(), 1);
+            assert_eq!(output[0].1.len(), 1);
+            let area = -signed_area_xz(&output[0].0) - signed_area_xz(&output[0].1[0]);
+            assert!((area - (16.0 - width * depth)).abs() < 1.0e-6);
+        }
+    }
+}
+
 /// Offset a centreline by ±half-width into one or more stroked regions, via the
 /// deterministic analytic offset. A simple centreline (open, L, closed loop,
 /// reflex, tight) yields ONE region from the single-ring offset. A self-crossing
@@ -19,7 +256,7 @@ pub type OffsetRegion = (Vec<Vector3>, Vec<Vec<Vector3>>);
 /// nonzero winding, so the overlapping strokes at the crossing MERGE into one
 /// clean region (no internal edges) — the cleanup a single-ring offset can't do.
 /// Each region is `normalize_winding` (CW outer / CCW holes) + `canonical_ring`.
-/// Empty vec = nothing buildable.
+/// Empty vec means no region remains.
 pub fn offset_polyline_regions(
     centreline: &[Vector3],
     width: f64,
@@ -127,9 +364,9 @@ fn forbidden_stadium(a: Pt2, b: Pt2, distance: f64) -> Vec<Pt2> {
 
 /// One interior hole of a ring being inset: its own closed ring plus one
 /// clearance distance per hole edge (edge i = ring[i] → ring[i+1]). The hole
-/// is an excluded region — an easement island, a protected tree pit — so the
-/// inset GROWS the hole by its distances (the buildable region keeps clear of
-/// the hole's edges, exactly as it keeps clear of the outer lot lines).
+/// is an excluded region — an excluded island — so the
+/// inset GROWS the hole by its distances (the retained region keeps clear of
+/// the hole's edges, exactly as it keeps clear of the outer boundary).
 pub struct OffsetHole {
     pub ring: Vec<Vector3>,
     pub distances: Vec<f64>,
@@ -174,7 +411,7 @@ fn prepare_inset_ring(
     // Drop zero-length edges together with their distance slot, so the
     // per-edge pairing stays aligned. (`simplify_polyline` is deliberately not
     // used: its width-based vertex dropping would desync `distances`, and a
-    // collinear vertex splitting one frontage into different setbacks is a
+    // collinear vertex splitting one boundary run into different clearances is a
     // feature, not noise.)
     let mut pts2: Vec<Pt2> = Vec::with_capacity(n);
     let mut dist2: Vec<f64> = Vec::with_capacity(n);
@@ -206,7 +443,7 @@ fn prepare_inset_ring(
 
 /// Inset a CLOSED ring inward, one distance per edge (edge i = ring[i] →
 /// ring[i+1], after stripping an optional closing duplicate). The result is
-/// the CLEARANCE-EXACT buildable region: the ring's interior minus, per edge,
+/// the clearance-exact inset region: the ring's interior minus, per edge,
 /// every point within that edge's distance of the edge SEGMENT (not just its
 /// line) — resolved as a positive-winding clip of the ring against per-edge
 /// forbidden stadiums. Corners therefore become circumscribed clearance arcs
@@ -222,7 +459,7 @@ fn prepare_inset_ring(
 /// inset collapsed or the outer ring is degenerate; `Err` = malformed
 /// ARGUMENTS (distance count mismatch, negative / non-finite distance, or a
 /// degenerate hole ring — a hole is an explicit argument, so a broken one is a
-/// caller bug rather than "nothing buildable").
+/// caller bug rather than "no region remains").
 pub fn offset_ring_variable(
     ring: &[Vector3],
     distances: &[f64],
@@ -233,7 +470,7 @@ pub fn offset_ring_variable(
 
     // The clip needs the base ring CCW (+1) against CW cutters (−1).
     let Some((pts2, dist2)) = prepare_inset_ring(ring, distances, true, "ring", eps)? else {
-        return Ok(Vec::new()); // geometrically unbuildable input — empty, not an error
+        return Ok(Vec::new()); // geometrically collapsed input — empty, not an error
     };
     let m = pts2.len();
 
@@ -415,7 +652,7 @@ struct OffsetPolylineJson {
 /// Wasm entry point: merge a GROUP of separate polylines (a crossing T / X / L
 /// overlap) into one clean stroked region by nonzero-winding union of their mitered
 /// bands. `polylines_json` is `[{centreline:[x,y,z,…], width, closed}, …]`. Returns
-/// CW-outer / CCW-hole regions (one or more); empty when nothing is buildable.
+/// CW-outer / CCW-hole regions (one or more); empty when no region remains.
 #[wasm_bindgen(js_name = offsetPolylineGroupRegions)]
 pub fn offset_polyline_group_regions_wasm(
     polylines_json: String,
@@ -847,11 +1084,11 @@ mod tests {
         }
     }
 
-    /// Front/side/rear setbacks on a rectangle land each edge at its own distance.
+    /// Distinct clearances on a rectangle land each edge at its own distance.
     #[test]
-    fn variable_inset_front_side_rear_setbacks() {
-        // 20 (x) × 30 (z); edge 0 = front (z=0, setback 6), edges 1/3 = sides
-        // (x=20 and x=0, setback 1.5), edge 2 = rear (z=30, setback 3).
+    fn variable_inset_distinct_edge_clearances() {
+        // 20 (x) × 30 (z); edge 0 has clearance 6, edges 1/3 have
+        // clearance 1.5, and edge 2 has clearance 3.
         let ring = vec![pt(0.0, 0.0), pt(20.0, 0.0), pt(20.0, 30.0), pt(0.0, 30.0)];
         let regions = variable(&ring, &[6.0, 1.5, 3.0, 1.5]).expect("valid arguments");
         let (outer, _) = single(regions);
@@ -863,13 +1100,13 @@ mod tests {
         assert!((area - 17.0 * 21.0).abs() < 1e-9, "area = {}", area);
     }
 
-    /// A zero-distance edge stays exactly in place (lot-line construction).
+    /// A zero-distance edge stays exactly in place (zero-clearance boundary).
     #[test]
     fn variable_inset_zero_distance_edge_stays() {
         let ring = vec![pt(0.0, 0.0), pt(20.0, 0.0), pt(20.0, 30.0), pt(0.0, 30.0)];
         let regions = variable(&ring, &[0.0, 1.5, 3.0, 1.5]).expect("valid arguments");
         let (outer, _) = single(regions);
-        // The front edge (z = 0) is untouched: its inset corners sit on it.
+        // Edge 0 (z = 0) is untouched: its inset corners sit on it.
         assert!(has_vertex(&outer, 1.5, 0.0));
         assert!(has_vertex(&outer, 18.5, 0.0));
     }
@@ -951,8 +1188,8 @@ mod tests {
         }
     }
 
-    /// Splitting one frontage into two collinear edges with different distances
-    /// transitions between the two setback lines through the deeper edge's
+    /// Splitting one boundary run into two collinear edges with different distances
+    /// transitions between the two inset lines through the deeper edge's
     /// clearance arc around the split point — NOT a perpendicular step, which
     /// would claim points within the deep distance of the deep segment's
     /// endpoint.
@@ -960,7 +1197,7 @@ mod tests {
     fn variable_inset_collinear_split_edge_steps() {
         let ring = vec![
             pt(0.0, 0.0),
-            pt(10.0, 0.0), // split point on the z=0 frontage
+            pt(10.0, 0.0), // split point on the z=0 boundary
             pt(20.0, 0.0),
             pt(20.0, 30.0),
             pt(0.0, 30.0),
@@ -972,27 +1209,27 @@ mod tests {
             !self_intersects2(&r2, DEFAULT_EPS),
             "stepped envelope is simple"
         );
-        // Both setback lines exist…
+        // Both inset lines exist…
         assert!(
             outer.iter().any(|v| (v.z - 2.0).abs() < 1e-9 && v.x < 5.5),
-            "shallow frontage line at z=2 (left of the deep edge's clearance arc)"
+            "shallow inset line at z=2 (left of the deep edge's clearance arc)"
         );
         assert!(
             outer
                 .iter()
                 .any(|v| (v.z - 5.0).abs() < 1e-9 && v.x > 10.0 - 1e-9),
-            "deep frontage line at z=5"
+            "deep inset line at z=5"
         );
         // …joined through the arc anchored at (10, 5) above the split point.
         assert!(has_vertex(&outer, 10.0, 5.0), "arc anchor above the split");
-        // The would-be step corner (10, 2) is within 5 m of the deep frontage
+        // The would-be step corner (10, 2) is within 5 m of the deep boundary run
         // segment, so it must NOT be claimed.
         let deep_a = Pt2::new(10.0, 0.0);
         let deep_b = Pt2::new(20.0, 0.0);
         for v in &outer {
             assert!(
                 dist_to_segment(Pt2::new(v.x, v.z), deep_a, deep_b) >= 5.0 - 1.0e-6,
-                "vertex ({}, {}) violates the deep frontage clearance",
+                "vertex ({}, {}) violates the deep edge clearance",
                 v.x,
                 v.z
             );
@@ -1000,7 +1237,7 @@ mod tests {
     }
 
     /// Every output vertex keeps at least its edge's distance to that edge —
-    /// the compliance property a setback envelope exists to guarantee. Cases
+    /// the per-edge distance condition this inset must guarantee. Cases
     /// include a sharp reflex notch (where a miter/bevel join would spike or
     /// under-clear) and a deep notch whose far flank constrains points across
     /// exterior space.
@@ -1012,7 +1249,7 @@ mod tests {
                 vec![6.0, 1.5, 3.0, 1.5],
             ),
             (
-                // Reflex notch in the top edge (sharp spike pointing into the lot).
+                // Reflex notch in the top edge (sharp spike pointing into the ring).
                 vec![
                     pt(0.0, 0.0),
                     pt(40.0, 0.0),
@@ -1050,11 +1287,10 @@ mod tests {
     }
 
     /// Clearance applies to edge SEGMENTS across exterior space: a narrow
-    /// notch's far lot line constrains the envelope on the near side, exactly
-    /// like the service's per-edge compliance checker measures it.
+    /// notch's far boundary edge constrains the inset on the near side.
     #[test]
     fn variable_inset_respects_distant_edges_across_a_notch() {
-        // A 2-wide exterior slot (x 10..12) cut into the top of a 30×20 lot.
+        // A 2-wide exterior slot (x 10..12) cut into the top of a 30×20 ring.
         let ring = vec![
             pt(0.0, 0.0),
             pt(30.0, 0.0),
@@ -1065,31 +1301,31 @@ mod tests {
             pt(10.0, 20.0),
             pt(0.0, 20.0),
         ];
-        // Edge 5 = slot's left wall (10,8)→(10,20) faces the right lobe across
+        // Edge 5 = slot's left flank (10,8)→(10,20) faces the right lobe across
         // the 2-wide slot with a 5 m clearance: it must carve into x ∈ (12, 15).
         let distances = vec![1.0, 1.0, 1.0, 1.0, 1.0, 5.0, 1.0, 1.0];
         let regions = variable(&ring, &distances).expect("valid arguments");
         assert!(!regions.is_empty());
-        let wall_a = Pt2::new(10.0, 8.0);
-        let wall_b = Pt2::new(10.0, 20.0);
+        let flank_a = Pt2::new(10.0, 8.0);
+        let flank_b = Pt2::new(10.0, 20.0);
         for region in &regions {
             for v in &region.0 {
                 assert!(
-                    dist_to_segment(Pt2::new(v.x, v.z), wall_a, wall_b) >= 5.0 - 1.0e-6,
-                    "vertex ({}, {}) is inside the slot wall's clearance",
+                    dist_to_segment(Pt2::new(v.x, v.z), flank_a, flank_b) >= 5.0 - 1.0e-6,
+                    "vertex ({}, {}) is inside the slot flank's clearance",
                     v.x,
                     v.z
                 );
             }
         }
-        // The point (13, 14) is only 3 m from the slot's left wall — across
+        // The point (13, 14) is only 3 m from the slot's left flank — across
         // exterior space — and must be excluded from every region.
         let probe = Pt2::new(13.0, 14.0);
         for region in &regions {
             let r2 = ring2(region);
             assert!(
                 !point_in_ring2(probe, &r2),
-                "(13, 14) violates the slot wall clearance but was claimed"
+                "(13, 14) violates the slot flank clearance but was claimed"
             );
         }
     }
@@ -1125,7 +1361,7 @@ mod tests {
             pt(0.0, 14.0),
         ];
         // The corridor is 4 wide (x 8..12); a uniform 3.0 inset closes it but
-        // leaves both 20×14 lobes buildable.
+        // leaves both 20×14 lobes in the result.
         let regions = variable(&dumbbell, &[3.0; 12]).expect("valid arguments");
         assert_eq!(regions.len(), 2, "pinched waist splits the envelope in two");
         let original: Vec<Pt2> = dumbbell.iter().map(|v| Pt2::new(v.x, v.z)).collect();
@@ -1195,7 +1431,7 @@ mod tests {
     }
 
     /// A centred hole with its own clearance: the outer ring shrinks inward, the
-    /// hole GROWS outward, and the buildable region is the ring between them.
+    /// hole GROWS outward, and the retained region is the ring between them.
     #[test]
     fn variable_inset_grows_holes_by_their_clearance() {
         let ring = vec![pt(0.0, 0.0), pt(20.0, 0.0), pt(20.0, 20.0), pt(0.0, 20.0)];
@@ -1237,14 +1473,14 @@ mod tests {
                 nearest
             );
         }
-        // The hole's clearance zone reaches (7, 10): inside the grown hole, not buildable.
+        // The hole's clearance zone reaches (7, 10): inside the grown hole, outside the retained region.
         assert!(
             point_in_ring2(Pt2::new(7.2, 10.0), &grown),
             "clearance around the hole is void"
         );
     }
 
-    /// A hole whose clearance reaches both lot lines splits the region into two lobes.
+    /// A hole whose clearance reaches both outer boundary edges splits the region into two lobes.
     #[test]
     fn variable_inset_hole_clearance_splits_region() {
         let ring = vec![pt(0.0, 0.0), pt(20.0, 0.0), pt(20.0, 10.0), pt(0.0, 10.0)];
@@ -1253,7 +1489,7 @@ mod tests {
             distances: vec![3.0; 4],
         };
         let regions = offset_ring_variable(&ring, &[0.0; 4], &[hole], DEFAULT_EPS).expect("valid");
-        assert_eq!(regions.len(), 2, "the grown hole cuts the lot in two");
+        assert_eq!(regions.len(), 2, "the grown hole cuts the ring in two");
         let mut left = 0;
         let mut right = 0;
         for (outer, holes) in &regions {
@@ -1268,7 +1504,7 @@ mod tests {
         assert_eq!((left, right), (1, 1), "one lobe each side of the hole");
     }
 
-    /// A degenerate hole is a caller bug, not "nothing buildable".
+    /// A degenerate hole is a caller bug, not "no region remains".
     #[test]
     fn variable_inset_rejects_degenerate_hole() {
         let ring = vec![pt(0.0, 0.0), pt(20.0, 0.0), pt(20.0, 20.0), pt(0.0, 20.0)];

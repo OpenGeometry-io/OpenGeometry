@@ -32,7 +32,7 @@ type KernelOffsetPolylineRegions = (
  * trims, and nonzero-winding resolution of reflex / closed loops. NO boolean union
  * (so it is deterministic, unlike the 3D-mesh CSG path). A simple centreline returns
  * one region; a self-crossing closed centreline (e.g. a figure-8) returns one per
- * simple sub-loop. Returns an EMPTY array for a genuinely unbuildable input (does
+ * simple sub-loop. Returns an EMPTY array for a collapsed input (does
  * not throw, so it never looks like a kernel crash). Rings are CW-outer / CCW-holes.
  *
  * @param centrelineFlat centreline points as `[x,y,z, …]`.
@@ -63,9 +63,8 @@ type KernelOffsetRingVariable = (
   holesJson: string,
 ) => KernelOffsetRegionsResult;
 
-/** An excluded interior ring of a variable inset (an easement island, a
- *  protected tree pit): its closed ring `[x,y,z, …]` plus one clearance
- *  distance per hole edge. The inset GROWS the hole by its distances. */
+/** An excluded interior ring of a variable inset. Its closed ring has one
+ * clearance distance per edge; the inset grows the hole by those distances. */
 export interface OffsetHole {
   ring: number[] | Float64Array;
   distances: number[] | Float64Array;
@@ -74,17 +73,17 @@ export interface OffsetHole {
 /**
  * Inset a CLOSED ring inward with one distance per edge (edge i =
  * `ring[i] → ring[i+1]`; an explicit closing duplicate point is accepted and
- * stripped, the distance count stays one per unique edge). Built for setback
- * envelopes: the result is the CLEARANCE-EXACT buildable region — the ring's
- * interior minus every point within `distances[i]` of edge i's SEGMENT, so
- * distant lot lines are honoured across notches and corners where distances
- * differ become circumscribed clearance arcs (conservative). There is no
+ * stripped, the distance count stays one per unique edge). The result is a
+ * clearance-exact inset region: the ring's interior minus every point within
+ * `distances[i]` of edge i's segment. Distant boundary segments remain
+ * effective across notches; different distances produce circumscribed
+ * clearance arcs. There is no
  * `miterLimit` parameter, deliberately: miters and bevels only approximate the
  * clearance arc, and a bevel would claim points inside the required distance.
  *
  * `holes` are excluded interior rings, each grown outward by its own per-edge
  * distances — the region keeps clear of a hole's edges exactly as it keeps
- * clear of the lot lines, so a hole can split the region or swallow it.
+ * clear of the outer boundary, so a hole can split the region or swallow it.
  *
  * Returns CW-outer / CCW-hole regions (canonical start vertex), possibly
  * SEVERAL when a deep inset (or a hole) splits a waisted ring into disjoint
@@ -96,7 +95,7 @@ export interface OffsetHole {
  *
  * @param ring closed ring points as `[x,y,z, …]` (Y is carried through).
  * @param distances inward inset distance per edge, metres, each >= 0
- *                  (0 = the edge stays in place, e.g. lot-line construction).
+ *                  (0 keeps that boundary edge in place).
  * @param holes excluded interior rings with their own per-edge distances.
  */
 export function offsetRingVariable(
@@ -133,7 +132,7 @@ type KernelOffsetPolylineGroupRegions = (polylinesJson: string) => KernelOffsetR
  * Merge a GROUP of separate polylines (a crossing T / X / L overlap) into one clean
  * region by nonzero-winding union of their mitered bands — the overlapping strokes
  * merge into a single region with mitered/bevelled corners, no internal edges.
- * Returns CW-outer / CCW-hole regions (one or more); empty if nothing is buildable.
+ * Returns CW-outer / CCW-hole regions (one or more); empty if no region remains.
  * No CSG. Used to render/extrude an overlapping crossing as one joined mass.
  */
 export function offsetPolylineGroupRegions(polylines: OffsetPolyline[]): OffsetRegion[] {

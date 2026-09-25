@@ -1718,8 +1718,8 @@ mod tests {
             primitives::frustum("f".into(), Frame3::IDENTITY, 2.0, 1.0, 3.0, accuracy()).unwrap(),
             primitives::sphere("s".into(), Frame3::IDENTITY, 1.0, accuracy()).unwrap(),
             primitives::torus("t".into(), Frame3::IDENTITY, 3.0, 1.0, accuracy()).unwrap(),
-            primitives::circular_wall(
-                "wall".into(),
+            primitives::annular_sector_extrusion(
+                "annular-sector".into(),
                 Frame3::IDENTITY,
                 3.0,
                 0.4,
@@ -1828,10 +1828,10 @@ mod tests {
         assert_eq!(original.outline_edge_ids, mesh.outline_edge_ids);
     }
     #[test]
-    fn thin_circular_wall_keeps_its_footprint_at_coarse_deflection() {
+    fn thin_annular_sector_extrusion_keeps_its_footprint_at_coarse_deflection() {
         let sweep = 7.0 * (0.2_f64 / 3.0).sqrt();
         let thickness = 0.0001;
-        let b = primitives::circular_wall(
+        let b = primitives::annular_sector_extrusion(
             "thin".into(),
             Frame3::IDENTITY,
             3.0,

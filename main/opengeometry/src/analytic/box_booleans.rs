@@ -2,8 +2,9 @@ use std::collections::{BTreeMap, VecDeque};
 
 use super::{
     booleans::{BooleanOp, BooleanReport, BooleanResult, FaceMapping},
-    geometry::{dot, norm, sub, unit},
+    geometry::{dot, norm, scale, sub, unit},
     primitives::{boundary, cuboid, uv_line, Builder},
+    query::{classify_point_validated, face_contains_uv, PointClassification},
     topology::*,
     CurveGeometry, Frame3, GeometryError, Point3, SurfaceGeometry,
 };
@@ -24,12 +25,124 @@ fn coverage() -> GeometryError {
     }
 }
 fn source(input: &BoxInput<'_>, face: usize) -> FaceSource {
+    let authored = &input.brep.topology.faces[face];
+    if matches!(authored.provenance.role, FaceRole::Preserved)
+        && authored.provenance.sources.len() == 1
+    {
+        return authored.provenance.sources[0].clone();
+    }
     FaceSource {
         entity: input.brep.id.clone(),
         body: input.brep.id.clone(),
-        key: input.brep.topology.faces[face].key.clone(),
+        key: authored.key.clone(),
         face: face as u32,
     }
+}
+
+fn rectilinear_input<'a>(
+    brep: &'a BrepEnvelope,
+    axes: Frame3,
+) -> Result<BoxInput<'a>, GeometryError> {
+    brep.validate()?;
+    if !matches!(brep.quality, GeometryQuality::Analytic)
+        || brep.geometry.surfaces.is_empty()
+        || brep.solids.is_empty()
+        || brep
+            .geometry
+            .surfaces
+            .iter()
+            .any(|surface| !matches!(surface, SurfaceGeometry::Plane { .. }))
+        || brep
+            .geometry
+            .curves
+            .iter()
+            .any(|curve| !matches!(curve, CurveGeometry::Line { .. }))
+    {
+        return Err(coverage());
+    }
+    let directions = [axes.x, axes.y, axes.z];
+    for surface in &brep.geometry.surfaces {
+        let normal = surface.frame().z;
+        if directions
+            .iter()
+            .all(|axis| dot(normal, *axis).abs() < 1.0 - 1.0e-10)
+        {
+            return Err(coverage());
+        }
+    }
+    let mut lo = [f64::INFINITY; 3];
+    let mut hi = [f64::NEG_INFINITY; 3];
+    for vertex in &brep.topology.vertices {
+        let point = axes.local(vertex.position);
+        for axis in 0..3 {
+            lo[axis] = lo[axis].min(point[axis]);
+            hi[axis] = hi[axis].max(point[axis]);
+        }
+    }
+    if (0..3).any(|axis| hi[axis] - lo[axis] <= 4.0 * brep.accuracy.geometric) {
+        return Err(coverage());
+    }
+    for edge in &brep.topology.edges {
+        let EdgeGeometry::Curve { curve, .. } = edge.geometry else {
+            return Err(coverage());
+        };
+        let CurveGeometry::Line { direction, .. } = brep.geometry.curves[curve as usize] else {
+            return Err(coverage());
+        };
+        if directions
+            .iter()
+            .all(|axis| dot(direction, *axis).abs() < 1.0 - 1.0e-10)
+        {
+            return Err(coverage());
+        }
+    }
+    Ok(BoxInput {
+        brep,
+        frame: Frame3 {
+            origin: axes.point(lo),
+            ..axes
+        },
+        size: std::array::from_fn(|axis| hi[axis] - lo[axis]),
+    })
+}
+
+fn classified_inside(brep: &BrepEnvelope, point: Point3) -> Result<bool, GeometryError> {
+    match classify_point_validated(brep, point)? {
+        PointClassification::Inside => Ok(true),
+        PointClassification::Outside => Ok(false),
+        _ => Err(GeometryError::UnresolvedIntersection(
+            "rectilinear arrangement cell classification is unresolved".into(),
+        )),
+    }
+}
+
+fn containing_faces(
+    input: &BoxInput<'_>,
+    point: Point3,
+    outward: Point3,
+    tolerance: f64,
+) -> Result<Vec<(usize, bool)>, GeometryError> {
+    let mut matches = Vec::new();
+    for (index, face) in input.brep.topology.faces.iter().enumerate() {
+        let SurfaceGeometry::Plane { frame } = input.brep.geometry.surfaces[face.surface as usize]
+        else {
+            return Err(coverage());
+        };
+        let local = frame.local(point);
+        if local[2].abs() > tolerance {
+            continue;
+        }
+        if face_contains_uv(input.brep, face, [local[0], local[1]])? != Some(true) {
+            continue;
+        }
+        let normal = scale(frame.z, face.sense.multiplier());
+        let alignment = dot(normal, outward);
+        if alignment.abs() < 1.0 - 1.0e-10 {
+            continue;
+        }
+        matches.push((index, alignment < 0.0));
+    }
+    Ok(matches)
 }
 pub(super) fn full_box(brep: &BrepEnvelope) -> Result<BoxInput<'_>, GeometryError> {
     brep.validate()?;
@@ -223,6 +336,31 @@ pub fn boolean_boxes(
 ) -> Result<BooleanResult, GeometryError> {
     let a = full_box(a)?;
     let b = full_box(b)?;
+    boolean_grid(a, b, operation, id, true)
+}
+
+pub(super) fn boolean_rectilinear(
+    a: &BrepEnvelope,
+    b: &BrepEnvelope,
+    operation: BooleanOp,
+    id: String,
+) -> Result<BooleanResult, GeometryError> {
+    let axes = match b.geometry.surfaces.first() {
+        Some(SurfaceGeometry::Plane { frame }) => *frame,
+        _ => return Err(coverage()),
+    };
+    let a = rectilinear_input(a, axes)?;
+    let b = rectilinear_input(b, axes)?;
+    boolean_grid(a, b, operation, id, false)
+}
+
+fn boolean_grid(
+    a: BoxInput<'_>,
+    b: BoxInput<'_>,
+    operation: BooleanOp,
+    id: String,
+    canonical_boxes: bool,
+) -> Result<BooleanResult, GeometryError> {
     if [a.frame.x, a.frame.y, a.frame.z] != [b.frame.x, b.frame.y, b.frame.z] {
         return Err(coverage());
     }
@@ -250,6 +388,16 @@ pub fn boolean_boxes(
         ));
     }
     let mut grid: [Vec<f64>; 3] = std::array::from_fn(|i| vec![alo[i], ahi[i], blo[i], bhi[i]]);
+    if !canonical_boxes {
+        for input in [&a, &b] {
+            for vertex in &input.brep.topology.vertices {
+                let point = a.frame.local(vertex.position);
+                for axis in 0..3 {
+                    grid[axis].push(point[axis]);
+                }
+            }
+        }
+    }
     // Only arithmetic roundoff is merged; actual unresolved feature widths fail.
     let magnitude = [a.frame.origin, b.frame.origin]
         .into_iter()
@@ -311,7 +459,15 @@ pub fn boolean_boxes(
         }
     }
     let n = grid.each_ref().map(|g| g.len() - 1);
-    let count = n[0] * n[1] * n[2];
+    let count = n
+        .into_iter()
+        .try_fold(1usize, |product, cells| product.checked_mul(cells))
+        .filter(|count| *count <= 2_000_000)
+        .ok_or_else(|| {
+            GeometryError::LimitExceeded(
+                "rectilinear Boolean grid exceeds two million cells".into(),
+            )
+        })?;
     let mut material = vec![false; count];
     for x in 0..n[0] {
         for y in 0..n[1] {
@@ -320,8 +476,16 @@ pub fn boolean_boxes(
                 let center = std::array::from_fn(|i| {
                     grid[i][p[i]] + (grid[i][p[i] + 1] - grid[i][p[i]]) / 2.0
                 });
-                let ia = inside(center, alo, ahi);
-                let ib = inside(center, blo, bhi);
+                let ia = if canonical_boxes {
+                    inside(center, alo, ahi)
+                } else {
+                    classified_inside(a.brep, a.frame.point(center))?
+                };
+                let ib = if canonical_boxes {
+                    inside(center, blo, bhi)
+                } else {
+                    classified_inside(b.brep, a.frame.point(center))?
+                };
                 material[flat_index(p, n)] = match operation {
                     BooleanOp::Union => ia || ib,
                     BooleanOp::Intersection => ia && ib,
@@ -388,21 +552,31 @@ pub fn boolean_boxes(
                         let mut owner = None;
                         for (input, lo, hi, cutter) in [(&a, alo, ahi, false), (&b, blo, bhi, true)]
                         {
-                            for side in [false, true] {
-                                let plane = if side { hi[axis] } else { lo[axis] };
-                                if coordinate == plane
-                                    && (0..3)
-                                        .filter(|i| *i != axis)
-                                        .all(|i| center[i] > lo[i] && center[i] < hi[i])
-                                {
-                                    let face = face_index(axis, side);
-                                    let reversed = side != upper;
-                                    if !reversed || (operation == BooleanOp::Subtraction && cutter)
-                                    {
-                                        sources.push(source(input, face));
-                                        if owner.is_none() {
-                                            owner = Some((input, face, reversed, cutter, lo, hi));
-                                        }
+                            let faces = if canonical_boxes {
+                                [false, true]
+                                    .into_iter()
+                                    .filter_map(|side| {
+                                        let plane = if side { hi[axis] } else { lo[axis] };
+                                        (coordinate == plane
+                                            && (0..3)
+                                                .filter(|i| *i != axis)
+                                                .all(|i| center[i] > lo[i] && center[i] < hi[i]))
+                                        .then_some((face_index(axis, side), side != upper))
+                                    })
+                                    .collect::<Vec<_>>()
+                            } else {
+                                containing_faces(
+                                    input,
+                                    a.frame.point(center),
+                                    scale([a.frame.x, a.frame.y, a.frame.z][axis], normal_sign),
+                                    accuracy.intersection,
+                                )?
+                            };
+                            for (face, reversed) in faces {
+                                if !reversed || (operation == BooleanOp::Subtraction && cutter) {
+                                    sources.push(source(input, face));
+                                    if owner.is_none() {
+                                        owner = Some((input, face, reversed, cutter, lo, hi));
                                     }
                                 }
                             }
@@ -523,10 +697,19 @@ pub fn boolean_boxes(
                                 }
                                 other => other,
                             })?;
-                        let whole = [u, v]
-                            .into_iter()
-                            .all(|i| grid[i][p[i]] == lo[i] && grid[i][p[i] + 1] == hi[i]);
-                        builder.brep.topology.faces[face].sense = if reversed {
+                        let whole = canonical_boxes
+                            && [u, v]
+                                .into_iter()
+                                .all(|i| grid[i][p[i]] == lo[i] && grid[i][p[i] + 1] == hi[i]);
+                        let surface_reversed = if canonical_boxes {
+                            reversed
+                        } else {
+                            dot(
+                                face_frame.z,
+                                scale([a.frame.x, a.frame.y, a.frame.z][axis], normal_sign),
+                            ) < 0.0
+                        };
+                        builder.brep.topology.faces[face].sense = if surface_reversed {
                             Orientation::Reverse
                         } else {
                             Orientation::Forward
@@ -635,7 +818,7 @@ pub fn boolean_boxes(
     out.validate()?;
     let face_mappings = [&a, &b]
         .into_iter()
-        .flat_map(|input| (0..6).map(move |face| source(input, face)))
+        .flat_map(|input| (0..input.brep.topology.faces.len()).map(move |face| source(input, face)))
         .map(|source| FaceMapping {
             result_faces: out
                 .topology

@@ -106,7 +106,11 @@ pub fn fit_intersection_curve(
         }
         let a = curve.point_at(range.lo)?;
         let b = curve.point_at(range.hi)?;
-        let deviation = bounds_chord_deviation(curve.enclose(range)?, a, b);
+        let deviation = if let Some(bound) = definition.certified_chord_deviation(range, store)? {
+            bound
+        } else {
+            bounds_chord_deviation(curve.enclose(range)?, a, b)
+        };
         if deviation <= tolerance {
             achieved = achieved.max(deviation);
             accepted.push(range);
@@ -152,7 +156,19 @@ pub fn fit_intersection_curve(
                     "export curve sample exceeds its certified fitting budget".into(),
                 ));
             }
-            for surface in supports {
+            for (surface, (from, to)) in supports
+                .into_iter()
+                .zip([(left.uv_a, right.uv_a), (left.uv_b, right.uv_b)])
+            {
+                let pcurve: UV =
+                    std::array::from_fn(|axis| from[axis] * (1.0 - fraction) + to[axis] * fraction);
+                if norm(sub(surface.point_at(pcurve)?, fitted))
+                    > tolerance + definition.residual_tolerance
+                {
+                    return Err(GeometryError::UnresolvedIntersection(
+                        "export pcurve sample misses the fitted spatial curve".into(),
+                    ));
+                }
                 let uv = surface.project(fitted, None)?;
                 if norm(sub(surface.point_at(uv)?, fitted))
                     > tolerance + definition.residual_tolerance

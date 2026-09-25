@@ -1,5 +1,6 @@
 pub mod booleans;
 pub mod box_booleans;
+mod curved_layered_boolean;
 pub mod diagnostics;
 pub mod exchange;
 pub mod export_curve;
@@ -9,6 +10,7 @@ pub mod ifc_exchange;
 pub mod intersection;
 pub mod modeling;
 pub mod placement;
+mod planar_booleans;
 pub mod primitives;
 pub mod query;
 pub mod ssi;

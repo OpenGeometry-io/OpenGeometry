@@ -1,5 +1,6 @@
 pub mod geometry {
     pub mod boolean2d;
+    pub mod curved_boolean2d;
     pub mod geometrybuffer;
     pub mod offset2d;
     pub mod offset_regions;

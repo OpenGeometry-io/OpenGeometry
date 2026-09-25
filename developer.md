@@ -24,8 +24,10 @@ npm run build              # Full pipeline: Rust → WASM → TS bundle → dist
 npm test                   # Cargo unit + integration tests (no TypeScript tests yet)
 ```
 
-`npm run build` runs `build-core` (wasm-pack + cargo release), `build-three` (Rollup),
-and `prepare-dist` in order. Running them out of order produces stale `pkg/` and bundle
+`npm run build` runs `build-core` (wasm-pack + cargo release), `build-three`
+(clean `dist/`, then Rollup), and `prepare-dist` (copy WASM and package metadata) in
+order. The clean step removes declarations for deleted sources before Rollup emits
+new ones. Running the stages out of order produces stale `pkg/` and bundle
 mismatches — see `.claude/skills/wasm-build-flow.md` if you hit that.
 
 ## Running the example app
