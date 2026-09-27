@@ -40,8 +40,6 @@ settings.json
 # AI and documentation files
 .requests/*.md
 .github/*.md
-# Track Copilot's instruction file (redirect to AGENTS.md).
-!.github/copilot-instructions.md
 # Agent instructions now live outside the repo (see AGENTS.md stub).
 AGENTS.md
 CLAUDE.md
