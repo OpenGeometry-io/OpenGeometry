@@ -30,7 +30,7 @@ pub(crate) fn build(
     let frame = profile_frame(&profile, accuracy.geometric)?;
     check_lines(&profile, frame, accuracy.geometric)?;
     if dot(sub(path[0], frame.origin), frame.z).abs() > 4.0 * accuracy.geometric
-        || (1.0 - dot(frame.z, directions[0]).abs()).abs() > 1e-9
+        || norm(cross(frame.z, directions[0])) > 1e-9
     {
         return Err(invalid(
             "profile plane is not at the start and perpendicular to the path",
@@ -98,13 +98,13 @@ fn remove_collinear_joints(
         if norm(before) <= 4.0 * accuracy.geometric || norm(after) <= 4.0 * accuracy.geometric {
             return Err(invalid("sweep path has a short segment"));
         }
-        let alignment = dot(unit(before)?, unit(after)?);
-        if norm(add(unit(before)?, unit(after)?)) <= 1e-9 {
+        let (u, v) = (unit(before)?, unit(after)?);
+        if norm(add(u, v)) <= 1e-9 {
             return Err(OperationError::SweepSelfIntersection(
                 "sweep path reverses".into(),
             ));
         }
-        if alignment >= 1.0 - 1e-18 {
+        if norm(cross(u, v)) <= 1e-9 && dot(u, v) > 0.0 {
             path.remove(index);
         } else {
             index += 1;
