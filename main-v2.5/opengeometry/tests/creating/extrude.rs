@@ -136,6 +136,90 @@ fn tilted_polyline_extrudes_along_its_normal() {
         .unwrap();
     let measured = volume::estimate(&world.brep("solid").unwrap(), 0.001);
     assert!((measured.value - 24.0).abs() <= measured.error_bound);
+    let bounds = world.bounds("solid").unwrap().unwrap();
+    assert!(bounds[2] >= -2e-8, "{bounds:?}");
+    assert!((bounds[5] - 4.0).abs() < 2e-8, "{bounds:?}");
+}
+
+#[test]
+fn concave_tilted_polyline_extrudes_to_right_hand_rule_side() {
+    let first = [0.0, 0.0, 0.0];
+    let normal = [0.0, -0.8, 0.6];
+    let mut world = graph();
+    world
+        .create_primitive(
+            Primitive::Polyline {
+                points: vec![
+                    first,
+                    [1.0, 0.6, 0.8],
+                    [2.0, 0.0, 0.0],
+                    [2.0, 1.2, 1.6],
+                    [0.0, 1.2, 1.6],
+                ],
+                closed: true,
+            },
+            named("profile"),
+        )
+        .unwrap();
+    world
+        .create_operation(extrude("profile", 2.0), named("solid"))
+        .unwrap();
+    let heights = world
+        .brep("solid")
+        .unwrap()
+        .topology
+        .vertices
+        .iter()
+        .map(|vertex| {
+            (0..3)
+                .map(|axis| (vertex.position[axis] - first[axis]) * normal[axis])
+                .sum::<f64>()
+        })
+        .collect::<Vec<_>>();
+    assert!(heights.iter().all(|height| *height >= -4e-8), "{heights:?}");
+    assert!(
+        heights.iter().any(|height| *height >= 2.0 - 4e-8),
+        "{heights:?}"
+    );
+}
+
+#[test]
+fn profile_tilted_1e_6_rad_is_not_flattened() {
+    let points = vec![
+        [0.0, 0.0, 0.0],
+        [0.0, -2.9999999999995e-6, 2.9999999999985],
+        [2.0, -2.9999999999995e-6, 2.9999999999985],
+        [2.0, 0.0, 0.0],
+    ];
+    let normal = [0.0, 0.9999999999995, 9.999999999998333e-7];
+    let mut world = graph();
+    world
+        .create_primitive(
+            Primitive::Polyline {
+                points: points.clone(),
+                closed: true,
+            },
+            named("profile"),
+        )
+        .unwrap();
+    world
+        .create_operation(extrude("profile", 2.0), named("solid"))
+        .unwrap();
+    let body = world.brep("solid").unwrap();
+    let near_vertex = |point: [f64; 3]| {
+        body.topology.vertices.iter().any(|vertex| {
+            (0..3)
+                .map(|axis| (vertex.position[axis] - point[axis]).powi(2))
+                .sum::<f64>()
+                .sqrt()
+                <= 4e-8
+        })
+    };
+    for point in points {
+        assert!(near_vertex(point), "{point:?}");
+        let top = [0, 1, 2].map(|axis| point[axis] + 2.0 * normal[axis]);
+        assert!(near_vertex(top), "{top:?}");
+    }
 }
 
 #[test]
