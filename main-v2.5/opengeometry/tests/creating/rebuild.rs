@@ -72,3 +72,43 @@ fn rebuild_obeys_shared_shape_scope() {
     assert_eq!(world.brep("solid").unwrap().revision, 1);
     assert_eq!(world.brep("instance").unwrap().revision, 1);
 }
+
+#[test]
+fn rebuild_after_180_about_x_extrudes_circle_and_rectangle_the_same_way() {
+    let mut world = graph();
+    world
+        .create_primitive(Primitive::Circle { radius: 1.0 }, named("circle"))
+        .unwrap();
+    world
+        .create_primitive(
+            Primitive::Rectangle {
+                width: 2.0,
+                breadth: 2.0,
+            },
+            named("rectangle"),
+        )
+        .unwrap();
+    for (profile, body) in [("circle", "circle-solid"), ("rectangle", "rectangle-solid")] {
+        world
+            .create_operation(extrude(profile, 2.0), named(body))
+            .unwrap();
+        world
+            .transform(
+                body,
+                Transform::Rotate {
+                    axis: [1.0, 0.0, 0.0],
+                    degrees: 180.0,
+                    pivot: Some([0.0; 3]),
+                },
+            )
+            .unwrap();
+        world
+            .rebuild_operation(body, extrude(profile, 2.0), EditScope::Node)
+            .unwrap();
+    }
+    for body in ["circle-solid", "rectangle-solid"] {
+        let bounds = world.bounds(body).unwrap().unwrap();
+        assert!((bounds[1] + 2.0).abs() < 2e-8, "{body} {bounds:?}");
+        assert!(bounds[4] < 2e-8, "{body} {bounds:?}");
+    }
+}
