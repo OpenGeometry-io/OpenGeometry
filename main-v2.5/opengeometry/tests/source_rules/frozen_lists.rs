@@ -54,7 +54,6 @@ pub(crate) const SERDE_JSON_OUTSIDE_EDGES: ListSpec = ListSpec {
     key_fields: 2,
     measured: false,
     frozen: &[
-        "world_graph/error.rs use@serde_json::Value B5",
         "world_graph/modifying.rs WorldGraph::operate B5",
         "world_graph/modifying.rs WorldGraph::report B5",
         "world_graph/shape_store.rs Shape B5",
@@ -66,8 +65,6 @@ pub(crate) const JSON_VALUES_IN_SIGNATURES: ListSpec = ListSpec {
     key_fields: 2,
     measured: false,
     frozen: &[
-        "world_graph/error.rs GraphError B5",
-        "world_graph/error.rs GraphError::with_details B5",
         "world_graph/modifying.rs WorldGraph::report B5",
         "world_graph/shape_store.rs Shape B5",
     ],

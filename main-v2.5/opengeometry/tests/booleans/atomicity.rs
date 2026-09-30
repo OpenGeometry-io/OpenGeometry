@@ -1,7 +1,8 @@
 use super::support::cuboid;
 use opengeometry::brep::FaceRole;
 use opengeometry::world_graph::{
-    CopyOptions, EditScope, ErrorCode, GraphError, ModifyingOperation, Primitive, Transform,
+    CopyOptions, EditScope, ErrorCode, ErrorDetails, GraphError, ModifyingOperation, Primitive,
+    Transform,
 };
 use opengeometry_test_support::volume;
 use opengeometry_test_support::world_graph::{graph, named};
@@ -84,9 +85,18 @@ fn shared_target_requires_explicit_all_instances_and_tool_instance_is_allowed() 
         )
         .unwrap_err();
     assert_eq!(error.error_code(), ErrorCode::SharedShape);
-    if let GraphError::Code { details, .. } = error {
-        assert_eq!(details["instanceCount"], 2);
-        assert_eq!(details["sharing"].as_array().unwrap().len(), 2);
+    if let GraphError::Code {
+        details:
+            ErrorDetails::SharedShape {
+                instance_count,
+                sharing,
+                ..
+            },
+        ..
+    } = error
+    {
+        assert_eq!(instance_count, 2);
+        assert_eq!(sharing.len(), 2);
     } else {
         panic!("expected SharedShape details");
     }
