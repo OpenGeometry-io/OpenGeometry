@@ -266,7 +266,7 @@ fn line_edge(builder: &mut Builder, from: u32, to: u32) -> Result<u32, Operation
             direction: unit(delta)?,
         },
         Interval::new(0.0, length).map_err(GeometryError::from)?,
-        true,
+        false,
     ))
 }
 
@@ -392,7 +392,7 @@ fn side_uses(
     let start_v = dot(sub(lower.centre, cylinder.origin), cylinder.z);
     let end_v = dot(sub(upper.centre, cylinder.origin), cylinder.z);
     Ok(vec![
-        projected(
+        ring_use(
             builder,
             lower.edges[half],
             &SurfacePoint {
@@ -403,6 +403,7 @@ fn side_uses(
             lower.vertices[half],
             lower.vertices[next],
             Orientation::Forward,
+            segment == 0,
         )?,
         seam_use(
             builder,
@@ -413,7 +414,7 @@ fn side_uses(
             cylinder,
             Orientation::Forward,
         )?,
-        projected(
+        ring_use(
             builder,
             upper.edges[half],
             &SurfacePoint {
@@ -424,6 +425,7 @@ fn side_uses(
             upper.vertices[next],
             upper.vertices[half],
             Orientation::Reverse,
+            segment + 2 == rings.len(),
         )?,
         seam_use(
             builder,
@@ -435,6 +437,27 @@ fn side_uses(
             Orientation::Reverse,
         )?,
     ])
+}
+
+fn ring_use(
+    builder: &Builder,
+    edge: u32,
+    point: &SurfacePoint,
+    from: u32,
+    to: u32,
+    sense: Orientation,
+    cap: bool,
+) -> Result<Use, OperationError> {
+    if cap {
+        return Ok(boundary(
+            edge,
+            from,
+            to,
+            sense,
+            uv_line([0.0, point.v], [1.0, 0.0]),
+        ));
+    }
+    projected(builder, edge, point, from, to, sense)
 }
 
 fn projected(
