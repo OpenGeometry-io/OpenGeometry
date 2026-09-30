@@ -304,7 +304,7 @@ fn sweep_rail_exports_projected_edges_without_pcurves() {
     let (text, report) = world
         .export_step(&["rail".into()], &StepOptions::default())
         .unwrap();
-    assert!(report.pcurveless_edges > 0);
+    assert_eq!(report.pcurveless_edges, 2);
     assert_eq!(report.bodies[0].pcurveless_edges, report.pcurveless_edges);
     assert_eq!(text.matches("=EDGE_CURVE(").count(), report.edges);
     let parsed = part21::Document::parse(&text).unwrap();

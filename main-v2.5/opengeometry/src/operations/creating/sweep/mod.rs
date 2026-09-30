@@ -1,4 +1,6 @@
 mod circle;
+#[cfg(test)]
+mod tests;
 
 use super::extrude;
 use super::profile::{check_lines, profile_frame, ProfileLoop};

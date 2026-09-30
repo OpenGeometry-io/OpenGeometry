@@ -5,7 +5,7 @@
       "count": 2,
       "members": [
         "opengeometry/src/operations/creating/sweep/circle.rs:253",
-        "opengeometry/src/operations/creating/sweep/mod.rs:269"
+        "opengeometry/src/operations/creating/sweep/mod.rs:271"
       ],
       "reason": "sweep line_edge pair: message and seam flag differ; the merge is deferred to the debt note (B5 extended)"
     },
