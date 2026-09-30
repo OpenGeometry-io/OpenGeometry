@@ -1,4 +1,4 @@
-use crate::brep::{BrepEnvelope, GeometryQuality};
+use crate::brep::{BrepEnvelope, GeometryError, GeometryQuality};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -23,6 +23,21 @@ pub(crate) struct StepBodyInput<'a> {
     pub(crate) shape_id: &'a str,
     pub(crate) shape_revision: u64,
     pub(crate) brep: &'a BrepEnvelope,
+}
+
+#[derive(Debug)]
+pub(crate) struct StepExportFailure {
+    pub(crate) body_index: Option<usize>,
+    pub(crate) error: GeometryError,
+}
+
+impl From<GeometryError> for StepExportFailure {
+    fn from(error: GeometryError) -> Self {
+        Self {
+            body_index: None,
+            error,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]

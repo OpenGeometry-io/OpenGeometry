@@ -5,7 +5,7 @@ mod report;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use report::StepBodyInput;
+pub(crate) use report::{StepBodyInput, StepExportFailure};
 pub use report::{StepBodyReport, StepExportReport, StepReport, StepSkipped};
 
 use super::preflight::preflight;
@@ -27,7 +27,8 @@ pub fn export_step(brep: &BrepEnvelope, unit: &str) -> Result<(String, StepRepor
         &brep.id,
         "1970-01-01T00:00:00",
         Vec::new(),
-    )?;
+    )
+    .map_err(|failure| failure.error)?;
     Ok((
         text,
         StepReport {
@@ -54,20 +55,21 @@ pub(crate) fn export_bodies(
     name: &str,
     timestamp: &str,
     skipped: Vec<StepSkipped>,
-) -> Result<(String, StepExportReport), GeometryError> {
+) -> Result<(String, StepExportReport), StepExportFailure> {
     let scale = match unit {
         "metre" => 1.0,
         "millimetre" => 1000.0,
         _ => {
             return Err(GeometryError::InvalidGeometry(
                 "STEP length unit must be metre or millimetre".into(),
-            ))
+            )
+            .into())
         }
     };
     if bodies.is_empty() {
-        return Err(GeometryError::InvalidGeometry(
-            "STEP export has no solid bodies".into(),
-        ));
+        return Err(
+            GeometryError::InvalidGeometry("STEP export has no solid bodies".into()).into(),
+        );
     }
     let mut writer = Part21Writer::new("AUTOMOTIVE_DESIGN");
     writer.set_file_name(name);
@@ -86,9 +88,9 @@ pub(crate) fn export_bodies(
     emit_products(&mut writer, &names, &representations);
     let entities = writer.entity_count();
     if entities > 2_000_000 {
-        return Err(GeometryError::LimitExceeded(
-            "STEP file exceeds 2,000,000 entities".into(),
-        ));
+        return Err(
+            GeometryError::LimitExceeded("STEP file exceeds 2,000,000 entities".into()).into(),
+        );
     }
     let text = writer.build()?;
     let body_reports = step_body_reports(bodies, &emitted, scale);
@@ -124,17 +126,16 @@ fn add_bodies(
     bodies: &[StepBodyInput<'_>],
     scale: f64,
     context2: usize,
-) -> Result<Vec<BodyEmission>, GeometryError> {
+) -> Result<Vec<BodyEmission>, StepExportFailure> {
     let mut emitted = Vec::with_capacity(bodies.len());
-    for input in bodies {
-        let initial_bound = preflight(input.brep, scale)?;
-        emitted.push(emit_body(
-            writer,
-            input.brep,
-            scale,
-            context2,
-            initial_bound,
-        )?);
+    for (index, input) in bodies.iter().enumerate() {
+        let body = preflight(input.brep, scale)
+            .and_then(|initial_bound| emit_body(writer, input.brep, scale, context2, initial_bound))
+            .map_err(|error| StepExportFailure {
+                body_index: Some(index),
+                error,
+            })?;
+        emitted.push(body);
     }
     Ok(emitted)
 }

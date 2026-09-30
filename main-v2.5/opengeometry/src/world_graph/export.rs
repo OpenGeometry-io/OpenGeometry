@@ -1,9 +1,11 @@
-use super::error::{ErrorCode, ErrorContext, GraphError};
+use super::error::{ErrorCode, ErrorContext, ErrorDetails, GraphError};
 use super::graph::WorldGraph;
 use super::node::NodeKind;
 use super::placement::is_identity;
 use crate::brep::{placed, BodyType, BrepEnvelope, Frame3, GeometryError, Similarity3};
-use crate::exchange::{export_bodies, StepBodyInput, StepExportReport, StepSkipped};
+use crate::exchange::{
+    export_bodies, StepBodyInput, StepExportFailure, StepExportReport, StepSkipped,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -158,7 +160,7 @@ impl WorldGraph {
             &options.timestamp,
             skipped,
         )
-        .map_err(GraphError::from)
+        .map_err(|failure| body_error(failure, &owned))
     }
 
     fn step_selection(
@@ -216,6 +218,25 @@ impl WorldGraph {
             owned.push((og_id, shape_id.clone(), shape.revision, brep));
         }
         Ok(owned)
+    }
+}
+
+fn body_error(
+    failure: StepExportFailure,
+    owned: &[(String, String, u64, BrepEnvelope)],
+) -> GraphError {
+    let og_id = failure
+        .body_index
+        .and_then(|index| owned.get(index))
+        .map(|body| body.0.clone());
+    let source = GraphError::Geometry(failure.error);
+    match og_id {
+        Some(og_id) => GraphError::with_details(
+            source.error_code(),
+            source.message(),
+            ErrorDetails::Export { og_id },
+        ),
+        None => source,
     }
 }
 

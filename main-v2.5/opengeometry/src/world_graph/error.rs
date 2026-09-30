@@ -1,7 +1,6 @@
 use crate::brep::GeometryError;
 use crate::operations::OperationError;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ErrorCode {
@@ -43,12 +42,41 @@ pub enum ErrorContext {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged, rename_all_fields = "camelCase")]
+pub enum ErrorDetails {
+    None,
+    SharedShape {
+        shape_id: Option<String>,
+        instance_count: u32,
+        sharing: Vec<String>,
+    },
+    MissingReference {
+        kind: String,
+        index: u32,
+    },
+    CoverageGap {
+        families: [String; 2],
+    },
+    Math {
+        math: String,
+    },
+    Operate {
+        handlers: Vec<String>,
+        tool_index: usize,
+        og_ids: Vec<String>,
+    },
+    Export {
+        og_id: String,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub enum GraphError {
     Code {
         code: ErrorCode,
         message: String,
-        details: Value,
+        details: ErrorDetails,
     },
     Geometry(GeometryError),
 }
@@ -58,14 +86,14 @@ impl GraphError {
         Self::Code {
             code,
             message: message.into(),
-            details: Value::Null,
+            details: ErrorDetails::None,
         }
     }
 
     pub(super) fn with_details(
         code: ErrorCode,
         message: impl Into<String>,
-        details: Value,
+        details: ErrorDetails,
     ) -> Self {
         Self::Code {
             code,
@@ -92,6 +120,32 @@ impl GraphError {
                 GeometryError::UnresolvedTessellation(_) => ErrorCode::UnresolvedTessellation,
                 GeometryError::LimitExceeded(_) => ErrorCode::LimitExceeded,
             },
+        }
+    }
+
+    pub fn details(&self) -> ErrorDetails {
+        match self {
+            Self::Code { details, .. } => details.clone(),
+            Self::Geometry(GeometryError::MissingReference { kind, index }) => {
+                ErrorDetails::MissingReference {
+                    kind: kind.clone(),
+                    index: *index,
+                }
+            }
+            Self::Geometry(GeometryError::CoverageGap { families }) => ErrorDetails::CoverageGap {
+                families: families.clone(),
+            },
+            Self::Geometry(GeometryError::Math(math)) => ErrorDetails::Math {
+                math: format!("{math:?}"),
+            },
+            Self::Geometry(_) => ErrorDetails::None,
+        }
+    }
+
+    pub fn message(&self) -> String {
+        match self {
+            Self::Code { message, .. } => message.clone(),
+            Self::Geometry(error) => error.to_string(),
         }
     }
 

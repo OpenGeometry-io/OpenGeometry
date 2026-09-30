@@ -1,36 +1,32 @@
-use crate::brep::GeometryError;
-use crate::world_graph::{ErrorCode, GraphError};
+use crate::world_graph::{ErrorCode, ErrorDetails, GraphError};
+use serde::Serialize;
 use wasm_bindgen::JsValue;
 
-pub(super) fn json(error: GraphError) -> JsValue {
-    let code = error.error_code();
-    let (message, mut details) = match error {
-        GraphError::Code {
-            message, details, ..
-        } => (message, details),
-        GraphError::Geometry(source) => {
-            let details = match &source {
-                GeometryError::MissingReference { kind, index } => {
-                    serde_json::json!({"kind": kind, "index": index})
-                }
-                GeometryError::CoverageGap { families } => {
-                    serde_json::json!({"families": families})
-                }
-                GeometryError::Math(math) => {
-                    serde_json::json!({"math": format!("{math:?}")})
-                }
-                _ => serde_json::Value::Null,
-            };
-            (source.to_string(), details)
-        }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ErrorDto {
+    pub(crate) code: ErrorCode,
+    pub(crate) message: String,
+    pub(crate) details: serde_json::Value,
+}
+
+pub(crate) fn dto(error: GraphError) -> ErrorDto {
+    let details = match error.details() {
+        ErrorDetails::None => serde_json::json!({}),
+        details => serde_json::to_value(details).unwrap_or(serde_json::json!({})),
     };
-    if details.is_null() {
-        details = serde_json::json!({});
+    ErrorDto {
+        code: error.error_code(),
+        message: error.message(),
+        details,
     }
-    let code = serde_json::to_value(code).unwrap_or(serde_json::json!("InvalidGeometry"));
-    JsValue::from_str(
-        &serde_json::json!({"code": code, "message": message, "details": details}).to_string(),
-    )
+}
+
+pub(super) fn json(error: GraphError) -> JsValue {
+    let rendered = serde_json::to_value(dto(error))
+        .map(|value| value.to_string())
+        .unwrap_or_default();
+    JsValue::from_str(&rendered)
 }
 
 pub(super) fn serialization(error: serde_json::Error) -> JsValue {

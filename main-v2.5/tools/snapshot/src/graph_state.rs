@@ -46,7 +46,7 @@ fn history(record: &mut Record, graph: &WorldGraph, tracked: &Tracked) {
                 &format!("changes_since {revision}"),
                 &pretty(to_value(&changes)),
             ),
-            Err(error) => record.error(&format!("changes_since {revision}"), error),
+            Err(error) => record.graph_error(&format!("changes_since {revision}"), &error),
         }
     }
 }
@@ -62,10 +62,10 @@ fn display_state(record: &mut Record, graph: &WorldGraph, og_id: &str) {
     match graph.brep(og_id).map(|brep| static_bucket(&brep)) {
         Ok(Ok(bucket)) => match graph.buffers(&shape_id, bucket, 2_000_000) {
             Ok(buffers) => write_buffers(record, &title, bucket, &buffers),
-            Err(error) => record.error(&title, error),
+            Err(error) => record.graph_error(&title, &error),
         },
         Ok(Err(error)) => record.error(&title, error),
-        Err(error) => record.error(&title, error),
+        Err(error) => record.graph_error(&title, &error),
     }
 }
 
@@ -76,15 +76,15 @@ pub(crate) fn state(record: &mut Record, graph: &WorldGraph, tracked: &Tracked, 
         node_state(record, graph, og_id);
         match graph.children(og_id) {
             Ok(children) => record.debug("children", children),
-            Err(error) => record.debug("children.error", error),
+            Err(error) => record.graph_error_field("children.error", &error),
         }
         match graph.parent(og_id) {
             Ok(parent) => record.debug("parent", parent),
-            Err(error) => record.debug("parent.error", error),
+            Err(error) => record.graph_error_field("parent.error", &error),
         }
         match graph.instance_count(og_id) {
             Ok(count) => record.field("instance_count", count),
-            Err(error) => record.debug("instance_count.error", error),
+            Err(error) => record.graph_error_field("instance_count.error", &error),
         }
         display_state(record, graph, og_id);
     }
