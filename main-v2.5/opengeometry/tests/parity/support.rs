@@ -1,6 +1,7 @@
+use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-pub fn parity_fixtures(folder: &str, keep: impl Fn(&str) -> bool) -> Vec<PathBuf> {
+pub(super) fn parity_fixtures(folder: &str, keep: impl Fn(&str) -> bool) -> Vec<PathBuf> {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/parity")
         .join(folder);
@@ -14,4 +15,8 @@ pub fn parity_fixtures(folder: &str, keep: impl Fn(&str) -> bool) -> Vec<PathBuf
         .collect::<Vec<_>>();
     files.sort();
     files
+}
+
+pub(super) fn read_fixture(path: &Path) -> Value {
+    serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
 }

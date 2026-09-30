@@ -1,8 +1,8 @@
-use crate::support::parity_fixtures;
+use crate::support::{parity_fixtures, read_fixture};
 use opengeometry::brep::BrepEnvelope;
 use opengeometry::tessellation::tessellate;
 use opengeometry_test_support::canonical::canonical_tessellation;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -43,8 +43,6 @@ fn source_tessellation_matches_for_supported_primitive_fixtures() {
 #[test]
 fn boolean_fixture_tessellation_matches_source_canonically() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/parity");
-    let read =
-        |path: &Path| -> Value { serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap() };
     let mut sources = BTreeMap::new();
     for name in [
         "box-union",
@@ -60,7 +58,7 @@ fn boolean_fixture_tessellation_matches_source_canonically() {
         for path in parity_fixtures(folder, |name| {
             !name.contains(".step.") && !name.contains(".fallback.")
         }) {
-            let fixture = read(&path);
+            let fixture = read_fixture(&path);
             if let Some(brep) = fixture["result"].get("brep") {
                 let name = path.file_stem().unwrap().to_str().unwrap();
                 sources.insert(
@@ -81,7 +79,7 @@ fn boolean_fixture_tessellation_matches_source_canonically() {
             Ok(mesh) => canonical_tessellation(&mesh),
             Err(error) => json!({"error": error}),
         };
-        let expected = read(&root.join("tessellation").join(format!("{name}.json")));
+        let expected = read_fixture(&root.join("tessellation").join(format!("{name}.json")));
         assert_eq!(actual, expected, "{name}");
     }
 }
