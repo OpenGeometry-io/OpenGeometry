@@ -1,6 +1,9 @@
 use crate::world_graph::{ErrorCode, GraphError};
 use serde::de::DeserializeOwned;
 
+#[cfg(test)]
+mod tests;
+
 pub(super) fn parse<T: DeserializeOwned>(json: &str) -> Result<T, GraphError> {
     if json.len() > 64 * 1024 {
         return Err(GraphError::code(
