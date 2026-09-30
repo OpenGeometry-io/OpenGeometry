@@ -1,9 +1,11 @@
 use super::errors::dto;
+use super::OGWorldGraph;
 use crate::brep::{Accuracy, GeometryError};
 use crate::math::MathError;
+use crate::tessellation::display::{bucket_floor, static_bucket};
 use crate::world_graph::{
-    CopyOptions, CreateOptions, ErrorCode, ErrorDetails, GraphError, Plane, Primitive, StepOptions,
-    Transform, WorldGraph,
+    ChangeSet, CopyOptions, CreateOptions, ErrorCode, ErrorDetails, GraphError, Plane, Primitive,
+    StepOptions, Transform, WorldGraph,
 };
 use serde_json::{json, Value};
 
@@ -136,16 +138,17 @@ fn assert_camel_case_keys(value: &Value) {
     }
 }
 
-#[test]
-fn bindings_payloads_are_camel_case() {
-    let accuracy = Accuracy {
+fn binding_accuracy() -> Accuracy {
+    Accuracy {
         geometric: 1e-8,
         intersection: 1e-9,
         tessellation: 0.01,
         exchange: 1e-6,
-    };
-    let mut graph = WorldGraph::new(accuracy).unwrap();
-    let created = graph
+    }
+}
+
+fn unit_cube(graph: &mut WorldGraph) -> (String, ChangeSet) {
+    graph
         .create_primitive(
             Primitive::Cuboid {
                 width: 1.0,
@@ -157,7 +160,14 @@ fn bindings_payloads_are_camel_case() {
                 ..CreateOptions::default()
             },
         )
-        .unwrap();
+        .unwrap()
+}
+
+#[test]
+fn bindings_payloads_are_camel_case() {
+    let accuracy = binding_accuracy();
+    let mut graph = WorldGraph::new(accuracy).unwrap();
+    let created = unit_cube(&mut graph);
     let plane = Plane {
         origin: Some([0.0; 3]),
         normal: Some([0.0, 0.0, 1.0]),
@@ -216,4 +226,41 @@ fn place_accepts_camel_case_x_direction_and_rejects_snake_case() {
     assert!(serde_json::from_str::<CopyOptions>(r#"{"og_id":"a"}"#).is_err());
     assert!(serde_json::from_str::<Plane>(r#"{"xDirection":[1,0,0]}"#).is_ok());
     assert!(serde_json::from_str::<Plane>(r#"{"x_direction":[1,0,0]}"#).is_err());
+}
+
+#[test]
+fn display_buckets_reports_the_kernel_floor_and_static_bucket() {
+    let mut binding = OGWorldGraph::new(
+        r#"{"geometric":1e-8,"intersection":1e-9,"tessellation":0.01,"exchange":1e-6}"#,
+    )
+    .unwrap();
+    binding
+        .create_primitive(
+            r#"{"kind":"Cuboid","width":1,"height":1,"depth":1}"#,
+            r#"{"ogId":"cube"}"#,
+        )
+        .unwrap();
+    let buckets: Value = serde_json::from_str(&binding.display_buckets("cube").unwrap()).unwrap();
+    let keys: Vec<&str> = buckets
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(keys, ["floor", "static"]);
+    let mut graph = WorldGraph::new(binding_accuracy()).unwrap();
+    unit_cube(&mut graph);
+    let brep = graph.brep("cube").unwrap();
+    let floor = bucket_floor(&brep).unwrap();
+    let bucket = static_bucket(&brep).unwrap();
+    assert_eq!(floor.to_bits(), 2.0_f64.powi(-21).to_bits());
+    assert_eq!(bucket.to_bits(), 2.0_f64.powi(-9).to_bits());
+    assert_eq!(
+        buckets["floor"].as_f64().unwrap().to_bits(),
+        floor.to_bits()
+    );
+    assert_eq!(
+        buckets["static"].as_f64().unwrap().to_bits(),
+        bucket.to_bits()
+    );
 }
