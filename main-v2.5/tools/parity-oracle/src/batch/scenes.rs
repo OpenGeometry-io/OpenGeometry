@@ -20,22 +20,6 @@ pub(super) fn scenes(ground: Frame3, standard: Accuracy) -> Vec<Scene> {
         .collect()
 }
 
-fn scene(name: &'static str, host: Part, cutters: Vec<Part>) -> Scene {
-    Scene {
-        name,
-        host,
-        cutters,
-        ordered: false,
-    }
-}
-
-fn ordered(name: &'static str, host: Part, cutters: Vec<Part>) -> Scene {
-    Scene {
-        ordered: true,
-        ..scene(name, host, cutters)
-    }
-}
-
 fn planar_scenes(ground: Frame3, standard: Accuracy) -> Vec<Scene> {
     let doors = |count: usize, prefix: &str, from: f64, pitch: f64, width: f64| {
         (0..count)
@@ -231,6 +215,22 @@ fn arc_scenes(ground: Frame3) -> Vec<Scene> {
             staged_openings(),
         ),
     ]
+}
+
+fn scene(name: &'static str, host: Part, cutters: Vec<Part>) -> Scene {
+    Scene {
+        name,
+        host,
+        cutters,
+        ordered: false,
+    }
+}
+
+fn ordered(name: &'static str, host: Part, cutters: Vec<Part>) -> Scene {
+    Scene {
+        ordered: true,
+        ..scene(name, host, cutters)
+    }
 }
 
 fn wide_sector(index: usize) -> Part {

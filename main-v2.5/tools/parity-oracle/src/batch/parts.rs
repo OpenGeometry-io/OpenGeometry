@@ -22,10 +22,10 @@ pub(super) enum Shape {
 }
 
 pub(super) struct Part {
-    pub(super) name: String,
-    pub(super) frame: Frame3,
-    pub(super) accuracy: Accuracy,
-    pub(super) shape: Shape,
+    name: String,
+    frame: Frame3,
+    accuracy: Accuracy,
+    shape: Shape,
 }
 
 pub(super) fn body(part: Part) -> Result<BrepEnvelope, GeometryError> {
@@ -69,7 +69,7 @@ pub(super) fn at(origin: Point3) -> Frame3 {
     }
 }
 
-pub(super) fn upright(origin: Point3) -> Frame3 {
+fn upright(origin: Point3) -> Frame3 {
     Frame3 {
         origin,
         x: [1.0, 0.0, 0.0],
@@ -134,7 +134,7 @@ pub(super) fn round(name: &str, frame: Frame3, radius: f64, height: f64) -> Part
     part(name, frame, fine(), Shape::Cylinder { radius, height })
 }
 
-pub(super) fn arc(radius: f64, start_angle: f64, sweep_angle: f64) -> ProfileEdge {
+fn arc(radius: f64, start_angle: f64, sweep_angle: f64) -> ProfileEdge {
     ProfileEdge::Arc {
         center: [0.0, 0.0],
         radius,
