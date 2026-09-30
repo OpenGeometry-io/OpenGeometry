@@ -1,6 +1,7 @@
 use super::change_log::ChangeSet;
 use super::error::{ErrorCode, ErrorContext, GraphError};
 use super::graph::WorldGraph;
+use super::node::PlaceInput;
 use crate::brep::{Frame3, Similarity3, GROUND};
 use crate::math::{add, scale, sub, Point3};
 use serde::{Deserialize, Serialize};
@@ -38,7 +39,18 @@ pub enum Transform {
 }
 
 pub(super) fn is_identity(transform: Similarity3) -> bool {
-    let actual = [
+    same_bits(transform, Similarity3::IDENTITY)
+}
+
+fn same_bits(a: Similarity3, b: Similarity3) -> bool {
+    entries(a)
+        .iter()
+        .zip(entries(b))
+        .all(|(a, b)| a.to_bits() == b.to_bits())
+}
+
+fn entries(transform: Similarity3) -> [f64; 13] {
+    [
         transform.frame.origin[0],
         transform.frame.origin[1],
         transform.frame.origin[2],
@@ -52,14 +64,7 @@ pub(super) fn is_identity(transform: Similarity3) -> bool {
         transform.frame.z[1],
         transform.frame.z[2],
         transform.scale,
-    ];
-    let expected: [f64; 13] = [
-        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0,
-    ];
-    actual
-        .iter()
-        .zip(expected)
-        .all(|(a, b)| a.to_bits() == b.to_bits())
+    ]
 }
 
 impl Transform {
@@ -80,7 +85,7 @@ impl Transform {
                 x_direction,
                 normal,
                 scale,
-            } => placed_local(local, origin, x_direction, normal, scale)?,
+            } => from_place(place_input(origin, x_direction, normal, scale))?,
         };
         result
             .validate()
@@ -172,55 +177,26 @@ fn scaled_local(
     })
 }
 
-fn placed_local(
-    local: Similarity3,
+fn place_input(
     origin: Option<Point3>,
     x_direction: Option<Point3>,
     normal: Option<Point3>,
     scale: Option<f64>,
-) -> Result<Similarity3, GraphError> {
-    let current = local.compose(&Similarity3 {
-        frame: GROUND,
-        scale: 1.0,
-    });
-    let expected_origin = origin.unwrap_or([0.0; 3]);
-    let expected_x = x_direction.unwrap_or([1.0, 0.0, 0.0]);
-    let expected_normal = normal.unwrap_or([0.0, 1.0, 0.0]);
-    let expected_scale = scale.unwrap_or(1.0);
-    let same = |a: Point3, b: Point3| {
-        a.into_iter()
-            .zip(b)
-            .all(|(x, y)| x.to_bits() == y.to_bits())
-    };
-    if same(current.frame.origin, expected_origin)
-        && same(current.frame.x, expected_x)
-        && same(current.frame.z, expected_normal)
-        && current.scale.to_bits() == expected_scale.to_bits()
-    {
-        Ok(local)
-    } else {
-        from_place(origin, x_direction, normal, scale)
+) -> PlaceInput {
+    PlaceInput {
+        origin: origin.unwrap_or([0.0; 3]),
+        x_direction: x_direction.unwrap_or([1.0, 0.0, 0.0]),
+        normal: normal.unwrap_or([0.0, 1.0, 0.0]),
+        scale: scale.unwrap_or(1.0),
     }
 }
 
-fn from_place(
-    origin: Option<Point3>,
-    x_direction: Option<Point3>,
-    normal: Option<Point3>,
-    scale: Option<f64>,
-) -> Result<Similarity3, GraphError> {
-    if origin.is_none() && x_direction.is_none() && normal.is_none() && scale.is_none() {
-        return Ok(Similarity3::IDENTITY);
-    }
-    let frame = Frame3::from_axis(
-        origin.unwrap_or([0.0; 3]),
-        normal.unwrap_or([0.0, 1.0, 0.0]),
-        x_direction.unwrap_or([1.0, 0.0, 0.0]),
-    )
-    .map_err(|error| invalid_transform(format!("invalid placement frame: {error}")))?;
+fn from_place(input: PlaceInput) -> Result<Similarity3, GraphError> {
+    let frame = Frame3::from_axis(input.origin, input.normal, input.x_direction)
+        .map_err(|error| invalid_transform(format!("invalid placement frame: {error}")))?;
     let local = Similarity3 {
         frame,
-        scale: scale.unwrap_or(1.0),
+        scale: input.scale,
     }
     .compose(
         &Similarity3 {
@@ -248,6 +224,15 @@ impl WorldGraph {
                 .get_mut(og_id)
                 .ok_or_else(|| GraphError::code(ErrorCode::UnknownNode, og_id))?;
             node.local = transform.apply(node.local)?;
+            if let Transform::Place {
+                origin,
+                x_direction,
+                normal,
+                scale,
+            } = transform
+            {
+                node.place_input = Some(place_input(origin, x_direction, normal, scale));
+            }
             draft.affected.extend(descendants);
             Ok(())
         })
@@ -255,19 +240,18 @@ impl WorldGraph {
     }
 
     pub fn placement(&self, og_id: &str) -> Result<Placement, GraphError> {
-        let local = self.node(og_id)?.local;
-        let frame = local
-            .compose(&Similarity3 {
-                frame: GROUND,
-                scale: 1.0,
-            })
-            .frame;
-        Ok(Placement {
-            origin: frame.origin,
-            x_direction: frame.x,
-            normal: frame.z,
-            scale: local.scale,
-        })
+        let node = self.node(og_id)?;
+        if let Some(input) = node.place_input {
+            if same_bits(from_place(input)?, node.local) {
+                return Ok(Placement {
+                    origin: input.origin,
+                    x_direction: input.x_direction,
+                    normal: input.normal,
+                    scale: input.scale,
+                });
+            }
+        }
+        Ok(placement_form(node.local))
     }
 
     pub fn world_placement(&self, og_id: &str) -> Result<Similarity3, GraphError> {
@@ -335,5 +319,20 @@ impl WorldGraph {
             .validate()
             .map_err(|error| invalid_transform(format!("invalid relative placement: {error}")))?;
         Ok(result)
+    }
+}
+
+fn placement_form(transform: Similarity3) -> Placement {
+    let frame = transform
+        .compose(&Similarity3 {
+            frame: GROUND,
+            scale: 1.0,
+        })
+        .frame;
+    Placement {
+        origin: frame.origin,
+        x_direction: frame.x,
+        normal: frame.z,
+        scale: transform.scale,
     }
 }

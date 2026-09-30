@@ -113,6 +113,7 @@ impl Candidate {
                 local,
                 shape,
                 kind,
+                place_input: None,
             },
         );
         if let Some(parent) = parent {
