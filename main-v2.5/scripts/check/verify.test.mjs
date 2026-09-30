@@ -67,7 +67,8 @@ test('--skip of every selected step selects nothing and fails', () => {
 test('an unknown step name fails with one line naming it', () => {
   assert.throws(
     () => selectSteps(['--skip', 'nope']),
-    (error) => error instanceof Error && error.message.startsWith('unknown step nope;') && !error.message.includes('\n'),
+    (error) => error instanceof Error && error.message.startsWith('unknown step nope;')
+      && !error.message.includes('\n'),
   );
 });
 

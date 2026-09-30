@@ -1,11 +1,12 @@
 import { defineConfig } from '@playwright/test';
-import { EXAMPLES_URL, PAGES_URL } from './opengeometry-three/tests/browser/support/servers.js';
+import { EXAMPLES_URL, PAGES_URL, PORT_BASE } from './opengeometry-three/tests/browser/support/servers.js';
 
 export default defineConfig({
   testDir: './opengeometry-three/tests/browser/specs',
   workers: 1,
   fullyParallel: false,
   retries: 0,
+  outputDir: `test-results/${String(PORT_BASE)}`,
   timeout: 30_000,
   use: { browserName: 'chromium', headless: true, baseURL: PAGES_URL },
   webServer: [
