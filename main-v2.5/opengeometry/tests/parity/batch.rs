@@ -1,6 +1,8 @@
 use crate::support::{parity_fixtures, read_fixture};
 use opengeometry::brep::BrepEnvelope;
-use opengeometry::operations::modifying::boolean::subtract_planar_cutters_with_handlers;
+use opengeometry::operations::modifying::boolean::{
+    multi_tool_boolean, subtract_planar_cutters_with_handlers, BooleanOp, MultiToolOutcome,
+};
 use serde_json::json;
 use std::collections::BTreeSet;
 
@@ -31,7 +33,9 @@ fn batch_subtraction_matches_source_brep_and_handlers() {
 #[test]
 fn fallback_rows_parse() {
     let expected = BTreeSet::from(["cutters", "handlers", "host", "result"]);
-    for path in parity_fixtures("batch-matrix", |name| name.contains(".fallback.")) {
+    let files = parity_fixtures("batch-matrix", |name| name.contains(".fallback."));
+    assert_eq!(files.len(), 3);
+    for path in files {
         let fixture = read_fixture(&path);
         let keys = fixture
             .as_object()
@@ -40,5 +44,34 @@ fn fallback_rows_parse() {
             .map(String::as_str)
             .collect::<BTreeSet<_>>();
         assert_eq!(keys, expected, "{}", path.display());
+    }
+}
+
+#[test]
+fn fallback_rows_match_source_serial_results() {
+    for path in parity_fixtures("batch-matrix", |name| name.contains(".fallback.")) {
+        let stem = path.file_stem().unwrap().to_str().unwrap();
+        let name = stem.strip_suffix(".fallback").unwrap();
+        let fixture = read_fixture(&path);
+        let host: BrepEnvelope = serde_json::from_value(fixture["host"].clone()).unwrap();
+        let cutters: Vec<BrepEnvelope> =
+            serde_json::from_value(fixture["cutters"].clone()).unwrap();
+        let MultiToolOutcome {
+            result, handlers, ..
+        } = multi_tool_boolean(
+            &host,
+            &cutters,
+            BooleanOp::Subtraction,
+            format!("batch-{name}"),
+        );
+        let actual = match result {
+            Ok(result) => {
+                result.brep.validate().unwrap();
+                json!({"brep": serde_json::to_value(result.brep).unwrap()})
+            }
+            Err(error) => json!({"error": error}),
+        };
+        assert_eq!(actual, fixture["result"], "{name}");
+        assert_eq!(json!(handlers), fixture["handlers"], "{name}");
     }
 }
