@@ -234,16 +234,21 @@ fn instances(record: &mut Record, graph: &mut WorldGraph, tracked: &mut Tracked,
 }
 
 fn reparent(record: &mut Record, graph: &mut WorldGraph, tracked: &mut Tracked) {
-    let place = on_plane(
-        create_options("level-2"),
-        [10.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [0.0, 0.0, -1.0],
-    );
     let level = tracked.add(
-        created(record, "second level", graph.create_system_assembly(place)),
+        created(
+            record,
+            "second level",
+            graph.create_system_assembly(create_options("level-2")),
+        ),
         "level-2",
     );
+    let place = Transform::Place {
+        origin: Some([10.0, 0.0, 0.0]),
+        x_direction: Some([0.0, 0.0, -1.0]),
+        normal: Some([0.0, 1.0, 0.0]),
+        scale: None,
+    };
+    changes(record, "place level-2", graph.transform(&level, place));
     changes(
         record,
         "add rail copy keep world",

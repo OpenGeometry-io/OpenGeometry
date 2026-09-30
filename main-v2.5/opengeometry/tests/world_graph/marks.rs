@@ -59,6 +59,7 @@ fn changes_since_compacts_updates_and_reports_subtree_motion() {
                 og_id: Some("child".into()),
                 parent: Some("parent".into()),
                 plane: None,
+                body_type: None,
             },
         )
         .unwrap();
@@ -193,6 +194,7 @@ fn subtree_dispose_and_rollback_preserve_counters_and_handles() {
                 og_id: None,
                 parent: Some("parent".into()),
                 plane: None,
+                body_type: None,
             },
         )
         .unwrap();

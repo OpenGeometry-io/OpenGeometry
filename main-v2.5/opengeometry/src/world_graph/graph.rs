@@ -1,3 +1,4 @@
+use super::candidate::IdCounters;
 use super::change_log::ChangeSet;
 use super::error::GraphError;
 use super::node::{MarkId, Node};
@@ -27,7 +28,7 @@ pub struct WorldGraph {
     pub(super) next_mark: u64,
     pub(super) next_handle: u32,
     pub(super) next_generation: u32,
-    pub(super) next_og_id: u64,
+    pub(super) next_og_ids: IdCounters,
     pub(super) world_cache: RefCell<BTreeMap<String, Similarity3>>,
 }
 
@@ -45,7 +46,7 @@ impl WorldGraph {
             next_mark: 0,
             next_handle: 0,
             next_generation: 0,
-            next_og_id: 0,
+            next_og_ids: IdCounters::FIRST,
             world_cache: RefCell::new(BTreeMap::new()),
         })
     }

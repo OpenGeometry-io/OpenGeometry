@@ -187,6 +187,7 @@ fn bindings_payloads_are_camel_case() {
             og_id: Some("cube".into()),
             parent: Some("root".into()),
             plane: Some(plane),
+            body_type: None,
         })
         .unwrap(),
         serde_json::to_value(CopyOptions {

@@ -6,14 +6,21 @@ use super::hierarchy::restamp;
 use super::node::Node;
 use super::shape_store::Shape;
 use crate::brep::Similarity3;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CopyOptions {
     pub og_id: Option<String>,
+    #[serde(default, deserialize_with = "explicit_parent")]
     pub parent: Option<Option<String>>,
+}
+
+fn explicit_parent<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Option<String>>, D::Error> {
+    Option::<String>::deserialize(deserializer).map(Some)
 }
 
 impl WorldGraph {
@@ -39,7 +46,8 @@ impl WorldGraph {
                 &original,
                 "invalid instance placement",
             )?;
-            let id = draft.new_og_id(options.og_id.as_deref())?;
+            let kind = draft.copy_kind(&shape_id)?;
+            let id = draft.new_og_id(options.og_id.as_deref(), kind)?;
             let handle = draft.new_handle()?;
             let shape = draft.shapes.get_mut(&shape_id).ok_or_else(|| {
                 GraphError::code(ErrorCode::InvalidTopology, "shape reference is missing")
@@ -92,7 +100,8 @@ impl WorldGraph {
                 &original,
                 "invalid duplicate placement",
             )?;
-            let id = draft.new_og_id(options.og_id.as_deref())?;
+            let kind = draft.copy_kind(old_shape_id)?;
+            let id = draft.new_og_id(options.og_id.as_deref(), kind)?;
             let shape_id = draft.new_shape_id()?;
             let brep = restamp((*old_shape.brep).clone(), old_shape_id, &shape_id)?;
             let handle = draft.new_handle()?;

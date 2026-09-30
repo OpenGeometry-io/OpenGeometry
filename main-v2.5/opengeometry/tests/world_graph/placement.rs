@@ -181,6 +181,7 @@ fn primitive_plane_and_precision_guard_are_applied_at_commit() {
                     origin: Some([4.0, 5.0, 6.0]),
                     ..Plane::default()
                 }),
+                body_type: None,
             },
         )
         .unwrap();
@@ -225,6 +226,7 @@ fn world_placement_form_composes_the_parent_chain() {
                     origin: Some([4.0, 5.0, 6.0]),
                     ..Plane::default()
                 }),
+                body_type: None,
             },
         )
         .unwrap();
@@ -286,6 +288,7 @@ fn copies_under_another_parent_keep_their_world_placement() {
                 og_id: Some("body".into()),
                 parent: Some("a".into()),
                 plane: None,
+                body_type: None,
             },
         )
         .unwrap();

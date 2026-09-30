@@ -63,6 +63,7 @@ fn parent_motion_and_reparenting_obey_local_and_world_rules() {
                 og_id: Some("child".into()),
                 parent: Some("a".into()),
                 plane: None,
+                body_type: None,
             },
         )
         .unwrap();
@@ -108,6 +109,7 @@ fn i6_failed_calls_do_not_consume_ids_or_change_the_graph() {
             og_id: Some("b".into()),
             parent: Some("a".into()),
             plane: None,
+            body_type: None,
         })
         .unwrap();
     let revision = world.revision();
@@ -164,7 +166,7 @@ fn i6_failed_calls_do_not_consume_ids_or_change_the_graph() {
     let (generated, _) = world
         .create_primitive(box_primitive(), CreateOptions::default())
         .unwrap();
-    assert_eq!(generated, "node-0");
+    assert_eq!(generated, "solid-1");
     assert_eq!(world.brep(&generated).unwrap().id, reserved.shape_ids[0]);
     let body = world.node(&generated).unwrap();
     let handle = body.handle;
@@ -180,5 +182,5 @@ fn i6_failed_calls_do_not_consume_ids_or_change_the_graph() {
     let (next, _) = world
         .create_primitive(box_primitive(), CreateOptions::default())
         .unwrap();
-    assert_eq!(next, "node-1");
+    assert_eq!(next, "solid-2");
 }

@@ -10,7 +10,7 @@ import type { SystemAssembly } from './system-assembly.js';
 
 export class Solid extends Body {
   constructor(kind: string, params: Record<string, unknown>, options: BodyOptions = {}) {
-    super(createBody(kind, params, options), 'Solid', options);
+    super(createBody(kind, params, options, 'Solid'), 'Solid', options);
     if (this.lastInfo.bodyType !== 'Solid') {
       throw new OGError('BodyTypeMismatch', 'Solid.constructor', 'expected Solid');
     }

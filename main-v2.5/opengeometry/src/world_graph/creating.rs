@@ -1,9 +1,10 @@
+use super::candidate::IdKind;
 use super::change_log::ChangeSet;
 use super::error::{ErrorCode, ErrorContext, GraphError};
 use super::graph::WorldGraph;
 use super::node::EditScope;
 use super::operands::{path_points, profile_loop};
-use super::primitive::CreateOptions;
+use super::primitive::{check_body_type, check_no_plane, CreateOptions};
 use crate::brep::{BodyType, BrepEnvelope, Similarity3};
 use crate::operations::creating::{extrude, sweep};
 use serde::{Deserialize, Serialize};
@@ -82,6 +83,8 @@ impl WorldGraph {
         operation: CreatingOperation,
         options: CreateOptions,
     ) -> Result<(String, ChangeSet), GraphError> {
+        check_body_type(options.body_type, BodyType::Solid)?;
+        check_no_plane(options.plane)?;
         let anchor = operation.anchor();
         let anchor_node = self.node(anchor)?;
         let parent = options.parent.or_else(|| anchor_node.parent.clone());
@@ -110,7 +113,7 @@ impl WorldGraph {
         }
         let mut created = None;
         let changes = self.mutate(|draft| {
-            let id = draft.new_og_id(options.og_id.as_deref())?;
+            let id = draft.new_og_id(options.og_id.as_deref(), IdKind::Solid)?;
             let allocated = draft.new_shape_id()?;
             if allocated != shape_id {
                 return Err(GraphError::code(

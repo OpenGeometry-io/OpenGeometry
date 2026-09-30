@@ -1,9 +1,23 @@
 use super::error::{ErrorCode, GraphError};
 use super::node::{Node, NodeKind};
 use super::shape_store::{Shape, ShapeId};
-use crate::brep::{BrepEnvelope, Similarity3};
+use crate::brep::{BodyType, BrepEnvelope, Similarity3};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+
+#[derive(Clone, Copy)]
+pub(super) struct IdCounters {
+    solid: u64,
+    wire: u64,
+    assembly: u64,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum IdKind {
+    Solid,
+    Wire,
+    Assembly,
+}
 
 #[derive(Clone)]
 pub(super) struct Candidate {
@@ -12,12 +26,23 @@ pub(super) struct Candidate {
     pub(super) next_shape_id: u64,
     pub(super) next_handle: u32,
     pub(super) next_generation: u32,
-    pub(super) next_og_id: u64,
+    pub(super) next_og_ids: IdCounters,
     pub(super) affected: BTreeSet<String>,
 }
 
 impl Candidate {
-    pub(super) fn new_og_id(&mut self, supplied: Option<&str>) -> Result<String, GraphError> {
+    pub(super) fn copy_kind(&self, shape_id: &str) -> Result<IdKind, GraphError> {
+        let shape = self.shapes.get(shape_id).ok_or_else(|| {
+            GraphError::code(ErrorCode::InvalidTopology, "shape reference is missing")
+        })?;
+        IdKind::of_shape(&shape.brep)
+    }
+
+    pub(super) fn new_og_id(
+        &mut self,
+        supplied: Option<&str>,
+        kind: IdKind,
+    ) -> Result<String, GraphError> {
         if let Some(id) = supplied {
             if id.is_empty() {
                 return Err(GraphError::code(
@@ -37,8 +62,9 @@ impl Candidate {
             return Ok(id.into());
         }
         loop {
-            let id = format!("node-{}", self.next_og_id);
-            self.next_og_id = self.next_og_id.checked_add(1).ok_or_else(|| {
+            let counter = self.next_og_ids.slot(kind);
+            let id = format!("{}-{}", kind.prefix(), *counter);
+            *counter = counter.checked_add(1).ok_or_else(|| {
                 GraphError::code(ErrorCode::LimitExceeded, "node id counter overflow")
             })?;
             if !self.nodes.contains_key(&id) {
@@ -122,5 +148,52 @@ impl Candidate {
             }
         }
         self.affected.insert(id.to_string());
+    }
+}
+
+impl IdKind {
+    pub(super) fn of_body(body_type: BodyType) -> Result<Self, GraphError> {
+        match body_type {
+            BodyType::Solid => Ok(Self::Solid),
+            BodyType::Wire => Ok(Self::Wire),
+            BodyType::Sheet => Err(GraphError::code(
+                ErrorCode::InvalidTopology,
+                "graph bodies are never sheets",
+            )),
+        }
+    }
+
+    fn of_shape(brep: &BrepEnvelope) -> Result<Self, GraphError> {
+        if !brep.solids.is_empty() {
+            Ok(Self::Solid)
+        } else if brep.topology.faces.is_empty() && !brep.topology.wires.is_empty() {
+            Ok(Self::Wire)
+        } else {
+            Self::of_body(BodyType::Sheet)
+        }
+    }
+
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Solid => "solid",
+            Self::Wire => "wire",
+            Self::Assembly => "assembly",
+        }
+    }
+}
+
+impl IdCounters {
+    pub(super) const FIRST: Self = Self {
+        solid: 1,
+        wire: 1,
+        assembly: 1,
+    };
+
+    fn slot(&mut self, kind: IdKind) -> &mut u64 {
+        match kind {
+            IdKind::Solid => &mut self.solid,
+            IdKind::Wire => &mut self.wire,
+            IdKind::Assembly => &mut self.assembly,
+        }
     }
 }
