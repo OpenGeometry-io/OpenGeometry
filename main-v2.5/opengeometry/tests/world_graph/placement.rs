@@ -204,6 +204,42 @@ fn primitive_plane_and_precision_guard_are_applied_at_commit() {
 }
 
 #[test]
+fn world_placement_form_composes_the_parent_chain() {
+    let mut world = graph();
+    world.create_system_assembly(named("parent")).unwrap();
+    world
+        .transform(
+            "parent",
+            Transform::Translate {
+                offset: [10.0, 0.0, 0.0],
+            },
+        )
+        .unwrap();
+    world
+        .create_primitive(
+            box_primitive(),
+            CreateOptions {
+                og_id: Some("body".into()),
+                parent: Some("parent".into()),
+                plane: Some(Plane {
+                    origin: Some([4.0, 5.0, 6.0]),
+                    ..Plane::default()
+                }),
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        world.world_placement_form("body").unwrap(),
+        Placement {
+            origin: [14.0, 5.0, 6.0],
+            x_direction: [1.0, 0.0, 0.0],
+            normal: [0.0, 1.0, 0.0],
+            scale: 1.0,
+        }
+    );
+}
+
+#[test]
 fn one_hundred_thousand_incremental_rotations_keep_a_valid_frame() {
     let mut world = graph();
     world.create_system_assembly(named("pivot")).unwrap();
