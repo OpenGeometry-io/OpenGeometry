@@ -1,3 +1,4 @@
+use super::holes::{check_annular, check_circle_hole, check_layout};
 use super::profile::{check_lines, edges, profile_frame, ProfileLoop};
 use crate::brep::{Accuracy, BrepEnvelope, Frame3};
 use crate::math::{add, dot, norm, scale, sub, Point3};
@@ -16,7 +17,7 @@ pub(crate) fn build(
     }
     let mut frame = profile_frame(&outer, accuracy.geometric)?;
     check_lines(&outer, frame, accuracy.geometric)?;
-    check_holes(&holes, frame, accuracy)?;
+    check_holes(&outer, &holes, frame, accuracy)?;
     let original_origin = frame.origin;
     if distance < 0.0 {
         frame.origin = add(frame.origin, scale(frame.z, distance));
@@ -77,6 +78,7 @@ pub(crate) fn build(
 }
 
 fn check_holes(
+    outer: &ProfileLoop,
     holes: &[ProfileLoop],
     frame: Frame3,
     accuracy: Accuracy,
@@ -87,16 +89,7 @@ fn check_holes(
             ProfileLoop::Circle {
                 frame: circle,
                 radius,
-            } => {
-                if !radius.is_finite() || *radius <= 4.0 * accuracy.geometric {
-                    return Err(invalid("hole radius is below geometric resolution"));
-                }
-                if dot(sub(circle.origin, frame.origin), frame.z).abs() > 4.0 * accuracy.geometric
-                    || dot(circle.z, frame.z).abs() < 1.0 - 1e-9
-                {
-                    return Err(invalid("hole is not coplanar"));
-                }
-            }
+            } => check_circle_hole(*circle, *radius, frame, accuracy.geometric)?,
             ProfileLoop::Lines(points) => {
                 for point in points {
                     if dot(sub(*point, frame.origin), frame.z).abs() > 4.0 * accuracy.geometric {
@@ -106,5 +99,6 @@ fn check_holes(
             }
         }
     }
-    Ok(())
+    check_annular(outer, holes, accuracy.geometric)?;
+    check_layout(outer, holes, frame, accuracy.geometric)
 }
