@@ -1,47 +1,46 @@
-use opengeometry::brep::Accuracy;
+use opengeometry::brep::{Accuracy, BrepEnvelope, Frame3, GeometryError, PatchBounds};
+use opengeometry::primitives;
 use opengeometry::tessellation::display::static_bucket;
-use opengeometry::world_graph::{CreateOptions, ErrorCode, Primitive, WorldGraph};
+use opengeometry::world_graph::{
+    CopyOptions, CreateOptions, CreatingOperation, ErrorCode, Primitive, StepOptions, Transform,
+    WorldGraph,
+};
 
-fn tessellation_accuracy(tessellation: f64) -> Accuracy {
-    Accuracy {
-        geometric: 1e-8,
-        intersection: 1e-9,
-        tessellation,
-        exchange: 1e-6,
-    }
-}
+const CUBOID: &str = include_str!("fixtures/parity/cuboid.brep.json");
 
 #[test]
-fn i5_graph_accuracy_is_validated_and_display_bucket_ignores_tessellation_budget() {
-    assert!(WorldGraph::new(Accuracy {
-        geometric: 0.0,
-        ..tessellation_accuracy(0.01)
-    })
-    .is_err());
-    assert!(WorldGraph::new(Accuracy {
-        intersection: 1e-7,
-        ..tessellation_accuracy(0.01)
-    })
-    .is_err());
-    let mut fine = WorldGraph::new(tessellation_accuracy(0.01)).unwrap();
-    let mut coarse = WorldGraph::new(tessellation_accuracy(0.1)).unwrap();
-    for graph in [&mut fine, &mut coarse] {
-        graph
-            .create_primitive(
-                Primitive::Cylinder {
-                    radius: 1.0,
-                    height: 2.0,
-                },
-                CreateOptions {
-                    og_id: Some("cylinder".into()),
-                    ..CreateOptions::default()
-                },
-            )
-            .unwrap();
-    }
+fn i5_graph_accepts_only_the_standard_accuracy_and_the_display_bucket_ignores_the_budget() {
+    let code = |accuracy| {
+        WorldGraph::new(accuracy)
+            .err()
+            .map(|error| error.error_code())
+    };
     assert_eq!(
-        static_bucket(&fine.brep("cylinder").unwrap()).unwrap(),
-        static_bucket(&coarse.brep("cylinder").unwrap()).unwrap()
+        code(Accuracy {
+            geometric: 0.0,
+            ..Accuracy::STANDARD
+        }),
+        Some(ErrorCode::InvalidGeometry)
+    );
+    assert_eq!(
+        code(Accuracy {
+            intersection: 1e-7,
+            ..Accuracy::STANDARD
+        }),
+        Some(ErrorCode::InvalidGeometry)
+    );
+    let coarse = Accuracy {
+        tessellation: 0.1,
+        ..Accuracy::STANDARD
+    };
+    assert_eq!(code(coarse), Some(ErrorCode::InvalidParameter));
+    assert_eq!(code(Accuracy::STANDARD), None);
+    let cylinder = |accuracy| {
+        primitives::cylinder("cylinder".into(), Frame3::IDENTITY, 1.0, 2.0, accuracy).unwrap()
+    };
+    assert_eq!(
+        static_bucket(&cylinder(Accuracy::STANDARD)).unwrap(),
+        static_bucket(&cylinder(coarse)).unwrap()
     );
 }
 
@@ -69,11 +68,35 @@ fn i9_public_input_types_reject_unknown_fields() {
     )
     .is_err());
     assert!(serde_json::from_str::<CreateOptions>(r#"{"ogId":"body","extra":1}"#).is_err());
+    assert!(BrepEnvelope::from_json(CUBOID).is_ok());
+    for key in [r#""range":{"#, r#""uv_bounds":[{"#] {
+        assert!(CUBOID.contains(key), "{key}");
+        let injected = CUBOID.replacen(key, &format!(r#"{key}"extra":1,"#), 1);
+        assert!(BrepEnvelope::from_json(&injected).is_err(), "{key}");
+    }
+    assert!(serde_json::from_str::<PatchBounds>(
+        r#"{"axes":[{"lo":0,"hi":1},{"lo":0,"hi":1},{"lo":0,"hi":1}],"extra":1}"#
+    )
+    .is_err());
+    assert!(serde_json::from_str::<GeometryError>(
+        r#"{"CoverageGap":{"families":["a","b"],"extra":1}}"#
+    )
+    .is_err());
+    assert!(serde_json::from_str::<Transform>(
+        r#"{"kind":"Translate","offset":[0,0,0],"extra":1}"#
+    )
+    .is_err());
+    assert!(serde_json::from_str::<CopyOptions>(r#"{"ogId":"copy","extra":1}"#).is_err());
+    assert!(serde_json::from_str::<CreatingOperation>(
+        r#"{"kind":"Sweep","profile":"p","path":"q","extra":1}"#
+    )
+    .is_err());
+    assert!(serde_json::from_str::<StepOptions>(r#"{"unit":"metre","extra":1}"#).is_err());
 }
 
 #[test]
 fn i11_features_at_or_below_four_geometric_are_invalid_parameters() {
-    let mut graph = WorldGraph::new(tessellation_accuracy(0.01)).unwrap();
+    let mut graph = WorldGraph::new(Accuracy::STANDARD).unwrap();
     for primitive in [
         Primitive::Cuboid {
             width: 4e-8,

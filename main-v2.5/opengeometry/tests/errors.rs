@@ -1,5 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
-use opengeometry::brep::{Accuracy, GeometryError};
+use opengeometry::brep::GeometryError;
 use opengeometry::math::MathError;
 use opengeometry::operations::OperationError;
 use opengeometry::world_graph::{
@@ -247,16 +247,10 @@ fn multi_tool_operate_failure_carries_handlers_tool_index_and_og_ids() {
 
 #[test]
 fn two_body_export_failing_on_the_second_body_carries_its_og_id() {
-    let mut world = WorldGraph::new(Accuracy {
-        geometric: 1e-8,
-        intersection: 1e-9,
-        tessellation: 0.01,
-        exchange: 1.001e-8,
-    })
-    .unwrap();
+    let mut world = graph();
     unit_cuboid(&mut world, "near", 1.0);
     unit_cuboid(&mut world, "far", 1.0);
-    translate(&mut world, "far", [10_000.0, 0.0, 0.0]);
+    translate(&mut world, "far", [1e6, 0.0, 0.0]);
     let options = StepOptions {
         unit: "metre".into(),
         up_axis: "Y".into(),
@@ -269,11 +263,7 @@ fn two_body_export_failing_on_the_second_body_carries_its_og_id() {
         error,
         GraphError::Code {
             code: ErrorCode::LimitExceeded,
-            message: GeometryError::LimitExceeded(
-                "analytic exchange exchange budget is below geometric tolerance or coordinate precision"
-                    .into()
-            )
-            .to_string(),
+            message: "far: placement coordinate precision exceeds geometric tolerance".into(),
             details: ErrorDetails::Export {
                 og_id: "far".into()
             },
