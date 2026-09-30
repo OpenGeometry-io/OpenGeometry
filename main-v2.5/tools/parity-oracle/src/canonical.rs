@@ -28,25 +28,6 @@ pub(super) fn write_canonical_tessellations(output: &Path) -> Result<(), Box<dyn
     Ok(())
 }
 
-fn result_breps(directory: &Path) -> Result<Vec<(String, BrepEnvelope)>, Box<dyn Error>> {
-    let mut rows = Vec::new();
-    for entry in fs::read_dir(directory)? {
-        let file_name = entry?.file_name().to_string_lossy().into_owned();
-        if file_name.contains(".step.") || file_name.contains(".fallback.") {
-            continue;
-        }
-        let Some(name) = file_name.strip_suffix(".json") else {
-            continue;
-        };
-        let row: Value = serde_json::from_slice(&fs::read(directory.join(&file_name))?)?;
-        if let Some(brep) = row["result"].get("brep") {
-            rows.push((name.to_string(), serde_json::from_value(brep.clone())?));
-        }
-    }
-    rows.sort_by(|a, b| a.0.cmp(&b.0));
-    Ok(rows)
-}
-
 fn write_canonical(
     directory: &Path,
     name: &str,
@@ -76,6 +57,25 @@ fn write_canonical(
     write_json(directory.join(format!("{name}.json")), &main_value)
 }
 
+fn result_breps(directory: &Path) -> Result<Vec<(String, BrepEnvelope)>, Box<dyn Error>> {
+    let mut rows = Vec::new();
+    for entry in fs::read_dir(directory)? {
+        let file_name = entry?.file_name().to_string_lossy().into_owned();
+        if file_name.contains(".step.") || file_name.contains(".fallback.") {
+            continue;
+        }
+        let Some(name) = file_name.strip_suffix(".json") else {
+            continue;
+        };
+        let row: Value = serde_json::from_slice(&fs::read(directory.join(&file_name))?)?;
+        if let Some(brep) = row["result"].get("brep") {
+            rows.push((name.to_string(), serde_json::from_value(brep.clone())?));
+        }
+    }
+    rows.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(rows)
+}
+
 fn canonical_tessellation(mesh: &Tessellation) -> Value {
     let vertices = canonical_vertices(mesh);
     json!({
@@ -87,6 +87,7 @@ fn canonical_tessellation(mesh: &Tessellation) -> Value {
         "achievedDeflection": mesh.achieved_deflection,
     })
 }
+
 fn canonical_vertices(mesh: &Tessellation) -> Vec<[f64; 6]> {
     let mut vertices = (0..mesh.positions.len() / 3)
         .map(|index| vertex(mesh, index))

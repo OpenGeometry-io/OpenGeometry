@@ -1,13 +1,8 @@
-use crate::support::parity_fixtures;
+use crate::support::{parity_fixtures, read_fixture};
 use opengeometry::brep::BrepEnvelope;
 use opengeometry::operations::modifying::boolean::subtract_planar_cutters_with_handlers;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::BTreeSet;
-use std::path::Path;
-
-fn read_fixture(path: &Path) -> Value {
-    serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
-}
 
 #[test]
 fn batch_subtraction_matches_source_brep_and_handlers() {
