@@ -8,7 +8,6 @@ use crate::brep::{
 };
 use crate::math::{add, cross, dot, norm, scale, sub, Interval, Point3};
 use crate::operations::{invalid, OperationError};
-
 use circle as sweep_circle;
 
 struct SweepTopology {
