@@ -1,9 +1,8 @@
 use crate::brep::{Frame3, Similarity3, GROUND};
 use crate::geom2d::{self_intersects2, Pt2};
 use crate::math::{cross, dot, norm, scale, sub, Point3};
-use crate::operations::invalid;
+use crate::operations::{invalid, OperationError};
 use crate::primitives::ProfileEdge;
-use crate::world_graph::GraphError;
 
 #[derive(Clone)]
 pub(crate) enum ProfileLoop {
@@ -20,7 +19,10 @@ pub(crate) fn mapped_frame(frame: Frame3, mapping: Similarity3) -> Frame3 {
     }
 }
 
-pub(super) fn profile_frame(profile: &ProfileLoop, tolerance: f64) -> Result<Frame3, GraphError> {
+pub(super) fn profile_frame(
+    profile: &ProfileLoop,
+    tolerance: f64,
+) -> Result<Frame3, OperationError> {
     match profile {
         ProfileLoop::Circle { frame, .. } => Ok(*frame),
         ProfileLoop::Lines(points) => {
@@ -95,7 +97,7 @@ pub(super) fn check_lines(
     profile: &ProfileLoop,
     frame: Frame3,
     tolerance: f64,
-) -> Result<(), GraphError> {
+) -> Result<(), OperationError> {
     if let ProfileLoop::Lines(points) = profile {
         let ring = points
             .iter()

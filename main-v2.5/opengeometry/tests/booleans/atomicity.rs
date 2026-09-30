@@ -1,8 +1,7 @@
 use super::support::cuboid;
 use opengeometry::brep::FaceRole;
-use opengeometry::operations::ModifyingOperation;
 use opengeometry::world_graph::{
-    CopyOptions, EditScope, ErrorCode, GraphError, Primitive, Transform,
+    CopyOptions, EditScope, ErrorCode, GraphError, ModifyingOperation, Primitive, Transform,
 };
 use opengeometry_test_support::volume;
 use opengeometry_test_support::world_graph::{graph, named};

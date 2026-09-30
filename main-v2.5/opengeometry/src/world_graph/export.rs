@@ -1,4 +1,4 @@
-use super::error::{ErrorCode, GraphError};
+use super::error::{ErrorCode, ErrorContext, GraphError};
 use super::graph::WorldGraph;
 use super::node::NodeKind;
 use super::placement::is_identity;
@@ -90,6 +90,15 @@ impl WorldGraph {
     }
 
     pub fn export_step(
+        &self,
+        nodes: &[String],
+        options: &StepOptions,
+    ) -> Result<(String, StepExportReport), GraphError> {
+        self.try_export_step(nodes, options)
+            .map_err(|error| error.in_context(ErrorContext::Export))
+    }
+
+    fn try_export_step(
         &self,
         nodes: &[String],
         options: &StepOptions,

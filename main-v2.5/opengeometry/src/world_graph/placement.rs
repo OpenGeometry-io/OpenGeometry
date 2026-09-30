@@ -1,5 +1,5 @@
 use super::change_log::ChangeSet;
-use super::error::{ErrorCode, GraphError};
+use super::error::{ErrorCode, ErrorContext, GraphError};
 use super::graph::WorldGraph;
 use crate::brep::{Frame3, Similarity3, GROUND};
 use crate::math::{add, scale, sub, Point3};
@@ -232,6 +232,7 @@ impl WorldGraph {
             draft.affected.extend(descendants);
             Ok(())
         })
+        .map_err(|error| error.in_context(ErrorContext::Transform))
     }
 
     pub fn placement(&self, og_id: &str) -> Result<Placement, GraphError> {

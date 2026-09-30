@@ -1,7 +1,6 @@
 use super::{check_options, created, OGWorldGraph};
 use crate::bindings::{errors, params};
-use crate::operations::CreatingOperation;
-use crate::world_graph::{CreateOptions, ErrorCode, GraphError, Primitive};
+use crate::world_graph::{CreateOptions, CreatingOperation, ErrorCode, GraphError, Primitive};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 

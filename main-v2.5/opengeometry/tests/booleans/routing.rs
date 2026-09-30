@@ -1,7 +1,8 @@
 use super::support::cuboid;
 use opengeometry::operations::modifying::boolean::{boolean_brep_outcome_with_handlers, BooleanOp};
-use opengeometry::operations::{CreatingOperation, ModifyingOperation};
-use opengeometry::world_graph::{CreateOptions, EditScope, Primitive, Transform};
+use opengeometry::world_graph::{
+    CreateOptions, CreatingOperation, EditScope, ModifyingOperation, Primitive, Transform,
+};
 use opengeometry_test_support::world_graph::{graph, named};
 
 #[test]

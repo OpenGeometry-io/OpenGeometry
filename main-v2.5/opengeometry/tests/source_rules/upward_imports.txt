@@ -1,8 +1,0 @@
-operations/creating/extrude.rs crate::world_graph::GraphError B5
-operations/creating/profile.rs crate::world_graph::GraphError B5
-operations/creating/sweep/circle.rs crate::world_graph::ErrorCode B5
-operations/creating/sweep/circle.rs crate::world_graph::GraphError B5
-operations/creating/sweep/mod.rs crate::world_graph::ErrorCode B5
-operations/creating/sweep/mod.rs crate::world_graph::GraphError B5
-operations/mod.rs crate::world_graph::ErrorCode B5
-operations/mod.rs crate::world_graph::GraphError B5

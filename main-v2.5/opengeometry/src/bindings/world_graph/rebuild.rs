@@ -1,7 +1,6 @@
 use super::{changed, OGWorldGraph};
 use crate::bindings::{errors, params};
-use crate::operations::CreatingOperation;
-use crate::world_graph::{EditScope, ErrorCode, GraphError, Primitive};
+use crate::world_graph::{CreatingOperation, EditScope, ErrorCode, GraphError, Primitive};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 

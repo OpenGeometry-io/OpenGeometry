@@ -1,7 +1,6 @@
 use super::{changed, serialise, OGWorldGraph};
 use crate::bindings::{errors, params};
-use crate::operations::ModifyingOperation;
-use crate::world_graph::{EditScope, Transform};
+use crate::world_graph::{EditScope, ModifyingOperation, Transform};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 

@@ -1,9 +1,10 @@
 #![cfg(not(target_arch = "wasm32"))]
 use opengeometry::brep::Accuracy;
-use opengeometry::operations::CreatingOperation;
 use opengeometry::query::classify_point;
 use opengeometry::tessellation::tessellate;
-use opengeometry::world_graph::{CreateOptions, Primitive, StepOptions, WorldGraph};
+use opengeometry::world_graph::{
+    CreateOptions, CreatingOperation, Primitive, StepOptions, WorldGraph,
+};
 use sha2::{Digest, Sha256};
 
 #[test]
