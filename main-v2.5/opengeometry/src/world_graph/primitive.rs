@@ -1,3 +1,4 @@
+use super::candidate::IdKind;
 use super::change_log::ChangeSet;
 use super::error::{ErrorCode, ErrorContext, GraphError};
 use super::graph::WorldGraph;
@@ -32,6 +33,16 @@ pub struct CreateOptions {
     pub og_id: Option<String>,
     pub parent: Option<String>,
     pub plane: Option<Plane>,
+    pub body_type: Option<BodyType>,
+}
+
+impl Primitive {
+    fn body_type(&self) -> BodyType {
+        match self {
+            Self::Cuboid { .. } | Self::Cylinder { .. } => BodyType::Solid,
+            Self::Rectangle { .. } | Self::Circle { .. } | Self::Polyline { .. } => BodyType::Wire,
+        }
+    }
 }
 
 impl WorldGraph {
@@ -49,6 +60,9 @@ impl WorldGraph {
         primitive: Primitive,
         options: CreateOptions,
     ) -> Result<(String, ChangeSet), GraphError> {
+        let body_type = primitive.body_type();
+        check_body_type(options.body_type, body_type)?;
+        let kind = IdKind::of_body(body_type)?;
         let accuracy = self.accuracy;
         let local = initial_placement(options.plane)?;
         let reserved = self.reserve(1, &[])?;
@@ -59,7 +73,7 @@ impl WorldGraph {
                     return Err(GraphError::code(ErrorCode::UnknownNode, parent));
                 }
             }
-            let id = draft.new_og_id(options.og_id.as_deref())?;
+            let id = draft.new_og_id(options.og_id.as_deref(), kind)?;
             let shape_id = draft.new_shape_id()?;
             if reserved.shape_ids.first() != Some(&shape_id) {
                 return Err(GraphError::code(
@@ -67,10 +81,8 @@ impl WorldGraph {
                     "reserved shape id changed",
                 ));
             }
-            let (brep, edge_keys, expected_type) =
-                build_primitive(shape_id.clone(), primitive, accuracy)?;
-
-            if brep.body_type()? != expected_type {
+            let (brep, edge_keys) = build_primitive(shape_id.clone(), primitive, accuracy)?;
+            if brep.body_type()? != body_type {
                 return Err(GraphError::code(
                     ErrorCode::BodyTypeMismatch,
                     "primitive produced the wrong body type",
@@ -115,9 +127,9 @@ impl WorldGraph {
         let reserved = self.reserve(0, std::slice::from_ref(&shape_id))?;
         let next_revision = reserved.revisions[0].1;
         let accuracy = self.accuracy;
+        let actual_type = primitive.body_type();
         self.mutate(|candidate| {
-            let (mut brep, edge_keys, actual_type) =
-                build_primitive(shape_id.clone(), primitive, accuracy)?;
+            let (mut brep, edge_keys) = build_primitive(shape_id.clone(), primitive, accuracy)?;
             if actual_type != expected_type {
                 return Err(GraphError::code(
                     ErrorCode::BodyTypeMismatch,
@@ -144,7 +156,30 @@ impl WorldGraph {
     }
 }
 
-pub(super) fn initial_placement(plane: Option<Plane>) -> Result<Similarity3, GraphError> {
+pub(super) fn check_body_type(
+    expected: Option<BodyType>,
+    actual: BodyType,
+) -> Result<(), GraphError> {
+    match expected {
+        Some(expected) if expected != actual => Err(GraphError::code(
+            ErrorCode::BodyTypeMismatch,
+            format!("expected {expected:?}, got {actual:?}"),
+        )),
+        _ => Ok(()),
+    }
+}
+
+pub(super) fn check_no_plane(plane: Option<Plane>) -> Result<(), GraphError> {
+    if plane.is_some() {
+        return Err(GraphError::code(
+            ErrorCode::InvalidParameter,
+            "plane applies only to primitives",
+        ));
+    }
+    Ok(())
+}
+
+fn initial_placement(plane: Option<Plane>) -> Result<Similarity3, GraphError> {
     let Some(plane) = plane else {
         return Ok(Similarity3::IDENTITY);
     };
@@ -177,7 +212,7 @@ fn build_primitive(
     shape_id: String,
     primitive: Primitive,
     accuracy: Accuracy,
-) -> Result<(BrepEnvelope, Vec<String>, BodyType), GraphError> {
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
     let result = match primitive {
         Primitive::Cuboid {
             width,
@@ -194,7 +229,6 @@ fn build_primitive(
             (
                 primitives::cuboid(shape_id.clone(), frame, [width, depth, height], accuracy)?,
                 Vec::new(),
-                BodyType::Solid,
             )
         }
         Primitive::Cylinder { radius, height } => {
@@ -203,7 +237,6 @@ fn build_primitive(
             (
                 primitives::cylinder(shape_id.clone(), GROUND, radius, height, accuracy)?,
                 Vec::new(),
-                BodyType::Solid,
             )
         }
         Primitive::Rectangle { width, breadth } => {
@@ -216,7 +249,7 @@ fn build_primitive(
                 breadth,
                 accuracy,
             )?;
-            (brep, keys, BodyType::Wire)
+            (brep, keys)
         }
         Primitive::Circle { radius } => {
             required_size(radius, accuracy.geometric, "radius")?;
@@ -232,14 +265,13 @@ fn build_primitive(
                     accuracy,
                 )?,
                 vec!["edge-0".into()],
-                BodyType::Wire,
             )
         }
         Primitive::Polyline { points, closed } => {
             check_polyline(&points, closed, accuracy)?;
             let (brep, keys) =
                 primitives::polyline_with_keys(shape_id.clone(), &points, closed, accuracy)?;
-            (brep, keys, BodyType::Wire)
+            (brep, keys)
         }
     };
     Ok(result)

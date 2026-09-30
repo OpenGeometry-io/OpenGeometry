@@ -9,7 +9,7 @@ import type { SystemAssembly } from './system-assembly.js';
 
 export class Wire extends Body {
   constructor(kind: string, params: Record<string, unknown>, options: BodyOptions = {}) {
-    super(createBody(kind, params, options), 'Wire', options);
+    super(createBody(kind, params, options, 'Wire'), 'Wire', options);
     if (this.lastInfo.bodyType !== 'Wire') throw new OGError('BodyTypeMismatch', 'Wire.constructor', 'expected Wire');
   }
   instance(options: { ogId?: string; parent?: SystemAssembly } = {}): Wire {

@@ -45,7 +45,7 @@ impl WorldGraph {
             next_shape_id: self.shapes.next_id,
             next_handle: self.next_handle,
             next_generation: self.next_generation,
-            next_og_id: self.next_og_id,
+            next_og_ids: self.next_og_ids,
             affected: BTreeSet::new(),
         }
     }
@@ -114,7 +114,7 @@ impl WorldGraph {
         self.shapes.next_id = draft.next_shape_id;
         self.next_handle = draft.next_handle;
         self.next_generation = draft.next_generation;
-        self.next_og_id = draft.next_og_id;
+        self.next_og_ids = draft.next_og_ids;
         self.revision = revision;
         self.world_cache
             .borrow_mut()

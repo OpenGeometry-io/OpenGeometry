@@ -1,7 +1,8 @@
 use super::error::GeometryError;
 use super::topology::BrepEnvelope;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BodyType {
     Wire,
     Sheet,
