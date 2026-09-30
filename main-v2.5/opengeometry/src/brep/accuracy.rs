@@ -10,6 +10,13 @@ pub struct Accuracy {
     pub exchange: f64,
 }
 impl Accuracy {
+    pub const STANDARD: Accuracy = Accuracy {
+        geometric: 1e-8,
+        intersection: 1e-9,
+        tessellation: 0.01,
+        exchange: 1e-6,
+    };
+
     pub(crate) fn validate(self) -> Result<(), GeometryError> {
         for value in [
             self.geometric,

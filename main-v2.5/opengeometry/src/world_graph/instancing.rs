@@ -112,7 +112,7 @@ impl WorldGraph {
                     revision: 0,
                     users: 1,
                     edge_keys: old_shape.edge_keys,
-                    report: old_shape.report,
+                    report: None,
                 },
             );
             draft.add_node(&id, handle, &parent, local, Some(shape_id), original.kind);
@@ -154,7 +154,7 @@ impl WorldGraph {
                     revision: 0,
                     users: 1,
                     edge_keys: old_shape.edge_keys,
-                    report: old_shape.report,
+                    report: None,
                 },
             );
             draft

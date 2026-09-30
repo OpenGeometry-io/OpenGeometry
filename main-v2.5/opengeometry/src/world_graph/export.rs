@@ -208,9 +208,12 @@ impl WorldGraph {
             } else {
                 placed(&shape.brep, placement.frame, placement.scale).map_err(
                     |error| match error {
-                        GeometryError::LimitExceeded(message) => GraphError::code(
+                        GeometryError::LimitExceeded(message) => GraphError::with_details(
                             ErrorCode::LimitExceeded,
                             format!("{og_id}: {message}"),
+                            ErrorDetails::Export {
+                                og_id: og_id.clone(),
+                            },
                         ),
                         other => GraphError::Geometry(other),
                     },

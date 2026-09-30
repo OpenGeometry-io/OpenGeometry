@@ -2,6 +2,7 @@ use crate::math::{Interval, Point3};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PatchBounds {
     pub axes: [Interval; 3],
 }

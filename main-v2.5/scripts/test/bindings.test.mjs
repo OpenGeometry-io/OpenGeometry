@@ -45,6 +45,10 @@ assert.throws(
   () => GRAPH.createPrimitive(ENCODE({ kind: 'Polyline', points: [[0, 0, 0], [1, 0, 0]], closed: false }), '{}'),
   (error) => JSON.parse(String(error)).code === 'InvalidParameter',
 );
+assert.throws(
+  () => new OGWorldGraph(JSON.stringify({ ...ACCURACY, tessellation: 0.1 })),
+  (error) => JSON.parse(String(error)).code === 'InvalidParameter',
+);
 
 const SNAPSHOT = GRAPH.snapshot(INFO.shapeId);
 assert(SNAPSHOT instanceof Uint8Array);

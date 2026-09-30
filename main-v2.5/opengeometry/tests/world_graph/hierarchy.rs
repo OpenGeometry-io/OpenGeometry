@@ -1,5 +1,7 @@
 use super::support::{box_primitive, copy_named, near};
-use opengeometry::world_graph::{CreateOptions, EditScope, ErrorCode, Primitive, Transform};
+use opengeometry::world_graph::{
+    CreateOptions, EditScope, ErrorCode, ModifyingOperation, Primitive, Transform,
+};
 use opengeometry_test_support::world_graph::{graph, named};
 use std::sync::Arc;
 
@@ -49,6 +51,39 @@ fn instances_share_one_immutable_shape_and_duplicates_do_not() {
     assert_eq!(world.instance_count("body").unwrap(), 1);
     assert_eq!(world.shape_count(), 3);
     assert!(world.make_unique("body").unwrap().is_none());
+}
+
+#[test]
+fn copies_of_an_operated_body_carry_no_report() {
+    let mut world = graph();
+    world
+        .create_primitive(box_primitive(), named("body"))
+        .unwrap();
+    world
+        .create_primitive(box_primitive(), named("tool"))
+        .unwrap();
+    world
+        .transform(
+            "tool",
+            Transform::Translate {
+                offset: [1.0, 0.0, 0.0],
+            },
+        )
+        .unwrap();
+    world
+        .operate(
+            "body",
+            ModifyingOperation::Subtract,
+            &["tool".into()],
+            EditScope::Node,
+        )
+        .unwrap();
+    world.duplicate("body", copy_named("duplicate")).unwrap();
+    world.instance("body", copy_named("instance")).unwrap();
+    world.make_unique("instance").unwrap().unwrap();
+    assert!(world.report("body").unwrap().is_some());
+    assert!(world.report("duplicate").unwrap().is_none());
+    assert!(world.report("instance").unwrap().is_none());
 }
 
 #[test]

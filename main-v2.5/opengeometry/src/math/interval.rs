@@ -2,6 +2,7 @@ use super::error::{finite, MathError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Interval {
     pub lo: f64,
     pub hi: f64,
