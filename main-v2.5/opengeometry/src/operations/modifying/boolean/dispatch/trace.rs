@@ -2,7 +2,7 @@ use super::handler_id::HandlerId;
 use crate::brep::GeometryError;
 use crate::operations::modifying::boolean::types::BooleanResult;
 
-pub(super) fn record_handler(
+pub(crate) fn record_handler(
     handlers: &mut Vec<String>,
     name: HandlerId,
     call: impl FnOnce() -> Result<BooleanResult, GeometryError>,

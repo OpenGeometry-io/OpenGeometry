@@ -1,7 +1,7 @@
 mod prismatic_profile;
 
 use super::assembly::{analytic_face_mappings, append_analytic_input};
-use super::dispatch::{boolean_brep_with_handlers, HandlerId};
+use super::dispatch::{boolean_brep_with_handlers, record_handler, HandlerId};
 use super::handlers::{boolean_rectilinear, subtract_vertical_arc_extrusion_batch};
 use super::operands::{all_planar, full_cylinder, unique_sources};
 use super::types::{BooleanOp, BooleanResult};
@@ -41,7 +41,20 @@ fn subtract_planar_cutters_inner(
     id: String,
     handlers: &mut Vec<String>,
 ) -> Result<BooleanResult, GeometryError> {
-    handlers.push(HandlerId::SubtractPlanarCutters.as_str().into());
+    let mut nested = Vec::new();
+    let result = record_handler(handlers, HandlerId::SubtractPlanarCutters, || {
+        planar_cutters_boolean(host, cutters, id, &mut nested)
+    })?;
+    handlers.append(&mut nested);
+    Ok(result)
+}
+
+fn planar_cutters_boolean(
+    host: &BrepEnvelope,
+    cutters: &[BrepEnvelope],
+    id: String,
+    handlers: &mut Vec<String>,
+) -> Result<BooleanResult, GeometryError> {
     if cutters.is_empty() || cutters.len() > 100 {
         return Err(GeometryError::InvalidGeometry(
             "planar batch subtraction requires between one and 100 cutters".into(),
