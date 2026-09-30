@@ -89,6 +89,51 @@
         "tools/snapshot/src/batch.rs:144"
       ],
       "reason": "the wide-opening sector cutter of the batch scenes, built against main's kernel types (batch-matrix oracle) and 2.5's (snapshot); the crates link different kernels, so no shared home"
+    },
+    {
+      "sha256": "f9fbe560b6c961a305d84307b825f6df436caa380809a474682dc476a61fc5a1",
+      "count": 2,
+      "members": [
+        "opengeometry/test-support/src/canonical.rs:17",
+        "tools/parity-oracle/src/canonical.rs:90"
+      ],
+      "reason": "the canonical tessellation form (canonical_vertices) over main's mesh type (parity oracle) and 2.5's (test-support); the crates link different kernels, so no shared home"
+    },
+    {
+      "sha256": "c576717bc95739276f43b865c169de43ef62d8b572185593ea3cfa3953524856",
+      "count": 2,
+      "members": [
+        "opengeometry/test-support/src/canonical.rs:26",
+        "tools/parity-oracle/src/canonical.rs:99"
+      ],
+      "reason": "the canonical tessellation form (canonical_triangles) over main's mesh type (parity oracle) and 2.5's (test-support); the crates link different kernels, so no shared home"
+    },
+    {
+      "sha256": "14855b3265a75c73ce33c9ebfb39fc3bbcd64b7ad635556a7ccac05e14b0b5b7",
+      "count": 2,
+      "members": [
+        "opengeometry/test-support/src/canonical.rs:48",
+        "tools/parity-oracle/src/canonical.rs:121"
+      ],
+      "reason": "the canonical tessellation form (canonical_outlines) over main's mesh type (parity oracle) and 2.5's (test-support); the crates link different kernels, so no shared home"
+    },
+    {
+      "sha256": "1390775ebaa965dcee1984b26b358e4c4abb7a2845d48f1fa5dc060ae992e681",
+      "count": 2,
+      "members": [
+        "opengeometry/test-support/src/canonical.rs:5",
+        "tools/parity-oracle/src/canonical.rs:79"
+      ],
+      "reason": "the canonical tessellation form (canonical_tessellation) over main's mesh type (parity oracle) and 2.5's (test-support); the crates link different kernels, so no shared home"
+    },
+    {
+      "sha256": "e23a79fefb8f868ff682b1a86464c141f1c1af215711a39682085e716c9b3df7",
+      "count": 2,
+      "members": [
+        "opengeometry/test-support/src/canonical.rs:74",
+        "tools/parity-oracle/src/canonical.rs:147"
+      ],
+      "reason": "the canonical tessellation form (vertex) over main's mesh type (parity oracle) and 2.5's (test-support); the crates link different kernels, so no shared home"
     }
   ]
 }

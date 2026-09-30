@@ -1,5 +1,6 @@
 mod batch;
 mod builders;
+mod canonical;
 mod compare;
 mod matrix;
 mod validity;
@@ -7,6 +8,7 @@ mod write;
 
 use crate::batch::write_batch_matrix;
 use crate::builders::{arc_hole, arc_outer, fixture_parameters};
+use crate::canonical::write_canonical_tessellations;
 use crate::compare::write_fixture;
 use crate::matrix::write_boolean_matrix;
 use crate::validity::{write_validity, write_validity_case};
@@ -68,6 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     write_validity(&output, frame, accuracy)?;
     write_batch_matrix(&output, frame, accuracy)?;
     write_boolean_matrix(&output, frame, accuracy)?;
+    write_canonical_tessellations(&output)?;
     fs::write(output.join("CORPUS.md"), corpus)?;
     Ok(())
 }
