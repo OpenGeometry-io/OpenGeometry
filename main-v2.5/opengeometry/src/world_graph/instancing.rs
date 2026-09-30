@@ -48,6 +48,7 @@ impl WorldGraph {
                 GraphError::code(ErrorCode::LimitExceeded, "instance count overflow")
             })?;
             draft.add_node(&id, handle, &parent, local, Some(shape_id), original.kind);
+            copy_place_input(draft, &id, &original);
             created = Some(id);
             Ok(())
         })?;
@@ -106,6 +107,7 @@ impl WorldGraph {
                 },
             );
             draft.add_node(&id, handle, &parent, local, Some(shape_id), original.kind);
+            copy_place_input(draft, &id, &original);
             created = Some(id);
             Ok(())
         })?;
@@ -195,4 +197,10 @@ fn copy_placement(
         GraphError::code(ErrorCode::InvalidTransform, format!("{message}: {error}"))
     })?;
     Ok((parent, local))
+}
+
+fn copy_place_input(draft: &mut Candidate, id: &str, original: &Node) {
+    if let Some(node) = draft.nodes.get_mut(id) {
+        node.place_input = original.place_input;
+    }
 }

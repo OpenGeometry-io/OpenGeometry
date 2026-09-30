@@ -52,20 +52,27 @@ impl Similarity3 {
         angle: f64,
         scale_factor: f64,
     ) -> Result<Self, GeometryError> {
-        checked(origin)?;
         if !angle.is_finite() {
             return Err(GeometryError::InvalidGeometry(
                 "rotation angle must be finite".into(),
             ));
         }
+        Self::from_axis_cos_sin(origin, axis, angle.cos(), angle.sin(), scale_factor)
+    }
+
+    pub(crate) fn from_axis_cos_sin(
+        origin: Point3,
+        axis: Point3,
+        cos: f64,
+        sin: f64,
+        scale_factor: f64,
+    ) -> Result<Self, GeometryError> {
+        checked(origin)?;
         let axis = unit(axis)?;
         let rotate = |vector: Point3| {
             add(
-                add(
-                    scale(vector, angle.cos()),
-                    scale(cross(axis, vector), angle.sin()),
-                ),
-                scale(axis, dot(axis, vector) * (1.0 - angle.cos())),
+                add(scale(vector, cos), scale(cross(axis, vector), sin)),
+                scale(axis, dot(axis, vector) * (1.0 - cos)),
             )
         };
         let result = Self {

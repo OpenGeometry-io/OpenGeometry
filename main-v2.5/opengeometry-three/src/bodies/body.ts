@@ -156,7 +156,7 @@ export abstract class Body extends THREE.Group {
     return JSON.parse(call(`${this.bodyType}.getPlacement`, () => worldGraph().placement(this.ogId)));
   }
 
-  getWorldPlacement() {
+  getWorldPlacement(): Placement {
     this.check();
     return JSON.parse(call(`${this.bodyType}.getWorldPlacement`, () => worldGraph().worldPlacement(this.ogId)));
   }

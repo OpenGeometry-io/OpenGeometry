@@ -2,7 +2,7 @@
   "returnTypeNames": {
     "owner": "C2",
     "reason": "These public members return JSON.parse results typed any, so any explicit return type other than any changes the API surface. C2 gives kernel payloads DTO types.",
-    "names": ["exportStep", "getBrep", "getReport", "getWorldPlacement", "markStats"]
+    "names": ["exportStep", "getBrep", "getReport", "markStats"]
   },
   "exceptions": [
     {

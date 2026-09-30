@@ -1,5 +1,6 @@
 use super::shape_store::ShapeId;
 use crate::brep::Similarity3;
+use crate::math::Point3;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -24,6 +25,15 @@ pub struct Node {
     pub local: Similarity3,
     pub shape: Option<ShapeId>,
     pub(crate) kind: NodeKind,
+    pub(crate) place_input: Option<PlaceInput>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct PlaceInput {
+    pub(crate) origin: Point3,
+    pub(crate) x_direction: Point3,
+    pub(crate) normal: Point3,
+    pub(crate) scale: f64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
