@@ -16,15 +16,19 @@ declare module 'node:fs' {
 }
 
 declare module 'node:child_process' {
-  export interface SpawnSyncResult {
-    status: number | null;
-    error?: Error;
+  export interface ChildProcess {
+    on(event: 'close', listener: (code: number | null) => void): ChildProcess;
+    on(event: 'error', listener: (error: Error) => void): ChildProcess;
   }
-  export function spawnSync(
+  export function spawn(
     command: string,
     args: string[],
     options: { cwd: string; env: Record<string, string | undefined>; stdio: ['ignore', number, number] },
-  ): SpawnSyncResult;
+  ): ChildProcess;
+}
+
+declare module 'node:test' {
+  export function test(name: string, body: () => void | Promise<void>): Promise<void>;
 }
 
 declare module 'node:fs/promises' {
@@ -86,9 +90,10 @@ declare const process: {
   argv: string[];
   arch: string;
   platform: string;
-  env: { OG_THREE_VERSION?: string };
+  env: { OG_THREE_VERSION?: string; OG_PW_PORT_BASE?: string };
   exitCode: number | undefined;
   stdout: { write(text: string): boolean };
+  stderr: { write(text: string): boolean };
 };
 
 interface ImportMeta {

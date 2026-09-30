@@ -4,6 +4,7 @@ const ROOT = decodeURIComponent(new URL('.', import.meta.url).pathname);
 
 export default defineConfig({
   root: ROOT,
+  cacheDir: `../../node_modules/.vite/examples-three-${process.env.OG_THREE_VERSION ?? '168'}`,
   ...(process.env.OG_THREE_VERSION === '184' ? { resolve: { alias: { three: 'three-184' } } } : {}),
   publicDir: decodeURIComponent(new URL('../../dist', import.meta.url).pathname),
   build: {
