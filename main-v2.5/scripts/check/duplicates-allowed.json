@@ -95,7 +95,7 @@
       "count": 2,
       "members": [
         "opengeometry/test-support/src/canonical.rs:17",
-        "tools/parity-oracle/src/canonical.rs:90"
+        "tools/parity-oracle/src/canonical.rs:91"
       ],
       "reason": "the canonical tessellation form (canonical_vertices) over main's mesh type (parity oracle) and 2.5's (test-support); the crates link different kernels, so no shared home"
     },
@@ -104,7 +104,7 @@
       "count": 2,
       "members": [
         "opengeometry/test-support/src/canonical.rs:26",
-        "tools/parity-oracle/src/canonical.rs:99"
+        "tools/parity-oracle/src/canonical.rs:100"
       ],
       "reason": "the canonical tessellation form (canonical_triangles) over main's mesh type (parity oracle) and 2.5's (test-support); the crates link different kernels, so no shared home"
     },
@@ -113,7 +113,7 @@
       "count": 2,
       "members": [
         "opengeometry/test-support/src/canonical.rs:48",
-        "tools/parity-oracle/src/canonical.rs:121"
+        "tools/parity-oracle/src/canonical.rs:122"
       ],
       "reason": "the canonical tessellation form (canonical_outlines) over main's mesh type (parity oracle) and 2.5's (test-support); the crates link different kernels, so no shared home"
     },
@@ -131,7 +131,7 @@
       "count": 2,
       "members": [
         "opengeometry/test-support/src/canonical.rs:74",
-        "tools/parity-oracle/src/canonical.rs:147"
+        "tools/parity-oracle/src/canonical.rs:148"
       ],
       "reason": "the canonical tessellation form (vertex) over main's mesh type (parity oracle) and 2.5's (test-support); the crates link different kernels, so no shared home"
     }
