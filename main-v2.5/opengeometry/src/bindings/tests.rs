@@ -1,8 +1,11 @@
 use super::errors::dto;
-use crate::brep::GeometryError;
+use crate::brep::{Accuracy, GeometryError};
 use crate::math::MathError;
-use crate::world_graph::{ErrorCode, ErrorDetails, GraphError};
-use serde_json::json;
+use crate::world_graph::{
+    CopyOptions, CreateOptions, ErrorCode, ErrorDetails, GraphError, Plane, Primitive, StepOptions,
+    Transform, WorldGraph,
+};
+use serde_json::{json, Value};
 
 fn rendered(error: GraphError) -> String {
     serde_json::to_value(dto(error)).unwrap().to_string()
@@ -113,4 +116,103 @@ fn dto_renders_coverage_gap_errors_byte_identical_to_the_untyped_form() {
         rendered(error),
         r#"{"code":"CoverageGap","details":{"families":["plane","torus"]},"message":"CoverageGap { families: [\"plane\", \"torus\"] }"}"#
     );
+}
+
+fn assert_camel_case_keys(value: &Value) {
+    match value {
+        Value::Object(map) => {
+            for (key, inner) in map {
+                let mut bytes = key.bytes();
+                let first = bytes.next().unwrap_or(b'_');
+                assert!(
+                    first.is_ascii_lowercase() && bytes.all(|byte| byte.is_ascii_alphanumeric()),
+                    "{key} in {value}"
+                );
+                assert_camel_case_keys(inner);
+            }
+        }
+        Value::Array(items) => items.iter().for_each(assert_camel_case_keys),
+        _ => {}
+    }
+}
+
+#[test]
+fn bindings_payloads_are_camel_case() {
+    let accuracy = Accuracy {
+        geometric: 1e-8,
+        intersection: 1e-9,
+        tessellation: 0.01,
+        exchange: 1e-6,
+    };
+    let mut graph = WorldGraph::new(accuracy).unwrap();
+    let created = graph
+        .create_primitive(
+            Primitive::Cuboid {
+                width: 1.0,
+                height: 1.0,
+                depth: 1.0,
+            },
+            CreateOptions {
+                og_id: Some("cube".into()),
+                ..CreateOptions::default()
+            },
+        )
+        .unwrap();
+    let plane = Plane {
+        origin: Some([0.0; 3]),
+        normal: Some([0.0, 0.0, 1.0]),
+        x_direction: Some([1.0, 0.0, 0.0]),
+    };
+    let error = GraphError::Code {
+        code: ErrorCode::InvalidOperand,
+        message: "bad tool".into(),
+        details: ErrorDetails::Operate {
+            handlers: vec!["box".into()],
+            tool_index: 0,
+            og_ids: vec!["cube".into()],
+        },
+    };
+    let payloads = [
+        serde_json::to_value(&created).unwrap(),
+        serde_json::to_value(graph.placement("cube").unwrap()).unwrap(),
+        serde_json::to_value(Transform::Place {
+            origin: Some([0.0; 3]),
+            x_direction: Some([1.0, 0.0, 0.0]),
+            normal: Some([0.0, 0.0, 1.0]),
+            scale: Some(1.0),
+        })
+        .unwrap(),
+        serde_json::to_value(plane).unwrap(),
+        serde_json::to_value(CreateOptions {
+            og_id: Some("cube".into()),
+            parent: Some("root".into()),
+            plane: Some(plane),
+        })
+        .unwrap(),
+        serde_json::to_value(CopyOptions {
+            og_id: Some("copy".into()),
+            parent: Some(Some("root".into())),
+        })
+        .unwrap(),
+        serde_json::to_value(StepOptions::default()).unwrap(),
+        serde_json::to_value(accuracy).unwrap(),
+        serde_json::to_value(dto(error)).unwrap(),
+    ];
+    for payload in &payloads {
+        assert_camel_case_keys(payload);
+    }
+}
+
+#[test]
+fn place_accepts_camel_case_x_direction_and_rejects_snake_case() {
+    assert!(serde_json::from_str::<Transform>(r#"{"kind":"Place","xDirection":[1,0,0]}"#).is_ok());
+    assert!(
+        serde_json::from_str::<Transform>(r#"{"kind":"Place","x_direction":[1,0,0]}"#).is_err()
+    );
+    assert!(serde_json::from_str::<CreateOptions>(r#"{"ogId":"a"}"#).is_ok());
+    assert!(serde_json::from_str::<CopyOptions>(r#"{"ogId":"a"}"#).is_ok());
+    assert!(serde_json::from_str::<CreateOptions>(r#"{"og_id":"a"}"#).is_err());
+    assert!(serde_json::from_str::<CopyOptions>(r#"{"og_id":"a"}"#).is_err());
+    assert!(serde_json::from_str::<Plane>(r#"{"xDirection":[1,0,0]}"#).is_ok());
+    assert!(serde_json::from_str::<Plane>(r#"{"x_direction":[1,0,0]}"#).is_err());
 }
