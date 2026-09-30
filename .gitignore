@@ -34,6 +34,7 @@ main-v2.5/opengeometry-three/examples-dist/
 main-v2.5/**/target/
 main-v2.5/test-results/
 main-v2.5/playwright-report/
+main-v2.5/.check/
 !main-v2.5/opengeometry/Cargo.lock
 !main-v2.5/tools/parity-oracle/**/Cargo.lock
 !main-v2.5/tools/snapshot/Cargo.lock
