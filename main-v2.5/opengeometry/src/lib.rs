@@ -1,4 +1,3 @@
-#![allow(non_snake_case)]
 #![cfg_attr(
     not(test),
     deny(

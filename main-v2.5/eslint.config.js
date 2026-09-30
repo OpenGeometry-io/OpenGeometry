@@ -231,9 +231,10 @@ const NAMING = [
   { selector: 'parameter', format: ['camelCase'], leadingUnderscore: 'allow' },
   {
     selector: ['objectLiteralProperty', 'typeProperty'],
-    format: ['camelCase', 'snake_case'],
+    format: ['camelCase'],
     leadingUnderscore: 'allowDouble',
   },
+  { selector: 'objectLiteralProperty', filter: { regex: '^module_or_path$', match: true }, format: null },
   {
     selector: ['objectLiteralProperty', 'typeProperty', 'objectLiteralMethod'],
     modifiers: ['requiresQuotes'],

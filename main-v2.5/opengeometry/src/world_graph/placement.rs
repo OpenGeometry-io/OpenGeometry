@@ -6,7 +6,7 @@ use crate::math::{add, scale, sub, Point3};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Placement {
     pub origin: Point3,
     pub x_direction: Point3,
@@ -15,7 +15,7 @@ pub struct Placement {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-#[serde(tag = "kind", deny_unknown_fields)]
+#[serde(tag = "kind", rename_all_fields = "camelCase", deny_unknown_fields)]
 pub enum Transform {
     Translate {
         offset: Point3,

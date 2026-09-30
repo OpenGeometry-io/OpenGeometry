@@ -12,7 +12,7 @@ export class SystemAssembly {
 
   constructor(options: { ogId?: string; parent?: SystemAssembly } = {}) {
     this.ogId = creation(call('SystemAssembly.constructor', () => worldGraph().createSystemAssembly(
-      encode({ og_id: options.ogId, parent: options.parent?.ogId }),
+      encode({ ogId: options.ogId, parent: options.parent?.ogId }),
     )));
     const info = node(this.ogId);
     this.handle = info.handle;

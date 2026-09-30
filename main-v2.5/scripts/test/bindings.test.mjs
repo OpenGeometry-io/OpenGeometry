@@ -12,13 +12,13 @@ const CAMEL_CASE_KEYS = (value) => {
     value.forEach(CAMEL_CASE_KEYS);
   } else if (value !== null && typeof value === 'object') {
     for (const [key, inner] of Object.entries(value)) {
-      assert.match(key, CAMEL_CASE_KEY);
+      assert(CAMEL_CASE_KEY.test(key), key);
       CAMEL_CASE_KEYS(inner);
     }
   }
 };
 const UNIT_CUBE = { kind: 'Cuboid', width: 1, height: 1, depth: 1 };
-const CUBE = JSON.parse(GRAPH.createPrimitive(ENCODE(UNIT_CUBE), ENCODE({ og_id: 'cube' })));
+const CUBE = JSON.parse(GRAPH.createPrimitive(ENCODE(UNIT_CUBE), ENCODE({ ogId: 'cube' })));
 assert.equal(CUBE.ogId, 'cube');
 CAMEL_CASE_KEYS(CUBE);
 const INFO = JSON.parse(GRAPH.node('cube'));

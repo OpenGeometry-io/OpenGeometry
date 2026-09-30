@@ -2,7 +2,7 @@ use super::shape_store::ShapeId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NodeChange {
     pub og_id: String,
     pub handle: u32,
@@ -12,7 +12,7 @@ pub struct NodeChange {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ChangeSet {
     pub(super) revision: u64,
     pub added: Vec<NodeChange>,
