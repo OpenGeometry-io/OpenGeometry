@@ -7,7 +7,7 @@
         "opengeometry/src/operations/creating/sweep/circle.rs:253",
         "opengeometry/src/operations/creating/sweep/mod.rs:271"
       ],
-      "reason": "sweep line_edge pair: message and seam flag differ; the merge is deferred to the debt note (B5 extended)"
+      "reason": "sweep line_edge pair: messages differ; the merge is deferred to the debt note (B5 extended)"
     },
     {
       "sha256": "faf9fceb832d4487c85d2ec16868b3367b964227d89f7c97eaea891c47986e0d",
