@@ -1,7 +1,6 @@
-use crate::write::write_json;
+use crate::write::{write_json, write_step_files};
 use opengeometry::analytic::{
     booleans::{boolean_brep, BooleanOp},
-    exchange::export_step,
     primitives,
     topology::{Accuracy, BrepEnvelope},
     Frame3,
@@ -373,23 +372,7 @@ fn write_matrix_case(
     );
     let handlers = traced::booleans::take_handler_trace();
     if let Ok(output) = &result {
-        for (unit, suffix) in [("metre", "m"), ("millimetre", "mm")] {
-            match export_step(&output.brep, unit) {
-                Ok((text, report)) => {
-                    fs::write(directory.join(format!("{name}.step.{suffix}")), text)?;
-                    write_json(
-                        directory.join(format!("{name}.step.{suffix}.report.json")),
-                        &serde_json::to_value(report)?,
-                    )?;
-                }
-                Err(error) => {
-                    write_json(
-                        directory.join(format!("{name}.step.{suffix}.error.json")),
-                        &serde_json::to_value(error)?,
-                    )?;
-                }
-            }
-        }
+        write_step_files(directory, name, &output.brep)?;
     }
     let main_value = match result {
         Ok(result) => json!({"brep": serde_json::to_value(result.brep)?}),
