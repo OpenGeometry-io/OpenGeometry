@@ -281,6 +281,10 @@ impl WorldGraph {
         Ok(result)
     }
 
+    pub fn world_placement_form(&self, og_id: &str) -> Result<Placement, GraphError> {
+        Ok(placement_form(self.world_placement(og_id)?))
+    }
+
     pub fn world_matrix(&self, og_id: &str) -> Result<[f64; 16], GraphError> {
         Ok(self.world_placement(og_id)?.to_column_major())
     }

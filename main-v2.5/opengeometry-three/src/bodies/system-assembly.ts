@@ -31,7 +31,7 @@ export class SystemAssembly {
     return JSON.parse(call('SystemAssembly.getPlacement', () => worldGraph().placement(this.ogId)));
   }
 
-  getWorldPlacement() {
+  getWorldPlacement(): Placement {
     this.check();
     return JSON.parse(call('SystemAssembly.getWorldPlacement', () => worldGraph().worldPlacement(this.ogId)));
   }

@@ -41,7 +41,12 @@ impl OGWorldGraph {
 
     #[wasm_bindgen(js_name = worldPlacement)]
     pub fn world_placement(&self, og_id: &str) -> Result<String, JsValue> {
-        serialise(&self.inner.world_placement(og_id).map_err(errors::json)?)
+        serialise(
+            &self
+                .inner
+                .world_placement_form(og_id)
+                .map_err(errors::json)?,
+        )
     }
 
     #[wasm_bindgen(js_name = worldMatrix)]
