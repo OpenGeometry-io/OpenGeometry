@@ -8837,164 +8837,170 @@ pub fn subtract_planar_cutters(
     cutters: &[BrepEnvelope],
     id: String,
 ) -> Result<BooleanResult, GeometryError> {
-    if cutters.is_empty() || cutters.len() > 100 {
-        return Err(GeometryError::InvalidGeometry(
-            "planar batch subtraction requires between one and 100 cutters".into(),
-        ));
-    }
-    if cutters.len() == 1 {
-        return boolean_brep(host, &cutters[0], BooleanOp::Subtraction, id);
-    }
-    let mut accuracy = host.accuracy;
-    let mut bounds = Vec::with_capacity(cutters.len());
-    for cutter in cutters {
-        cutter.validate()?;
-        accuracy.geometric = accuracy.geometric.max(cutter.accuracy.geometric);
-        accuracy.intersection = accuracy.intersection.max(cutter.accuracy.intersection);
-        accuracy.tessellation = accuracy.tessellation.max(cutter.accuracy.tessellation);
-        accuracy.exchange = accuracy.exchange.max(cutter.accuracy.exchange);
-        bounds.push(
-            cutter.bounds()?.ok_or_else(|| {
+    traced("subtract_planar_cutters", || {
+        if cutters.is_empty() || cutters.len() > 100 {
+            return Err(GeometryError::InvalidGeometry(
+                "planar batch subtraction requires between one and 100 cutters".into(),
+            ));
+        }
+        if cutters.len() == 1 {
+            return boolean_brep(host, &cutters[0], BooleanOp::Subtraction, id);
+        }
+        let mut accuracy = host.accuracy;
+        let mut bounds = Vec::with_capacity(cutters.len());
+        for cutter in cutters {
+            cutter.validate()?;
+            accuracy.geometric = accuracy.geometric.max(cutter.accuracy.geometric);
+            accuracy.intersection = accuracy.intersection.max(cutter.accuracy.intersection);
+            accuracy.tessellation = accuracy.tessellation.max(cutter.accuracy.tessellation);
+            accuracy.exchange = accuracy.exchange.max(cutter.accuracy.exchange);
+            bounds.push(cutter.bounds()?.ok_or_else(|| {
                 GeometryError::InvalidGeometry("planar cutter has no bounds".into())
-            })?,
-        );
-    }
-    let planar = cutters
-        .iter()
-        .filter(|cutter| {
-            cutter
-                .geometry
-                .surfaces
-                .iter()
-                .all(|surface| matches!(surface, SurfaceGeometry::Plane { .. }))
-        })
-        .collect::<Vec<_>>();
-    let cylinders = if planar.len() == cutters.len() {
-        Vec::new()
-    } else {
-        cutters
+            })?);
+        }
+        let planar = cutters
             .iter()
-            .filter(|cutter| full_cylinder(cutter).is_ok())
-            .collect::<Vec<_>>()
-    };
-    if !cylinders.is_empty() && planar.len() + cylinders.len() == cutters.len() {
-        if let Some(result) = subtract_prismatic_profile_batch(host, cutters, id.clone())? {
+            .filter(|cutter| {
+                cutter
+                    .geometry
+                    .surfaces
+                    .iter()
+                    .all(|surface| matches!(surface, SurfaceGeometry::Plane { .. }))
+            })
+            .collect::<Vec<_>>();
+        let cylinders = if planar.len() == cutters.len() {
+            Vec::new()
+        } else {
+            cutters
+                .iter()
+                .filter(|cutter| full_cylinder(cutter).is_ok())
+                .collect::<Vec<_>>()
+        };
+        if !cylinders.is_empty() && planar.len() + cylinders.len() == cutters.len() {
+            if let Some(result) = traced_optional("subtract_prismatic_profile_batch", || {
+                subtract_prismatic_profile_batch(host, cutters, id.clone())
+            })? {
+                return Ok(result);
+            }
+        }
+        if !planar.is_empty()
+            && !cylinders.is_empty()
+            && planar.len() + cylinders.len() == cutters.len()
+        {
+            let planar_cutters = planar.into_iter().cloned().collect::<Vec<_>>();
+            let mut result = subtract_planar_cutters(host, &planar_cutters, format!("{id}:planar"))
+                .map_err(|error| match error {
+                    GeometryError::CoverageGap { .. } => GeometryError::CoverageGap {
+                        families: ["mixed cutter batch".into(), "planar stage".into()],
+                    },
+                    other => other,
+                })?;
+            let count = cylinders.len();
+            for (index, cylinder) in cylinders.into_iter().enumerate() {
+                let prior = result;
+                let mut next = boolean_brep(
+                    &prior.brep,
+                    cylinder,
+                    BooleanOp::Subtraction,
+                    if index + 1 == count {
+                        id.clone()
+                    } else {
+                        format!("{id}:round-{index}")
+                    },
+                )
+                .map_err(|error| match error {
+                    GeometryError::CoverageGap { .. } => GeometryError::CoverageGap {
+                        families: ["mixed cutter batch".into(), "cylindrical stage".into()],
+                    },
+                    other => other,
+                })?;
+
+                for face in &mut next.brep.topology.faces {
+                    let mut lineage = Vec::new();
+                    for source in std::mem::take(&mut face.provenance.sources) {
+                        if source.entity == prior.brep.id && source.body == prior.brep.id {
+                            let previous = prior
+                                .brep
+                                .topology
+                                .faces
+                                .get(source.face as usize)
+                                .ok_or_else(|| {
+                                    GeometryError::InvalidTopology(
+                                        "mixed cut source face is missing".into(),
+                                    )
+                                })?;
+                            if previous.provenance.sources.is_empty() {
+                                lineage.push(source);
+                            } else {
+                                lineage.extend(previous.provenance.sources.iter().cloned());
+                            }
+                        } else {
+                            lineage.push(source);
+                        }
+                    }
+                    face.provenance.sources = unique_sources(lineage);
+                }
+                next.brep.validate()?;
+                result = next;
+            }
+            result.report.face_mappings =
+                analytic_face_mappings(&result.brep, std::iter::once(host).chain(cutters.iter()));
             return Ok(result);
         }
-    }
-    if !planar.is_empty()
-        && !cylinders.is_empty()
-        && planar.len() + cylinders.len() == cutters.len()
-    {
-        let planar_cutters = planar.into_iter().cloned().collect::<Vec<_>>();
-        let mut result = subtract_planar_cutters(host, &planar_cutters, format!("{id}:planar"))
-            .map_err(|error| match error {
-                GeometryError::CoverageGap { .. } => GeometryError::CoverageGap {
-                    families: ["mixed cutter batch".into(), "planar stage".into()],
-                },
-                other => other,
-            })?;
-        let count = cylinders.len();
-        for (index, cylinder) in cylinders.into_iter().enumerate() {
-            let prior = result;
-            let mut next = boolean_brep(
-                &prior.brep,
-                cylinder,
-                BooleanOp::Subtraction,
-                if index + 1 == count {
-                    id.clone()
-                } else {
-                    format!("{id}:round-{index}")
-                },
-            )
-            .map_err(|error| match error {
-                GeometryError::CoverageGap { .. } => GeometryError::CoverageGap {
-                    families: ["mixed cutter batch".into(), "cylindrical stage".into()],
-                },
-                other => other,
-            })?;
-
-            for face in &mut next.brep.topology.faces {
-                let mut lineage = Vec::new();
-                for source in std::mem::take(&mut face.provenance.sources) {
-                    if source.entity == prior.brep.id && source.body == prior.brep.id {
-                        let previous = prior
-                            .brep
-                            .topology
-                            .faces
-                            .get(source.face as usize)
-                            .ok_or_else(|| {
-                                GeometryError::InvalidTopology(
-                                    "mixed cut source face is missing".into(),
-                                )
-                            })?;
-                        if previous.provenance.sources.is_empty() {
-                            lineage.push(source);
-                        } else {
-                            lineage.extend(previous.provenance.sources.iter().cloned());
-                        }
-                    } else {
-                        lineage.push(source);
-                    }
-                }
-                face.provenance.sources = unique_sources(lineage);
-            }
-            next.brep.validate()?;
-            result = next;
-        }
-        result.report.face_mappings =
-            analytic_face_mappings(&result.brep, std::iter::once(host).chain(cutters.iter()));
-        return Ok(result);
-    }
-    if host
-        .geometry
-        .surfaces
-        .iter()
-        .any(|surface| matches!(surface, SurfaceGeometry::Cylinder { .. }))
-        && cutters.iter().all(|cutter| {
-            cutter
-                .geometry
-                .surfaces
-                .iter()
-                .all(|surface| matches!(surface, SurfaceGeometry::Plane { .. }))
-        })
-    {
-        match super::curved_layered_boolean::subtract_vertical_arc_extrusion_batch(
-            host,
-            &cutters.iter().collect::<Vec<_>>(),
-            id.clone(),
-        ) {
-            Ok(result) => return Ok(result),
-            Err(GeometryError::CoverageGap { .. }) => {}
-            Err(error) => return Err(error),
-        }
-    }
-    for first in 0..cutters.len() {
-        for second in first + 1..cutters.len() {
-            if (0..3).all(|axis| {
-                bounds[first].axes[axis]
-                    .hi
-                    .min(bounds[second].axes[axis].hi)
-                    - bounds[first].axes[axis]
-                        .lo
-                        .max(bounds[second].axes[axis].lo)
-                    > 4.0 * accuracy.geometric
+        if host
+            .geometry
+            .surfaces
+            .iter()
+            .any(|surface| matches!(surface, SurfaceGeometry::Cylinder { .. }))
+            && cutters.iter().all(|cutter| {
+                cutter
+                    .geometry
+                    .surfaces
+                    .iter()
+                    .all(|surface| matches!(surface, SurfaceGeometry::Plane { .. }))
+            })
+        {
+            match traced("subtract_vertical_arc_extrusion_batch", || {
+                super::curved_layered_boolean::subtract_vertical_arc_extrusion_batch(
+                    host,
+                    &cutters.iter().collect::<Vec<_>>(),
+                    id.clone(),
+                )
             }) {
-                return Err(GeometryError::CoverageGap {
-                    families: [
-                        "overlapping planar batch cutters".into(),
-                        "overlapping planar batch cutters".into(),
-                    ],
-                });
+                Ok(result) => return Ok(result),
+                Err(GeometryError::CoverageGap { .. }) => {}
+                Err(error) => return Err(error),
             }
         }
-    }
-    let mut combined = BrepEnvelope::new(format!("{id}:cutters"), accuracy)?;
-    for cutter in cutters {
-        append_analytic_input(&mut combined, cutter)?;
-    }
-    combined.validate()?;
-    super::box_booleans::boolean_rectilinear(host, &combined, BooleanOp::Subtraction, id)
+        for first in 0..cutters.len() {
+            for second in first + 1..cutters.len() {
+                if (0..3).all(|axis| {
+                    bounds[first].axes[axis]
+                        .hi
+                        .min(bounds[second].axes[axis].hi)
+                        - bounds[first].axes[axis]
+                            .lo
+                            .max(bounds[second].axes[axis].lo)
+                        > 4.0 * accuracy.geometric
+                }) {
+                    return Err(GeometryError::CoverageGap {
+                        families: [
+                            "overlapping planar batch cutters".into(),
+                            "overlapping planar batch cutters".into(),
+                        ],
+                    });
+                }
+            }
+        }
+        let mut combined = BrepEnvelope::new(format!("{id}:cutters"), accuracy)?;
+        for cutter in cutters {
+            append_analytic_input(&mut combined, cutter)?;
+        }
+        combined.validate()?;
+        traced("boolean_rectilinear", || {
+            super::box_booleans::boolean_rectilinear(host, &combined, BooleanOp::Subtraction, id)
+        })
+    })
 }
 
 pub fn boolean_spheres(
