@@ -6,8 +6,7 @@ use super::placement::is_identity;
 use super::shape_store::{Shape, ShapeId};
 use crate::brep::{placed, BodyType, BrepEnvelope, GeometryError, GeometryQuality};
 use crate::operations::modifying::boolean::{
-    boolean_brep_outcome_with_handlers, subtract_planar_cutters_outcome_with_handlers, BooleanOp,
-    BooleanResult,
+    multi_tool_boolean, BooleanOp, BooleanResult, MultiToolOutcome,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -88,10 +87,7 @@ impl WorldGraph {
         let revision = self.reserve(0, std::slice::from_ref(&shape_id))?.revisions[0].1;
         let mapped = self.mapped_tools(target, tools, &shape_id)?;
         let (mut result, handlers) = kernel_result(target_shape, &mapped, operation, &shape_id)
-            .map_err(|failure| failure.graph_error(target, tools))?
-            .ok_or_else(|| {
-                GraphError::code(ErrorCode::InvalidTopology, "boolean produced no result")
-            })?;
+            .map_err(|failure| failure.graph_error(target, tools))?;
         if result.brep.solids.is_empty() && result.brep.topology.faces.is_empty() {
             return Err(GraphError::code(
                 ErrorCode::EmptyResult,
@@ -181,65 +177,23 @@ fn kernel_result(
     mapped: &[BrepEnvelope],
     operation: ModifyingOperation,
     shape_id: &ShapeId,
-) -> Result<Option<(BooleanResult, Vec<String>)>, ToolFailure> {
+) -> Result<(BooleanResult, Vec<String>), ToolFailure> {
     let kernel_op = match operation {
         ModifyingOperation::Union => BooleanOp::Union,
         ModifyingOperation::Subtract => BooleanOp::Subtraction,
         ModifyingOperation::Intersect => BooleanOp::Intersection,
     };
-    let (result, handlers) = if mapped.len() == 1 {
-        boolean_brep_outcome_with_handlers(
-            &target_shape.brep,
-            &mapped[0],
-            kernel_op,
-            shape_id.clone(),
-        )
-    } else if operation == ModifyingOperation::Subtract {
-        subtract_planar_cutters_outcome_with_handlers(&target_shape.brep, mapped, shape_id.clone())
-    } else {
-        return chained_boolean(target_shape, mapped, kernel_op, shape_id);
-    };
+    let MultiToolOutcome {
+        result,
+        handlers,
+        tool_index,
+    } = multi_tool_boolean(&target_shape.brep, mapped, kernel_op, shape_id.clone());
     match result {
-        Ok(result) => Ok(Some((result, handlers))),
+        Ok(result) => Ok((result, handlers)),
         Err(error) => Err(ToolFailure {
-            tool_index: 0,
+            tool_index,
             error,
             handlers,
         }),
     }
-}
-
-fn chained_boolean(
-    target_shape: &Shape,
-    mapped: &[BrepEnvelope],
-    kernel_op: BooleanOp,
-    shape_id: &ShapeId,
-) -> Result<Option<(BooleanResult, Vec<String>)>, ToolFailure> {
-    let mut handlers = Vec::new();
-    let count = mapped.len();
-    let mut final_result: Option<BooleanResult> = None;
-    for (index, tool) in mapped.iter().enumerate() {
-        let id = if index + 1 == count {
-            shape_id.clone()
-        } else {
-            format!("{shape_id}:part:{index}")
-        };
-        let current = final_result
-            .as_ref()
-            .map_or(&*target_shape.brep, |result| &result.brep);
-        let (result, step_handlers) =
-            boolean_brep_outcome_with_handlers(current, tool, kernel_op, id);
-        handlers.extend(step_handlers);
-        match result {
-            Ok(result) => final_result = Some(result),
-            Err(error) => {
-                return Err(ToolFailure {
-                    tool_index: index,
-                    error,
-                    handlers,
-                })
-            }
-        }
-    }
-    Ok(final_result.map(|result| (result, handlers)))
 }

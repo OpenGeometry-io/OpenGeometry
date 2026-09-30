@@ -3,12 +3,13 @@ mod table;
 mod trace;
 
 pub(super) use handler_id::HandlerId;
+pub(super) use trace::record_handler;
 
 use super::handlers::{coincident_boolean, disjoint_boolean};
 use super::types::{BooleanOp, BooleanResult};
 use crate::brep::{BrepEnvelope, GeometryError};
 use table::{generic_boolean, specialized_boolean};
-use trace::{record_handler, record_optional};
+use trace::record_optional;
 
 pub fn boolean_brep(
     a: &BrepEnvelope,

@@ -2,6 +2,7 @@ mod assembly;
 mod batch;
 mod dispatch;
 mod handlers;
+mod multi_tool;
 mod operands;
 mod shell;
 #[cfg(test)]
@@ -14,5 +15,6 @@ pub use batch::{
 };
 pub use dispatch::{boolean_brep, boolean_brep_outcome_with_handlers, boolean_brep_with_handlers};
 pub use handlers::{boolean_boxes, boolean_spheres};
+pub use multi_tool::{multi_tool_boolean, MultiToolOutcome};
 pub use shell::shell_brep;
 pub use types::{BooleanOp, BooleanReport, BooleanResult};
