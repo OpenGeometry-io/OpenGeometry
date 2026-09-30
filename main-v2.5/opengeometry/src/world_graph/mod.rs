@@ -20,11 +20,13 @@ mod shape_store;
 mod tree_walk;
 
 pub use change_log::{ChangeSet, NodeChange};
-pub use error::{ErrorCode, GraphError};
+pub use creating::CreatingOperation;
+pub use error::{ErrorCode, ErrorContext, GraphError};
 pub use export::StepOptions;
 pub use graph::WorldGraph;
 pub use instancing::CopyOptions;
 pub use journal::MarkStats;
+pub use modifying::ModifyingOperation;
 pub use node::{EditScope, MarkId, Node};
 pub use placement::{Placement, Transform};
 pub use primitive::{CreateOptions, Plane, Primitive};

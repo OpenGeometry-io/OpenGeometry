@@ -7,8 +7,8 @@ use crate::brep::{
     GeometryError, Orientation, SurfaceGeometry, Use,
 };
 use crate::math::{add, cross, dot, norm, scale, sub, Interval, Point3};
-use crate::operations::invalid;
-use crate::world_graph::{ErrorCode, GraphError};
+use crate::operations::{invalid, OperationError};
+
 use circle as sweep_circle;
 
 struct SweepTopology {
@@ -22,7 +22,7 @@ pub(crate) fn build(
     profile: ProfileLoop,
     mut path: Vec<Point3>,
     accuracy: Accuracy,
-) -> Result<BrepEnvelope, GraphError> {
+) -> Result<BrepEnvelope, OperationError> {
     if path.len() < 2 || path.iter().flatten().any(|value| !value.is_finite()) {
         return Err(invalid("sweep path is invalid"));
     }
@@ -88,7 +88,10 @@ pub(crate) fn build(
     Ok(builder.finish_solid()?)
 }
 
-fn remove_collinear_joints(path: &mut Vec<Point3>, accuracy: Accuracy) -> Result<(), GraphError> {
+fn remove_collinear_joints(
+    path: &mut Vec<Point3>,
+    accuracy: Accuracy,
+) -> Result<(), OperationError> {
     let mut index = 1;
     while index + 1 < path.len() {
         let before = sub(path[index], path[index - 1]);
@@ -98,9 +101,8 @@ fn remove_collinear_joints(path: &mut Vec<Point3>, accuracy: Accuracy) -> Result
         }
         let alignment = dot(unit(before)?, unit(after)?);
         if norm(add(unit(before)?, unit(after)?)) <= 1e-9 {
-            return Err(GraphError::code(
-                ErrorCode::SweepSelfIntersection,
-                "sweep path reverses",
+            return Err(OperationError::SweepSelfIntersection(
+                "sweep path reverses".into(),
             ));
         }
         if alignment >= 1.0 - 1e-18 {
@@ -112,7 +114,7 @@ fn remove_collinear_joints(path: &mut Vec<Point3>, accuracy: Accuracy) -> Result
     Ok(())
 }
 
-fn path_directions(path: &[Point3], accuracy: Accuracy) -> Result<Vec<Point3>, GraphError> {
+fn path_directions(path: &[Point3], accuracy: Accuracy) -> Result<Vec<Point3>, OperationError> {
     path.windows(2)
         .map(|pair| {
             let delta = sub(pair[1], pair[0]);
@@ -121,7 +123,7 @@ fn path_directions(path: &[Point3], accuracy: Accuracy) -> Result<Vec<Point3>, G
             }
             unit(delta).map_err(Into::into)
         })
-        .collect::<Result<Vec<_>, GraphError>>()
+        .collect::<Result<Vec<_>, OperationError>>()
 }
 
 fn check_segment_overlap(
@@ -129,7 +131,7 @@ fn check_segment_overlap(
     path: &[Point3],
     directions: &[Point3],
     accuracy: Accuracy,
-) -> Result<(), GraphError> {
+) -> Result<(), OperationError> {
     let radius = match profile {
         ProfileLoop::Lines(points) => points
             .iter()
@@ -142,9 +144,8 @@ fn check_segment_overlap(
             if segment_distance(path[first], path[first + 1], path[second], path[second + 1])
                 <= 2.0 * radius + 4.0 * accuracy.geometric
             {
-                return Err(GraphError::code(
-                    ErrorCode::SweepSelfIntersection,
-                    "non-adjacent sweep segments overlap",
+                return Err(OperationError::SweepSelfIntersection(
+                    "non-adjacent sweep segments overlap".into(),
                 ));
             }
         }
@@ -173,7 +174,7 @@ fn miter_rings(
     path: &[Point3],
     directions: &[Point3],
     count: usize,
-) -> Result<Vec<Vec<Point3>>, GraphError> {
+) -> Result<Vec<Vec<Point3>>, OperationError> {
     let mut offsets = polygon
         .iter()
         .map(|point| sub(*point, path[0]))
@@ -182,9 +183,8 @@ fn miter_rings(
     rings.push(polygon);
     for joint in 1..path.len() - 1 {
         let previous = directions[joint - 1];
-        let bisector = unit(add(previous, directions[joint])).map_err(|_| {
-            GraphError::code(ErrorCode::SweepSelfIntersection, "sweep path reverses")
-        })?;
+        let bisector = unit(add(previous, directions[joint]))
+            .map_err(|_| OperationError::SweepSelfIntersection("sweep path reverses".into()))?;
         let mut ring = Vec::with_capacity(count);
         for offset in &mut offsets {
             let along = -dot(*offset, bisector) / dot(previous, bisector);
@@ -207,7 +207,7 @@ fn check_miter_spans(
     directions: &[Point3],
     count: usize,
     accuracy: Accuracy,
-) -> Result<(), GraphError> {
+) -> Result<(), OperationError> {
     for segment in 0..directions.len() {
         for vertex in 0..count {
             let span = dot(
@@ -215,9 +215,8 @@ fn check_miter_spans(
                 directions[segment],
             );
             if span <= 4.0 * accuracy.geometric {
-                return Err(GraphError::code(
-                    ErrorCode::SweepSelfIntersection,
-                    "miter planes meet within a segment",
+                return Err(OperationError::SweepSelfIntersection(
+                    "miter planes meet within a segment".into(),
                 ));
             }
         }
@@ -230,7 +229,7 @@ fn add_sweep_topology(
     rings: &[Vec<Point3>],
     directions: &[Point3],
     count: usize,
-) -> Result<SweepTopology, GraphError> {
+) -> Result<SweepTopology, OperationError> {
     let vertices = rings
         .iter()
         .map(|ring| {
@@ -268,15 +267,14 @@ fn add_sweep_topology(
     })
 }
 
-fn line_edge(builder: &mut Builder, from: u32, to: u32) -> Result<u32, GraphError> {
+fn line_edge(builder: &mut Builder, from: u32, to: u32) -> Result<u32, OperationError> {
     let a = builder.brep.topology.vertices[from as usize].position;
     let b = builder.brep.topology.vertices[to as usize].position;
     let delta = sub(b, a);
     let length = norm(delta);
     if length <= 4.0 * builder.brep.accuracy.geometric {
-        return Err(GraphError::code(
-            ErrorCode::SweepSelfIntersection,
-            "sweep edge collapses",
+        return Err(OperationError::SweepSelfIntersection(
+            "sweep edge collapses".into(),
         ));
     }
     Ok(builder.edge(
@@ -297,7 +295,7 @@ fn add_caps(
     rings: &[Vec<Point3>],
     count: usize,
     accuracy: Accuracy,
-) -> Result<(), GraphError> {
+) -> Result<(), OperationError> {
     let SweepTopology {
         vertices,
         ring_edges,
@@ -364,7 +362,7 @@ fn add_side_faces(
     rings: &[Vec<Point3>],
     count: usize,
     accuracy: Accuracy,
-) -> Result<(), GraphError> {
+) -> Result<(), OperationError> {
     for segment in 0..directions.len() {
         for edge in 0..count {
             let next = (edge + 1) % count;
@@ -403,7 +401,7 @@ fn side_uses(
     edge: usize,
     next: usize,
     side_frame: Frame3,
-) -> Result<Vec<Use>, GraphError> {
+) -> Result<Vec<Use>, OperationError> {
     let SweepTopology {
         vertices,
         ring_edges,

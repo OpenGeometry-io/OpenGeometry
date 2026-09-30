@@ -1,13 +1,36 @@
 use super::change_log::ChangeSet;
-use super::error::{ErrorCode, GraphError};
+use super::error::{ErrorCode, ErrorContext, GraphError};
 use super::graph::WorldGraph;
 use super::node::EditScope;
 use super::operands::{path_points, profile_loop};
 use super::primitive::CreateOptions;
 use crate::brep::{BodyType, BrepEnvelope, Similarity3};
 use crate::operations::creating::{extrude, sweep};
-use crate::operations::CreatingOperation;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", deny_unknown_fields)]
+pub enum CreatingOperation {
+    Extrude {
+        profile: String,
+        holes: Vec<String>,
+        distance: f64,
+    },
+    Sweep {
+        profile: String,
+        path: String,
+    },
+}
+
+impl CreatingOperation {
+    fn anchor(&self) -> &str {
+        match self {
+            Self::Extrude { profile, .. } => profile,
+            Self::Sweep { path, .. } => path,
+        }
+    }
+}
 
 impl WorldGraph {
     fn build_operation(
@@ -35,17 +58,26 @@ impl WorldGraph {
                         profile_loop(self, hole, target)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                extrude::build(id, outer, holes, *distance, self.accuracy)
+                extrude::build(id, outer, holes, *distance, self.accuracy).map_err(GraphError::from)
             }
             CreatingOperation::Sweep { profile, path } => {
                 let profile = profile_loop(self, profile, target)?;
                 let path = path_points(self, path, target)?;
-                sweep::build(id, profile, path, self.accuracy)
+                sweep::build(id, profile, path, self.accuracy).map_err(GraphError::from)
             }
         }
     }
 
     pub fn create_operation(
+        &mut self,
+        operation: CreatingOperation,
+        options: CreateOptions,
+    ) -> Result<(String, ChangeSet), GraphError> {
+        self.try_create_operation(operation, options)
+            .map_err(|error| error.in_context(ErrorContext::Create))
+    }
+
+    fn try_create_operation(
         &mut self,
         operation: CreatingOperation,
         options: CreateOptions,
@@ -99,6 +131,16 @@ impl WorldGraph {
     }
 
     pub fn rebuild_operation(
+        &mut self,
+        og_id: &str,
+        operation: CreatingOperation,
+        scope: EditScope,
+    ) -> Result<ChangeSet, GraphError> {
+        self.try_rebuild_operation(og_id, operation, scope)
+            .map_err(|error| error.in_context(ErrorContext::Rebuild))
+    }
+
+    fn try_rebuild_operation(
         &mut self,
         og_id: &str,
         operation: CreatingOperation,

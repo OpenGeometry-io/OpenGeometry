@@ -1,6 +1,7 @@
 use super::support::extrude;
-use opengeometry::operations::CreatingOperation;
-use opengeometry::world_graph::{CreateOptions, ErrorCode, Primitive, Transform};
+use opengeometry::world_graph::{
+    CreateOptions, CreatingOperation, ErrorCode, Primitive, Transform,
+};
 use opengeometry_test_support::volume;
 use opengeometry_test_support::world_graph::{graph, named};
 

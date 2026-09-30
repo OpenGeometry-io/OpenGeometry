@@ -1,13 +1,13 @@
 {
   "groups": [
     {
-      "sha256": "46db956f80cd51b586e3cebc15039a351b025fce42ebd5f5c77eaac92884c2cf",
+      "sha256": "4b3909d13af4ba99e95196ca70bd183ca7c861dfc9e7bc431257081a525ce2d7",
       "count": 2,
       "members": [
-        "opengeometry/src/operations/creating/sweep/circle.rs:255",
-        "opengeometry/src/operations/creating/sweep/mod.rs:271"
+        "opengeometry/src/operations/creating/sweep/circle.rs:253",
+        "opengeometry/src/operations/creating/sweep/mod.rs:270"
       ],
-      "reason": "sweep line_edge pair: message and seam flag differ; B5 merges it once operations no longer imports world_graph::error"
+      "reason": "sweep line_edge pair: message and seam flag differ; the merge is deferred to the debt note (B5 extended)"
     },
     {
       "sha256": "faf9fceb832d4487c85d2ec16868b3367b964227d89f7c97eaea891c47986e0d",

@@ -1,9 +1,8 @@
 use super::profile::{check_lines, edges, profile_frame, ProfileLoop};
 use crate::brep::{Accuracy, BrepEnvelope, Frame3};
 use crate::math::{add, dot, norm, scale, sub, Point3};
-use crate::operations::invalid;
+use crate::operations::{invalid, OperationError};
 use crate::primitives;
-use crate::world_graph::GraphError;
 
 pub(crate) fn build(
     id: String,
@@ -11,7 +10,7 @@ pub(crate) fn build(
     holes: Vec<ProfileLoop>,
     distance: f64,
     accuracy: Accuracy,
-) -> Result<BrepEnvelope, GraphError> {
+) -> Result<BrepEnvelope, OperationError> {
     if !distance.is_finite() || distance.abs() <= 4.0 * accuracy.geometric {
         return Err(invalid("extrusion distance is below geometric resolution"));
     }
@@ -77,7 +76,11 @@ pub(crate) fn build(
     Ok(result)
 }
 
-fn check_holes(holes: &[ProfileLoop], frame: Frame3, accuracy: Accuracy) -> Result<(), GraphError> {
+fn check_holes(
+    holes: &[ProfileLoop],
+    frame: Frame3,
+    accuracy: Accuracy,
+) -> Result<(), OperationError> {
     for hole in holes {
         check_lines(hole, frame, accuracy.geometric)?;
         match hole {

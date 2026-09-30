@@ -1,6 +1,7 @@
 use opengeometry::brep::FaceRole;
-use opengeometry::operations::{CreatingOperation, ModifyingOperation};
-use opengeometry::world_graph::{EditScope, Primitive, Transform};
+use opengeometry::world_graph::{
+    CreatingOperation, EditScope, ModifyingOperation, Primitive, Transform,
+};
 use opengeometry_test_support::volume;
 use opengeometry_test_support::world_graph::{graph, named};
 

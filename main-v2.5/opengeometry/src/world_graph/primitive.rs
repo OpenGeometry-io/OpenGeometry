@@ -1,5 +1,5 @@
 use super::change_log::ChangeSet;
-use super::error::{ErrorCode, GraphError};
+use super::error::{ErrorCode, ErrorContext, GraphError};
 use super::graph::WorldGraph;
 use super::node::EditScope;
 use crate::brep::{Accuracy, BodyType, BrepEnvelope, CurveGeometry, Frame3, Similarity3, GROUND};
@@ -36,6 +36,15 @@ pub struct CreateOptions {
 
 impl WorldGraph {
     pub fn create_primitive(
+        &mut self,
+        primitive: Primitive,
+        options: CreateOptions,
+    ) -> Result<(String, ChangeSet), GraphError> {
+        self.try_create_primitive(primitive, options)
+            .map_err(|error| error.in_context(ErrorContext::Create))
+    }
+
+    fn try_create_primitive(
         &mut self,
         primitive: Primitive,
         options: CreateOptions,
@@ -80,6 +89,16 @@ impl WorldGraph {
     }
 
     pub fn rebuild_primitive(
+        &mut self,
+        og_id: &str,
+        primitive: Primitive,
+        scope: EditScope,
+    ) -> Result<ChangeSet, GraphError> {
+        self.try_rebuild_primitive(og_id, primitive, scope)
+            .map_err(|error| error.in_context(ErrorContext::Rebuild))
+    }
+
+    fn try_rebuild_primitive(
         &mut self,
         og_id: &str,
         primitive: Primitive,

@@ -1,6 +1,5 @@
-use opengeometry::operations::CreatingOperation;
 use opengeometry::world_graph::{
-    CopyOptions, CreateOptions, ErrorCode, Primitive, StepOptions, Transform,
+    CopyOptions, CreateOptions, CreatingOperation, ErrorCode, Primitive, StepOptions, Transform,
 };
 use opengeometry_test_support::part21;
 use opengeometry_test_support::world_graph::{graph, named};

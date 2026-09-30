@@ -1,5 +1,5 @@
 use super::change_log::ChangeSet;
-use super::error::{ErrorCode, GraphError};
+use super::error::{ErrorCode, ErrorContext, GraphError};
 use super::graph::WorldGraph;
 use super::node::EditScope;
 use super::placement::is_identity;
@@ -8,8 +8,22 @@ use crate::brep::{placed, BodyType, BrepEnvelope, GeometryQuality};
 use crate::operations::modifying::boolean::{
     boolean_brep_with_handlers, subtract_planar_cutters_with_handlers, BooleanOp, BooleanResult,
 };
-use crate::operations::ModifyingOperation;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ModifyingOperation {
+    Union,
+    Subtract,
+    Intersect,
+}
+
+struct Operated {
+    result: BooleanResult,
+    handlers: Vec<String>,
+    revision: u64,
+    shape_id: ShapeId,
+}
 
 impl WorldGraph {
     pub fn report(&self, og_id: &str) -> Result<Option<&serde_json::Value>, GraphError> {
@@ -23,6 +37,35 @@ impl WorldGraph {
         tools: &[String],
         scope: EditScope,
     ) -> Result<ChangeSet, GraphError> {
+        let Operated {
+            result,
+            handlers,
+            revision,
+            shape_id,
+        } = self
+            .operated(target, operation, tools, scope)
+            .map_err(|error| error.in_context(ErrorContext::Operate))?;
+        let report = serde_json::json!({ "report": result.report, "handlers": handlers, "revision": revision });
+        self.mutate(|draft| {
+            let shape = draft.shapes.get_mut(&shape_id).ok_or_else(|| {
+                GraphError::code(ErrorCode::InvalidTopology, "target shape is missing")
+            })?;
+            shape.brep = Arc::new(result.brep);
+            shape.revision = revision;
+            shape.edge_keys.clear();
+            shape.report = Some(report);
+            Ok(())
+        })
+        .map_err(|error| error.in_context(ErrorContext::Operate))
+    }
+
+    fn operated(
+        &self,
+        target: &str,
+        operation: ModifyingOperation,
+        tools: &[String],
+        scope: EditScope,
+    ) -> Result<Operated, GraphError> {
         if tools.is_empty() || tools.len() > 100 {
             return Err(GraphError::code(
                 ErrorCode::LimitExceeded,
@@ -58,16 +101,11 @@ impl WorldGraph {
         validate_solid(&result.brep)?;
         result.brep.revision = revision;
         result.brep.validate()?;
-        let report = serde_json::json!({ "report": result.report, "handlers": handlers, "revision": revision });
-        self.mutate(|draft| {
-            let shape = draft.shapes.get_mut(&shape_id).ok_or_else(|| {
-                GraphError::code(ErrorCode::InvalidTopology, "target shape is missing")
-            })?;
-            shape.brep = Arc::new(result.brep);
-            shape.revision = revision;
-            shape.edge_keys.clear();
-            shape.report = Some(report);
-            Ok(())
+        Ok(Operated {
+            result,
+            handlers,
+            revision,
+            shape_id,
         })
     }
 

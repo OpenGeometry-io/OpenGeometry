@@ -3,7 +3,7 @@ use crate::brep::{
     EdgeGeometry, Frame3, GeometryError, Orientation, PcurveGeometry, SurfaceGeometry, Use,
 };
 use crate::math::{add, cross, dot, norm, scale, sub, Interval, Point3};
-use crate::world_graph::{ErrorCode, GraphError};
+use crate::operations::OperationError;
 
 struct Ring {
     centre: Point3,
@@ -34,7 +34,7 @@ pub(super) fn build(
     path: Vec<Point3>,
     directions: Vec<Point3>,
     accuracy: Accuracy,
-) -> Result<BrepEnvelope, GraphError> {
+) -> Result<BrepEnvelope, OperationError> {
     let mut builder = Builder::new(id, accuracy)?;
     let first_axis = directions[0];
     let SweptRings {
@@ -93,7 +93,7 @@ fn add_rings(
     path: &[Point3],
     directions: &[Point3],
     first_axis: Point3,
-) -> Result<SweptRings, GraphError> {
+) -> Result<SweptRings, OperationError> {
     let mut x = profile.x;
     let mut offset = sub(profile.origin, path[0]);
     let mut rings = Vec::with_capacity(path.len());
@@ -110,9 +110,8 @@ fn add_rings(
     cylinders.push(Frame3::from_axis(add(path[0], offset), first_axis, x)?);
     for joint in 1..path.len() - 1 {
         let previous = directions[joint - 1];
-        let bisector = unit(add(previous, directions[joint])).map_err(|_| {
-            GraphError::code(ErrorCode::SweepSelfIntersection, "sweep path reverses")
-        })?;
+        let bisector = unit(add(previous, directions[joint]))
+            .map_err(|_| OperationError::SweepSelfIntersection("sweep path reverses".into()))?;
         let denominator = dot(previous, bisector);
         let centre = add(
             add(path[joint], offset),
@@ -150,7 +149,7 @@ fn ring(
     major_axis: Point3,
     major: f64,
     minor: f64,
-) -> Result<Ring, GraphError> {
+) -> Result<Ring, OperationError> {
     let y_axis = unit(cross(axis, major_axis))?;
     let frame = Frame3::from_axis(centre, axis, major_axis)?;
     let start = (dot(radial, y_axis) / minor).atan2(dot(radial, major_axis) / major);
@@ -204,7 +203,7 @@ fn check_miter_planes(
     radius: f64,
     last: usize,
     accuracy: Accuracy,
-) -> Result<(), GraphError> {
+) -> Result<(), OperationError> {
     for segment in 0..last {
         let axis = directions[segment];
         let start = &rings[segment];
@@ -220,9 +219,8 @@ fn check_miter_planes(
         let minimum =
             dot(sub(end.centre, start.centre), axis) - radius * coefficient_x.hypot(coefficient_y);
         if minimum <= 4.0 * accuracy.geometric {
-            return Err(GraphError::code(
-                ErrorCode::SweepSelfIntersection,
-                "circular miter planes meet within a segment",
+            return Err(OperationError::SweepSelfIntersection(
+                "circular miter planes meet within a segment".into(),
             ));
         }
     }
@@ -233,7 +231,7 @@ fn add_seams(
     builder: &mut Builder,
     rings: &[Ring],
     last: usize,
-) -> Result<Vec<[u32; 2]>, GraphError> {
+) -> Result<Vec<[u32; 2]>, OperationError> {
     let mut seams = Vec::with_capacity(last);
     for segment in 0..last {
         seams.push([
@@ -252,15 +250,14 @@ fn add_seams(
     Ok(seams)
 }
 
-fn line_edge(builder: &mut Builder, from: u32, to: u32) -> Result<u32, GraphError> {
+fn line_edge(builder: &mut Builder, from: u32, to: u32) -> Result<u32, OperationError> {
     let a = builder.brep.topology.vertices[from as usize].position;
     let b = builder.brep.topology.vertices[to as usize].position;
     let delta = sub(b, a);
     let length = norm(delta);
     if length <= 4.0 * builder.brep.accuracy.geometric {
-        return Err(GraphError::code(
-            ErrorCode::SweepSelfIntersection,
-            "circular sweep seam collapses",
+        return Err(OperationError::SweepSelfIntersection(
+            "circular sweep seam collapses".into(),
         ));
     }
     Ok(builder.edge(
@@ -281,7 +278,7 @@ fn add_caps(
     end_frame: Frame3,
     radius: f64,
     accuracy: Accuracy,
-) -> Result<(), GraphError> {
+) -> Result<(), OperationError> {
     let start_uses = vec![
         plane_boundary(
             builder,
@@ -341,7 +338,7 @@ fn add_side_faces(
     last: usize,
     radius: f64,
     accuracy: Accuracy,
-) -> Result<(), GraphError> {
+) -> Result<(), OperationError> {
     for segment in 0..last {
         let cylinder = cylinders[segment];
         let low = v_extent(&rings[segment], cylinder.origin, cylinder.z);
@@ -388,7 +385,7 @@ fn side_uses(
     half: usize,
     surface: u32,
     cylinder: Frame3,
-) -> Result<Vec<Use>, GraphError> {
+) -> Result<Vec<Use>, OperationError> {
     let next = (half + 1) % 2;
     let lower = &rings[segment];
     let upper = &rings[segment + 1];
@@ -447,13 +444,12 @@ fn projected(
     from: u32,
     to: u32,
     sense: Orientation,
-) -> Result<Use, GraphError> {
+) -> Result<Use, OperationError> {
     let SurfacePoint { surface, theta, v } = *point;
     let EdgeGeometry::Curve { curve, range } = builder.brep.topology.edges[edge as usize].geometry
     else {
-        return Err(GraphError::code(
-            ErrorCode::InvalidTopology,
-            "sweep edge has no curve",
+        return Err(OperationError::InvalidTopology(
+            "sweep edge has no curve".into(),
         ));
     };
     Ok(boundary(
@@ -480,19 +476,17 @@ fn seam_use(
     theta: f64,
     cylinder: Frame3,
     sense: Orientation,
-) -> Result<Use, GraphError> {
+) -> Result<Use, OperationError> {
     let EdgeGeometry::Curve { curve, .. } = builder.brep.topology.edges[edge as usize].geometry
     else {
-        return Err(GraphError::code(
-            ErrorCode::InvalidTopology,
-            "sweep seam has no curve",
+        return Err(OperationError::InvalidTopology(
+            "sweep seam has no curve".into(),
         ));
     };
     let CurveGeometry::Line { origin, direction } = builder.brep.geometry.curves[curve as usize]
     else {
-        return Err(GraphError::code(
-            ErrorCode::InvalidTopology,
-            "sweep seam is not a line",
+        return Err(OperationError::InvalidTopology(
+            "sweep seam is not a line".into(),
         ));
     };
     let v = dot(sub(origin, cylinder.origin), cylinder.z);

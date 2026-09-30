@@ -3,7 +3,6 @@ use super::graph::WorldGraph;
 use crate::brep::{CurveGeometry, EdgeGeometry, Similarity3};
 use crate::math::Point3;
 use crate::operations::creating::{mapped_frame, ProfileLoop};
-use crate::operations::invalid;
 
 pub(super) fn path_points(
     graph: &WorldGraph,
@@ -142,4 +141,8 @@ fn profile_loop_mapped(
         return Err(invalid("profile has fewer than three vertices"));
     }
     Ok(ProfileLoop::Lines(points))
+}
+
+fn invalid(message: impl Into<String>) -> GraphError {
+    GraphError::code(ErrorCode::InvalidParameter, message)
 }

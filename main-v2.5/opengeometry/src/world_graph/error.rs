@@ -1,4 +1,5 @@
 use crate::brep::GeometryError;
+use crate::operations::OperationError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -30,6 +31,15 @@ pub enum ErrorCode {
     KernelPanic,
     RevisionConflict,
     Cancelled,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ErrorContext {
+    Create,
+    Rebuild,
+    Transform,
+    Operate,
+    Export,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -75,8 +85,8 @@ impl GraphError {
                 | GeometryError::MissingReference { .. }
                 | GeometryError::UnsupportedSchema { .. } => ErrorCode::InvalidTopology,
                 GeometryError::UnsupportedGeometry(_) => ErrorCode::UnsupportedGeometry,
-                GeometryError::AmbiguousProfileAlignment(_)
-                | GeometryError::SingularParameterization => ErrorCode::InvalidParameter,
+                GeometryError::AmbiguousProfileAlignment(_) => ErrorCode::InvalidParameter,
+                GeometryError::SingularParameterization => ErrorCode::InvalidGeometry,
                 GeometryError::CoverageGap { .. } => ErrorCode::CoverageGap,
                 GeometryError::UnresolvedIntersection(_) => ErrorCode::UnresolvedIntersection,
                 GeometryError::UnresolvedTessellation(_) => ErrorCode::UnresolvedTessellation,
@@ -84,11 +94,43 @@ impl GraphError {
             },
         }
     }
+
+    pub fn in_context(self, context: ErrorContext) -> GraphError {
+        if self != Self::Geometry(GeometryError::SingularParameterization) {
+            return self;
+        }
+        match context {
+            ErrorContext::Create | ErrorContext::Rebuild => {
+                Self::code(ErrorCode::InvalidParameter, "SingularParameterization")
+            }
+            ErrorContext::Transform => {
+                Self::code(ErrorCode::InvalidTransform, "SingularParameterization")
+            }
+            ErrorContext::Operate | ErrorContext::Export => self,
+        }
+    }
 }
 
 impl From<GeometryError> for GraphError {
     fn from(value: GeometryError) -> Self {
         Self::Geometry(value)
+    }
+}
+
+impl From<OperationError> for GraphError {
+    fn from(value: OperationError) -> Self {
+        match value {
+            OperationError::InvalidParameter(message) => {
+                Self::code(ErrorCode::InvalidParameter, message)
+            }
+            OperationError::SweepSelfIntersection(message) => {
+                Self::code(ErrorCode::SweepSelfIntersection, message)
+            }
+            OperationError::InvalidTopology(message) => {
+                Self::code(ErrorCode::InvalidTopology, message)
+            }
+            OperationError::Geometry(error) => Self::Geometry(error),
+        }
     }
 }
 
