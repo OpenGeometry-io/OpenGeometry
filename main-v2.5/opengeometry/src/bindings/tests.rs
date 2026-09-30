@@ -1,6 +1,6 @@
 use super::errors::dto;
 use super::OGWorldGraph;
-use crate::brep::{Accuracy, GeometryError};
+use crate::brep::{coarse_accuracy, GeometryError};
 use crate::math::MathError;
 use crate::tessellation::display::{bucket_floor, static_bucket};
 use crate::world_graph::{
@@ -138,15 +138,6 @@ fn assert_camel_case_keys(value: &Value) {
     }
 }
 
-fn binding_accuracy() -> Accuracy {
-    Accuracy {
-        geometric: 1e-8,
-        intersection: 1e-9,
-        tessellation: 0.01,
-        exchange: 1e-6,
-    }
-}
-
 fn unit_cube(graph: &mut WorldGraph) -> (String, ChangeSet) {
     graph
         .create_primitive(
@@ -165,7 +156,7 @@ fn unit_cube(graph: &mut WorldGraph) -> (String, ChangeSet) {
 
 #[test]
 fn bindings_payloads_are_camel_case() {
-    let accuracy = binding_accuracy();
+    let accuracy = coarse_accuracy(1e-6);
     let mut graph = WorldGraph::new(accuracy).unwrap();
     let created = unit_cube(&mut graph);
     let plane = Plane {
@@ -248,7 +239,7 @@ fn display_buckets_reports_the_kernel_floor_and_static_bucket() {
         .map(String::as_str)
         .collect();
     assert_eq!(keys, ["floor", "static"]);
-    let mut graph = WorldGraph::new(binding_accuracy()).unwrap();
+    let mut graph = WorldGraph::new(coarse_accuracy(1e-6)).unwrap();
     unit_cube(&mut graph);
     let brep = graph.brep("cube").unwrap();
     let floor = bucket_floor(&brep).unwrap();
