@@ -1,7 +1,7 @@
 mod circle;
 
 use super::extrude;
-use super::profile::{check_lines, profile_frame, ProfileLoop};
+use super::profile::{check_lines, newell_normal, profile_frame, ProfileLoop};
 use crate::brep::{
     padded_uv_bounds, plane_boundary, unit, Accuracy, BrepEnvelope, Builder, CurveGeometry, Frame3,
     GeometryError, Orientation, SurfaceGeometry, Use,
@@ -53,12 +53,8 @@ pub(crate) fn build(
         }
     };
     let mut polygon = points;
-    let area_normal = polygon
-        .iter()
-        .enumerate()
-        .fold([0.0; 3], |sum, (index, point)| {
-            add(sum, cross(*point, polygon[(index + 1) % polygon.len()]))
-        });
+    let area_normal = newell_normal(&polygon, accuracy.geometric)
+        .ok_or_else(|| invalid("profile is collinear"))?;
     if dot(area_normal, directions[0]) < 0.0 {
         polygon.reverse();
     }
