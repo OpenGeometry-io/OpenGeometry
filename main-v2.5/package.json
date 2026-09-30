@@ -26,6 +26,8 @@
     "check:duplicates": "node scripts/check/duplicates.mjs",
     "check:source": "node scripts/check/source-rules.mjs && node scripts/check/lint-exceptions.mjs",
     "check:cycles": "node scripts/check/import-cycles.mjs",
+    "check": "node scripts/check/verify.mjs",
+    "check:full": "node scripts/check/verify.mjs --full",
     "dev-example": "vite --config opengeometry-three/examples-vite/vite.config.ts",
     "build-example": "vite build --config opengeometry-three/examples-vite/vite.config.ts",
     "dev-test-pages": "vite --config opengeometry-three/tests/browser/vite.config.ts"

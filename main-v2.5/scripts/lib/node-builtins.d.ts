@@ -8,6 +8,23 @@ declare module 'node:fs' {
   export function readFileSync(path: string | URL, encoding: 'utf8'): string;
   export function readFileSync(path: string | URL): Uint8Array;
   export function readdirSync(path: string, options: { withFileTypes: true; recursive?: boolean }): Dirent[];
+  export function existsSync(path: string): boolean;
+  export function mkdirSync(path: string, options?: { recursive?: boolean }): string | undefined;
+  export function openSync(path: string, flags: string): number;
+  export function writeSync(fd: number, text: string): number;
+  export function closeSync(fd: number): void;
+}
+
+declare module 'node:child_process' {
+  export interface SpawnSyncResult {
+    status: number | null;
+    error?: Error;
+  }
+  export function spawnSync(
+    command: string,
+    args: string[],
+    options: { cwd: string; env: Record<string, string | undefined>; stdio: ['ignore', number, number] },
+  ): SpawnSyncResult;
 }
 
 declare module 'node:fs/promises' {
