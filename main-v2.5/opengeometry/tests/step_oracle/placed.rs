@@ -165,10 +165,6 @@ fn world_export_handles_far_body_and_rejects_options_without_mutation() {
             ..StepOptions::default()
         },
         StepOptions {
-            name: "x".repeat(4097),
-            ..StepOptions::default()
-        },
-        StepOptions {
             name: String::new(),
             ..StepOptions::default()
         },
@@ -181,6 +177,103 @@ fn world_export_handles_far_body_and_rejects_options_without_mutation() {
             ErrorCode::InvalidParameter
         );
     }
+    assert_eq!(
+        world
+            .export_step(
+                &["far".into()],
+                &StepOptions {
+                    name: "x".repeat(4097),
+                    ..StepOptions::default()
+                },
+            )
+            .unwrap_err()
+            .error_code(),
+        ErrorCode::LimitExceeded
+    );
+    assert!(world
+        .export_step(
+            &["far".into()],
+            &StepOptions {
+                name: "x".repeat(4096),
+                ..StepOptions::default()
+            },
+        )
+        .is_ok());
+    assert_eq!(world.revision(), revision);
+}
+
+#[test]
+fn body_children_are_exported_or_skipped_in_stored_order() {
+    let mut world = graph();
+    let cube = Primitive::Cuboid {
+        width: 2.0,
+        height: 2.0,
+        depth: 2.0,
+    };
+    world
+        .create_primitive(cube.clone(), named("parent"))
+        .unwrap();
+    world
+        .transform(
+            "parent",
+            Transform::Translate {
+                offset: [10.0, 0.0, 0.0],
+            },
+        )
+        .unwrap();
+    world
+        .create_primitive(
+            cube,
+            CreateOptions {
+                parent: Some("parent".into()),
+                ..named("child")
+            },
+        )
+        .unwrap();
+    world
+        .transform(
+            "child",
+            Transform::Translate {
+                offset: [0.0, 0.0, 20.0],
+            },
+        )
+        .unwrap();
+    world
+        .create_primitive(
+            Primitive::Polyline {
+                points: vec![[0.0; 3], [1.0, 0.0, 0.0]],
+                closed: false,
+            },
+            CreateOptions {
+                parent: Some("parent".into()),
+                ..named("rail")
+            },
+        )
+        .unwrap();
+    let revision = world.revision();
+    let options = StepOptions {
+        unit: "metre".into(),
+        up_axis: "Y".into(),
+        ..StepOptions::default()
+    };
+    let (text, report) = world.export_step(&["parent".into()], &options).unwrap();
+    assert_eq!(report.products, 2);
+    assert_eq!(
+        report
+            .bodies
+            .iter()
+            .map(|body| body.og_id.as_str())
+            .collect::<Vec<_>>(),
+        ["parent", "child"]
+    );
+    assert_eq!(
+        serde_json::to_value(&report.skipped).unwrap(),
+        serde_json::json!([{"ogId": "rail", "reason": "Wire"}])
+    );
+    assert!(text.contains(
+        "CARTESIAN_POINT('',(9.00000000000000000E0,0.00000000000000000E0,1.90000000000000000E1))"
+    ));
+    part21::Document::parse(&text).unwrap();
     assert_eq!(world.revision(), revision);
 }
 
