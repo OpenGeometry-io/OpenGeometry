@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import {
-  OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, OG_TRANSFORM_ROTATE, OG_TRANSFORM_TRANSLATE,
+  OpenGeometry, OGError, Solid, Wire, OG_PRIMITIVE_CUBOID, OG_PRIMITIVE_PARAMS_RECTANGLE,
+  OG_PRIMITIVE_RECTANGLE, OG_TRANSFORM_ROTATE, OG_TRANSFORM_TRANSLATE,
 } from '../../../dist/index.js';
 
 const BYTES = readFileSync(new URL('../../../dist/opengeometry_bg.wasm', import.meta.url));
@@ -88,5 +89,12 @@ for (let index = 0; index < 24; index++) {
   replacement.dispose();
   assert.equal((await OpenGeometry.settled()).failed.length, 0);
 }
+const LEAK_PARAMS = OG_PRIMITIVE_PARAMS_RECTANGLE({ width: 1, breadth: 1 });
+assert.throws(
+  () => new Solid(OG_PRIMITIVE_RECTANGLE, LEAK_PARAMS, { ogId: 'leak' }),
+  (error) => error instanceof OGError && error.code === 'BodyTypeMismatch',
+);
+new Wire(OG_PRIMITIVE_RECTANGLE, LEAK_PARAMS, { ogId: 'leak' });
+assert.equal((await OpenGeometry.settled()).failed.length, 0);
 OpenGeometry.reset();
 console.log('Node SDK passed');
