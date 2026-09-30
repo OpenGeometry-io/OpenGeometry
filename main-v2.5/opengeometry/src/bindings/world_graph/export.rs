@@ -9,8 +9,7 @@ use wasm_bindgen::JsValue;
 impl OGWorldGraph {
     #[wasm_bindgen(js_name = exportStep)]
     pub fn export_step(&self, nodes_json: &str, options_json: &str) -> Result<JsValue, JsValue> {
-        let nodes: Vec<String> = params::parse(nodes_json).map_err(errors::json)?;
-        params::ids(&nodes).map_err(errors::json)?;
+        let nodes = params::nodes(nodes_json).map_err(errors::json)?;
         let options: StepOptions = params::parse(options_json).map_err(errors::json)?;
         let (text, report) = self
             .inner

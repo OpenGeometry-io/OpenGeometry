@@ -1,8 +1,43 @@
 use crate::world_graph::{ErrorCode, GraphError};
-use serde::de::DeserializeOwned;
+use serde::de::{self, DeserializeOwned, Deserializer as _, IgnoredAny, SeqAccess, Visitor};
+use std::fmt;
 
 #[cfg(test)]
 mod tests;
+
+struct NodeFault<'a> {
+    fault: &'a mut Option<GraphError>,
+}
+
+impl<'de> Visitor<'de> for NodeFault<'_> {
+    type Value = Vec<String>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("an array of node ids")
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Vec<String>, A::Error> {
+        let mut values = Vec::new();
+        while values.len() < 100_000 {
+            let Some(value) = seq.next_element::<String>()? else {
+                return Ok(values);
+            };
+            if let Err(error) = id(&value) {
+                *self.fault = Some(error);
+                return Err(de::Error::custom("ogId exceeds 1024 characters"));
+            }
+            values.push(value);
+        }
+        if seq.next_element::<IgnoredAny>()?.is_some() {
+            *self.fault = Some(GraphError::code(
+                ErrorCode::LimitExceeded,
+                "exportStep nodes exceed 100,000 ids",
+            ));
+            return Err(de::Error::custom("exportStep nodes exceed 100,000 ids"));
+        }
+        Ok(values)
+    }
+}
 
 pub(super) fn parse<T: DeserializeOwned>(json: &str) -> Result<T, GraphError> {
     if json.len() > 64 * 1024 {
@@ -53,4 +88,20 @@ pub(super) fn points(values: &[f64]) -> Result<Vec<[f64; 3]>, GraphError> {
         .chunks_exact(3)
         .map(|point| [point[0], point[1], point[2]])
         .collect())
+}
+
+pub(super) fn nodes(json: &str) -> Result<Vec<String>, GraphError> {
+    let mut fault = None;
+    let mut deserializer = serde_json::Deserializer::from_str(json);
+    let values = deserializer
+        .deserialize_seq(NodeFault { fault: &mut fault })
+        .and_then(|values| deserializer.end().map(|()| values));
+    values.map_err(|error| {
+        fault.unwrap_or_else(|| {
+            GraphError::code(
+                ErrorCode::InvalidParameter,
+                format!("invalid params JSON: {error}"),
+            )
+        })
+    })
 }

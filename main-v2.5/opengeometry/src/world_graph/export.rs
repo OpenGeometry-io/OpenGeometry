@@ -56,35 +56,34 @@ impl WorldGraph {
         if !seen.insert(node.og_id.clone()) {
             return Ok(());
         }
-        if node.kind == NodeKind::SystemAssembly {
-            for child in &node.children {
-                self.expand_export(child, false, seen, selected, skipped)?;
+        if node.kind != NodeKind::SystemAssembly {
+            let shape = self.shape(og_id)?;
+            match shape.brep.body_type()? {
+                BodyType::Solid => selected.push(og_id.into()),
+                BodyType::Wire if direct => {
+                    return Err(GraphError::code(
+                        ErrorCode::InvalidOperand,
+                        "a Wire cannot be exported directly",
+                    ))
+                }
+                BodyType::Wire => skipped.push(StepSkipped {
+                    og_id: og_id.into(),
+                    reason: "Wire".into(),
+                }),
+                BodyType::Sheet if direct => {
+                    return Err(GraphError::code(
+                        ErrorCode::InvalidOperand,
+                        "a Sheet cannot be exported directly",
+                    ))
+                }
+                BodyType::Sheet => skipped.push(StepSkipped {
+                    og_id: og_id.into(),
+                    reason: "Sheet".into(),
+                }),
             }
-            return Ok(());
         }
-        let shape = self.shape(og_id)?;
-        match shape.brep.body_type()? {
-            BodyType::Solid => selected.push(og_id.into()),
-            BodyType::Wire if direct => {
-                return Err(GraphError::code(
-                    ErrorCode::InvalidOperand,
-                    "a Wire cannot be exported directly",
-                ))
-            }
-            BodyType::Wire => skipped.push(StepSkipped {
-                og_id: og_id.into(),
-                reason: "Wire".into(),
-            }),
-            BodyType::Sheet if direct => {
-                return Err(GraphError::code(
-                    ErrorCode::InvalidOperand,
-                    "a Sheet cannot be exported directly",
-                ))
-            }
-            BodyType::Sheet => skipped.push(StepSkipped {
-                og_id: og_id.into(),
-                reason: "Sheet".into(),
-            }),
+        for child in &node.children {
+            self.expand_export(child, false, seen, selected, skipped)?;
         }
         Ok(())
     }
@@ -113,11 +112,16 @@ impl WorldGraph {
             || !matches!(options.up_axis.as_str(), "Y" | "Z")
             || !valid_timestamp(&options.timestamp)
             || options.name.is_empty()
-            || options.name.len() > 4096
         {
             return Err(GraphError::code(
                 ErrorCode::InvalidParameter,
                 "invalid STEP export options",
+            ));
+        }
+        if options.name.len() > 4096 {
+            return Err(GraphError::code(
+                ErrorCode::LimitExceeded,
+                "STEP export name exceeds 4096 bytes",
             ));
         }
         let (selected, skipped) = self.step_selection(nodes)?;
