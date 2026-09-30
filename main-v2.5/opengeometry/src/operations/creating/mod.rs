@@ -1,4 +1,5 @@
 pub(crate) mod extrude;
+mod holes;
 mod profile;
 pub(crate) mod sweep;
 

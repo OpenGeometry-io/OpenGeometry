@@ -23,4 +23,7 @@ pub use internal::{
 };
 pub use polyline::{polyline, polyline_with_keys};
 pub use profile::ProfileEdge;
+pub(super) use profile::{
+    arc_profile_contains, loops_touch, profile_edge_intersections, profile_point_inside,
+};
 pub use rectangle::{rectangle, rectangle_with_keys};
