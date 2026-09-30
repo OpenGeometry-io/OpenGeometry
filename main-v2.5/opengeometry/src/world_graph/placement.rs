@@ -119,8 +119,12 @@ fn rotated_local(
     if pivot.iter().any(|value| !value.is_finite()) {
         return Err(invalid_transform("pivot must be finite"));
     }
-    let rotation = Similarity3::from_axis_angle([0.0; 3], axis, degrees.to_radians(), 1.0)
-        .map_err(|error| invalid_transform(format!("invalid rotation: {error}")))?;
+    let reduced = degrees % 360.0;
+    let rotation = match quarter_turn(reduced) {
+        Some((cos, sin)) => Similarity3::from_axis_cos_sin([0.0; 3], axis, cos, sin, 1.0),
+        None => Similarity3::from_axis_angle([0.0; 3], axis, reduced.to_radians(), 1.0),
+    }
+    .map_err(|error| invalid_transform(format!("invalid rotation: {error}")))?;
     let origin = sub(pivot, rotation.apply_vector(pivot));
     Ok(Similarity3 {
         frame: Frame3 {
@@ -130,6 +134,21 @@ fn rotated_local(
         ..rotation
     }
     .compose(&local))
+}
+
+fn quarter_turn(degrees: f64) -> Option<(f64, f64)> {
+    [
+        (0.0, (1.0, 0.0)),
+        (90.0, (0.0, 1.0)),
+        (180.0, (-1.0, 0.0)),
+        (270.0, (0.0, -1.0)),
+        (-90.0, (0.0, -1.0)),
+        (-180.0, (-1.0, 0.0)),
+        (-270.0, (0.0, 1.0)),
+    ]
+    .into_iter()
+    .find(|(turn, _)| *turn == degrees)
+    .map(|(_, cos_sin)| cos_sin)
 }
 
 fn scaled_local(
