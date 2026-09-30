@@ -1,4 +1,5 @@
 mod display;
+mod seams;
 mod support;
 
 use super::cache::TessellationCache;
