@@ -113,25 +113,22 @@ fn single_body_step_matches_source_fixtures_in_both_units() {
     }
 }
 
-#[test]
-fn boolean_matrix_step_matches_source_or_pins_an_error() {
-    let directory =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/parity/boolean-matrix");
+fn assert_matrix_step_matches_source(matrix: &str, count: usize, skipped: &[&str]) {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/parity")
+        .join(matrix);
     let mut cases = fs::read_dir(&directory)
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|path| {
+            let name = path.file_name().unwrap().to_string_lossy();
             path.extension()
                 .is_some_and(|extension| extension == "json")
-                && !path
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .contains(".step.")
+                && !skipped.iter().any(|part| name.contains(part))
         })
         .collect::<Vec<_>>();
     cases.sort();
-    assert_eq!(cases.len(), 18);
+    assert_eq!(cases.len(), count);
     for case in cases {
         let name = case.file_stem().unwrap().to_string_lossy().to_string();
         let fixture: serde_json::Value = serde_json::from_slice(&fs::read(&case).unwrap()).unwrap();
@@ -168,6 +165,16 @@ fn boolean_matrix_step_matches_source_or_pins_an_error() {
             }
         }
     }
+}
+
+#[test]
+fn boolean_matrix_step_matches_source_or_pins_an_error() {
+    assert_matrix_step_matches_source("boolean-matrix", 18, &[".step."]);
+}
+
+#[test]
+fn batch_matrix_step_matches_source_or_pins_an_error() {
+    assert_matrix_step_matches_source("batch-matrix", 23, &[".step.", ".fallback."]);
 }
 
 #[test]

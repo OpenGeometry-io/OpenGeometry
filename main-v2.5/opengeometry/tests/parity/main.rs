@@ -1,3 +1,4 @@
+mod batch;
 mod builders;
 mod matrix;
 mod tessellation;
