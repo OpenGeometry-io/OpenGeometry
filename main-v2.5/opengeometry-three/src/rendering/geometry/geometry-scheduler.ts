@@ -23,14 +23,14 @@ export function flush(options: { geometry?: 'sync' } = {}): void {
     const changes = JSON.parse(packet.changesJson) as ChangeSet;
     let offset = 0;
     for (const changed of [...changes.added, ...changes.changed]) {
-      const body = state.bodies.get(changed.og_id);
+      const body = state.bodies.get(changed.ogId);
       if (body) {
         body.lastInfo = node(body.ogId);
         body.applyWorldMatrix(packet.matrices.subarray(offset, offset + 16));
       }
       offset += 16;
     }
-    for (const removed of changes.removed) state.bodies.get(removed.og_id)?.hideForDispose();
+    for (const removed of changes.removed) state.bodies.get(removed.ogId)?.hideForDispose();
     for (const body of state.bodies.values()) body.swapReadyRecord();
     for (const body of state.bodies.values()) {
       if (body.lastInfo.shapeId && body.lastInfo.shapeRevision !== null) {

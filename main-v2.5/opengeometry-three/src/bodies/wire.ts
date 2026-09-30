@@ -15,14 +15,14 @@ export class Wire extends Body {
   instance(options: { ogId?: string; parent?: SystemAssembly } = {}): Wire {
     this.check();
     const ogId = creation(call('Wire.instance', () => worldGraph().instance(
-      this.ogId, encode({ og_id: options.ogId, parent: options.parent?.ogId }),
+      this.ogId, encode({ ogId: options.ogId, parent: options.parent?.ogId }),
     )));
     return new Wire('__existing', {}, { ogId });
   }
   duplicate(options: { ogId?: string; parent?: SystemAssembly } = {}): Wire {
     this.check();
     const ogId = creation(call('Wire.duplicate', () => worldGraph().duplicate(
-      this.ogId, encode({ og_id: options.ogId, parent: options.parent?.ogId }),
+      this.ogId, encode({ ogId: options.ogId, parent: options.parent?.ogId }),
     )));
     return new Wire('__existing', {}, { ogId });
   }

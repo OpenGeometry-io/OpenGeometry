@@ -68,7 +68,7 @@ fn i9_public_input_types_reject_unknown_fields() {
         r#"{"kind":"Cuboid","width":1,"height":1,"depth":1,"extra":1}"#
     )
     .is_err());
-    assert!(serde_json::from_str::<CreateOptions>(r#"{"og_id":"body","extra":1}"#).is_err());
+    assert!(serde_json::from_str::<CreateOptions>(r#"{"ogId":"body","extra":1}"#).is_err());
 }
 
 #[test]

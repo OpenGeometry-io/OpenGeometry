@@ -5,9 +5,7 @@ import type { BodyOptions } from './body-options.js';
 
 export function createBody(kind: string, params: Record<string, unknown>, options: BodyOptions): string {
   const graph = worldGraph();
-  const settings = { og_id: options.ogId, parent: options.parent?.ogId, plane: options.plane && {
-    origin: options.plane.origin, normal: options.plane.normal, x_direction: options.plane.xDirection,
-  } };
+  const settings = { ogId: options.ogId, parent: options.parent?.ogId, plane: options.plane };
   if (kind === '__existing') return options.ogId!;
   if (kind === 'Polyline') {
     const points = params['points'] as [number, number, number][];

@@ -26,14 +26,14 @@ export class Solid extends Body {
   instance(options: { ogId?: string; parent?: SystemAssembly } = {}): Solid {
     this.check();
     const ogId = creation(call('Solid.instance', () => worldGraph().instance(
-      this.ogId, encode({ og_id: options.ogId, parent: options.parent?.ogId }),
+      this.ogId, encode({ ogId: options.ogId, parent: options.parent?.ogId }),
     )));
     return new Solid('__existing', {}, { ogId });
   }
   duplicate(options: { ogId?: string; parent?: SystemAssembly } = {}): Solid {
     this.check();
     const ogId = creation(call('Solid.duplicate', () => worldGraph().duplicate(
-      this.ogId, encode({ og_id: options.ogId, parent: options.parent?.ogId }),
+      this.ogId, encode({ ogId: options.ogId, parent: options.parent?.ogId }),
     )));
     return new Solid('__existing', {}, { ogId });
   }

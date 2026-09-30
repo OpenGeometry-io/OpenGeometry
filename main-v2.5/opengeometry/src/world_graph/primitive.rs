@@ -19,7 +19,7 @@ pub enum Primitive {
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Plane {
     pub origin: Option<Point3>,
     pub normal: Option<Point3>,
@@ -27,7 +27,7 @@ pub struct Plane {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateOptions {
     pub og_id: Option<String>,
     pub parent: Option<String>,
