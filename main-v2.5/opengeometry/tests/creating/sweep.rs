@@ -1,5 +1,7 @@
 use super::support::extrude;
-use opengeometry::world_graph::{CreatingOperation, EditScope, ErrorCode, Primitive, Transform};
+use opengeometry::world_graph::{
+    CreateOptions, CreatingOperation, EditScope, ErrorCode, Plane, Primitive, Transform,
+};
 use opengeometry_test_support::volume;
 use opengeometry_test_support::world_graph::{graph, named};
 
@@ -285,4 +287,96 @@ fn sweep_rejects_miter_and_separated_segment_collisions() {
             .unwrap_err();
         assert_eq!(error.error_code(), ErrorCode::SweepSelfIntersection);
     }
+}
+
+#[test]
+fn sweep_profile_tilted_1e_6_rad_gives_invalid_parameter() {
+    let tilt = 1e-6_f64;
+    let mut world = graph();
+    world
+        .create_primitive(
+            Primitive::Rectangle {
+                width: 2.0,
+                breadth: 2.0,
+            },
+            CreateOptions {
+                og_id: Some("tilted".into()),
+                plane: Some(Plane {
+                    normal: Some([0.0, -tilt.sin(), tilt.cos()]),
+                    ..Plane::default()
+                }),
+                ..CreateOptions::default()
+            },
+        )
+        .unwrap();
+    world
+        .create_primitive(
+            Primitive::Polyline {
+                points: vec![[0.0, 0.0, 0.0], [0.0, 0.0, 3.0], [3.0, 0.0, 3.0]],
+                closed: false,
+            },
+            named("rise"),
+        )
+        .unwrap();
+    let revision = world.revision();
+    let nodes = world.node_count();
+    let error = world
+        .create_operation(
+            CreatingOperation::Sweep {
+                profile: "tilted".into(),
+                path: "rise".into(),
+            },
+            named("tilted-sweep"),
+        )
+        .unwrap_err();
+    assert_eq!(error.error_code(), ErrorCode::InvalidParameter, "{error:?}");
+    assert_eq!((world.revision(), world.node_count()), (revision, nodes));
+}
+
+#[test]
+fn collinear_diagonal_path_merges() {
+    let mut world = graph();
+    world
+        .create_primitive(
+            Primitive::Rectangle {
+                width: 0.1,
+                breadth: 0.1,
+            },
+            CreateOptions {
+                og_id: Some("square".into()),
+                plane: Some(Plane {
+                    normal: Some([1.0, 2.0, 3.0]),
+                    ..Plane::default()
+                }),
+                ..CreateOptions::default()
+            },
+        )
+        .unwrap();
+    world
+        .create_primitive(
+            Primitive::Polyline {
+                points: vec![[0.0, 0.0, 0.0], [0.1, 0.2, 0.3], [0.3, 0.6, 0.9]],
+                closed: false,
+            },
+            named("diagonal"),
+        )
+        .unwrap();
+    world
+        .create_operation(
+            CreatingOperation::Sweep {
+                profile: "square".into(),
+                path: "diagonal".into(),
+            },
+            named("prism"),
+        )
+        .unwrap();
+    let prism = world.brep("prism").unwrap();
+    assert_eq!(prism.topology.faces.len(), 6);
+    let expected = 0.01 * 1.1224972160321824;
+    let measured = volume::estimate(&prism, 0.0005);
+    assert!(
+        (measured.value - expected).abs() <= measured.error_bound,
+        "{} vs {expected}",
+        measured.value
+    );
 }
