@@ -1,3 +1,5 @@
+use crate::kernel::GraphError;
+use serde_json::{json, Value};
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::fmt::{Debug, Display};
@@ -81,6 +83,22 @@ impl Record {
         self.line(&format!("error: {error:?}"));
     }
 
+    pub(crate) fn graph_error(&mut self, title: &str, error: &GraphError) {
+        self.section(title);
+        self.graph_error_field("error", error);
+    }
+
+    pub(crate) fn graph_error_field(&mut self, key: &str, error: &GraphError) {
+        self.line(&format!("{key}: {}", graph_error_json(error)));
+    }
+
+    pub(crate) fn graph_result<T: Debug>(&mut self, key: &str, result: &Result<T, GraphError>) {
+        match result {
+            Ok(value) => self.line(&format!("{key}: Ok({value:?})")),
+            Err(error) => self.line(&format!("{key}: Err({})", graph_error_json(error))),
+        }
+    }
+
     pub(crate) fn cover(&mut self, name: &str) {
         self.findings.covered.insert(name.to_string());
     }
@@ -114,4 +132,13 @@ impl Record {
         self.findings.staged_handlers.extend(staged);
         (self.text, self.findings)
     }
+}
+
+fn graph_error_json(error: &GraphError) -> String {
+    let details = match serde_json::to_value(error.details()) {
+        Ok(Value::Null) => json!({}),
+        Ok(details) => details,
+        Err(failure) => json!(format!("serialization error: {failure:?}")),
+    };
+    json!({"code": error.error_code(), "details": details, "message": error.message()}).to_string()
 }

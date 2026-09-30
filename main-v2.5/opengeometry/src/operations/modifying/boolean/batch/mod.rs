@@ -21,9 +21,18 @@ pub fn subtract_planar_cutters_with_handlers(
     cutters: &[BrepEnvelope],
     id: String,
 ) -> Result<(BooleanResult, Vec<String>), GeometryError> {
+    let (result, handlers) = subtract_planar_cutters_outcome_with_handlers(host, cutters, id);
+    result.map(|result| (result, handlers))
+}
+
+pub fn subtract_planar_cutters_outcome_with_handlers(
+    host: &BrepEnvelope,
+    cutters: &[BrepEnvelope],
+    id: String,
+) -> (Result<BooleanResult, GeometryError>, Vec<String>) {
     let mut handlers = Vec::new();
-    let result = subtract_planar_cutters_inner(host, cutters, id, &mut handlers)?;
-    Ok((result, handlers))
+    let result = subtract_planar_cutters_inner(host, cutters, id, &mut handlers);
+    (result, handlers)
 }
 
 fn subtract_planar_cutters_inner(

@@ -25,15 +25,15 @@ fn sharing(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Failure> {
         "instance",
         graph.instance("body", copy_options("instance", None)),
     );
-    record.debug(
+    record.graph_result(
         "ensure node",
-        graph
+        &graph
             .ensure_editable("body", EditScope::Node)
             .map(|shape| shape.revision),
     );
-    record.debug(
+    record.graph_result(
         "ensure all",
-        graph
+        &graph
             .ensure_editable("body", EditScope::AllInstances)
             .map(|shape| shape.revision),
     );
@@ -42,15 +42,15 @@ fn sharing(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Failure> {
         "duplicate",
         graph.duplicate("body", copy_options("duplicate", None)),
     );
-    record.debug(
+    record.graph_result(
         "make unique instance",
-        graph
+        &graph
             .make_unique("instance")
             .map(|changes| changes.is_some()),
     );
-    record.debug(
+    record.graph_result(
         "make unique body",
-        graph.make_unique("body").map(|changes| changes.is_some()),
+        &graph.make_unique("body").map(|changes| changes.is_some()),
     );
     nodes(record, graph, &["body", "instance", "duplicate"]);
     Ok(())
@@ -224,9 +224,9 @@ fn rejected_primitives(graph: &mut WorldGraph, record: &mut Record) -> Result<()
     if let Some(generated) = generated {
         let node = graph.node(&generated)?.clone();
         changes(record, "dispose generated", graph.dispose(&generated));
-        record.debug(
+        record.graph_result(
             "disposed handle",
-            graph
+            &graph
                 .node_by_handle(node.handle, node.generation)
                 .map(|node| node.og_id.clone()),
         );
@@ -248,9 +248,9 @@ fn marks(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Failure> {
         "instance",
         graph.instance("body", copy_options("instance", None)),
     );
-    record.debug(
+    record.graph_result(
         "make unique",
-        graph
+        &graph
             .make_unique("instance")
             .map(|changes| changes.is_some()),
     );
@@ -264,7 +264,7 @@ fn marks(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Failure> {
         "after rollback",
         graph.create_primitive(unit_box(), CreateOptions::default()),
     );
-    record.debug("release", graph.release(mark));
+    record.graph_result("release", &graph.release(mark));
     nodes(record, graph, &["body", "instance"]);
     Ok(())
 }
@@ -281,14 +281,14 @@ fn nested_marks(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Failu
     );
     record.debug("stats with inner", graph.mark_stats());
     changes(record, "rollback inner", graph.rollback(inner));
-    record.debug("release inner", graph.release(inner));
+    record.graph_result("release inner", &graph.release(inner));
     changes(record, "rollback outer", graph.rollback(outer));
     changes(
         record,
         "changes since baseline",
         graph.changes_since(baseline),
     );
-    record.debug("release outer", graph.release(outer));
+    record.graph_result("release outer", &graph.release(outer));
     nodes(record, graph, &["body", "temporary"]);
     Ok(())
 }
@@ -326,7 +326,7 @@ fn shared_rebuild(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Fai
         "rebuild type mismatch",
         graph.rebuild_primitive("body", rectangle, EditScope::AllInstances),
     );
-    record.debug("release", graph.release(mark));
+    record.graph_result("release", &graph.release(mark));
     nodes(record, graph, &["body", "instance"]);
     Ok(())
 }
@@ -354,7 +354,7 @@ fn subtree_dispose(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Fa
         "next generated",
         graph.create_primitive(unit_box(), CreateOptions::default()),
     );
-    record.debug("release", graph.release(mark));
+    record.graph_result("release", &graph.release(mark));
     nodes(record, graph, &["parent"]);
     Ok(())
 }
@@ -408,9 +408,9 @@ fn copies_and_planes(graph: &mut WorldGraph, record: &mut Record) -> Result<(), 
         [0.0, 1.0, 0.0],
     );
     primitive(record, graph, unit_box(), planned);
-    record.debug(
+    record.graph_result(
         "relative copy to body",
-        graph.relative_placement("copy", "body"),
+        &graph.relative_placement("copy", "body"),
     );
     nodes(
         record,

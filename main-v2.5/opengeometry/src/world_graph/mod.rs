@@ -21,7 +21,7 @@ mod tree_walk;
 
 pub use change_log::{ChangeSet, NodeChange};
 pub use creating::CreatingOperation;
-pub use error::{ErrorCode, ErrorContext, GraphError};
+pub use error::{ErrorCode, ErrorContext, ErrorDetails, GraphError};
 pub use export::StepOptions;
 pub use graph::WorldGraph;
 pub use instancing::CopyOptions;

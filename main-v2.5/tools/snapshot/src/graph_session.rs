@@ -25,7 +25,7 @@ fn unique(record: &mut Record, label: &str, result: Result<Option<ChangeSet>, Gr
             changes(record, label, Ok(changeset));
         }
         Ok(None) => record.block(&format!("step {label}"), "unchanged"),
-        Err(error) => record.error(&format!("step {label}"), error),
+        Err(error) => record.graph_error(&format!("step {label}"), &error),
     }
 }
 
@@ -163,7 +163,7 @@ fn edit_scene(record: &mut Record, graph: &mut WorldGraph, scene: &Scene) {
 fn trial_edit(record: &mut Record, graph: &mut WorldGraph, scene: &Scene) {
     let mark = graph.mark();
     record.section("step mark");
-    record.debug("mark", &mark);
+    record.graph_result("mark", &mark);
     record.debug("mark_stats", graph.mark_stats());
     changes(
         record,
@@ -177,8 +177,8 @@ fn trial_edit(record: &mut Record, graph: &mut WorldGraph, scene: &Scene) {
     record.debug("mark_stats after trial", graph.mark_stats());
     if let Ok(mark) = mark {
         changes(record, "rollback trial", graph.rollback(mark));
-        record.debug("release trial", graph.release(mark));
-        record.debug("release again", graph.release(mark));
+        record.graph_result("release trial", &graph.release(mark));
+        record.graph_result("release again", &graph.release(mark));
     }
     record.debug("mark_stats after release", graph.mark_stats());
 }
@@ -284,7 +284,7 @@ fn dispose_and_reuse(
     tracked.remember(graph);
     let mark = graph.mark();
     record.section("step reuse mark");
-    record.debug("mark", &mark);
+    record.graph_result("mark", &mark);
     changes(record, "dispose wall copy 9", graph.dispose("wall-copy-9"));
     created(
         record,
@@ -295,7 +295,7 @@ fn dispose_and_reuse(
     state(record, graph, tracked, "after reuse");
     if let Ok(mark) = mark {
         changes(record, "rollback reuse", graph.rollback(mark));
-        record.debug("release reuse", graph.release(mark));
+        record.graph_result("release reuse", &graph.release(mark));
     }
     tracked.remember(graph);
 }

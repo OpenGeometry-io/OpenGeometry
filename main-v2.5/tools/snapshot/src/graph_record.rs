@@ -17,7 +17,7 @@ pub(crate) fn changes(
             true
         }
         Err(error) => {
-            record.error(&format!("step {label}"), error);
+            record.graph_error(&format!("step {label}"), &error);
             false
         }
     }
@@ -52,7 +52,7 @@ pub(crate) fn created(
             Some(og_id)
         }
         Err(error) => {
-            record.error(&format!("step {label}"), error);
+            record.graph_error(&format!("step {label}"), &error);
             None
         }
     }
@@ -65,27 +65,27 @@ pub(crate) fn counters(record: &mut Record, graph: &WorldGraph) {
     record.debug("mark_stats", graph.mark_stats());
     match graph.reserve(1, &[]) {
         Ok(reserved) => record.debug("next_reservation", reserved),
-        Err(error) => record.debug("next_reservation.error", error),
+        Err(error) => record.graph_error_field("next_reservation.error", &error),
     }
 }
 
 fn placement_state(record: &mut Record, graph: &WorldGraph, og_id: &str) {
     match graph.placement(og_id) {
         Ok(placement) => record.debug("placement", placement),
-        Err(error) => record.debug("placement.error", error),
+        Err(error) => record.graph_error_field("placement.error", &error),
     }
     match graph.world_placement(og_id) {
         Ok(world) => record.debug("world_placement", world),
-        Err(error) => record.debug("world_placement.error", error),
+        Err(error) => record.graph_error_field("world_placement.error", &error),
     }
     match graph.world_matrix(og_id) {
         Ok(matrix) => record.field("world_matrix", bits_list(&matrix)),
-        Err(error) => record.debug("world_matrix.error", error),
+        Err(error) => record.graph_error_field("world_matrix.error", &error),
     }
     match graph.bounds(og_id) {
         Ok(Some(bounds)) => record.field("bounds", bits_list(&bounds)),
         Ok(None) => record.line("bounds: none"),
-        Err(error) => record.debug("bounds.error", error),
+        Err(error) => record.graph_error_field("bounds.error", &error),
     }
 }
 
@@ -111,11 +111,11 @@ fn shape_state(record: &mut Record, graph: &WorldGraph, shape_id: &str, og_id: &
                 None => record.line("shape.report: none"),
             }
         }
-        Err(error) => record.debug("shape.error", error),
+        Err(error) => record.graph_error_field("shape.error", &error),
     }
     match graph.snapshot(shape_id) {
         Ok(bytes) => record.field("snapshot.sha256", sha256(&bytes)),
-        Err(error) => record.debug("snapshot.error", error),
+        Err(error) => record.graph_error_field("snapshot.error", &error),
     }
 }
 
@@ -124,14 +124,14 @@ pub(crate) fn node_state(record: &mut Record, graph: &WorldGraph, og_id: &str) {
     let node = match graph.node(og_id) {
         Ok(node) => node.clone(),
         Err(error) => {
-            record.debug("error", error);
+            record.graph_error_field("error", &error);
             return;
         }
     };
     record.debug("node", &node);
     match graph.node_by_handle(node.handle, node.generation) {
         Ok(found) => record.field("by_handle", &found.og_id),
-        Err(error) => record.debug("by_handle.error", error),
+        Err(error) => record.graph_error_field("by_handle.error", &error),
     }
     placement_state(record, graph, og_id);
     if let Some(shape_id) = &node.shape {
@@ -156,6 +156,6 @@ pub(crate) fn export(
             record.line(&pretty(to_value(&report)));
             record.block(&format!("{title}.text"), &text);
         }
-        Err(error) => record.error(&title, error),
+        Err(error) => record.graph_error(&title, &error),
     }
 }

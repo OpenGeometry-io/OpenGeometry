@@ -1,4 +1,2 @@
-world_graph/error.rs GraphError B5
-world_graph/error.rs GraphError::with_details B5
 world_graph/modifying.rs WorldGraph::report B5
 world_graph/shape_store.rs Shape B5

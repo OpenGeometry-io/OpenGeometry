@@ -1,4 +1,4 @@
-use super::error::{ErrorCode, GraphError};
+use super::error::{ErrorCode, ErrorDetails, GraphError};
 use super::graph::WorldGraph;
 use super::node::{EditScope, Node};
 use super::shape_store::Shape;
@@ -80,7 +80,11 @@ impl WorldGraph {
             return Err(GraphError::with_details(
                 ErrorCode::SharedShape,
                 "shape has multiple instances",
-                serde_json::json!({"shapeId": shape_id, "instanceCount": shape.users, "sharing": sharing}),
+                ErrorDetails::SharedShape {
+                    shape_id: shape_id.cloned(),
+                    instance_count: shape.users,
+                    sharing,
+                },
             ));
         }
         Ok(shape)
