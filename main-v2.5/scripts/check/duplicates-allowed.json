@@ -1,0 +1,49 @@
+{
+  "groups": [
+    {
+      "sha256": "46db956f80cd51b586e3cebc15039a351b025fce42ebd5f5c77eaac92884c2cf",
+      "count": 2,
+      "members": [
+        "opengeometry/src/operations/creating/sweep/circle.rs:255",
+        "opengeometry/src/operations/creating/sweep/mod.rs:271"
+      ],
+      "reason": "sweep line_edge pair: message and seam flag differ; B5 merges it once operations no longer imports world_graph::error"
+    },
+    {
+      "sha256": "faf9fceb832d4487c85d2ec16868b3367b964227d89f7c97eaea891c47986e0d",
+      "count": 2,
+      "members": [
+        "opengeometry/examples/performance.rs:7",
+        "tools/parity-oracle/src/bin/performance.rs:8"
+      ],
+      "reason": "the same 50-cutter wall benchmark built against main's kernel API (oracle bin) and 2.5's (kernel example); the crates link different kernels, so no shared home"
+    },
+    {
+      "sha256": "6b542763acdc5252b13bb34053775241ed7e9c9d4ce8ac1f445c3a59bf1bfa3a",
+      "count": 2,
+      "members": [
+        "opengeometry/src/brep/geometry/store.rs:107",
+        "opengeometry/src/brep/geometry/store.rs:117"
+      ],
+      "reason": "CurveView point_at and tangent_at: equal shape, but they return different fields of the evaluation and call different elementary fns"
+    },
+    {
+      "sha256": "1bd7edf464269be4c44d32dadbdd40d9504bd136deac717907af75e5e201e14d",
+      "count": 2,
+      "members": [
+        "opengeometry/src/brep/topology/fixtures.rs:93",
+        "opengeometry/src/intersection/universal_ssi/tests.rs:7"
+      ],
+      "reason": "universal_ssi's unit-test budget (geometric 1e-5, intersection 2.5e-6) differs from the shared cfg(test) fine_accuracy (1e-9, 1e-10); the bodies match only in shape"
+    },
+    {
+      "sha256": "d889b94bfc6ee9cbf42f9550c21a1128fe9b3815e2813251f49dad3c61b9ada7",
+      "count": 2,
+      "members": [
+        "opengeometry/src/brep/topology/fixtures.rs:102",
+        "opengeometry/test-support/src/accuracy.rs:3"
+      ],
+      "reason": "the same exchange-parameterised budget in both homes: src unit tests cannot call test-support's accuracy(), which links a separate kernel crate instance, and test-support cannot see the kernel's cfg(test) coarse_accuracy"
+    }
+  ]
+}

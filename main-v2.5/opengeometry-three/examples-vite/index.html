@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenGeometry 2.5 Example</title>
+    <link rel="stylesheet" href="./theme.css" />
+  </head>
+  <body>
+    <main id="app">
+      <div id="viewport" aria-label="Interactive OpenGeometry model"></div>
+      <div id="controls">
+        <a class="example-link" href="./sweep.html">Sweep example</a>
+        <a class="example-link" href="./boolean.html">Boolean example</a>
+        <a class="example-link" href="./operations/analytic-boolean-operations.html">Analytic Boolean example</a>
+        <a class="example-link" href="./opening.html">Opening example</a>
+        <a class="example-link" href="./shapes/cuboid.html">Cuboid example</a>
+        <a class="example-link" href="./shapes/cylinder.html">Cylinder example</a>
+        <a class="example-link" href="./operations/step-export.html">STEP export example</a>
+        <button id="reset-view" type="button">Reset view</button>
+        <button id="toggle-edges" type="button" aria-pressed="false">Show edges</button>
+        <button id="export-step" type="button">Export STEP</button>
+        <span id="status" role="status" aria-live="polite">Loading kernel…</span>
+      </div>
+    </main>
+    <script>
+      if (location.protocol === 'file:') document.querySelector('#status').textContent = 'Use the local Vite server. Open http://127.0.0.1:5100/ after starting it.';
+      window.addEventListener('error', (event) => { if (location.protocol !== 'file:') document.querySelector('#status').textContent = `Error: ${event.message}`; }, true);
+      window.addEventListener('unhandledrejection', (event) => { if (location.protocol !== 'file:') document.querySelector('#status').textContent = `Error: ${String(event.reason)}`; });
+    </script>
+    <script type="module" src="./showcase/main.ts"></script>
+  </body>
+</html>

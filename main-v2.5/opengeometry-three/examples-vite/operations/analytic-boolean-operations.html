@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenGeometry Analytic Boolean Operations</title>
+    <link rel="stylesheet" href="../theme.css" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Analytic Boolean Operations</span>
+    </div>
+    <aside class="og-controls">
+      <h3>Two-cylinder boolean</h3>
+      <p class="og-control-summary">The orange and blue source cylinders appear on the left. Their analytic result appears on the right.</p>
+      <label class="og-control-row">
+        Operation
+        <select id="operation" class="og-control-select">
+          <option value="union">Union</option>
+          <option value="intersection">Intersection</option>
+          <option value="subtraction" selected>Subtraction</option>
+        </select>
+      </label>
+      <label class="og-control-row">
+        Cylinder offset
+        <input id="offset" type="range" min="0" max="2.5" step="0.05" value="1" />
+      </label>
+      <label class="og-control-row">
+        Chord error
+        <input id="deflection" type="range" min="-3" max="-1" step="0.1" value="-2" />
+      </label>
+      <pre id="report" style="white-space: pre-wrap" aria-live="polite"></pre>
+      <p id="error" role="alert"></p>
+      <p id="status" class="og-control-summary" role="status" aria-live="polite">Loading kernel…</p>
+      <p><a href="../boolean.html">Cuboid Boolean example</a></p>
+    </aside>
+    <div id="app"></div>
+    <script>
+      if (location.protocol === 'file:') document.querySelector('#status').textContent = 'Open this page through the Vite server.';
+      window.addEventListener('error', (event) => { document.querySelector('#status').textContent = `Error: ${event.message}`; }, true);
+      window.addEventListener('unhandledrejection', (event) => { document.querySelector('#status').textContent = `Error: ${String(event.reason)}`; });
+    </script>
+    <script type="module" src="./analytic-boolean-operations.ts"></script>
+  </body>
+</html>

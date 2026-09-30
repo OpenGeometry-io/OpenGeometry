@@ -1,0 +1,19 @@
+{
+  "platform": "darwin-arm64",
+  "measuredOn": "2026-09-28",
+  "wall50BooleanMs": 585.801167,
+  "wall50TessellationMs": 20.856875,
+  "rotated20BooleanMs": 113.652833,
+  "sliderRebuildMs": 11.657083,
+  "sliderBooleanMs": 18.787875,
+  "sliderTessellationMs": 1.423875,
+  "storeyFirstRenderMs": 503.7,
+  "storeyTransformFlushMs": 307.3,
+  "storeyStepMs": 1670.5,
+  "storeyStepBytes": 45605587,
+  "storeyStepEntities": 778410,
+  "nonparallelCylinderStepBytes": 4924611,
+  "nativeSourceWall50TessellationMs": 3.25431708,
+  "nativeNextWall50TessellationMs": 3.21790917,
+  "nativeWall50Triangles": 1220
+}

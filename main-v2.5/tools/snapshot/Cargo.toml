@@ -1,0 +1,10 @@
+[package]
+name = "opengeometry-snapshot"
+version = "2.5.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+opengeometry = { path = "../../opengeometry" }
+serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
+sha2 = "=0.10.9"

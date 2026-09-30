@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["opengeometry-three/tests/**/*.ts", "scripts/lib/node-builtins.d.ts", "playwright.config.ts"]
+}

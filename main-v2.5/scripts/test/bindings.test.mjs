@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { initSync, OGWorldGraph, OGTessellator } from '../../opengeometry/pkg/opengeometry.js';
+
+initSync({ module: readFileSync(new URL('../../opengeometry/pkg/opengeometry_bg.wasm', import.meta.url)) });
+const ACCURACY = { geometric: 1e-8, intersection: 1e-9, tessellation: 0.01, exchange: 1e-6 };
+const GRAPH = new OGWorldGraph(JSON.stringify(ACCURACY));
+const ENCODE = JSON.stringify;
+const UNIT_CUBE = { kind: 'Cuboid', width: 1, height: 1, depth: 1 };
+const CUBE = JSON.parse(GRAPH.createPrimitive(ENCODE(UNIT_CUBE), ENCODE({ og_id: 'cube' })));
+assert.equal(CUBE.ogId, 'cube');
+const INFO = JSON.parse(GRAPH.node('cube'));
+assert.equal(INFO.bodyType, 'Solid');
+assert.equal(JSON.parse(GRAPH.nodeByHandle(INFO.handle, INFO.generation)).ogId, 'cube');
+assert.throws(
+  () => GRAPH.createPrimitive(ENCODE({ kind: 'Cuboid', width: 1, height: 1, depth: 1, extra: 1 }), '{}'),
+  (error) => JSON.parse(String(error)).code === 'InvalidParameter',
+);
+assert.throws(
+  () => GRAPH.createPrimitive(ENCODE({ kind: 'Polyline', points: [[0, 0, 0], [1, 0, 0]], closed: false }), '{}'),
+  (error) => JSON.parse(String(error)).code === 'InvalidParameter',
+);
+
+const SNAPSHOT = GRAPH.snapshot(INFO.shapeId);
+assert(SNAPSHOT instanceof Uint8Array);
+const TESSELLATOR = new OGTessellator();
+const SLOT = TESSELLATOR.load(SNAPSHOT);
+const DIRECT = GRAPH.buffers(INFO.shapeId, 0.01, 1000);
+const LOADED = TESSELLATOR.buffers(SLOT, 0.01, 1000);
+assert.deepEqual(DIRECT.positions, LOADED.positions);
+assert.deepEqual(DIRECT.faceRanges, LOADED.faceRanges);
+assert.equal(DIRECT.triangles, 12);
+assert.equal(TESSELLATOR.drop(SLOT), true);
+
+const MARK = GRAPH.mark();
+GRAPH.transform('cube', ENCODE({ kind: 'Translate', offset: [2, 0, 0] }));
+assert(Math.abs(JSON.parse(GRAPH.bounds('cube'))[0] - 1.5) < 1e-6);
+GRAPH.rollback(MARK);
+GRAPH.release(MARK);
+assert(Math.abs(JSON.parse(GRAPH.bounds('cube'))[0] + 0.5) < 1e-6);
+const CHANGES = GRAPH.changesSince(0n);
+assert(CHANGES.matrices instanceof Float64Array);
+assert.equal(CHANGES.matrices.length, 16);
+
+const COPY = JSON.parse(GRAPH.instance('cube', '{}'));
+assert.equal(GRAPH.instanceCount('cube'), 2);
+GRAPH.makeUnique(COPY.ogId);
+assert.equal(GRAPH.instanceCount('cube'), 1);
+const EXPORTED = GRAPH.exportStep(ENCODE(['cube']), '{}');
+assert(EXPORTED.text.includes('MANIFOLD_SOLID_BREP'));
+assert.equal(JSON.parse(EXPORTED.reportJson).products, 1);
+GRAPH.dispose('cube');
+assert.throws(
+  () => GRAPH.nodeByHandle(INFO.handle, INFO.generation),
+  (error) => JSON.parse(String(error)).code === 'Disposed',
+);
+TESSELLATOR.free();
+GRAPH.free();
+console.log('WASM bindings passed');

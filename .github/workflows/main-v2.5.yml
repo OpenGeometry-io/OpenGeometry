@@ -1,0 +1,80 @@
+name: OpenGeometry 2.5 verification
+
+on:
+  push:
+    paths:
+      - 'main-v2.5/**'
+      - '.github/workflows/main-v2.5.yml'
+  pull_request:
+    paths:
+      - 'main-v2.5/**'
+      - '.github/workflows/main-v2.5.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.88.0'
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: main-v2.5/package-lock.json
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --version 0.13.1 --locked
+      - name: Regenerate source parity fixtures
+        run: cargo run --manifest-path main-v2.5/tools/parity-oracle/Cargo.toml -- main-v2.5/opengeometry/tests/fixtures/parity
+      - name: Check parity oracle tools
+        run: |
+          cargo fmt -p parity-oracle --manifest-path main-v2.5/tools/parity-oracle/Cargo.toml -- --check
+          cargo clippy -p parity-oracle --bins --manifest-path main-v2.5/tools/parity-oracle/Cargo.toml -- -D warnings
+      - name: Check Rust formatting
+        run: cargo fmt --all --manifest-path main-v2.5/opengeometry/Cargo.toml -- --check
+      - name: Check Rust lints and compilation
+        run: |
+          cargo clippy --all-targets --manifest-path main-v2.5/opengeometry/Cargo.toml -- -D warnings
+          cargo check --manifest-path main-v2.5/opengeometry/Cargo.toml
+      - name: Record Linux golden and test determinism
+        run: |
+          OG_GOLDEN_UPDATE=1 cargo test --manifest-path main-v2.5/opengeometry/Cargo.toml --test golden
+          cargo test --manifest-path main-v2.5/opengeometry/Cargo.toml --all-targets
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-golden
+          path: main-v2.5/opengeometry/tests/fixtures/golden/*-unknown-linux-gnu.sweep-3d.sha256
+      - name: Test wasm32
+        run: wasm-pack test --node
+        working-directory: main-v2.5/opengeometry
+      - name: Install SDK dependencies
+        run: npm ci
+        working-directory: main-v2.5
+      - name: Build and check SDK
+        run: |
+          npm run build
+          npm run lint:check
+          npx tsc --emitDeclarationOnly --pretty false
+          npm run build-example
+          npm run test:bindings
+          npm run test:sdk-node
+          npm run test:performance
+        working-directory: main-v2.5
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: main-v2.5
+      - name: Test Three 0.168
+        run: npm run test:browser -- --workers=1
+        working-directory: main-v2.5
+      - name: Test Three 0.184
+        run: npm run test:browser -- --workers=1
+        working-directory: main-v2.5
+        env:
+          OG_THREE_VERSION: '184'

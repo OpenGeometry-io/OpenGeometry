@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenGeometry Analytic Cylinder Example</title>
+    <link rel="stylesheet" href="../theme.css" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Analytic Cylinder</span>
+    </div>
+    <aside class="og-controls">
+      <h3>Analytic Cylinder</h3>
+      <p
+        class="og-control-summary">Full authoritative cylinder with deflection tessellation.</p>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Radius</span>
+        <input id="radius" type="number" min="0.3" max="2" step="0.05"
+          value="0.9" required />
+      </label>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Height</span>
+        <input id="height" type="number" min="0.5" max="4" step="0.1" value="2"
+          required />
+      </label>
+      <label class="og-control-row">
+        <span class="og-control-label-chip">Chord error</span>
+        <input id="deflection" type="range" min="-3" max="-0.5" step="0.1"
+          value="-2" />
+      </label>
+      <label
+        class="og-control-row"><input id="wireframe" type="checkbox" /> Show render triangles</label>
+      <label
+        class="og-control-row"><input id="outline" type="checkbox" checked /> Show feature outlines</label>
+      <p id="statistics" role="status"></p>
+      <p id="selection">Click a surface to inspect its analytic face.</p>
+      <p id="error" role="alert"></p>
+      <p id="status" class="og-control-summary" role="status" aria-live="polite">Loading kernel…</p>
+    </aside>
+    <div id="app"></div>
+
+    <script>
+      if (location.protocol === 'file:') document.querySelector('#status').textContent = 'Open this page through the Vite server.';
+      window.addEventListener('error', (event) => { document.querySelector('#status').textContent = `Error: ${event.message}`; }, true);
+      window.addEventListener('unhandledrejection', (event) => { document.querySelector('#status').textContent = `Error: ${String(event.reason)}`; });
+    </script>
+    <script type="module" src="./cylinder.ts"></script>
+  </body>
+</html>

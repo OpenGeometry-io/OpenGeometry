@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenGeometry 2.5 acceptance</title>
+  </head>
+  <body>
+    <main id="status">Building acceptance scene</main>
+    <script>
+      if (location.protocol === 'file:') {
+        document.querySelector('#status').textContent = 'Use the local Vite server for this example. From the repository root, run: npm --prefix main-v2.5 run dev-test-pages -- --host 127.0.0.1 --port 5100 --strictPort. Then open http://127.0.0.1:5100/acceptance.html';
+      }
+      window.addEventListener('error', (event) => {
+        if (location.protocol !== 'file:') document.querySelector('#status').textContent = `Kernel failed to load: ${event.message || 'check the browser console'}`;
+      }, true);
+      window.addEventListener('unhandledrejection', (event) => {
+        if (location.protocol !== 'file:') document.querySelector('#status').textContent = `Kernel failed to load: ${String(event.reason)}`;
+      });
+    </script>
+    <script type="module" src="./acceptance.ts"></script>
+  </body>
+</html>

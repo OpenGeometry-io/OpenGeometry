@@ -28,6 +28,16 @@ dist/
 main/opengeometry-three/examples-dist/
 main/opengeometry-three/examples-vite/.generated/
 main/opengeometry/pkg/
+main-v2.5/opengeometry/pkg/
+main-v2.5/dist/
+main-v2.5/opengeometry-three/examples-dist/
+main-v2.5/**/target/
+main-v2.5/test-results/
+main-v2.5/playwright-report/
+!main-v2.5/opengeometry/Cargo.lock
+!main-v2.5/tools/parity-oracle/**/Cargo.lock
+!main-v2.5/tools/snapshot/Cargo.lock
+!main-v2.5/opengeometry/test-support/Cargo.lock
 
 .DS_Store
 .vscode/
