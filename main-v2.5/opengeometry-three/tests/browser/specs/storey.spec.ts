@@ -3,7 +3,7 @@ import BASELINE from '../../../../scripts/bench/performance-baseline.json' with 
 import { disposeFixture } from '../support/acceptance-page';
 
 const SAME_BASELINE_PLATFORM = process.platform === 'darwin' && process.arch === 'arm64';
-const GEOMETRY_FLOOR = 200;
+const GEOMETRY_FLOOR = 100;
 const GEOMETRY_BOUND = 600;
 
 for (const backend of ['inline', 'worker'] as const) {

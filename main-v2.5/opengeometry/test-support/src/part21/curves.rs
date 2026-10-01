@@ -1,12 +1,13 @@
 use super::document::Document;
 use super::lexer::{fields, reference, references};
+use crate::vector::{cross, dot, norm, sub};
 use std::f64::consts::{FRAC_PI_2, TAU};
 
 pub(super) struct Conic3 {
     pub(super) origin: [f64; 3],
     pub(super) x: [f64; 3],
     pub(super) y: [f64; 3],
-    pub(super) z: [f64; 3],
+    z: [f64; 3],
     pub(super) a: f64,
     pub(super) b: f64,
 }
@@ -127,24 +128,4 @@ fn ellipse_distance(px: f64, py: f64, pz: f64, a: f64, b: f64) -> f64 {
     }
     let (sin, cos) = t.sin_cos();
     (pz * pz + (a * cos - x).powi(2) + (b * sin - y).powi(2)).sqrt()
-}
-
-pub(super) fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-    std::array::from_fn(|index| a[index] - b[index])
-}
-
-pub(super) fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (0..3).map(|index| a[index] * b[index]).sum()
-}
-
-fn norm(a: [f64; 3]) -> f64 {
-    dot(a, a).sqrt()
-}
-
-fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
 }

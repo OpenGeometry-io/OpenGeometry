@@ -1,3 +1,4 @@
+use crate::vector::{add, dot, norm, scale, sub, unit};
 use opengeometry::brep::{BrepEnvelope, Similarity3, SurfaceGeometry};
 use opengeometry::math::Point3;
 use opengeometry::world_graph::WorldGraph;
@@ -168,28 +169,4 @@ fn segment_distance(p: [Point3; 2], q: [Point3; 2]) -> f64 {
         s = ((b - c) / a).clamp(0.0, 1.0);
     }
     norm(sub(add(p[0], scale(u, s)), add(q[0], scale(v, t))))
-}
-
-fn add(a: Point3, b: Point3) -> Point3 {
-    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
-}
-
-fn sub(a: Point3, b: Point3) -> Point3 {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-fn scale(a: Point3, s: f64) -> Point3 {
-    [a[0] * s, a[1] * s, a[2] * s]
-}
-
-fn dot(a: Point3, b: Point3) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn norm(a: Point3) -> f64 {
-    dot(a, a).sqrt()
-}
-
-fn unit(a: Point3) -> Point3 {
-    scale(a, 1.0 / norm(a))
 }

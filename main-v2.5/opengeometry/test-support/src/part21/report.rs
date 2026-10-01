@@ -1,6 +1,6 @@
-use super::curves::{dot, sub};
 use super::document::Document;
 use super::lexer::{fields, reference, references};
+use crate::vector::{dot, sub};
 use std::f64::consts::TAU;
 
 pub struct ParameterDirectionReport {
