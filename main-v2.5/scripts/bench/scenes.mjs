@@ -1,5 +1,5 @@
 import {
-  Wire, Solid, OG_PRIMITIVE_RECTANGLE, OG_PRIMITIVE_CUBOID, OG_OPERATION_EXTRUDE,
+  Wire, Solid, OG_PRIMITIVE_RECTANGLE, OG_PRIMITIVE_POLYLINE, OG_PRIMITIVE_CUBOID, OG_OPERATION_EXTRUDE,
 } from '../../dist/index.js';
 import { graph } from '../../dist/testing.js';
 
@@ -22,4 +22,11 @@ export function cutters(count, prefix, width, step, rotation = 0) {
 export function wall(prefix, width, height = 3) {
   const profile = new Wire(OG_PRIMITIVE_RECTANGLE, { width, breadth: 0.2 }, { ogId: `${prefix}-profile` });
   return { profile, body: new Solid(OG_OPERATION_EXTRUDE, { profile, distance: height }, { ogId: `${prefix}-wall` }) };
+}
+
+export function mitredWall(prefix, length) {
+  const end = length / 2;
+  const points = [[-end, 0, -0.1], [end, 0, -0.1], [end - 0.2, 0, 0.1], [-end + 0.2, 0, 0.1]];
+  const profile = new Wire(OG_PRIMITIVE_POLYLINE, { points, closed: true }, { ogId: `${prefix}-profile` });
+  return new Solid(OG_OPERATION_EXTRUDE, { profile, distance: 3 }, { ogId: `${prefix}-wall` });
 }

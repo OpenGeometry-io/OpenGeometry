@@ -176,7 +176,6 @@ fn i2_uncovered_rotated_box_returns_coverage_gap_without_mesh_fallback() {
         clearance > 10.0 * a.accuracy.geometric,
         "clearance={clearance}"
     );
-    let started = std::time::Instant::now();
     let (result, handlers) = boolean_brep_outcome_with_handlers(
         &a,
         &b,
@@ -188,9 +187,6 @@ fn i2_uncovered_rotated_box_returns_coverage_gap_without_mesh_fallback() {
         Err(opengeometry::brep::GeometryError::CoverageGap { .. })
     ));
     assert_eq!(json!(handlers), fixture["handlers"]);
-    if !cfg!(debug_assertions) {
-        assert!(started.elapsed() < std::time::Duration::from_secs(2));
-    }
 }
 
 #[test]

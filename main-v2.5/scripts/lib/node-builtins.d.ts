@@ -90,7 +90,7 @@ declare const process: {
   argv: string[];
   arch: string;
   platform: string;
-  env: { OG_THREE_VERSION?: string; OG_PW_PORT_BASE?: string };
+  env: { OG_THREE_VERSION?: string; OG_PW_PORT_BASE?: string; CI?: string };
   exitCode: number | undefined;
   stdout: { write(text: string): boolean };
   stderr: { write(text: string): boolean };

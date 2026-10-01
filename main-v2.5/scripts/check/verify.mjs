@@ -8,10 +8,7 @@ import { REPOSITORY_ROOT } from '../lib/paths.mjs';
 const LOG_DIRECTORY = path.join(REPOSITORY_ROOT, '.check');
 const WORKER_BUNDLE = path.join(REPOSITORY_ROOT, 'dist/tessellation-worker.js');
 const THREE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(?\s*)['"]three(?:\/[^'"]*)?['"]/;
-const REGRESSION = /^Error: (\w+) regressed: /m;
-const FLAKY_METRIC = 'rotated20BooleanMs';
 const FLAKY_BROWSER_TEST = 'instance geometry memory returns to baseline after disposal';
-const PERFORMANCE_RETRIES = 2;
 const BROWSER_REPEATS = 5;
 
 function crateSteps(name, directory, lintTargets, withTests) {
@@ -115,12 +112,6 @@ export function selectSteps(argv) {
   return selected;
 }
 
-function performanceFlake(log) {
-  const metric = REGRESSION.exec(log)?.[1];
-  if (metric === undefined) return undefined;
-  return { verdict: metric === FLAKY_METRIC ? 'KNOWN-FLAKE' : 'INVESTIGATE', detail: metric };
-}
-
 function failedTests(lines) {
   const index = lines.findIndex((line) => /^ {2}\d+ failed$/.test(line));
   if (index < 0) return [];
@@ -137,7 +128,6 @@ function browserFlake(log) {
 }
 
 export function classifyFlake(stepName, log) {
-  if (stepName === 'test:performance') return performanceFlake(log);
   if (stepName.startsWith('browser:')) return browserFlake(log);
   return undefined;
 }
@@ -199,17 +189,6 @@ async function attempt(step, suffix) {
   return { status, text: readFileSync(file, 'utf8') };
 }
 
-async function performanceRetry(step, status) {
-  for (let retry = 1; retry <= PERFORMANCE_RETRIES; retry += 1) {
-    const rerun = await attempt(step, `.retry-${String(retry)}`);
-    if (rerun.status === 0) return { status: 0, note: `KNOWN-FLAKE ${FLAKY_METRIC}, passed on retry ${String(retry)}` };
-    const flake = classifyFlake(step.name, rerun.text);
-    if (flake === undefined) return { status: rerun.status, note: `retry ${String(retry)} failed` };
-    if (flake.verdict === 'INVESTIGATE') return { status: rerun.status, note: `INVESTIGATE ${flake.detail}` };
-  }
-  return { status, note: `${FLAKY_METRIC} regressed on ${String(PERFORMANCE_RETRIES)} retries` };
-}
-
 async function browserRepeat(step, status) {
   const repeat = `--repeat-each=${String(BROWSER_REPEATS)}`;
   const commands = [['npm', 'run', 'test:browser', '--', repeat, '--grep', FLAKY_BROWSER_TEST]];
@@ -225,8 +204,6 @@ async function stepOutcome(step) {
   if (first.status === 0) return { status: 0, note: '' };
   const flake = classifyFlake(step.name, first.text);
   if (flake === undefined) return { status: first.status, note: '' };
-  if (flake.verdict === 'INVESTIGATE') return { status: first.status, note: `INVESTIGATE ${flake.detail}` };
-  if (step.name === 'test:performance') return performanceRetry(step, first.status);
   return browserRepeat(step, first.status);
 }
 

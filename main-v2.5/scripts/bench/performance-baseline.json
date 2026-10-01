@@ -1,19 +1,25 @@
 {
-  "platform": "darwin-arm64",
-  "measuredOn": "2026-09-28",
-  "wall50BooleanMs": 585.801167,
-  "wall50TessellationMs": 20.856875,
-  "rotated20BooleanMs": 113.652833,
-  "sliderRebuildMs": 11.657083,
-  "sliderBooleanMs": 18.787875,
-  "sliderTessellationMs": 1.423875,
-  "storeyFirstRenderMs": 341.2,
-  "storeyTransformFlushMs": 12.3,
-  "storeyStepMs": 1647.6,
-  "storeyStepBytes": 48476818,
-  "storeyStepEntities": 830410,
-  "nonparallelCylinderStepBytes": 4924611,
-  "nativeSourceWall50TessellationMs": 3.25431708,
-  "nativeNextWall50TessellationMs": 3.21790917,
-  "nativeWall50Triangles": 1220
+  "sizes": {
+    "wall50Triangles": 1220,
+    "sliderTriangles": 92,
+    "mitred20Triangles": 332,
+    "storeyStepBytes": 48476818,
+    "storeyStepEntities": 830410,
+    "nonparallelCylinderStepBytes": 4924611
+  },
+  "timings": {
+    "darwin-arm64": {
+      "measuredOn": "2026-10-01",
+      "wall50BooleanMs": 627.670167,
+      "wall50TessellationMs": 19.105958,
+      "rotated20BooleanMs": 119.950083,
+      "mitred20BooleanMs": 637.486417,
+      "sliderRebuildMs": 1.542709,
+      "sliderBooleanMs": 9.603958,
+      "sliderTessellationMs": 1.4455,
+      "storeyFirstRenderMs": 341.2,
+      "storeyTransformFlushMs": 13.1,
+      "storeyStepMs": 1615.8
+    }
+  }
 }
