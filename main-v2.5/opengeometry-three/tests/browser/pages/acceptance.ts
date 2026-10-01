@@ -132,7 +132,7 @@ const SECOND_EXPORT = await OpenGeometry.exportStep({ nodes: [LEVEL] });
 if (FIRST_EXPORT.text !== SECOND_EXPORT.text || FIRST_EXPORT.report.products !== 12) {
   throw new Error('Level STEP export is not deterministic');
 }
-const SKIPPED = FIRST_EXPORT.report.skipped as { ogId: string }[];
+const SKIPPED = FIRST_EXPORT.report.skipped;
 const SKIPPED_WIRES = ['wall-profile', 'rail-path', 'rail-disc'];
 if (SKIPPED.length !== 3 || !SKIPPED_WIRES.every((id) => SKIPPED.some((item) => item.ogId === id))) {
   throw new Error('STEP wire skips differ');

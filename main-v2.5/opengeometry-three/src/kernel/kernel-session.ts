@@ -1,6 +1,8 @@
 import { OGError } from '../errors.js';
 import { emit } from '../runtime/event-bus.js';
 import { runtime as runtimeState } from '../runtime/runtime-state.js';
+import { parseKernelError } from './kernel-errors.js';
+import { takePanicMessage } from './kernel-loader.js';
 
 export function kernelCall<T>(call: string, fn: () => T): T {
   try {
@@ -8,16 +10,10 @@ export function kernelCall<T>(call: string, fn: () => T): T {
   } catch (cause) {
     if (cause instanceof OGError) throw cause;
     if (cause instanceof WebAssembly.RuntimeError) {
-      throw new OGError('KernelPanic', call, cause.message);
+      throw new OGError('KernelPanic', call, takePanicMessage() ?? cause.message);
     }
-    if (typeof cause === 'string') {
-      try {
-        const value = JSON.parse(cause) as { code: string; message: string; details: unknown };
-        if (value.code && value.message) throw new OGError(value.code, call, value.message, value.details);
-      } catch (parsed) {
-        if (parsed instanceof OGError) throw parsed;
-      }
-    }
+    const value = typeof cause === 'string' ? parseKernelError(cause) : undefined;
+    if (value) throw new OGError(value.code, call, value.message, value.details);
     throw new OGError('InvalidGeometry', call, String(cause));
   }
 }

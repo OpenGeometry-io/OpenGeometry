@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Brep } from '../dto/brep.js';
 import type { NodeInfo } from '../dto/node-info.js';
 import type { Placement } from '../dto/placement.js';
 import { OGError } from '../errors.js';
@@ -10,7 +11,7 @@ import { worldUnitsPerPixel } from '../rendering/lod/screen-metrics.js';
 import { lineMaterial, releaseLine, releaseSurface, surfaceMaterial } from '../rendering/materials/material-pool.js';
 import type { GeometryRecord } from '../rendering/records/geometry-record.js';
 import { runtime } from '../runtime/runtime-state.js';
-import { encode, operationParams, scope } from '../world-graph/codec.js';
+import { encode, operationParams, polylinePoints, scope } from '../world-graph/codec.js';
 import { node, worldGraph } from '../world-graph/world-graph-client.js';
 import type { Appearance, BodyOptions } from './body-options.js';
 import { register, unregister } from './body-registry.js';
@@ -49,7 +50,7 @@ export abstract class Body extends THREE.Group {
   protected constructor(ogId: string, bodyType: 'Wire' | 'Solid', options: BodyOptions) {
     super();
     this.ogId = ogId;
-    this.lastInfo = node(ogId);
+    this.lastInfo = node(ogId, `${bodyType}.constructor`);
     this.handle = this.lastInfo.handle;
     this.generation = this.lastInfo.generation;
     this.bodyType = bodyType;
@@ -72,10 +73,10 @@ export abstract class Body extends THREE.Group {
     this.surface.onBeforeRender = (renderer, _scene, camera) => { this.observeCamera(renderer, camera); };
     this.outline.onBeforeRender = (renderer, _scene, camera) => { this.observeCamera(renderer, camera); };
     register(this);
-    this.applyWorldMatrix(call('Body.constructor', () => worldGraph().worldMatrix(ogId)));
+    this.applyWorldMatrix(call(`${bodyType}.constructor`, () => worldGraph().worldMatrix(ogId)));
   }
 
-  protected check(): void { checkNode('Body', 'body', this.epoch, this.handle, this.generation); }
+  protected check(call: string): void { checkNode(call, 'body', this.epoch, this.handle, this.generation); }
 
   private observeCamera(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void {
     const state = runtime();
@@ -152,30 +153,36 @@ export abstract class Body extends THREE.Group {
   }
 
   transform(kind: string, params: Record<string, unknown>): void {
-    this.check();
+    this.check(`${this.bodyType}.transform`);
     call(`${this.bodyType}.transform`, () => worldGraph().transform(this.ogId, encode({ kind, ...params })));
   }
 
-  getPlacement(): Placement { this.check(); return getPlacement(this.bodyType, this.ogId); }
+  getPlacement(): Placement {
+    this.check(`${this.bodyType}.getPlacement`);
+    return getPlacement(this.bodyType, this.ogId);
+  }
 
-  getWorldPlacement(): Placement { this.check(); return getWorldPlacement(this.bodyType, this.ogId); }
+  getWorldPlacement(): Placement {
+    this.check(`${this.bodyType}.getWorldPlacement`);
+    return getWorldPlacement(this.bodyType, this.ogId);
+  }
 
   addChild(children: (Body | SystemAssembly)[], options: { keepWorld?: boolean } = {}): void {
-    this.check();
+    this.check(`${this.bodyType}.addChild`);
     addChild(this.bodyType, this.ogId, children, Boolean(options.keepWorld));
   }
 
   removeChild(child: Body | SystemAssembly, options: { keepWorld?: boolean } = {}): void {
-    this.check();
+    this.check(`${this.bodyType}.removeChild`);
     removeChild(this.bodyType, this.ogId, child.ogId, Boolean(options.keepWorld));
   }
 
-  getChildren(): string[] { this.check(); return getChildren(this.bodyType, this.ogId); }
+  getChildren(): string[] { this.check(`${this.bodyType}.getChildren`); return getChildren(this.bodyType, this.ogId); }
 
-  getParent(): string | null { this.check(); return getParent(this.bodyType, this.ogId); }
+  getParent(): string | null { this.check(`${this.bodyType}.getParent`); return getParent(this.bodyType, this.ogId); }
 
   getBounds(): [number, number, number, number, number, number] | null {
-    this.check();
+    this.check(`${this.bodyType}.getBounds`);
     return getBounds(this.bodyType, this.ogId);
   }
 
@@ -191,32 +198,31 @@ export abstract class Body extends THREE.Group {
     return this.sizeCache;
   }
 
-  getBrep() { this.check(); return getBrep(this.bodyType, this.ogId); }
+  getBrep(): Brep { this.check(`${this.bodyType}.getBrep`); return getBrep(this.bodyType, this.ogId); }
 
-  getInstanceCount(): number { this.check(); return getInstanceCount(this.bodyType, this.ogId); }
+  getInstanceCount(): number {
+    this.check(`${this.bodyType}.getInstanceCount`);
+    return getInstanceCount(this.bodyType, this.ogId);
+  }
 
   makeUnique(): void {
-    this.check();
+    this.check(`${this.bodyType}.makeUnique`);
     call(`${this.bodyType}.makeUnique`, () => worldGraph().makeUnique(this.ogId));
     flush();
   }
 
   rebuild(kind: string, params: Record<string, unknown>, options: { instances?: 'all' } = {}): void {
-    this.check();
+    this.check(`${this.bodyType}.rebuild`);
     const graph = worldGraph();
+    const label = `${this.bodyType}.rebuild`;
     if (kind === 'Polyline') {
-      const points = params['points'] as [number, number, number][];
-      call(`${this.bodyType}.rebuild`, () => graph.rebuildPolyline(
-        this.ogId, new Float64Array(points.flat()), Boolean(params['closed']), scope(options),
-      ));
+      const points = polylinePoints(params, label);
+      call(label, () => graph.rebuildPolyline(this.ogId, points, Boolean(params['closed']), scope(options)));
     } else if (kind === 'Extrude' || kind === 'Sweep') {
-      call(`${this.bodyType}.rebuild`, () => graph.rebuildOperation(
-        this.ogId, encode(operationParams(kind, params)), scope(options),
-      ));
+      const operation = encode(operationParams(kind, params, label));
+      call(label, () => graph.rebuildOperation(this.ogId, operation, scope(options)));
     } else {
-      call(`${this.bodyType}.rebuild`, () => graph.rebuildPrimitive(
-        this.ogId, encode({ kind, ...params }), scope(options),
-      ));
+      call(label, () => graph.rebuildPrimitive(this.ogId, encode({ kind, ...params }), scope(options)));
     }
     flush();
   }
@@ -238,12 +244,12 @@ export abstract class Body extends THREE.Group {
   reviveIfRestored(): void {
     if (!this.inLimbo) return;
     try {
-      call('revive', () => worldGraph().nodeByHandle(this.handle, this.generation));
+      call('OGMark.rollback', () => worldGraph().nodeByHandle(this.handle, this.generation));
       this.inLimbo = false;
       this.visible = true;
       this.previousParent?.add(this);
       this.previousParent = null;
-      this.lastInfo = node(this.ogId);
+      this.lastInfo = node(this.ogId, 'OGMark.rollback');
     } catch { this.visible = false; }
   }
 
@@ -257,7 +263,7 @@ export abstract class Body extends THREE.Group {
   }
 
   dispose(): void {
-    this.check();
+    this.check(`${this.bodyType}.dispose`);
     call(`${this.bodyType}.dispose`, () => worldGraph().dispose(this.ogId));
     this.hideForDispose();
     flush();

@@ -13,17 +13,17 @@ export class Wire extends Body {
     if (this.lastInfo.bodyType !== 'Wire') throw new OGError('BodyTypeMismatch', 'Wire.constructor', 'expected Wire');
   }
   instance(options: { ogId?: string; parent?: SystemAssembly } = {}): Wire {
-    this.check();
+    this.check('Wire.instance');
     const ogId = creation(call('Wire.instance', () => worldGraph().instance(
       this.ogId, encode({ ogId: options.ogId, parent: options.parent?.ogId }),
-    )));
+    )), 'Wire.instance');
     return new Wire('', existingParams(ogId));
   }
   duplicate(options: { ogId?: string; parent?: SystemAssembly } = {}): Wire {
-    this.check();
+    this.check('Wire.duplicate');
     const ogId = creation(call('Wire.duplicate', () => worldGraph().duplicate(
       this.ogId, encode({ ogId: options.ogId, parent: options.parent?.ogId }),
-    )));
+    )), 'Wire.duplicate');
     return new Wire('', existingParams(ogId));
   }
 }

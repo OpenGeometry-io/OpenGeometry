@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { DisplayBuffers } from '../../dto/display-buffers.js';
+import { validateDisplayBuffers } from './validate-display-buffers.js';
 
 export class GeometryRecord {
   readonly key: string;
@@ -16,16 +17,7 @@ export class GeometryRecord {
   lastUse = 0;
 
   constructor(readonly shapeId: string, buffers: DisplayBuffers) {
-    if (!(buffers.positions instanceof Float32Array) || !(buffers.normals instanceof Float32Array)
-      || !(buffers.indices instanceof Uint32Array) || !(buffers.faceRanges instanceof Uint32Array)
-      || !(buffers.outline instanceof Float32Array) || !(buffers.edgeIds instanceof Uint32Array)
-      || !(buffers.origin instanceof Float64Array) || buffers.origin.length !== 3
-      || buffers.positions.length % 3 || buffers.normals.length !== buffers.positions.length
-      || buffers.indices.length % 3 || buffers.indices.length > 6_000_000
-      || buffers.outline.length % 6 || buffers.outline.length > 12_000_000
-      || buffers.edgeIds.length !== buffers.outline.length / 6 || buffers.faceRanges.length % 3) {
-      throw new Error('Invalid display buffer structure');
-    }
+    validateDisplayBuffers(buffers);
     this.key = `${shapeId}@${String(buffers.revision)}#${String(Math.log2(buffers.bucket))}`;
     this.revision = buffers.revision;
     this.bucket = buffers.bucket;

@@ -1,36 +1,34 @@
-import type { ChangeSet } from '../../dto/change-set.js';
 import type { DisplayBuffers } from '../../dto/display-buffers.js';
 import { OGError } from '../../errors.js';
 import { call } from '../../kernel/kernel-session.js';
 import type { Body } from '../../bodies/body.js';
 import { emit } from '../../runtime/event-bus.js';
 import { currentRuntime, runtime, type Runtime } from '../../runtime/runtime-state.js';
+import { decodeChangeSet } from '../../world-graph/codec.js';
 import { node } from '../../world-graph/world-graph-client.js';
 import { wantedBucket } from '../lod/deflection.js';
 import type { TessellationRequest } from '../provider.js';
 import { GeometryRecord } from '../records/geometry-record.js';
+import { validateDisplayBuffers } from '../records/validate-display-buffers.js';
 
 type GeometryTarget = { body: Body; shapeId: string; revision: number; bucket: number; key: string };
 
 export function flush(options: { geometry?: 'sync' } = {}): void {
   const state = runtime();
-  const revision = state.graph.revision();
+  const revision = call('OpenGeometry.flush', () => state.graph.revision());
   if (!state.flushing
     && (revision !== state.revision || (!state.renderPassActive && state.readyVersion !== state.flushedReadyVersion))) {
     state.flushing = true;
     try {
-      const packet = call('OpenGeometry.flush', () => state.graph.changesSince(state.revision)) as {
-        changesJson: string;
-        matrices: Float64Array;
-      };
+      const packet = call('OpenGeometry.flush', (): unknown => state.graph.changesSince(state.revision));
+      const { changes, matrices } = decodeChangeSet(packet, 'OpenGeometry.flush');
       state.revision = revision;
-      const changes = JSON.parse(packet.changesJson) as ChangeSet;
       let offset = 0;
       for (const changed of [...changes.added, ...changes.changed]) {
         const body = state.bodies.get(changed.ogId);
         if (body) {
-          body.lastInfo = node(body.ogId);
-          body.applyWorldMatrix(packet.matrices.subarray(offset, offset + 16));
+          body.lastInfo = node(body.ogId, 'OpenGeometry.flush');
+          body.applyWorldMatrix(matrices.subarray(offset, offset + 16));
         }
         offset += 16;
       }
@@ -91,24 +89,31 @@ function computeNow(state: Runtime, target: GeometryTarget, sync: boolean): void
   try {
     const request = requestFor(body, bucket);
     if (sync) state.provider.cancelShape(shapeId, request.generation);
-    const buffers = state.provider.compute
-      ? state.provider.compute(request)
-      : state.graph.buffers(shapeId, bucket, 2_000_000) as DisplayBuffers;
-    receive(shapeId, revision, bucket, buffers);
+    receive(shapeId, revision, bucket, computed(state, request));
   } catch (error) {
+    if (fatal(state, error)) throw error;
     if (error instanceof OGError && error.code === 'LimitExceeded' && !state.failedBuckets.has(key)) {
       state.failedBuckets.add(key);
       state.buckets.set(shapeId, bucket * 2);
       emit('warning', { code: 'LimitExceeded', shapeId, revision, bucket, retryBucket: bucket * 2 });
       try {
-        const coarser = requestFor(body, bucket * 2);
-        const buffers = state.provider.compute
-          ? state.provider.compute(coarser)
-          : state.graph.buffers(shapeId, bucket * 2, 2_000_000) as DisplayBuffers;
-        receive(shapeId, revision, bucket * 2, buffers);
-      } catch (retry) { emit('error', retry); }
+        receive(shapeId, revision, bucket * 2, computed(state, requestFor(body, bucket * 2)));
+      } catch (retry) {
+        if (fatal(state, retry)) throw retry;
+        emit('error', retry);
+      }
     } else emit('error', error);
   }
+}
+
+function computed(state: Runtime, request: TessellationRequest): DisplayBuffers {
+  if (state.provider.compute) return state.provider.compute(request);
+  return validateDisplayBuffers(call('OpenGeometry.flush', (): unknown =>
+    state.graph.buffers(request.shapeId, request.bucket, request.maxTriangles)));
+}
+
+function fatal(state: Runtime, error: unknown): boolean {
+  return state.poisoned && error instanceof OGError && error.code === 'KernelPanic';
 }
 
 function requestLater(state: Runtime, target: GeometryTarget): void {
@@ -129,7 +134,8 @@ function requestLater(state: Runtime, target: GeometryTarget): void {
       receive(shapeId, revision, buffers.bucket, buffers);
     }
   }).catch((error: unknown) => {
-    if (currentRuntime() === state && !(error instanceof OGError && error.code === 'Cancelled')) emit('error', error);
+    if (currentRuntime() !== state || fatal(state, error)) return;
+    if (!(error instanceof OGError && error.code === 'Cancelled')) emit('error', error);
   }).finally(() => { state.pending.delete(key); });
   state.pending.set(key, promise);
 }

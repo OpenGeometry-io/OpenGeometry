@@ -75,7 +75,7 @@ function createExample(): Example {
     try {
       result.operate(OPERATION(), { tools: [tool] });
       faces = result.getBrep().topology.faces.length;
-      contacts = result.getReport().report.contacts.length;
+      contacts = result.getReport()?.report.contacts.length ?? 0;
     } catch (error) {
       if (!(error instanceof OGError && error.code === 'EmptyResult')) throw error;
       empty = true;

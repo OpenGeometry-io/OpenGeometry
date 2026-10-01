@@ -1,4 +1,5 @@
-import { initSync, OGTessellator } from '../kernel/kernel-loader.js';
+import { parseKernelError } from '../kernel/kernel-errors.js';
+import { initSync, OGTessellator, takePanicMessage } from '../kernel/kernel-loader.js';
 import type { DisplayBuffers } from '../dto/display-buffers.js';
 
 type Job = {
@@ -23,15 +24,11 @@ const JOBS_STARTED = new Map<string, number>();
 const CHANNEL = new MessageChannel();
 
 function error(value: unknown): WorkerError {
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value) as { code: string; message: string; details?: unknown };
-      if (parsed.code && parsed.message) return parsed;
-    } catch {
-      return { code: 'WorkerFailure', message: value, details: {} };
-    }
+  if (value instanceof WebAssembly.RuntimeError) {
+    return { code: 'KernelPanic', message: takePanicMessage() ?? value.message, details: {} };
   }
-  return { code: 'WorkerFailure', message: String(value), details: {} };
+  const parsed = typeof value === 'string' ? parseKernelError(value) : undefined;
+  return parsed ?? { code: 'WorkerFailure', message: String(value), details: {} };
 }
 
 function evict(except: string): void {

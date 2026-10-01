@@ -1,6 +1,7 @@
 import type { DisplayBuffers } from '../dto/display-buffers.js';
 import { OGError } from '../errors.js';
 import type { OGWorldGraph } from '../kernel/kernel-loader.js';
+import { call } from '../kernel/kernel-session.js';
 import { InlineBackend } from './inline-backend.js';
 import type { TessellationProvider, TessellationRequest } from './provider.js';
 import type { WorkerReply } from './worker-protocol.js';
@@ -78,6 +79,7 @@ export class WorkerBackend implements TessellationProvider {
     this.pending.delete(reply.request);
     if (reply.error) {
       pending.reject(new OGError(reply.error.code, 'tessellation', reply.error.message, reply.error.details));
+      if (reply.error.code === 'KernelPanic') this.crash();
     } else pending.resolve(reply);
   }
 
@@ -94,7 +96,7 @@ export class WorkerBackend implements TessellationProvider {
     if (this.activeBackend === 'inline') return;
     const key = `${shapeId}@${String(revision)}`;
     if (this.snapshots.has(key)) return;
-    const bytes = this.graph.snapshot(shapeId);
+    const bytes = call('tessellation', () => this.graph.snapshot(shapeId));
     const reply = await this.send({ kind: 'snapshot', shapeId, revision, bytes }, [bytes.buffer]);
     if (!reply.ok) throw new OGError('WorkerFailure', 'snapshot', 'worker rejected snapshot');
     this.snapshots.add(key);
