@@ -145,7 +145,7 @@ export type AcceptanceFixture = {
   flush(): void;
   settled(): Settled;
   render(): void;
-  exportStep(options?: { unit?: 'metre' | 'millimetre'; upAxis?: 'Y' | 'Z' }): Promise<StepExport>;
+  exportStep(options?: { nodes?: string[]; unit?: 'metre' | 'millimetre'; upAxis?: 'Y' | 'Z' }): Promise<StepExport>;
   buildStorey(): Promise<StoreyResult>;
   storeyPerformanceProbe(): Promise<StoreyPerformance>;
   memoryProbe(): Promise<MemoryResult>;
