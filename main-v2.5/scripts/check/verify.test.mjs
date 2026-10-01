@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { classifyFlake, playwrightCounts, selectSteps } from './verify.mjs';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { REPOSITORY_ROOT } from '../lib/paths.mjs';
 
 const MEMORY_TEST = 'instance geometry memory returns to baseline after disposal';
 const SEPARATOR = '─'.repeat(12);
@@ -40,6 +43,15 @@ test('--only keeps the named steps in check order', () => {
 
 test('the wasm test step is named test:wasm like its npm script', () => {
   assert.deepEqual(names(['--only', 'test:wasm']), ['test:wasm']);
+});
+
+test('every cargo gate step runs in a directory that holds a Cargo.toml', () => {
+  const cargoSteps = selectSteps(['--full']).filter((step) => step.commands?.some((command) => command[0] === 'cargo'));
+  assert(cargoSteps.length > 0);
+  const missing = cargoSteps
+    .filter((step) => !existsSync(path.join(REPOSITORY_ROOT, step.cwd ?? '', 'Cargo.toml')))
+    .map((step) => step.name);
+  assert.deepEqual(missing, []);
 });
 
 test('--from starts at the named step', () => {
