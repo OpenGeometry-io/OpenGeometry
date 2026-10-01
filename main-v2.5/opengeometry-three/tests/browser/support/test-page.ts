@@ -49,7 +49,9 @@ export function statusElement(): Element {
   return status;
 }
 
-export function publishFixture(fixture: object, status: string): void {
-  (window as typeof window & { __ogTest?: unknown }).__ogTest = fixture;
+export function publishFixture<K extends 'ogSmoke' | 'ogAcceptance'>(
+  key: K, fixture: NonNullable<(typeof globalThis)[K]>, status: string,
+): void {
+  globalThis[key] = fixture;
   statusElement().textContent = status;
 }

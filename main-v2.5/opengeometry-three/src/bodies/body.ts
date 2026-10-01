@@ -59,7 +59,8 @@ export abstract class Body extends THREE.Group {
     this.generation = this.lastInfo.generation;
     this.bodyType = bodyType;
     this.appearance = {
-      color: bodyType === 'Wire' ? 0x2563eb : 0x6699dd, opacity: 1, outline: bodyType === 'Wire', ...options.appearance,
+      color: bodyType === 'Wire' ? 0x2563eb : 0x6699dd, opacity: 1, outline: bodyType === 'Wire',
+      pickOutline: bodyType === 'Wire', ...options.appearance,
     };
     this.matrixAutoUpdate = false;
     this.matrixWorldAutoUpdate = false;
@@ -75,6 +76,7 @@ export abstract class Body extends THREE.Group {
     this.lineKey = outlineStyle.key;
     this.outline = new THREE.LineSegments(placeholder ?? new THREE.BufferGeometry(), outlineStyle.material);
     this.outline.visible = Boolean(placeholder) && this.appearance.outline;
+    if (!this.appearance.pickOutline) this.outline.raycast = THREE.Object3D.prototype.raycast.bind(this.outline);
     this.add(this.surface, this.outline);
     this.surface.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); };
     this.outline.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); };
@@ -135,6 +137,11 @@ export abstract class Body extends THREE.Group {
       this.outline.material = outlineStyle.material;
     }
     this.outline.visible = this.appearance.outline;
+    if (previous.pickOutline !== this.appearance.pickOutline) {
+      this.outline.raycast = this.appearance.pickOutline
+        ? THREE.LineSegments.prototype.raycast.bind(this.outline)
+        : THREE.Object3D.prototype.raycast.bind(this.outline);
+    }
     const shapeId = this.lastInfo.shapeId;
     if (shapeId && previous.deflection !== this.appearance.deflection) overrideChanged(runtime(), shapeId);
   }

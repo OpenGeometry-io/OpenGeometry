@@ -44,7 +44,8 @@ export function createRuntime(module: WebAssembly.Module, options: CreateOptions
       (error) => { fallBack(state, error); },
     );
   const state: Runtime = {
-    graph, provider, records: new RecordPool(), bodies: new Map(), byShape: new Map(), limbo: new Map(), listeners,
+    graph, provider, records: new RecordPool(), bodies: new Map(), pickTargets: new WeakMap(), byShape: new Map(),
+    limbo: new Map(), listeners,
     revision: 0n, readyVersion: 0, flushedReadyVersion: -1, renderPassActive: false, pass: 0, displayed: new Map(),
     pending: new Map(), generations: new Map(), shapeBuckets: new Map(),
     lod: createLodState(() => { refreshDisplayed(state); }), module, createOptions: options, poisoned: false,

@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID } from '../../../../../../dist/index.js';
 import * as TESTING from '../../../../../../dist/testing.js';
+import type { RetryResult } from '../../../support/fixture-types.js';
 import { required } from '../../../support/test-page.js';
 import { tessellateSends, type AcceptancePage } from '../../acceptance-probes.js';
 
-type RetryWarning = { code: string; bucket: number; retryBucket: number };
+type RetryWarning = NonNullable<RetryResult['warning']>;
 
 function wallBucket(page: AcceptancePage): number {
   return required(page.wall.record, 'a wall record').bucket;
@@ -96,7 +97,7 @@ function isRetryWarning(value: unknown): value is RetryWarning {
     && typeof Reflect.get(value, 'bucket') === 'number' && typeof Reflect.get(value, 'retryBucket') === 'number';
 }
 
-export async function coarserRetryProbe(): Promise<Record<string, unknown>> {
+export async function coarserRetryProbe(): Promise<RetryResult> {
   const body = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'retry-cube' });
   let warning: RetryWarning | undefined;
   const errors: unknown[] = [];

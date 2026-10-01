@@ -12,6 +12,10 @@ export function node(ogId: string, label: string): NodeInfo {
   return decodeNodeInfo(call(label, () => worldGraph().node(ogId)), label);
 }
 
+export function checkHandle(label: string, target: { handle: number; generation: number }): void {
+  call(label, () => worldGraph().nodeByHandle(target.handle, target.generation));
+}
+
 export function creation(value: string, label: string): string {
   return decodeCreation(value, label).ogId;
 }
