@@ -2,9 +2,25 @@ import { expect, test } from '@playwright/test';
 import BASELINE from '../../../../scripts/bench/performance-baseline.json' with { type: 'json' };
 import { disposeFixture } from '../support/acceptance-page';
 
-const SAME_BASELINE_PLATFORM = process.platform === 'darwin' && process.arch === 'arm64';
 const GEOMETRY_FLOOR = 100;
 const GEOMETRY_BOUND = 600;
+const PROBE_RUNS = 5;
+const MARGIN = 1.25;
+
+type TimingBlock = (typeof BASELINE.timings)[keyof typeof BASELINE.timings];
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
+}
+
+function timingBaseline(): TimingBlock | undefined {
+  const ci = process.env.CI === 'true';
+  const key = ci ? `${process.platform}-${process.arch}-ci` : `${process.platform}-${process.arch}`;
+  const block = new Map(Object.entries(BASELINE.timings)).get(key);
+  if (block === undefined && ci) throw new Error(`missing timing baseline for ${key}`);
+  return block;
+}
 
 for (const backend of ['inline', 'worker'] as const) {
   test(
@@ -49,23 +65,33 @@ test('storey transform flush and STEP export stay within file limits', async ({ 
   await page.goto('/acceptance.html?backend=inline');
   await expect(page.locator('#status')).toHaveText('Acceptance ready', { timeout: 20_000 });
   try {
-    const result = await page.evaluate(async () => {
+    const probed = await page.evaluate(async (runs) => {
       const fixture = window.ogAcceptance;
       if (!fixture) throw new Error('The acceptance page published no fixture');
       const built = await fixture.buildStorey();
-      const measured = await fixture.storeyPerformanceProbe();
+      let measured = await fixture.storeyPerformanceProbe();
+      const flushRuns = [measured.transformFlushMs];
+      const stepRuns = [measured.stepMs];
+      for (let run = 1; run < runs; run += 1) {
+        measured = await fixture.storeyPerformanceProbe();
+        flushRuns.push(measured.transformFlushMs);
+        stepRuns.push(measured.stepMs);
+      }
       if (measured.products !== 1200 || measured.entities > 2_000_000 || measured.bytes > 64 * 1024 * 1024) {
         throw new Error(`Storey export exceeded expected limits: ${JSON.stringify(measured)}`);
       }
-      return { renderMs: built.renderMs, ...measured };
-    });
+      return { renderMs: built.renderMs, ...measured, flushRuns, stepRuns };
+    }, PROBE_RUNS);
+    const result = { ...probed, transformFlushMs: median(probed.flushRuns), stepMs: median(probed.stepRuns) };
     console.log(`Storey performance baseline: ${JSON.stringify(result)}`);
-    if (SAME_BASELINE_PLATFORM) {
-      expect(result.renderMs).toBeLessThanOrEqual(BASELINE.storeyFirstRenderMs * 1.25);
-      expect(result.transformFlushMs).toBeLessThanOrEqual(BASELINE.storeyTransformFlushMs * 1.25);
-      expect(result.stepMs).toBeLessThanOrEqual(BASELINE.storeyStepMs * 1.25);
+    const timings = timingBaseline();
+    if (timings) {
+      expect(result.renderMs).toBeLessThanOrEqual(timings.storeyFirstRenderMs * MARGIN);
+      expect(result.transformFlushMs).toBeLessThanOrEqual(timings.storeyTransformFlushMs * MARGIN);
+      expect(result.stepMs).toBeLessThanOrEqual(timings.storeyStepMs * MARGIN);
     }
-    expect(result.bytes).toBeLessThanOrEqual(BASELINE.storeyStepBytes * 1.25);
+    expect(result.bytes).toBeLessThanOrEqual(BASELINE.sizes.storeyStepBytes * MARGIN);
+    expect(result.entities).toBeLessThanOrEqual(BASELINE.sizes.storeyStepEntities * MARGIN);
   } finally {
     await disposeFixture(page);
   }

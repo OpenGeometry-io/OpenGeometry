@@ -10,15 +10,6 @@
       "reason": "sweep line_edge pair: messages differ; the merge is deferred to the debt note (B5 extended)"
     },
     {
-      "sha256": "faf9fceb832d4487c85d2ec16868b3367b964227d89f7c97eaea891c47986e0d",
-      "count": 2,
-      "members": [
-        "opengeometry/examples/performance.rs:7",
-        "tools/parity-oracle/src/bin/performance.rs:8"
-      ],
-      "reason": "the same 50-cutter wall benchmark built against main's kernel API (oracle bin) and 2.5's (kernel example); the crates link different kernels, so no shared home"
-    },
-    {
       "sha256": "6b542763acdc5252b13bb34053775241ed7e9c9d4ce8ac1f445c3a59bf1bfa3a",
       "count": 2,
       "members": [
