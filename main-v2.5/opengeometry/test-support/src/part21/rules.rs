@@ -101,6 +101,7 @@ impl Document {
             }
         }
         let document = Self { entities };
+        document.check_solids()?;
         for kind in [
             "LENGTH_UNIT",
             "PLANE_ANGLE_UNIT",
