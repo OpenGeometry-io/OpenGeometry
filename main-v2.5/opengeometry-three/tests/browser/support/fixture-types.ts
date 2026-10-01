@@ -47,6 +47,8 @@ export type AcceptanceResult = {
   railBounds: Bounds;
   wallBounds: Bounds;
   coverageGap: boolean;
+  coverageGapMs: number;
+  railPcurveless: number[];
   products: number;
   skipped: number;
   pcurvelessEdges: number;
@@ -55,7 +57,8 @@ export type AcceptanceResult = {
 
 export type StoreyResult = {
   walls: number;
-  openingsPerWall: number;
+  uniqueWalls: number;
+  openingsPerWall: { min: number; max: number };
   instances: number;
   flushCount: number;
   renderFlushes: number;
@@ -141,7 +144,7 @@ export type AcceptanceFixture = {
   flush(): void;
   settled(): Settled;
   render(): void;
-  exportStep(): Promise<StepExport>;
+  exportStep(options?: { unit?: 'metre' | 'millimetre'; upAxis?: 'Y' | 'Z' }): Promise<StepExport>;
   buildStorey(): Promise<StoreyResult>;
   storeyPerformanceProbe(): Promise<StoreyPerformance>;
   memoryProbe(): Promise<MemoryResult>;

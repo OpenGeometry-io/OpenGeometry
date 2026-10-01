@@ -57,9 +57,13 @@ export async function buildStorey(page: AcceptancePage): Promise<StoreyResult> {
   const renderFlushes = flushCount() - beforeRenderFlush;
   await OpenGeometry.settled();
   page.renderer.render(page.scene, page.camera);
+  const openings = walls.map((wall) => new Set(wall.getBrep().topology.faces
+    .filter((face) => face.provenance.role === 'Cut')
+    .flatMap((face) => face.provenance.sources.map((source) => source.body))).size);
   return {
-    walls: walls.length, openingsPerWall: 4, instances: instances.length, flushCount: flushCount(),
-    renderFlushes, geometryCount: page.renderer.info.memory.geometries, renderMs,
+    walls: walls.length, uniqueWalls: walls.filter((wall) => wall.getInstanceCount() === 1).length,
+    openingsPerWall: { min: Math.min(...openings), max: Math.max(...openings) }, instances: instances.length,
+    flushCount: flushCount(), renderFlushes, geometryCount: page.renderer.info.memory.geometries, renderMs,
   };
 }
 

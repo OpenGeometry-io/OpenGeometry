@@ -106,9 +106,11 @@ WALL.operate(OG_OPERATION_SUBTRACT, { tools: [CUTTER] });
 const RECUT_VOLUME = volume(WALL);
 assertNear(RECUT_VOLUME, 4.422, 1e-5, 'wall recut volume');
 let coverageGap = false;
+const BEFORE_COVERAGE_GAP = performance.now();
 try {
   RAIL.operate(OG_OPERATION_SUBTRACT, { tools: [WALL] });
 } catch (error) { coverageGap = error instanceof OGError && error.code === 'CoverageGap'; }
+const COVERAGE_GAP_MS = performance.now() - BEFORE_COVERAGE_GAP;
 if (!coverageGap) throw new Error('CoverageGap pair did not return CoverageGap');
 const BEFORE_TRIAL = JSON.stringify(WALL.getBrep());
 const MARK = OpenGeometry.mark();
@@ -148,10 +150,14 @@ if (SKIPPED.length !== 3 || !SKIPPED_WIRES.every((id) => SKIPPED.some((item) => 
   throw new Error('STEP wire skips differ');
 }
 if (FIRST_EXPORT.report.pcurvelessEdges <= 0) throw new Error('Swept rail lost pcurve-less edges');
+const RAIL_PCURVELESS = FIRST_EXPORT.report.bodies
+  .filter((body) => body.ogId.startsWith('rail-'))
+  .map((body) => body.pcurvelessEdges);
 const RESULT = {
   baseVolume: BASE_VOLUME, cutVolume: CUT_VOLUME, railVolume: RAIL_VOLUME, rebuiltVolume: REBUILT_VOLUME,
   recutVolume: RECUT_VOLUME, railBounds: RAIL_BOUNDS, wallBounds: MOVED_BOUNDS, coverageGap,
-  products: FIRST_EXPORT.report.products, skipped: SKIPPED.length,
+  coverageGapMs: COVERAGE_GAP_MS, railPcurveless: RAIL_PCURVELESS, products: FIRST_EXPORT.report.products,
+  skipped: SKIPPED.length,
   pcurvelessEdges: FIRST_EXPORT.report.pcurvelessEdges, stepBytes: FIRST_EXPORT.text.length,
 };
 const PAGE = { renderer: RENDERER, scene: SCENE, camera: CAMERA, wall: WALL, rail: RAIL };
@@ -163,7 +169,7 @@ publishFixture('ogAcceptance', {
   flush: () => { OpenGeometry.flush(); },
   settled: () => OpenGeometry.settled(),
   render: () => { RENDERER.render(SCENE, CAMERA); },
-  exportStep: () => OpenGeometry.exportStep({ nodes: [LEVEL] }),
+  exportStep: (options = {}) => OpenGeometry.exportStep({ nodes: [LEVEL], ...options }),
   buildStorey: () => buildStorey(PAGE),
   storeyPerformanceProbe,
   memoryProbe: () => memoryProbe(PAGE),

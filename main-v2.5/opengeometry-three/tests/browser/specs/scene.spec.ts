@@ -27,6 +27,12 @@ for (const backend of ['inline', 'worker'] as const) {
         if (result.products !== 12 || result.skipped !== 3 || result.pcurvelessEdges <= 0) {
           throw new Error('STEP counts changed');
         }
+        if (result.railPcurveless.length !== 11 || !result.railPcurveless.every((edges) => edges > 0)) {
+          throw new Error(`Rail pcurve-less edges changed: ${JSON.stringify(result.railPcurveless)}`);
+        }
+        if (result.coverageGapMs > 2000) {
+          throw new Error(`Rail minus wall took ${String(result.coverageGapMs)} ms to return CoverageGap`);
+        }
         const rails = fixture.rails;
         if (!rails.every((rail) => rail.record !== undefined && rail.record === rails[0]?.record)) {
           throw new Error('Rail instances do not share one record');
