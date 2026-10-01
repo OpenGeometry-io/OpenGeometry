@@ -1,4 +1,4 @@
-use crate::support::fixture_text;
+use crate::support::{add_cuboid, fixture_text};
 use opengeometry::brep::{BrepEnvelope, GeometryError};
 use opengeometry::exchange::export_step;
 use opengeometry::world_graph::{CreateOptions, ErrorCode, Primitive, StepOptions, WorldGraph};
@@ -44,30 +44,17 @@ fn assert_export_rejected_unchanged(
     assert_eq!(graph_state(world, bodies), before);
 }
 
-fn world_with_cuboid() -> WorldGraph {
-    let mut world = graph();
-    world
-        .create_primitive(
-            Primitive::Cuboid {
-                width: 1.0,
-                height: 1.0,
-                depth: 1.0,
-            },
-            named("body"),
-        )
-        .unwrap();
-    world
-}
-
 #[test]
 fn empty_node_list_is_invalid_parameter_and_leaves_the_graph_unchanged() {
-    let world = world_with_cuboid();
+    let mut world = graph();
+    add_cuboid(&mut world, "body", [1.0; 3], [0.0; 3]);
     assert_export_rejected_unchanged(&world, &[], ErrorCode::InvalidParameter, &["body"]);
 }
 
 #[test]
 fn unknown_node_is_unknown_node_and_leaves_the_graph_unchanged() {
-    let world = world_with_cuboid();
+    let mut world = graph();
+    add_cuboid(&mut world, "body", [1.0; 3], [0.0; 3]);
     assert_export_rejected_unchanged(&world, &["missing"], ErrorCode::UnknownNode, &["body"]);
 }
 

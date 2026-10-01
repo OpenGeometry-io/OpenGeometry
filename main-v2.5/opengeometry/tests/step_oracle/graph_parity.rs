@@ -1,20 +1,12 @@
-use crate::support::{add_cuboid, export_matched, fixture_text};
-use opengeometry::world_graph::{EditScope, ModifyingOperation, Primitive, StepOptions};
+use crate::support::{add_cuboid, cylinder, export_matched, fixture_text};
+use opengeometry::world_graph::{EditScope, ModifyingOperation, StepOptions};
 use opengeometry_test_support::part21::normalise_step;
-use opengeometry_test_support::world_graph::{graph, named};
+use opengeometry_test_support::world_graph::graph;
 
 #[test]
 fn graph_export_of_fixture_primitives_matches_main_text_after_normalisation() {
     let mut world = graph();
-    world
-        .create_primitive(
-            Primitive::Cylinder {
-                radius: 1.0,
-                height: 2.0,
-            },
-            named("cylinder"),
-        )
-        .unwrap();
+    cylinder(&mut world, "cylinder");
     add_cuboid(&mut world, "cuboid", [2.0, 3.0, 1.0], [1.0, 0.0, -0.5]);
     add_cuboid(&mut world, "box-cut", [3.0; 3], [1.5, 0.0, -1.5]);
     add_cuboid(&mut world, "box-cutter", [3.0; 3], [3.0, 0.5, -2.0]);

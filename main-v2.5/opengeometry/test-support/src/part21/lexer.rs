@@ -1,4 +1,4 @@
-pub(super) fn references(expression: &str) -> Vec<usize> {
+pub fn references(expression: &str) -> Vec<usize> {
     let bytes = expression.as_bytes();
     let mut result = Vec::new();
     let mut index = 0;

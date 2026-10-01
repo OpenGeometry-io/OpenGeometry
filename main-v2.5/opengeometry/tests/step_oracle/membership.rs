@@ -1,9 +1,9 @@
-use crate::support::{add_cuboid, export_matched};
+use crate::support::{add_cuboid, cylinder, export_matched};
 use opengeometry::world_graph::{
-    CopyOptions, EditScope, ModifyingOperation, Primitive, StepOptions, Transform, WorldGraph,
+    CopyOptions, EditScope, ModifyingOperation, StepOptions, Transform,
 };
 use opengeometry_test_support::part21::SolidEntry;
-use opengeometry_test_support::world_graph::{graph, named};
+use opengeometry_test_support::world_graph::graph;
 
 fn both_conventions() -> [StepOptions; 2] {
     [
@@ -14,18 +14,6 @@ fn both_conventions() -> [StepOptions; 2] {
         },
         StepOptions::default(),
     ]
-}
-
-fn cylinder(world: &mut WorldGraph, og_id: &str) {
-    world
-        .create_primitive(
-            Primitive::Cylinder {
-                radius: 1.0,
-                height: 2.0,
-            },
-            named(og_id),
-        )
-        .unwrap();
 }
 
 #[test]

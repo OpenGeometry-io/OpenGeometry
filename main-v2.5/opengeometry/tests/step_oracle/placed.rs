@@ -3,6 +3,7 @@ use opengeometry::world_graph::{
     CopyOptions, CreateOptions, CreatingOperation, ErrorCode, Primitive, StepOptions, Transform,
     WorldGraph,
 };
+use opengeometry_test_support::part21::bits;
 use opengeometry_test_support::world_graph::{graph, named};
 use serde_json::{json, Value};
 
@@ -307,10 +308,6 @@ fn sweep_rail_exports_projected_edges_without_pcurves() {
     assert_eq!(exported.document.pcurveless_edges().unwrap(), 2);
 }
 
-fn bits(values: &[f64]) -> Vec<u64> {
-    values.iter().map(|value| value.to_bits()).collect()
-}
-
 fn circle_edges(world: &WorldGraph, og_id: &str) -> usize {
     let brep: Value = serde_json::from_str(&world.brep(og_id).unwrap().to_json().unwrap()).unwrap();
     let curves = &brep["geometry"]["curves"];
@@ -356,7 +353,7 @@ fn circle_extrusion_and_cylinder_edges_are_circles_of_the_source_radius() {
         ..StepOptions::default()
     };
     for options in [metre_y, StepOptions::default()] {
-        let radius = (1.75 * unit_scale(&options.unit)).to_bits();
+        let radius = bits([1.75 * unit_scale(&options.unit)]);
         for name in ["extruded", "primitive"] {
             let exported = export_matched(&world, &[name], &options);
             let circles = exported
@@ -369,12 +366,20 @@ fn circle_extrusion_and_cylinder_edges_are_circles_of_the_source_radius() {
             assert_eq!(circles.len(), circle_edges(&world, name), "{name}");
             for circle in circles {
                 assert!(circle.with_pcurves, "{name}");
-                assert_eq!(bits(&circle.radii), [radius], "{name}");
+                assert_eq!(
+                    circle.radii.iter().map(|r| bits([*r])).collect::<Vec<_>>(),
+                    [radius],
+                    "{name}"
+                );
             }
             let surfaces = exported.document.surface_radii().unwrap();
             assert_eq!(surfaces.len(), 1, "{name}");
             assert_eq!(surfaces[0].0, "cylinder", "{name}");
-            assert_eq!(bits(&surfaces[0].1), [radius], "{name}");
+            assert_eq!(
+                surfaces[0].1.iter().map(|r| bits([*r])).collect::<Vec<_>>(),
+                [radius],
+                "{name}"
+            );
             assert_eq!(exported.report["solids"], 1);
             assert_eq!(exported.document.count("POLY_LOOP"), 0);
         }
