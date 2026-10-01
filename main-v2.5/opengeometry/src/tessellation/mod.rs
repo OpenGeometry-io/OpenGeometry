@@ -5,6 +5,7 @@ mod deviation;
 pub mod display;
 mod edges;
 mod grid;
+mod loop_minimum;
 mod mesh;
 mod planar_face;
 mod snapshot_store;

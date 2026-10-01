@@ -2,6 +2,7 @@ use super::curved_face::curved_face;
 use super::deviation::edge_count;
 use super::edges::{sample_edge, synchronize_edge_samples};
 use super::grid::{grid_size, rectangle, Rect};
+use super::loop_minimum::raise_short_planar_loops;
 use super::mesh::Tessellation;
 use super::planar_face::planar_face;
 use super::trimmed_face::{curved_trimmed_face, FaceGrid};
@@ -38,6 +39,7 @@ pub fn tessellate(
     for edge in &brep.topology.edges {
         counts.push(edge_count(brep, edge.id, error, max_triangles)?);
     }
+    raise_short_planar_loops(brep, &mut counts)?;
     let mut grids = Vec::with_capacity(brep.topology.faces.len());
     for face in &brep.topology.faces {
         let surface = brep.geometry.surface(face.surface)?;
