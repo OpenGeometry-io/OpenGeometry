@@ -4,8 +4,8 @@ pub(crate) use opengeometry::brep::{
 pub(crate) use opengeometry::exchange::export_step;
 pub(crate) use opengeometry::math::Point3;
 pub(crate) use opengeometry::operations::modifying::boolean::{
-    boolean_boxes, boolean_brep_outcome_with_handlers, boolean_spheres, shell_brep,
-    subtract_planar_cutters_with_handlers, BooleanOp, BooleanResult,
+    boolean_boxes, boolean_brep_outcome_with_handlers, boolean_spheres, multi_tool_boolean,
+    shell_brep, subtract_planar_cutters_with_handlers, BooleanOp, BooleanResult,
 };
 pub(crate) use opengeometry::primitives;
 pub(crate) use opengeometry::primitives::ProfileEdge;

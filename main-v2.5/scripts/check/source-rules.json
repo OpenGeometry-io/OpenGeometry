@@ -14,7 +14,6 @@
     { "path": "opengeometry/tests", "recursive": true },
     { "path": "opengeometry/test-support", "recursive": true },
     { "path": "opengeometry/examples", "recursive": true },
-    { "path": "tools/snapshot/src", "recursive": true },
     { "path": "tools/parity-oracle/src", "recursive": true }
   ],
   "exceptionListRoots": [

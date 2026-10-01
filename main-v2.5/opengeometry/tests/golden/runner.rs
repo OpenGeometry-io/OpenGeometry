@@ -1,8 +1,6 @@
 use crate::record::{Failure, Findings, Record};
-use std::collections::BTreeSet;
-use std::fs;
+use std::collections::{BTreeMap, BTreeSet};
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
@@ -22,6 +20,19 @@ const SLOWEST_CASES: [&str; 12] = [
     "booleans.sphere-cylinder.crossing.reversed-subtraction",
     "booleans.generic.sphere-cone.subtraction",
 ];
+
+#[derive(Default)]
+pub(crate) struct Run {
+    pub(crate) records: BTreeMap<String, String>,
+    pub(crate) findings: Findings,
+}
+
+impl Run {
+    fn absorb(&mut self, other: Run) {
+        self.records.extend(other.records);
+        self.findings.absorb(other.findings);
+    }
+}
 
 pub(crate) struct Case {
     name: String,
@@ -131,45 +142,36 @@ fn slowest_first(cases: &[Case]) -> Result<Vec<&Case>, Failure> {
     Ok(order)
 }
 
-fn prepare(output: &Path) -> Result<(), Failure> {
-    fs::create_dir_all(output)?;
-    if fs::read_dir(output)?.next().is_some() {
-        return Err(format!("output directory {} must be empty", output.display()).into());
-    }
-    Ok(())
-}
-
-fn work(cases: &[&Case], next: &AtomicUsize, output: &Path) -> Result<Findings, Failure> {
-    let mut findings = Findings::default();
+fn work(cases: &[&Case], next: &AtomicUsize) -> Run {
+    let mut run = Run::default();
     loop {
         let index = next.fetch_add(1, Ordering::Relaxed);
         let Some(case) = cases.get(index) else {
-            return Ok(findings);
+            return run;
         };
         let (text, case_findings) = case.execute();
-        fs::write(output.join(format!("{}.txt", case.name)), text)?;
-        findings.absorb(case_findings);
+        run.records.insert(case.name.clone(), text);
+        run.findings.absorb(case_findings);
     }
 }
 
-pub(crate) fn run(cases: &[Case], output: &Path) -> Result<Findings, Failure> {
+pub(crate) fn run(cases: &[Case]) -> Result<Run, Failure> {
     check_names(cases)?;
     let order = slowest_first(cases)?;
-    prepare(output)?;
     let next = AtomicUsize::new(0);
     let workers = thread::available_parallelism().map_or(1, |count| count.get());
     let results = thread::scope(|scope| {
         let handles = (0..workers)
-            .map(|_| scope.spawn(|| work(&order, &next, output)))
+            .map(|_| scope.spawn(|| work(&order, &next)))
             .collect::<Vec<_>>();
         handles
             .into_iter()
             .map(|handle| handle.join())
             .collect::<Vec<_>>()
     });
-    let mut findings = Findings::default();
+    let mut run = Run::default();
     for result in results {
-        findings.absorb(result.map_err(|payload| panic_message(payload.as_ref()))??);
+        run.absorb(result.map_err(|payload| panic_message(payload.as_ref()))?);
     }
-    Ok(findings)
+    Ok(run)
 }

@@ -9,7 +9,7 @@ import { lexTypeScript } from './lexers/typescript-lexer.mjs';
 const ALLOWED_FILE = path.join(REPOSITORY_ROOT, 'scripts', 'check', 'duplicates-allowed.json');
 const MINIMUM_LINES = 8;
 const RUST_ROOTS = ['opengeometry/src', 'opengeometry/examples', 'opengeometry/tests', 'opengeometry/test-support/src',
-  'opengeometry/test-support/tests', 'tools/snapshot/src', 'tools/parity-oracle/src']
+  'opengeometry/test-support/tests', 'tools/parity-oracle/src']
   .map((directory) => ({ path: directory, recursive: true }));
 const SCRIPT_ROOTS = [
   { path: '.', recursive: false },

@@ -51,7 +51,6 @@ function browserStep(threeVersion, portBase) {
 const CHECK_STEPS = [
   ...crateSteps('opengeometry', 'opengeometry', '--all-targets', true),
   ...crateSteps('test-support', 'opengeometry/test-support', '--all-targets', true),
-  ...crateSteps('snapshot', 'tools/snapshot', '--all-targets', true),
   ...crateSteps('parity-oracle', 'tools/parity-oracle', '--bins', false),
   { name: 'test:wasm', cwd: 'opengeometry', commands: [['wasm-pack', 'test', '--node']] },
   npmStep('build'),

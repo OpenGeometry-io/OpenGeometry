@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 const BOOLEAN_SOURCE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../opengeometry/src/operations/modifying/boolean"
+    "/src/operations/modifying/boolean"
 );
 
 const BOOLEAN_HANDLER_FLOOR: usize = 29;
