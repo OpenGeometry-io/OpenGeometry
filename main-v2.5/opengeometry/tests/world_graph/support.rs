@@ -17,8 +17,13 @@ pub(super) fn box_primitive() -> Primitive {
 }
 
 pub(super) fn near(a: [f64; 3], b: [f64; 3]) {
-    for axis in 0..3 {
-        assert!((a[axis] - b[axis]).abs() < 1e-12, "{a:?} != {b:?}");
+    near_within(&a, &b, 1e-12);
+}
+
+pub(super) fn near_within(a: &[f64], b: &[f64], tolerance: f64) {
+    assert_eq!(a.len(), b.len(), "{a:?} != {b:?}");
+    for (x, y) in a.iter().zip(b) {
+        assert!((x - y).abs() < tolerance, "{a:?} != {b:?}");
     }
 }
 
