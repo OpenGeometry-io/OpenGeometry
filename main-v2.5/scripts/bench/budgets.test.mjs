@@ -4,7 +4,7 @@ import { budgetFindings, median, platformKey } from './budgets.mjs';
 
 const BASELINE = {
   sizes: { wall50Triangles: 1000 },
-  timings: { 'darwin-arm64': { measuredOn: '2026-10-01', wall50BooleanMs: 100 } },
+  timings: { 'darwin-arm64': { measuredOn: '2026-10-01', wall50BooleanMs: 100 }, 'linux-x64-ci': {} },
 };
 const KEYS = [['darwin-arm64', false], ['linux-x64', false], ['linux-x64-ci', true]];
 
@@ -43,7 +43,7 @@ test('a timing more than 25 percent over its baseline fails on the baseline plat
 });
 
 test('a missing timing block fails when CI is true', () => {
-  const key = platformKey({ CI: 'true' }, 'darwin', 'arm64');
+  const key = platformKey(Object.fromEntries([['CI', 'true']]), 'darwin', 'arm64');
   assert.equal(key, 'darwin-arm64-ci');
   assert.deepEqual(budgetFindings(timed({ wall50BooleanMs: 1 }), BASELINE, key, true), {
     findings: ['missing timing baseline for darwin-arm64-ci'], notes: [],
