@@ -1,13 +1,13 @@
-import type { Placement } from '../dto/placement.js';
-import { call } from '../kernel/kernel-session.js';
-import { flush } from '../rendering/geometry/geometry-scheduler.js';
-import { runtime } from '../runtime/runtime-state.js';
-import { encode } from '../world-graph/codec.js';
-import { creation, node, worldGraph } from '../world-graph/world-graph-client.js';
-import type { Body } from './body.js';
+import type { Placement } from '../dto/placement';
+import { call } from '../kernel/kernel-session';
+import { flush } from '../rendering/geometry/geometry-scheduler';
+import { runtime } from '../runtime/runtime-state';
+import { encode } from '../world-graph/codec';
+import { creation, node, worldGraph } from '../world-graph/world-graph-client';
+import type { Body } from './body';
 import {
   addChild, checkNode, getBounds, getChildren, getParent, getPlacement, getWorldPlacement, removeChild,
-} from './node-methods.js';
+} from './node-methods';
 
 export class SystemAssembly {
   readonly ogId: string;

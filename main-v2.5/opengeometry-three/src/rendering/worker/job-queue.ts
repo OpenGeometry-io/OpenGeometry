@@ -1,4 +1,4 @@
-import type { TessellateMessage } from '../worker-protocol.js';
+import type { TessellateMessage } from '../worker-protocol';
 
 export class JobQueue {
   private readonly jobs = new Map<string, TessellateMessage>();

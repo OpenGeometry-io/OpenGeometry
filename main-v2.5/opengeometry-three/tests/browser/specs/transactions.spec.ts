@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { disposeFixture } from '../support/acceptance-page.js';
+import { disposeFixture } from '../support/acceptance-page';
 
 test('nested transaction rollback revives a disposed body and dry run restores placement', async ({ page }) => {
   test.setTimeout(45_000);

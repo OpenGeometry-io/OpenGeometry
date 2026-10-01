@@ -1,30 +1,30 @@
 import * as THREE from 'three';
-import type { Brep } from '../dto/brep.js';
-import type { NodeInfo } from '../dto/node-info.js';
-import type { Placement } from '../dto/placement.js';
-import { OGError } from '../errors.js';
-import { call } from '../kernel/kernel-session.js';
-import { enterLimbo, revive } from '../marks/limbo.js';
-import { flush, wanted } from '../rendering/geometry/geometry-scheduler.js';
-import { noteDisplayed } from '../rendering/geometry/render-pass.js';
-import { observeCamera } from '../rendering/lod/camera-observer.js';
-import { overrideChanged } from '../rendering/lod/lod-controller.js';
+import type { Brep } from '../dto/brep';
+import type { NodeInfo } from '../dto/node-info';
+import type { Placement } from '../dto/placement';
+import { OGError } from '../errors';
+import { call } from '../kernel/kernel-session';
+import { enterLimbo, revive } from '../marks/limbo';
+import { flush, wanted } from '../rendering/geometry/geometry-scheduler';
+import { noteDisplayed } from '../rendering/geometry/render-pass';
+import { observeCamera } from '../rendering/lod/camera-observer';
+import { overrideChanged } from '../rendering/lod/lod-controller';
 import {
   lineMaterial, releaseLine, releaseSurface, surfaceMaterial, type MaterialAppearance,
-} from '../rendering/materials/material-pool.js';
-import type { GeometryRecord } from '../rendering/records/geometry-record.js';
-import { bodyKey, runtime } from '../runtime/runtime-state.js';
-import { encode, operationParams, polylinePoints, scope } from '../world-graph/codec.js';
-import { node, worldGraph } from '../world-graph/world-graph-client.js';
-import type { Appearance, BodyOptions } from './body-options.js';
-import { derivePose, keepPose, poseMemory } from './body-placement.js';
-import { register, unregister } from './body-registry.js';
-import { DisplayClone } from './display-clone.js';
+} from '../rendering/materials/material-pool';
+import type { GeometryRecord } from '../rendering/records/geometry-record';
+import { bodyKey, runtime } from '../runtime/runtime-state';
+import { encode, operationParams, polylinePoints, scope } from '../world-graph/codec';
+import { node, worldGraph } from '../world-graph/world-graph-client';
+import type { Appearance, BodyOptions } from './body-options';
+import { derivePose, keepPose, poseMemory } from './body-placement';
+import { register, unregister } from './body-registry';
+import { DisplayClone } from './display-clone';
 import {
   addChild, checkNode, getBounds, getBrep, getChildren, getInstanceCount, getParent, getPlacement, getWorldPlacement,
   localBounds, removeChild,
-} from './node-methods.js';
-import type { SystemAssembly } from './system-assembly.js';
+} from './node-methods';
+import type { SystemAssembly } from './system-assembly';
 
 function singleMaterial(material: THREE.Material | THREE.Material[], label: string): THREE.Material {
   if (Array.isArray(material)) throw new OGError('InvalidOperand', label, 'display material must be a single material');

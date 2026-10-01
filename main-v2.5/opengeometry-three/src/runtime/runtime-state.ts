@@ -1,12 +1,12 @@
-import type { Body } from '../bodies/body.js';
-import type { Events, Listener } from '../dto/events.js';
-import { OGError } from '../errors.js';
-import type { OGWorldGraph } from '../kernel/kernel-loader.js';
-import type { OGMark } from '../marks/og-mark.js';
-import type { LodState } from '../rendering/lod/lod-controller.js';
-import type { LineEntry, SurfaceEntry } from '../rendering/materials/material-pool.js';
-import type { TessellationProvider } from '../rendering/provider.js';
-import type { RecordPool } from '../rendering/records/record-pool.js';
+import type { Body } from '../bodies/body';
+import type { Events, Listener } from '../dto/events';
+import { OGError } from '../errors';
+import type { OGWorldGraph } from '../kernel/kernel-loader';
+import type { OGMark } from '../marks/og-mark';
+import type { LodState } from '../rendering/lod/lod-controller';
+import type { LineEntry, SurfaceEntry } from '../rendering/materials/material-pool';
+import type { TessellationProvider } from '../rendering/provider';
+import type { RecordPool } from '../rendering/records/record-pool';
 
 export type CreateOptions = { workerURL?: string | URL; tessellation?: 'worker' | 'inline' };
 

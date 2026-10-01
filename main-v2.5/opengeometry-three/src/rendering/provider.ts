@@ -1,4 +1,4 @@
-import type { DisplayBuffers } from '../dto/display-buffers.js';
+import type { DisplayBuffers } from '../dto/display-buffers';
 
 export type TessellationRequest = {
   shapeId: string;

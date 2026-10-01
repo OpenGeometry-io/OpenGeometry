@@ -1,5 +1,5 @@
-import { bodyKey, reindexShape, releaseShapeIfEmpty, runtime } from '../runtime/runtime-state.js';
-import type { Body } from './body.js';
+import { bodyKey, reindexShape, releaseShapeIfEmpty, runtime } from '../runtime/runtime-state';
+import type { Body } from './body';
 
 export function register(body: Body): void {
   const state = runtime();

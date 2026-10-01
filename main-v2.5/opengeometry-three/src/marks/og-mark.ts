@@ -1,11 +1,11 @@
-import type { MarkStats } from '../dto/mark-stats.js';
-import { OGError } from '../errors.js';
-import { call } from '../kernel/kernel-session.js';
-import { flush } from '../rendering/geometry/geometry-scheduler.js';
-import { bodyKey, runtime } from '../runtime/runtime-state.js';
-import { decodeChanges, decodeMarkStats } from '../world-graph/codec.js';
-import { worldGraph } from '../world-graph/world-graph-client.js';
-import { finalizeNow, finalizeSettled, revive } from './limbo.js';
+import type { MarkStats } from '../dto/mark-stats';
+import { OGError } from '../errors';
+import { call } from '../kernel/kernel-session';
+import { flush } from '../rendering/geometry/geometry-scheduler';
+import { bodyKey, runtime } from '../runtime/runtime-state';
+import { decodeChanges, decodeMarkStats } from '../world-graph/codec';
+import { worldGraph } from '../world-graph/world-graph-client';
+import { finalizeNow, finalizeSettled, revive } from './limbo';
 
 export class OGMark {
   constructor(private slot: number) {}

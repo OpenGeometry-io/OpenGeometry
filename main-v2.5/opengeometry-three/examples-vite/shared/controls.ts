@@ -1,4 +1,4 @@
-import { requiredElement } from './dom.js';
+import { requiredElement } from './dom';
 
 export type NumberControl = { range: HTMLInputElement; number: HTMLInputElement; value: HTMLElement };
 

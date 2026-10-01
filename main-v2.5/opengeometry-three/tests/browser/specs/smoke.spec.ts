@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { disposeFixture } from '../support/acceptance-page.js';
+import { disposeFixture } from '../support/acceptance-page';
 
 async function checkSmokeScene({ expected, version }: { expected: string; version: string }): Promise<void> {
   const fixture = window.ogSmoke;

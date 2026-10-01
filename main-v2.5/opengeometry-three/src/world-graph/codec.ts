@@ -1,13 +1,13 @@
-import type { ShapeReport } from '../dto/boolean-report.js';
-import type { Bounds } from '../dto/bounds.js';
-import type { Brep } from '../dto/brep.js';
-import type { ChangeSet } from '../dto/change-set.js';
-import type { Creation } from '../dto/creation.js';
-import type { MarkStats } from '../dto/mark-stats.js';
-import type { NodeInfo } from '../dto/node-info.js';
-import type { Placement } from '../dto/placement.js';
-import type { StepExport, StepExportReport } from '../dto/step-export.js';
-import { OGError } from '../errors.js';
+import type { ShapeReport } from '../dto/boolean-report';
+import type { Bounds } from '../dto/bounds';
+import type { Brep } from '../dto/brep';
+import type { ChangeSet } from '../dto/change-set';
+import type { Creation } from '../dto/creation';
+import type { MarkStats } from '../dto/mark-stats';
+import type { NodeInfo } from '../dto/node-info';
+import type { Placement } from '../dto/placement';
+import type { StepExport, StepExportReport } from '../dto/step-export';
+import { OGError } from '../errors';
 
 type Fields = Record<string, unknown>;
 type Check<T> = (value: unknown) => value is T;

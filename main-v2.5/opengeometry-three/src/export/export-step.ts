@@ -1,11 +1,11 @@
-import type { Body } from '../bodies/body.js';
-import { SystemAssembly } from '../bodies/system-assembly.js';
-import type { StepExport } from '../dto/step-export.js';
-import { OGError } from '../errors.js';
-import { call } from '../kernel/kernel-session.js';
-import { bodyKey, runtime } from '../runtime/runtime-state.js';
-import { decodeStepExport, encode } from '../world-graph/codec.js';
-import { checkHandle, worldGraph } from '../world-graph/world-graph-client.js';
+import type { Body } from '../bodies/body';
+import { SystemAssembly } from '../bodies/system-assembly';
+import type { StepExport } from '../dto/step-export';
+import { OGError } from '../errors';
+import { call } from '../kernel/kernel-session';
+import { bodyKey, runtime } from '../runtime/runtime-state';
+import { decodeStepExport, encode } from '../world-graph/codec';
+import { checkHandle, worldGraph } from '../world-graph/world-graph-client';
 
 const LABEL = 'OpenGeometry.exportStep';
 

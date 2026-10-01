@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { EXAMPLES_URL } from '../support/servers.js';
+import { EXAMPLES_URL } from '../support/servers';
 
 test('source pages explain how to start the local server when opened as files', async ({ page }) => {
   for (const source of ['../../../examples-vite/index.html', '../pages/acceptance.html']) {

@@ -1,11 +1,11 @@
-import type { DisplayBuffers } from '../dto/display-buffers.js';
-import { OGError } from '../errors.js';
-import type { OGWorldGraph } from '../kernel/kernel-loader.js';
-import { call } from '../kernel/kernel-session.js';
-import { Deferred } from './deferred.js';
-import { InlineBackend } from './inline-backend.js';
-import type { TessellationProvider, TessellationRequest } from './provider.js';
-import type { SnapshotMessage, TessellateMessage, WorkerMessage, WorkerReply } from './worker-protocol.js';
+import type { DisplayBuffers } from '../dto/display-buffers';
+import { OGError } from '../errors';
+import type { OGWorldGraph } from '../kernel/kernel-loader';
+import { call } from '../kernel/kernel-session';
+import { Deferred } from './deferred';
+import { InlineBackend } from './inline-backend';
+import type { TessellationProvider, TessellationRequest } from './provider';
+import type { SnapshotMessage, TessellateMessage, WorkerMessage, WorkerReply } from './worker-protocol';
 
 export type WorkerSend = { kind: 'tessellate'; shapeId: string; bucket: number; priority: number; generation: number };
 

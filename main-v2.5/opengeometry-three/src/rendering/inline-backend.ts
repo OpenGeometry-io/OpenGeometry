@@ -1,8 +1,8 @@
-import type { DisplayBuffers } from '../dto/display-buffers.js';
-import type { OGWorldGraph } from '../kernel/kernel-loader.js';
-import { call } from '../kernel/kernel-session.js';
-import type { TessellationProvider, TessellationRequest } from './provider.js';
-import { validateDisplayBuffers } from './records/validate-display-buffers.js';
+import type { DisplayBuffers } from '../dto/display-buffers';
+import type { OGWorldGraph } from '../kernel/kernel-loader';
+import { call } from '../kernel/kernel-session';
+import type { TessellationProvider, TessellationRequest } from './provider';
+import { validateDisplayBuffers } from './records/validate-display-buffers';
 
 export class InlineBackend implements TessellationProvider {
   readonly activeBackend = 'inline' as const;

@@ -1,3 +1,3 @@
-export * from './primitives.js';
-export * from './operations.js';
-export * from './transforms.js';
+export * from './primitives';
+export * from './operations';
+export * from './transforms';

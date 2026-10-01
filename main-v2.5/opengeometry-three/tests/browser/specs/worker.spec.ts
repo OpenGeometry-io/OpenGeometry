@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { disposeFixture } from '../support/acceptance-page.js';
+import { disposeFixture } from '../support/acceptance-page';
 
 test('a missing worker script falls back inline, emits WorkerFailure and settles', async ({ page }) => {
   test.setTimeout(45_000);

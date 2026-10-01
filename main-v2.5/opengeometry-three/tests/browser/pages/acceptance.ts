@@ -8,12 +8,12 @@ import {
 import { activeBackend, graph } from '../../../../dist/testing.js';
 import {
   bootKernel, createRenderer, publishFixture, releasePage, required, statusElement,
-} from '../support/test-page.js';
+} from '../support/test-page';
 import {
   buildStorey, memoryProbe, onDemandProbe, placementPixelProbe, reuseProbe, snapshotResendProbe, staleWorkerProbe,
   storeyPerformanceProbe, transactionProbe, workerCrashProbe, workerFailureProbe,
-} from './acceptance-probes.js';
-import { coarserRetryProbe, lodHysteresisProbe, lodProbe, orbitProbe } from './acceptance/probes/lod.js';
+} from './acceptance-probes';
+import { coarserRetryProbe, lodHysteresisProbe, lodProbe, orbitProbe } from './acceptance/probes/lod';
 
 type Point = [number, number, number];
 

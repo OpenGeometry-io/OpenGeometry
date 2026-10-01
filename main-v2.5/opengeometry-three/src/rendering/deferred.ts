@@ -1,4 +1,4 @@
-import type { OGError } from '../errors.js';
+import type { OGError } from '../errors';
 
 export class Deferred<T> {
   resolve!: (value: T) => void;

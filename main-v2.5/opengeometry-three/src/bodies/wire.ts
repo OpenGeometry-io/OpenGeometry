@@ -1,11 +1,11 @@
-import { OGError } from '../errors.js';
-import { call } from '../kernel/kernel-session.js';
-import { encode } from '../world-graph/codec.js';
-import { creation, worldGraph } from '../world-graph/world-graph-client.js';
-import { Body } from './body.js';
-import { createBody, existingParams } from './body-factory.js';
-import type { BodyOptions } from './body-options.js';
-import type { SystemAssembly } from './system-assembly.js';
+import { OGError } from '../errors';
+import { call } from '../kernel/kernel-session';
+import { encode } from '../world-graph/codec';
+import { creation, worldGraph } from '../world-graph/world-graph-client';
+import { Body } from './body';
+import { createBody, existingParams } from './body-factory';
+import type { BodyOptions } from './body-options';
+import type { SystemAssembly } from './system-assembly';
 
 export class Wire extends Body {
   constructor(kind: string, params: Record<string, unknown>, options: BodyOptions = {}) {

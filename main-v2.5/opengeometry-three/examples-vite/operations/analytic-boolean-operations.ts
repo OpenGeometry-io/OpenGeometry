@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { requiredElement } from '../shared/dom.js';
-import { startFpsMeter } from '../shared/fps.js';
-import { bootExample } from '../shared/kernel.js';
-import { releaseOnUnload } from '../shared/unload.js';
-import { fitRenderer } from '../shared/viewport.js';
+import { requiredElement } from '../shared/dom';
+import { startFpsMeter } from '../shared/fps';
+import { bootExample } from '../shared/kernel';
+import { releaseOnUnload } from '../shared/unload';
+import { fitRenderer } from '../shared/viewport';
 import {
   OGError, OpenGeometry, Solid,
   OG_OPERATION_INTERSECT, OG_OPERATION_SUBTRACT, OG_OPERATION_UNION,

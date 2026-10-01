@@ -1,5 +1,5 @@
-import { OGError } from '../../errors.js';
-import { HYSTERESIS_KEEP } from '../../limits.js';
+import { OGError } from '../../errors';
+import { HYSTERESIS_KEEP } from '../../limits';
 
 export function deflectionBucket(target: number): number {
   if (!Number.isFinite(target) || target <= 0) {

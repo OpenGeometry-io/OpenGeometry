@@ -1,13 +1,13 @@
-import type { Bounds } from '../dto/bounds.js';
-import type { Brep } from '../dto/brep.js';
-import type { Placement } from '../dto/placement.js';
-import { OGError } from '../errors.js';
-import { call } from '../kernel/kernel-session.js';
-import { runtime } from '../runtime/runtime-state.js';
+import type { Bounds } from '../dto/bounds';
+import type { Brep } from '../dto/brep';
+import type { Placement } from '../dto/placement';
+import { OGError } from '../errors';
+import { call } from '../kernel/kernel-session';
+import { runtime } from '../runtime/runtime-state';
 import {
   decodeBounds, decodeBrep, decodeChildren, decodeParent, decodePlacement, encode,
-} from '../world-graph/codec.js';
-import { worldGraph } from '../world-graph/world-graph-client.js';
+} from '../world-graph/codec';
+import { worldGraph } from '../world-graph/world-graph-client';
 
 export function checkNode(label: string, noun: string, epoch: number, handle: number, generation: number): void {
   if (runtime().epoch !== epoch) throw new OGError('Disposed', label, `${noun} belongs to a reset runtime`);

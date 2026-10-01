@@ -1,5 +1,5 @@
-import { OGError } from '../errors.js';
-import { createMark } from './og-mark.js';
+import { OGError } from '../errors';
+import { createMark } from './og-mark';
 
 export function transaction<T>(fn: () => T, options: { dryRun?: boolean } = {}): T {
   const mark = createMark();

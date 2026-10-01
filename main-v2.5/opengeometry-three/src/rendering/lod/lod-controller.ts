@@ -1,10 +1,10 @@
 import type * as THREE from 'three';
-import type { Body } from '../../bodies/body.js';
-import { EVALUATION_INTERVAL_MS, MOTION_WINDOW_MS, PIXELS_AT_REST, PIXELS_MOVING } from '../../limits.js';
-import { currentRuntime, type Runtime } from '../../runtime/runtime-state.js';
-import { finestLocal, localTarget, shapeBuckets, type ShapeBuckets } from './body-size.js';
-import { deflectionBucket, wantedBucket } from './deflection.js';
-import { worldUnitsPerPixel } from './screen-metrics.js';
+import type { Body } from '../../bodies/body';
+import { EVALUATION_INTERVAL_MS, MOTION_WINDOW_MS, PIXELS_AT_REST, PIXELS_MOVING } from '../../limits';
+import { currentRuntime, type Runtime } from '../../runtime/runtime-state';
+import { finestLocal, localTarget, shapeBuckets, type ShapeBuckets } from './body-size';
+import { deflectionBucket, wantedBucket } from './deflection';
+import { worldUnitsPerPixel } from './screen-metrics';
 
 type Tiers = { temporary: number | undefined; own: number | undefined; global: number | undefined };
 type SeenCamera = { camera: THREE.Camera; height: number };

@@ -1,5 +1,5 @@
-import type { Events, Listener } from '../dto/events.js';
-import { currentRuntime, runtime } from './runtime-state.js';
+import type { Events, Listener } from '../dto/events';
+import { currentRuntime, runtime } from './runtime-state';
 
 export function on(event: Events, handler: Listener): () => boolean {
   const listeners = runtime().listeners;

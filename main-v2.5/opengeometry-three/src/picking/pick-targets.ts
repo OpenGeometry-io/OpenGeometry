@@ -1,8 +1,8 @@
 import type * as THREE from 'three';
-import type { Body } from '../bodies/body.js';
-import { OGError } from '../errors.js';
-import type { GeometryRecord } from '../rendering/records/geometry-record.js';
-import { runtime } from '../runtime/runtime-state.js';
+import type { Body } from '../bodies/body';
+import { OGError } from '../errors';
+import type { GeometryRecord } from '../rendering/records/geometry-record';
+import { runtime } from '../runtime/runtime-state';
 
 function faceRangeValue(ranges: Uint32Array, index: number): number {
   const value = ranges[index];

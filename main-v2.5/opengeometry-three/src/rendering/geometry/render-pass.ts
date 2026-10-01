@@ -1,7 +1,7 @@
-import type { Body } from '../../bodies/body.js';
-import { currentRuntime, runtime, type Runtime } from '../../runtime/runtime-state.js';
-import { displayedBodies, evaluatePass, stampDisplayed } from '../lod/lod-controller.js';
-import { ensureGeometry, flush } from './geometry-scheduler.js';
+import type { Body } from '../../bodies/body';
+import { currentRuntime, runtime, type Runtime } from '../../runtime/runtime-state';
+import { displayedBodies, evaluatePass, stampDisplayed } from '../lod/lod-controller';
+import { ensureGeometry, flush } from './geometry-scheduler';
 
 export function noteDisplayed(body: Body): void {
   const state = runtime();

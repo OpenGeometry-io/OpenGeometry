@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID } from '../../../../../../dist/index.js';
 import * as TESTING from '../../../../../../dist/testing.js';
-import type { RetryResult } from '../../../support/fixture-types.js';
-import { required } from '../../../support/test-page.js';
-import { tessellateSends, type AcceptancePage } from '../../acceptance-probes.js';
+import type { RetryResult } from '../../../support/fixture-types';
+import { required } from '../../../support/test-page';
+import { tessellateSends, type AcceptancePage } from '../../acceptance-probes';
 
 type RetryWarning = NonNullable<RetryResult['warning']>;
 

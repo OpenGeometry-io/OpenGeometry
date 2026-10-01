@@ -1,5 +1,5 @@
-import type { DisplayBuffers } from '../dto/display-buffers.js';
-import type { TessellationRequest } from './provider.js';
+import type { DisplayBuffers } from '../dto/display-buffers';
+import type { TessellationRequest } from './provider';
 
 export type WorkerError = { code: string; message: string; details?: unknown };
 

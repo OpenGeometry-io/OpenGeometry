@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import BASELINE from '../../../../scripts/bench/performance-baseline.json' with { type: 'json' };
-import { disposeFixture } from '../support/acceptance-page.js';
+import { disposeFixture } from '../support/acceptance-page';
 
 const SAME_BASELINE_PLATFORM = process.platform === 'darwin' && process.arch === 'arm64';
 

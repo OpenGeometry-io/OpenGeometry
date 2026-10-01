@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import type { DisplayBuffers } from '../../dto/display-buffers.js';
-import { validateDisplayBuffers } from './validate-display-buffers.js';
+import type { DisplayBuffers } from '../../dto/display-buffers';
+import { validateDisplayBuffers } from './validate-display-buffers';
 
 export class GeometryRecord {
   readonly key: string;

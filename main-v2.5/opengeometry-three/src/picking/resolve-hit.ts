@@ -1,6 +1,6 @@
 import type * as THREE from 'three';
-import type { PickResult } from '../dto/pick-result.js';
-import { edgeIdAt, faceIdAt, pickTarget } from './pick-targets.js';
+import type { PickResult } from '../dto/pick-result';
+import { edgeIdAt, faceIdAt, pickTarget } from './pick-targets';
 
 export function resolveHit(hit: THREE.Intersection): PickResult | undefined {
   const body = pickTarget(hit.object);

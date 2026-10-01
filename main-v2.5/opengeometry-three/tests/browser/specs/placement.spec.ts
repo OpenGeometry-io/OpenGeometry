@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { disposeFixture } from '../support/acceptance-page.js';
+import { disposeFixture } from '../support/acceptance-page';
 
 test('transform updates a known pixel without changing geometry buffers', async ({ page }) => {
   test.setTimeout(45_000);

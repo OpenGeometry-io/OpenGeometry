@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { emit } from '../runtime/event-bus.js';
+import { emit } from '../runtime/event-bus';
 
 export type PoseMemory = {
   position: THREE.Vector3;
