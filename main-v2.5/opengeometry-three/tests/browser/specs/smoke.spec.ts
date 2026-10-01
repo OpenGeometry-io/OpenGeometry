@@ -98,11 +98,10 @@ async function checkSmokeScene({ expected, version }: { expected: string; versio
     throw new Error('STEP export failed');
   }
   if (expected === 'worker') {
-    const replies = await fixture.workerReplies();
-    const [init, nonsense, snapshot] = replies;
+    const [init, nonsense, snapshot] = await fixture.workerReplies();
     if (init?.request !== 0 || !init.error || nonsense?.request !== 7 || nonsense.error?.code !== 'InvalidParameter'
       || snapshot?.request !== 8 || snapshot.error?.code !== 'InvalidParameter') {
-      throw new Error(`Worker guard replies differ: ${JSON.stringify(replies)}`);
+      throw new Error(`Worker guard replies differ: ${JSON.stringify([init, nonsense, snapshot])}`);
     }
   }
 }

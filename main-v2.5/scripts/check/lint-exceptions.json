@@ -26,18 +26,8 @@
     {
       "owner": "C4",
       "files": ["opengeometry-three/src/rendering/inline-backend.ts"],
-      "rules": [
-        "@typescript-eslint/no-unsafe-type-assertion",
-        "@typescript-eslint/require-await",
-        "@typescript-eslint/no-empty-function"
-      ],
-      "reason": "compute asserts graph.buffers, request stays async so a compute throw becomes a rejection, and the no-op members satisfy TessellationProvider. C4 reshapes the provider."
-    },
-    {
-      "owner": "C4",
-      "files": ["opengeometry-three/src/rendering/tessellation-worker.ts"],
-      "rules": ["@typescript-eslint/no-unsafe-type-assertion", "@typescript-eslint/no-non-null-assertion"],
-      "reason": "The worker asserts message fields and the tessellator before init. C4 adds message guards."
+      "rules": ["@typescript-eslint/no-empty-function"],
+      "reason": "The no-op members satisfy TessellationProvider, whose shape C5 owns."
     },
     {
       "owner": "C2",
@@ -48,12 +38,6 @@
       ],
       "rules": ["@typescript-eslint/no-unsafe-return", "@typescript-eslint/no-unsafe-type-assertion"],
       "reason": "The pages read graph() payloads through dist/testing.js, whose glue methods return any or JSON text, and assert them."
-    },
-    {
-      "owner": "C4",
-      "files": ["opengeometry-three/tests/browser/pages/acceptance-probes.ts"],
-      "rules": ["@typescript-eslint/no-unsafe-type-assertion"],
-      "reason": "The worker probes cast the runtime provider to reach WorkerBackend internals. C4 exposes worker test seams."
     },
     {
       "owner": "C7",

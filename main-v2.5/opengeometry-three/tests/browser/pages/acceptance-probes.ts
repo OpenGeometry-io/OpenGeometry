@@ -3,8 +3,9 @@ import {
   OpenGeometry, SystemAssembly, Wire, Solid, OGError,
   OG_PRIMITIVE_RECTANGLE, OG_PRIMITIVE_CUBOID, OG_OPERATION_EXTRUDE, OG_OPERATION_SUBTRACT, OG_TRANSFORM_TRANSLATE,
 } from '../../../../dist/index.js';
-import { activeBackend, ensureGeometry, flushCount, graph, runtime, wantedBucket } from '../../../../dist/testing.js';
-import * as TESTING from '../../../../dist/testing.js';
+import {
+  activeBackend, ensureGeometry, flushCount, graph, postToWorker, runtime, wantedBucket, workerSendLog,
+} from '../../../../dist/testing.js';
 import { recordedErrors, required } from '../support/test-page.js';
 
 export type AcceptancePage = {
@@ -22,15 +23,6 @@ type StoreyResult = {
   renderFlushes: number;
   geometryCount: number;
   renderMs: number;
-};
-type StatsProvider = { debugStats(): Promise<Record<string, number>> };
-type TessellationRequest = {
-  shapeId: string; revision: number; bucket: number; maxTriangles: number; priority: number; generation: number;
-};
-type ResendProvider = {
-  worker: Worker;
-  ensureSnapshot(shapeId: string, revision: number): Promise<void>;
-  request(value: TessellationRequest): Promise<{ triangles: number }>;
 };
 
 let storeyData: { root: SystemAssembly; bodies: Solid[] } | undefined;
@@ -148,29 +140,18 @@ function errorCodes(): string[] {
   return recordedErrors().map((event) => (event instanceof OGError ? event.code : String(event)));
 }
 
-async function crashWorker(): Promise<void> {
-  const post: unknown = Reflect.get(TESTING, 'postToWorker');
-  if (typeof post === 'function') {
-    await post({ kind: 'throw' }, { awaitCrash: true });
-    return;
-  }
-  const worker: unknown = Reflect.get(runtime().provider, 'worker');
-  if (!(worker instanceof Worker)) throw new Error('Test page expected a live worker');
-  const crashed = new Promise<void>((resolve) => {
-    worker.addEventListener('error', () => { resolve(); }, { once: true });
-  });
-  worker.postMessage({ kind: 'throw' });
-  await crashed;
+function tessellateSends(shapeId: string): number {
+  return workerSendLog().filter((send) => send.shapeId === shapeId).length;
 }
 
 export async function workerCrashProbe(page: AcceptancePage): Promise<Record<string, unknown>> {
   const { renderer, scene, camera, wall } = page;
   const record = wall.record;
-  await crashWorker();
+  await postToWorker({ kind: 'throw' }, { awaitCrash: true });
   const info = JSON.parse(graph().node(wall.ogId)) as { shapeId: string; shapeRevision: number };
   await runtime().provider.ensureSnapshot(info.shapeId, info.shapeRevision);
   const afterRestart = activeBackend();
-  await crashWorker();
+  await postToWorker({ kind: 'throw' }, { awaitCrash: true });
   const errors = errorCodes();
   const afterFallback = activeBackend();
   const body = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.3, height: 0.3, depth: 0.3 }, { ogId: 'after-fallback' });
@@ -259,14 +240,13 @@ export async function staleWorkerProbe(page: AcceptancePage): Promise<Record<str
   renderer.render(scene, camera);
   await OpenGeometry.settled();
   const info = JSON.parse(graph().node(body.ogId)) as { shapeId: string };
-  const provider = runtime().provider as unknown as StatsProvider;
-  const before = (await provider.debugStats())[info.shapeId] ?? 0;
+  const before = tessellateSends(info.shapeId);
   for (let i = 0; i < 10; i++) {
     body.rebuild(OG_PRIMITIVE_CUBOID, { width: 1 + i * 0.1, height: 1, depth: 1 });
     renderer.render(scene, camera);
   }
   await OpenGeometry.settled();
-  const after = (await provider.debugStats())[info.shapeId] ?? 0;
+  const after = tessellateSends(info.shapeId);
   const current = body.getBrep().revision;
   const displayed = body.record?.revision;
   body.dispose();
@@ -275,9 +255,9 @@ export async function staleWorkerProbe(page: AcceptancePage): Promise<Record<str
 
 export async function snapshotResendProbe(page: AcceptancePage): Promise<{ triangles: number }> {
   const info = JSON.parse(graph().node(page.rail.ogId)) as { shapeId: string; shapeRevision: number };
-  const provider = runtime().provider as unknown as ResendProvider;
+  const provider = runtime().provider;
   await provider.ensureSnapshot(info.shapeId, info.shapeRevision);
-  provider.worker.postMessage({ kind: 'drop', shapeId: info.shapeId, revision: info.shapeRevision });
+  await postToWorker({ kind: 'drop', shapeId: info.shapeId, revision: info.shapeRevision });
   const buffers = await provider.request({
     shapeId: info.shapeId, revision: info.shapeRevision, bucket: required(page.rail.record, 'a rail record').bucket * 2,
     maxTriangles: 2_000_000, priority: 0, generation: 1,
@@ -301,8 +281,7 @@ export function lodHysteresisProbe(): Record<string, number> {
 export async function orbitProbe(page: AcceptancePage): Promise<{ jobs: number }> {
   const { renderer, scene, camera } = page;
   const info = JSON.parse(graph().node(page.wall.ogId)) as { shapeId: string };
-  const provider = runtime().provider as unknown as StatsProvider;
-  const before = (await provider.debugStats())[info.shapeId] ?? 0;
+  const before = tessellateSends(info.shapeId);
   OpenGeometry.setCameraMotion(true);
   for (let i = 0; i < 10; i++) {
     camera.position.x += 0.02;
@@ -312,7 +291,7 @@ export async function orbitProbe(page: AcceptancePage): Promise<{ jobs: number }
   }
   await OpenGeometry.settled();
   OpenGeometry.setCameraMotion(false);
-  const after = (await provider.debugStats())[info.shapeId] ?? 0;
+  const after = tessellateSends(info.shapeId);
   return { jobs: after - before };
 }
 

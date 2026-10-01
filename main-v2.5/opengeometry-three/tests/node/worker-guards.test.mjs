@@ -19,6 +19,7 @@ test('worker messages with unknown kinds, extra keys or wrong field types are re
   ];
   for (const row of rows) {
     const failure = parse(row.message);
+    assert('error' in failure, row.key);
     assert.equal(failure.error.code, 'InvalidParameter', row.key);
     assert(failure.error.message.includes(row.key), failure.error.message);
     assert(Object.hasOwn(failure, 'request'), row.key);
