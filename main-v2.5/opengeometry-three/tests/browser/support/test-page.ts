@@ -1,13 +1,27 @@
 import * as THREE from 'three';
 import { OpenGeometry } from '../../../../dist/index.js';
 
+const ERRORS: unknown[] = [];
+
 export async function bootKernel(): Promise<URL> {
+  const params = new URLSearchParams(location.search);
   const wasmURL = new URL('./opengeometry_bg.wasm', document.baseURI);
-  const workerURL = new URL('./tessellation-worker.js', document.baseURI);
+  const workerURL = new URL(workerPath(params.get('worker')), document.baseURI);
   const module = await WebAssembly.compileStreaming(fetch(wasmURL));
-  const backend = new URLSearchParams(location.search).get('backend') === 'inline' ? 'inline' : 'worker';
+  const backend = params.get('backend') === 'inline' ? 'inline' : 'worker';
   await OpenGeometry.create({ wasmModule: module }, { workerURL, tessellation: backend });
+  OpenGeometry.on('error', (event) => { ERRORS.push(event); });
   return workerURL;
+}
+
+function workerPath(name: string | null): string {
+  if (name === 'missing') return './missing-worker.js';
+  if (name === 'crash') return './crash-worker.ts';
+  return './tessellation-worker.js';
+}
+
+export function recordedErrors(): unknown[] {
+  return [...ERRORS];
 }
 
 export function createRenderer(width: number, height: number): THREE.WebGLRenderer {

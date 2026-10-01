@@ -4,7 +4,8 @@ import {
   OG_PRIMITIVE_RECTANGLE, OG_PRIMITIVE_CUBOID, OG_OPERATION_EXTRUDE, OG_OPERATION_SUBTRACT, OG_TRANSFORM_TRANSLATE,
 } from '../../../../dist/index.js';
 import { activeBackend, ensureGeometry, flushCount, graph, runtime, wantedBucket } from '../../../../dist/testing.js';
-import { required } from '../support/test-page.js';
+import * as TESTING from '../../../../dist/testing.js';
+import { recordedErrors, required } from '../support/test-page.js';
 
 export type AcceptancePage = {
   renderer: THREE.WebGLRenderer;
@@ -22,7 +23,6 @@ type StoreyResult = {
   geometryCount: number;
   renderMs: number;
 };
-type WorkerProvider = { crash(): void; ensureSnapshot(shapeId: string, revision: number): Promise<void> };
 type StatsProvider = { debugStats(): Promise<Record<string, number>> };
 type TessellationRequest = {
   shapeId: string; revision: number; bucket: number; maxTriangles: number; priority: number; generation: number;
@@ -144,15 +144,47 @@ export async function lodProbe(page: AcceptancePage): Promise<{ before: number; 
   return { before, after: required(wall.record, 'a wall record').bucket };
 }
 
+function errorCodes(): string[] {
+  return recordedErrors().map((event) => (event instanceof OGError ? event.code : String(event)));
+}
+
+async function crashWorker(): Promise<void> {
+  const post: unknown = Reflect.get(TESTING, 'postToWorker');
+  if (typeof post === 'function') {
+    await post({ kind: 'throw' }, { awaitCrash: true });
+    return;
+  }
+  const worker: unknown = Reflect.get(runtime().provider, 'worker');
+  if (!(worker instanceof Worker)) throw new Error('Test page expected a live worker');
+  const crashed = new Promise<void>((resolve) => {
+    worker.addEventListener('error', () => { resolve(); }, { once: true });
+  });
+  worker.postMessage({ kind: 'throw' });
+  await crashed;
+}
+
 export async function workerCrashProbe(page: AcceptancePage): Promise<Record<string, unknown>> {
-  const provider = runtime().provider as unknown as WorkerProvider;
-  const record = page.wall.record;
-  provider.crash();
-  const info = JSON.parse(graph().node(page.wall.ogId)) as { shapeId: string; shapeRevision: number };
-  await provider.ensureSnapshot(info.shapeId, info.shapeRevision);
+  const { renderer, scene, camera, wall } = page;
+  const record = wall.record;
+  await crashWorker();
+  const info = JSON.parse(graph().node(wall.ogId)) as { shapeId: string; shapeRevision: number };
+  await runtime().provider.ensureSnapshot(info.shapeId, info.shapeRevision);
   const afterRestart = activeBackend();
-  provider.crash();
-  return { afterRestart, afterFallback: activeBackend(), sameRecord: page.wall.record === record };
+  await crashWorker();
+  const errors = errorCodes();
+  const afterFallback = activeBackend();
+  const body = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.3, height: 0.3, depth: 0.3 }, { ogId: 'after-fallback' });
+  scene.add(body);
+  renderer.render(scene, camera);
+  const drawnInSameRender = Boolean(body.record);
+  body.dispose();
+  return { afterRestart, afterFallback, sameRecord: wall.record === record, errors, drawnInSameRender };
+}
+
+export async function workerFailureProbe(page: AcceptancePage): Promise<Record<string, unknown>> {
+  const { failed } = await OpenGeometry.settled();
+  const hasRecord = Boolean(page.wall.record);
+  return { failed: failed.length, hasRecord, errors: errorCodes(), backend: activeBackend() };
 }
 
 export function placementPixelProbe(page: AcceptancePage): Record<string, unknown> {
