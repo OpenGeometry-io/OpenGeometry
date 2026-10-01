@@ -122,3 +122,51 @@ pub(super) fn keywords(expression: &str) -> Vec<String> {
     }
     result
 }
+
+pub(super) fn records(expression: &str) -> Result<Vec<&str>, String> {
+    let Some(inner) = expression.strip_prefix('(') else {
+        return Ok(vec![expression]);
+    };
+    let inner = inner.strip_suffix(')').ok_or("unbalanced complex entity")?;
+    let bytes = inner.as_bytes();
+    let mut result = Vec::new();
+    let mut depth = 0usize;
+    let mut quoted = false;
+    let mut start = None;
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\'' if quoted && bytes.get(index + 1) == Some(&b'\'') => index += 1,
+            b'\'' => quoted = !quoted,
+            b'(' if !quoted => depth += 1,
+            b')' if !quoted => {
+                depth = depth.checked_sub(1).ok_or("unbalanced complex entity")?;
+                if depth == 0 {
+                    let from: usize = start.take().ok_or("complex entity record lacks a name")?;
+                    result.push(&inner[from..=index]);
+                }
+            }
+            byte if !quoted && depth == 0 && start.is_none() && !byte.is_ascii_whitespace() => {
+                start = Some(index)
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    if quoted || depth != 0 || start.is_some() {
+        return Err("unbalanced complex entity".into());
+    }
+    Ok(result)
+}
+
+pub(super) fn record<'a>(expression: &'a str, kind: &str) -> Result<Option<&'a str>, String> {
+    Ok(records(expression)?.into_iter().find(|record| {
+        record
+            .strip_prefix(kind)
+            .is_some_and(|rest| rest.starts_with('('))
+    }))
+}
+
+pub(super) fn keyword(expression: &str) -> &str {
+    &expression[..expression.find('(').unwrap_or(expression.len())]
+}

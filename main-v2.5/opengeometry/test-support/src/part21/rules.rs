@@ -101,19 +101,8 @@ impl Document {
             }
         }
         let document = Self { entities };
-        for kind in [
-            "LENGTH_UNIT",
-            "PLANE_ANGLE_UNIT",
-            "SOLID_ANGLE_UNIT",
-            "UNCERTAINTY_MEASURE_WITH_UNIT",
-            "GLOBAL_UNIT_ASSIGNED_CONTEXT",
-            "GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT",
-            "PRODUCT_CONTEXT",
-        ] {
-            if document.count(kind) == 0 {
-                return Err(format!("missing {kind}"));
-            }
-        }
+        document.check_contexts()?;
+        document.check_solids()?;
         document.validate_loops_and_shells()?;
         document.validate_curve_endpoints()?;
         document.validate_pcurves()?;
@@ -140,7 +129,7 @@ impl Document {
         Ok((edge, from, to, forward))
     }
 
-    fn face_edges(&self, face_id: usize) -> Result<Vec<(usize, bool)>, String> {
+    pub(super) fn face_edges(&self, face_id: usize) -> Result<Vec<(usize, bool)>, String> {
         let face = self.entity(face_id)?;
         if !face.starts_with("ADVANCED_FACE(") {
             return Err(format!("#{face_id} is not ADVANCED_FACE"));
@@ -243,7 +232,7 @@ impl Document {
             for vertex in [reference(&args[1])?, reference(&args[2])?] {
                 let point = self.vertex(vertex)?;
                 let distance = self.curve_distance(geometry, point)?;
-                if !distance.is_finite() || distance > tolerance * 1.1 + 1e-12 {
+                if !distance.is_finite() || distance > tolerance {
                     return Err(format!("edge #{id} vertex #{vertex} misses curve #{geometry}: {distance} > {tolerance}"));
                 }
             }
@@ -263,13 +252,7 @@ impl Document {
                 .entity(curve)?
                 .starts_with("B_SPLINE_CURVE_WITH_KNOTS(");
             for pcurve in references(&args[2]) {
-                let pcurve_args = fields(self.entity(pcurve)?)?;
-                let surface = reference(&pcurve_args[1])?;
-                let definition = reference(&pcurve_args[2])?;
-                let representation = fields(self.entity(definition)?)?;
-                let uv_curve = *references(&representation[1])
-                    .first()
-                    .ok_or("empty pcurve representation")?;
+                let (surface, uv_curve) = self.pcurve_support(pcurve)?;
                 for sample in 0..=16 {
                     let parameter = sample as f64 / 16.0;
                     let uv = self.pcurve_point(uv_curve, parameter)?;
@@ -288,7 +271,7 @@ impl Document {
                     } else {
                         self.curve_distance(curve, point)?
                     };
-                    if !distance.is_finite() || distance > tolerance * 1.1 + 1e-12 {
+                    if !distance.is_finite() || distance > tolerance {
                         return Err(format!("surface curve #{id} pcurve #{pcurve} sample {sample} misses 3D curve: {distance} > {tolerance}"));
                     }
                 }

@@ -1,5 +1,7 @@
+use super::curves::conic_point;
 use super::lexer::{fields, keywords, reference, references};
 use std::collections::BTreeMap;
+use std::f64::consts::TAU;
 
 pub struct Document {
     pub(super) entities: BTreeMap<usize, String>,
@@ -39,7 +41,7 @@ impl Document {
             .collect()
     }
 
-    fn coordinates(&self, id: usize) -> Result<[f64; 3], String> {
+    pub(super) fn coordinates(&self, id: usize) -> Result<[f64; 3], String> {
         let expression = self.entity(id)?;
         if !expression.starts_with("CARTESIAN_POINT(") && !expression.starts_with("DIRECTION(") {
             return Err(format!("#{id} is not a point or direction"));
@@ -61,7 +63,7 @@ impl Document {
         self.coordinates(reference(&args[1])?)
     }
 
-    fn axis(&self, id: usize) -> Result<Axis3, String> {
+    pub(super) fn axis(&self, id: usize) -> Result<Axis3, String> {
         let expression = self.entity(id)?;
         if !expression.starts_with("AXIS2_PLACEMENT_3D(") {
             return Err(format!("#{id} is not a 3D placement"));
@@ -74,72 +76,7 @@ impl Document {
         ))
     }
 
-    pub(super) fn curve_distance(&self, id: usize, point: [f64; 3]) -> Result<f64, String> {
-        let expression = self.entity(id)?;
-        let args = fields(expression)?;
-        let sub =
-            |a: [f64; 3], b: [f64; 3]| std::array::from_fn::<_, 3, _>(|index| a[index] - b[index]);
-        let dot = |a: [f64; 3], b: [f64; 3]| (0..3).map(|index| a[index] * b[index]).sum::<f64>();
-        let norm = |a: [f64; 3]| dot(a, a).sqrt();
-        if expression.starts_with("LINE(") {
-            let origin = self.coordinates(reference(&args[1])?)?;
-            let vector = fields(self.entity(reference(&args[2])?)?)?;
-            let direction = self.coordinates(reference(&vector[1])?)?;
-            let delta = sub(point, origin);
-            let projection = dot(delta, direction);
-            return Ok(norm(std::array::from_fn(|index| {
-                delta[index] - projection * direction[index]
-            })));
-        }
-        if expression.starts_with("CIRCLE(") || expression.starts_with("ELLIPSE(") {
-            let (origin, z, x) = self.axis(reference(&args[1])?)?;
-            let y = [
-                z[1] * x[2] - z[2] * x[1],
-                z[2] * x[0] - z[0] * x[2],
-                z[0] * x[1] - z[1] * x[0],
-            ];
-            let delta = sub(point, origin);
-            let (px, py, pz) = (dot(delta, x), dot(delta, y), dot(delta, z));
-            let major: f64 = args[2].parse().map_err(|_| "invalid conic radius")?;
-            if expression.starts_with("CIRCLE(") {
-                return Ok((pz * pz + (px.hypot(py) - major).powi(2)).sqrt());
-            }
-            let minor: f64 = args[3].parse().map_err(|_| "invalid ellipse radius")?;
-            let normalized = (px / major).hypot(py / minor);
-            return Ok((pz * pz + ((normalized - 1.0) * major.min(minor)).powi(2)).sqrt());
-        }
-        if expression.starts_with("B_SPLINE_CURVE_WITH_KNOTS(") {
-            let controls = references(&args[2]);
-            let first = self.coordinates(*controls.first().ok_or("empty spline controls")?)?;
-            let last = self.coordinates(*controls.last().ok_or("empty spline controls")?)?;
-            return Ok(norm(sub(point, first)).min(norm(sub(point, last))));
-        }
-        Err(format!("#{id} is not an edge curve support"))
-    }
-
-    pub(super) fn curve_point(&self, id: usize, parameter: f64) -> Result<[f64; 3], String> {
-        let expression = self.entity(id)?;
-        if expression.starts_with("B_SPLINE_CURVE_WITH_KNOTS(") {
-            let point = self.spline_point(id, parameter)?;
-            if point.len() != 3 {
-                return Err("3D spline is not three-dimensional".into());
-            }
-            return Ok([point[0], point[1], point[2]]);
-        }
-        if expression.starts_with("LINE(") {
-            let args = fields(expression)?;
-            let origin = self.coordinates(reference(&args[1])?)?;
-            let vector = fields(self.entity(reference(&args[2])?)?)?;
-            let direction = self.coordinates(reference(&vector[1])?)?;
-            let length: f64 = vector[2].parse().map_err(|_| "invalid vector length")?;
-            return Ok(std::array::from_fn(|axis| {
-                origin[axis] + parameter * length * direction[axis]
-            }));
-        }
-        Err(format!("#{id} has no comparable parameterization"))
-    }
-
-    fn coordinates2(&self, id: usize) -> Result<[f64; 2], String> {
+    pub(super) fn coordinates2(&self, id: usize) -> Result<[f64; 2], String> {
         let expression = self.entity(id)?;
         if !expression.starts_with("CARTESIAN_POINT(") && !expression.starts_with("DIRECTION(") {
             return Err(format!("#{id} is not a point or direction"));
@@ -233,13 +170,20 @@ impl Document {
             } else {
                 args[3].parse().map_err(|_| "invalid pcurve minor radius")?
             };
-            let angle = std::f64::consts::TAU * parameter;
-            return Ok([
-                origin[0] + major * angle.cos() * x[0] + minor * angle.sin() * y[0],
-                origin[1] + major * angle.cos() * x[1] + minor * angle.sin() * y[1],
-            ]);
+            return Ok(conic_point(origin, x, y, [major, minor], TAU * parameter));
         }
         Err(format!("#{id} is not a supported pcurve"))
+    }
+
+    pub(super) fn pcurve_support(&self, pcurve: usize) -> Result<(usize, usize), String> {
+        let pcurve_args = fields(self.entity(pcurve)?)?;
+        let surface = reference(&pcurve_args[1])?;
+        let definition = reference(&pcurve_args[2])?;
+        let representation = fields(self.entity(definition)?)?;
+        let uv_curve = *references(&representation[1])
+            .first()
+            .ok_or("empty pcurve representation")?;
+        Ok((surface, uv_curve))
     }
 
     pub(super) fn surface_point(&self, id: usize, uv: [f64; 2]) -> Result<[f64; 3], String> {
