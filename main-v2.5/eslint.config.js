@@ -49,6 +49,11 @@ const LAYERS = [
 const THREE_AND_DOM_FREE = new Set(['dto', 'errors', 'constants', 'runtime-state', 'kernel', 'world-graph']);
 const THREE_IMPORTS = [{ regex: '^three(/|$)', message: 'This layer imports no three.' }];
 const GLUE_IMPORT = { regex: '(^|/)opengeometry/pkg/', message: 'Only kernel/** imports the WASM glue.' };
+const JS_SPECIFIER = {
+  regex: '^(?!.*/(dist|opengeometry/pkg)/)\\.\\.?/.*\\.js$',
+  message: 'A relative import names the TypeScript module without an extension;'
+    + ' only dist/*.js and the opengeometry/pkg glue keep .js.',
+};
 const WORKER_IMPORTS = [
   ...THREE_IMPORTS,
   { regex: '(^|/)(bodies|runtime)/', message: 'The worker imports no three, bodies or runtime.' },
@@ -308,6 +313,10 @@ export function lintConfig(exceptions, returnTypeNames) {
     ...importConfigs(),
     ...syntaxConfigs(exceptions),
     consumerConfig(),
+    {
+      files: [...SDK_FILES, 'opengeometry-three/{examples-vite,tests}/**/*.ts'],
+      rules: { 'no-restricted-imports': ['error', { patterns: [JS_SPECIFIER] }] },
+    },
     ...exceptionConfigs(exceptions),
   ];
 }
