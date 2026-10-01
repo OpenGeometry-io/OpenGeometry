@@ -117,11 +117,15 @@ fn batch_matrix_step_matches_source_or_pins_an_error() {
     assert_matrix_step_matches_source("batch-matrix", 23, &[".step.", ".fallback."]);
 }
 
-#[test]
-fn nonparallel_cylinder_step_has_fitted_curves_within_exchange_budget() {
+fn cylinder_cross() -> BrepEnvelope {
     let fixture: Value =
         serde_json::from_str(&fixture_text("boolean-matrix/cylinder-cross.json").unwrap()).unwrap();
-    let body: BrepEnvelope = serde_json::from_value(fixture["result"]["brep"].clone()).unwrap();
+    serde_json::from_value(fixture["result"]["brep"].clone()).unwrap()
+}
+
+#[test]
+fn nonparallel_cylinder_step_has_fitted_curves_within_exchange_budget() {
+    let body = cylinder_cross();
     let (text, report) = export_step(&body, "metre").unwrap();
     assert!(text.contains("B_SPLINE_CURVE_WITH_KNOTS"));
     assert!(report.exchange_error_bound <= 1e-6);
@@ -131,6 +135,23 @@ fn nonparallel_cylinder_step_has_fitted_curves_within_exchange_budget() {
     let direction = parsed.parameter_direction_report().unwrap();
     assert!(direction.assessed > 0);
     assert_eq!(direction.assessed, direction.aligned + direction.reversed);
+}
+
+#[test]
+fn nonparallel_cylinder_step_size_stays_within_its_baseline() {
+    let baseline: Value = serde_json::from_str(include_str!(
+        "../../../scripts/bench/performance-baseline.json"
+    ))
+    .unwrap();
+    let budget = baseline["sizes"]["nonparallelCylinderStepBytes"]
+        .as_u64()
+        .expect("sizes.nonparallelCylinderStepBytes in the performance baseline");
+    let (text, _) = export_step(&cylinder_cross(), "metre").unwrap();
+    let bytes = text.len() as u64;
+    assert!(
+        bytes * 4 <= budget * 5,
+        "{bytes} bytes exceed 1.25 x {budget}"
+    );
 }
 
 fn cone_pcurves(parsed: &Document) -> Vec<ConePcurve> {

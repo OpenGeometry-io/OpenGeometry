@@ -13,16 +13,6 @@ function failsWith(message) {
   return (error) => error instanceof Error && error.message === message;
 }
 
-function performanceLog(metric) {
-  return [
-    '> opengeometry@2.5.0 test:performance',
-    'file:///repo/scripts/bench/performance.mjs:51',
-    '        throw new Error(`${key} regressed: ${result[key]} ms exceeds ${baseline[key] * 1.25} ms`);',
-    `Error: ${metric} regressed: 31.5 ms exceeds 25 ms`,
-    '    at file:///repo/scripts/bench/performance.mjs:51:15',
-  ].join('\n');
-}
-
 function browserLog(failed, passed) {
   return [
     `Running ${String(failed.length + passed)} tests using 1 worker`,
@@ -77,20 +67,13 @@ test('an option without a value fails naming the option', () => {
   assert.throws(() => selectSteps(['--from', '--full']), failsWith('--from needs a value'));
 });
 
-test('a rotated20BooleanMs regression is a known flake', () => {
-  assert.deepEqual(classifyFlake('test:performance', performanceLog('rotated20BooleanMs')), {
-    verdict: 'KNOWN-FLAKE', detail: 'rotated20BooleanMs',
-  });
-});
-
-test('any other performance regression needs investigation', () => {
-  assert.deepEqual(classifyFlake('test:performance', performanceLog('sliderBooleanMs')), {
-    verdict: 'INVESTIGATE', detail: 'sliderBooleanMs',
-  });
-});
-
-test('a performance failure without a regressed metric is not classified', () => {
-  assert.equal(classifyFlake('test:performance', 'Error: dist/index.js not found'), undefined);
+test('a performance regression is not classified as a flake', () => {
+  const log = [
+    '> opengeometry@2.5.0 test:performance',
+    'Error: rotated20BooleanMs regressed: 150 ms exceeds 142 ms',
+    '    at file:///repo/scripts/bench/performance.mjs:60:11',
+  ].join('\n');
+  assert.equal(classifyFlake('test:performance', log), undefined);
 });
 
 test('a browser run whose only failure is the memory test is a known flake', () => {
@@ -109,7 +92,7 @@ test('a browser run failing only another test is not classified', () => {
 });
 
 test('a failure in any other step is not classified', () => {
-  assert.equal(classifyFlake('typecheck', performanceLog('rotated20BooleanMs')), undefined);
+  assert.equal(classifyFlake('typecheck', browserLog([MEMORY_TEST], 39)), undefined);
 });
 
 test('playwright counts read the passed and failed totals', () => {
