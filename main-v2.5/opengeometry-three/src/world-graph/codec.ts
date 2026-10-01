@@ -46,7 +46,7 @@ export function polylinePoints(params: Record<string, unknown>, call: string): F
   return new Float64Array(points.flat());
 }
 
-export function decode<T>(text: string, call: string, payload: string, check: Check<T>): T {
+function decode<T>(text: string, call: string, payload: string, check: Check<T>): T {
   return checked(parsed(text), call, payload, check);
 }
 
@@ -139,15 +139,15 @@ function isPoint(value: unknown): value is [number, number, number] {
   return isNumbers(value, 3);
 }
 
-function isNullable(value: unknown, check: (item: unknown) => boolean): boolean {
-  return value === null || check(value);
-}
-
 function isNodeInfo(value: unknown): value is NodeInfo {
   return isFields(value) && isString(value['ogId']) && isNumber(value['handle']) && isNumber(value['generation'])
     && isNullable(value['parent'], isString) && isStrings(value['children']) && isString(value['kind'])
     && isNullable(value['shapeId'], isString) && isNullable(value['shapeRevision'], isNumber)
     && isNullable(value['bodyType'], isString);
+}
+
+function isNullable(value: unknown, check: (item: unknown) => boolean): boolean {
+  return value === null || check(value);
 }
 
 function isPlacement(value: unknown): value is Placement {
