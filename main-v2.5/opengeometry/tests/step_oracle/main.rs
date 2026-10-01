@@ -1,3 +1,4 @@
+mod acceptance;
 mod fixtures;
 mod graph_parity;
 mod membership;
