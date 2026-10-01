@@ -232,7 +232,7 @@ impl Document {
             for vertex in [reference(&args[1])?, reference(&args[2])?] {
                 let point = self.vertex(vertex)?;
                 let distance = self.curve_distance(geometry, point)?;
-                if !distance.is_finite() || distance > tolerance * 1.1 + 1e-12 {
+                if !distance.is_finite() || distance > tolerance {
                     return Err(format!("edge #{id} vertex #{vertex} misses curve #{geometry}: {distance} > {tolerance}"));
                 }
             }
@@ -277,7 +277,7 @@ impl Document {
                     } else {
                         self.curve_distance(curve, point)?
                     };
-                    if !distance.is_finite() || distance > tolerance * 1.1 + 1e-12 {
+                    if !distance.is_finite() || distance > tolerance {
                         return Err(format!("surface curve #{id} pcurve #{pcurve} sample {sample} misses 3D curve: {distance} > {tolerance}"));
                     }
                 }
