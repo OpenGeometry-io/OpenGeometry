@@ -15,7 +15,7 @@ type Sweep = (&'static str, fn() -> Primitive, &'static [Point3]);
 
 const L_PATH: [Point3; 3] = [[0.0, 0.0, 0.0], [0.0, 3.0, 0.0], [3.0, 3.0, 0.0]];
 
-const SPATIAL_PATH: [Point3; 4] = [
+pub(crate) const SPATIAL_PATH: [Point3; 4] = [
     [0.0, 0.0, 0.0],
     [0.0, 3.0, 0.0],
     [3.0, 3.0, 0.0],

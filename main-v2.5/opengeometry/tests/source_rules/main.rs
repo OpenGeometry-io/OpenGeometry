@@ -26,11 +26,10 @@ use source_tree::SourceTree;
 use std::path::{Path, PathBuf};
 
 const RULES_ROOT: &str = "tests/source_rules";
-const ROOTS_OUTSIDE_KERNEL_SRC: [&str; 5] = [
+const ROOTS_OUTSIDE_KERNEL_SRC: [&str; 4] = [
     "tests",
     "test-support/src",
     "examples",
-    "../tools/snapshot/src",
     "../tools/parity-oracle/src",
 ];
 

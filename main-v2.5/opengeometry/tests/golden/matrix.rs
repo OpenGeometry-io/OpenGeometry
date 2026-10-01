@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 const FIXTURE_DIRECTORY: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../opengeometry/tests/fixtures/parity/boolean-matrix"
+    "/tests/fixtures/parity/boolean-matrix"
 );
 
 const MATRIX_FIXTURES: usize = 18;

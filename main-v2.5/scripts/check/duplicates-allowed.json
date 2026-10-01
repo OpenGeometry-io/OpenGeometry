@@ -49,46 +49,46 @@
       "sha256": "acee2b0279dbf1e5c22c005fa5daed01ff7477d3f5e3135b2cf3762519350649",
       "count": 2,
       "members": [
-        "tools/parity-oracle/src/batch/parts.rs:52",
-        "tools/snapshot/src/fixtures.rs:8"
+        "opengeometry/tests/golden/fixtures.rs:8",
+        "tools/parity-oracle/src/batch/parts.rs:52"
       ],
-      "reason": "the Accuracy constructor, a general snapshot fixture helper that the batch-matrix oracle mirrors, built against main's kernel types (batch-matrix oracle) and 2.5's (snapshot); the crates link different kernels, so no shared home"
+      "reason": "the Accuracy constructor, a general golden corpus fixture helper that the batch-matrix oracle mirrors, built against main's kernel types (batch-matrix oracle) and 2.5's (golden corpus); the crates link different kernels, so no shared home"
     },
     {
       "sha256": "1fb5e754deb1fbc9304b20ff3a607d4fd305c97b1074dc5823b6346d64598f85",
       "count": 2,
       "members": [
-        "tools/parity-oracle/src/batch/parts.rs:72",
-        "tools/snapshot/src/fixtures.rs:38"
+        "opengeometry/tests/golden/fixtures.rs:38",
+        "tools/parity-oracle/src/batch/parts.rs:72"
       ],
-      "reason": "the upright frame, a general snapshot fixture helper that the batch-matrix oracle mirrors, built against main's kernel types (batch-matrix oracle) and 2.5's (snapshot); the crates link different kernels, so no shared home"
+      "reason": "the upright frame, a general golden corpus fixture helper that the batch-matrix oracle mirrors, built against main's kernel types (batch-matrix oracle) and 2.5's (golden corpus); the crates link different kernels, so no shared home"
     },
     {
       "sha256": "570f6d8e08e0b6f1d093d8fcdea163b96284a073fef8b4f2f19b3d353c0f3164",
       "count": 2,
       "members": [
-        "tools/parity-oracle/src/batch/parts.rs:81",
-        "tools/snapshot/src/fixtures.rs:58"
+        "opengeometry/tests/golden/fixtures.rs:58",
+        "tools/parity-oracle/src/batch/parts.rs:81"
       ],
-      "reason": "the tilted_about_y frame, a general snapshot fixture helper that the batch-matrix oracle mirrors, built against main's kernel types (batch-matrix oracle) and 2.5's (snapshot); the crates link different kernels, so no shared home"
+      "reason": "the tilted_about_y frame, a general golden corpus fixture helper that the batch-matrix oracle mirrors, built against main's kernel types (batch-matrix oracle) and 2.5's (golden corpus); the crates link different kernels, so no shared home"
     },
     {
       "sha256": "ac1c33bef60907958e2907e356a2f4cdd6daf8ba85460c981c3e360a576f512b",
       "count": 2,
       "members": [
-        "tools/parity-oracle/src/batch/parts.rs:90",
-        "tools/snapshot/src/fixtures.rs:98"
+        "opengeometry/tests/golden/fixtures.rs:98",
+        "tools/parity-oracle/src/batch/parts.rs:90"
       ],
-      "reason": "the rectangle profile, a general snapshot fixture helper that the batch-matrix oracle mirrors, built against main's kernel types (batch-matrix oracle) and 2.5's (snapshot); the crates link different kernels, so no shared home"
+      "reason": "the rectangle profile, a general golden corpus fixture helper that the batch-matrix oracle mirrors, built against main's kernel types (batch-matrix oracle) and 2.5's (golden corpus); the crates link different kernels, so no shared home"
     },
     {
       "sha256": "2fbf7364a5ef7c572e2f60870999a93195d06fa48b01ceda055523c8020efb7c",
       "count": 2,
       "members": [
-        "tools/parity-oracle/src/batch/scenes.rs:236",
-        "tools/snapshot/src/batch.rs:144"
+        "opengeometry/tests/golden/batch.rs:144",
+        "tools/parity-oracle/src/batch/scenes.rs:236"
       ],
-      "reason": "the wide-opening sector cutter of the batch scenes, built against main's kernel types (batch-matrix oracle) and 2.5's (snapshot); the crates link different kernels, so no shared home"
+      "reason": "the wide-opening sector cutter of the batch scenes, built against main's kernel types (batch-matrix oracle) and 2.5's (golden corpus); the crates link different kernels, so no shared home"
     },
     {
       "sha256": "f9fbe560b6c961a305d84307b825f6df436caa380809a474682dc476a61fc5a1",

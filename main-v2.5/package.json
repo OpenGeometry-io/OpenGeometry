@@ -20,7 +20,7 @@
     "test:node": "node --test 'opengeometry-three/tests/node/*.test.mjs' 'scripts/check/*.test.mjs'",
     "test:performance": "node --max-old-space-size=512 scripts/bench/performance.mjs --check",
     "test:browser": "playwright test",
-    "snapshot:kernel": "cargo run --locked --offline --manifest-path tools/snapshot/Cargo.toml --",
+    "snapshot:kernel": "node scripts/snapshot/kernel-snapshot.mjs",
     "snapshot:sdk": "node scripts/snapshot/sdk-snapshot.mjs",
     "check:api": "node scripts/check/api-surface.mjs",
     "check:duplicates": "node scripts/check/duplicates.mjs",
