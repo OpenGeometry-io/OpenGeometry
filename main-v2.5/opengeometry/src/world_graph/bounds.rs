@@ -52,4 +52,23 @@ impl WorldGraph {
         }
         Ok(bounds)
     }
+
+    pub fn local_bounds(&self, og_id: &str) -> Result<Option<Bounds3>, GraphError> {
+        let Some(shape_id) = &self.node(og_id)?.shape else {
+            return Ok(None);
+        };
+        let shape = self.shapes.shapes.get(shape_id).ok_or_else(|| {
+            GraphError::code(ErrorCode::InvalidTopology, "shape reference is missing")
+        })?;
+        Ok(shape.brep.bounds()?.map(|bounds| {
+            [
+                bounds.axes[0].lo,
+                bounds.axes[1].lo,
+                bounds.axes[2].lo,
+                bounds.axes[0].hi,
+                bounds.axes[1].hi,
+                bounds.axes[2].hi,
+            ]
+        }))
+    }
 }

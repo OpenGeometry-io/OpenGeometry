@@ -1,4 +1,4 @@
-use super::errors;
+use super::{errors, panic};
 use crate::tessellation::{display::DisplayBuffers, SnapshotStore};
 use js_sys::{Float32Array, Float64Array, Object, Reflect, Uint32Array};
 use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
@@ -72,6 +72,7 @@ pub struct OGTessellator {
 impl OGTessellator {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
+        panic::install_panic_hook();
         Self {
             inner: SnapshotStore::new(),
         }

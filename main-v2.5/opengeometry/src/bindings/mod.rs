@@ -1,4 +1,5 @@
 mod errors;
+mod panic;
 mod params;
 mod tessellator;
 #[cfg(test)]

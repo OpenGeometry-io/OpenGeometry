@@ -6,7 +6,7 @@ mod placement;
 mod rebuild;
 mod shapes;
 
-use crate::bindings::{errors, params};
+use crate::bindings::{errors, panic, params};
 use crate::brep::Accuracy;
 use crate::world_graph::{ChangeSet, CopyOptions, CreateOptions, GraphError, MarkId, WorldGraph};
 use serde::Serialize;
@@ -54,7 +54,7 @@ pub struct OGWorldGraph {
 impl OGWorldGraph {
     #[wasm_bindgen(constructor)]
     pub fn new(accuracy_json: &str) -> Result<Self, JsValue> {
-        console_error_panic_hook::set_once();
+        panic::install_panic_hook();
         let accuracy: Accuracy = params::parse(accuracy_json).map_err(errors::json)?;
         let inner = WorldGraph::new(accuracy).map_err(errors::json)?;
         Ok(Self {

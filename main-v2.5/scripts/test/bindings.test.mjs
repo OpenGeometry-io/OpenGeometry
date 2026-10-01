@@ -66,6 +66,30 @@ GRAPH.transform('cube', ENCODE({ kind: 'Translate', offset: [2, 0, 0] }));
 assert(Math.abs(JSON.parse(GRAPH.bounds('cube'))[0] - 1.5) < 1e-6);
 GRAPH.rollback(MARK);
 GRAPH.release(MARK);
+const M1 = GRAPH.mark();
+const M2 = GRAPH.mark();
+GRAPH.rollback(M1);
+assert.throws(
+  () => GRAPH.release(M2),
+  (error) => {
+    const parsed = JSON.parse(String(error));
+    return parsed.code === 'InvalidMark' && parsed.message === 'mark handle is stale';
+  },
+);
+const NEAR = (actual, expected) => actual.every((value, index) => Math.abs(value - expected[index]) < 1e-9);
+const LOCAL = JSON.parse(GRAPH.localBounds('cube'));
+const WORLD = JSON.parse(GRAPH.bounds('cube'));
+assert(NEAR(LOCAL, WORLD));
+GRAPH.transform('cube', ENCODE({ kind: 'Translate', offset: [2, 0, 0] }));
+assert(NEAR(JSON.parse(GRAPH.localBounds('cube')), LOCAL));
+assert(Math.abs(JSON.parse(GRAPH.bounds('cube'))[0] - WORLD[0] - 2) < 1e-9);
+const BUCKETS = JSON.parse(GRAPH.displayBuckets('cube'));
+assert.deepEqual(Object.keys(BUCKETS).sort(), ['floor', 'static']);
+CAMEL_CASE_KEYS(BUCKETS);
+assert.equal(BUCKETS.floor, 2 ** -21);
+assert(BUCKETS.static >= BUCKETS.floor);
+GRAPH.rollback(M1);
+GRAPH.release(M1);
 assert(Math.abs(JSON.parse(GRAPH.bounds('cube'))[0] + 0.5) < 1e-6);
 const CHANGES = GRAPH.changesSince(0n);
 assert(CHANGES.matrices instanceof Float64Array);

@@ -61,4 +61,9 @@ impl OGWorldGraph {
     pub fn bounds(&self, og_id: &str) -> Result<String, JsValue> {
         serialise(&self.inner.bounds(og_id).map_err(errors::json)?)
     }
+
+    #[wasm_bindgen(js_name = localBounds)]
+    pub fn local_bounds(&self, og_id: &str) -> Result<String, JsValue> {
+        serialise(&self.inner.local_bounds(og_id).map_err(errors::json)?)
+    }
 }

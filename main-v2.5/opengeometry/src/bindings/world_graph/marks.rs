@@ -27,7 +27,9 @@ impl OGWorldGraph {
                 "mark handle is stale",
             ))
         })?;
-        changed(self.inner.rollback(mark).map_err(errors::json)?)
+        let changes = self.inner.rollback(mark).map_err(errors::json)?;
+        self.marks.retain(|s, _| *s <= slot);
+        changed(changes)
     }
 
     pub fn release(&mut self, slot: u32) -> Result<(), JsValue> {
