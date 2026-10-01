@@ -28,7 +28,9 @@ test('a real LimitExceeded from the inline backend gives a warning and a coarser
   const errors = listen('error');
   try {
     const { floor } = JSON.parse(graph().displayBuckets(body.ogId));
-    Reflect.get(TESTING, 'pinWantedBucket')(body.lastInfo.shapeId, floor / 2);
+    const shapeId = body.lastInfo.shapeId;
+    assert(shapeId);
+    Reflect.get(TESTING, 'pinWantedBucket')(shapeId, floor / 2);
     ensureGeometry(body, true);
     assert.deepEqual(errors.events, []);
     assert.equal(warnings.events.length, 1);
@@ -105,7 +107,7 @@ test('a stubbed RuntimeError poisons the runtime emits fatal and names the metho
   const body = cube('panic-cube');
   const graph = Object(runtime().graph);
   const fatal = listen('fatal');
-  runtime().displayed.add(body);
+  runtime().displayed.set(body, runtime().pass);
   graph.buffers = () => { throw new WebAssembly.RuntimeError('unreachable'); };
   Reflect.set(globalThis, '__opengeometryPanic', 'index out of bounds');
   try {

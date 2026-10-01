@@ -87,6 +87,11 @@ export function decodeMarkStats(text: string, call: string): MarkStats {
     && isNumber(value['liveMarks']) && isNumber(value['retainedRevisions']));
 }
 
+export function decodeDisplayBuckets(text: string, call: string): { floor: number; static: number } {
+  return decode(text, call, 'display buckets', (value): value is { floor: number; static: number } => isFields(value)
+    && Number.isFinite(value['floor']) && Number.isFinite(value['static']));
+}
+
 export function decodeChangeSet(packet: unknown, call: string): { changes: ChangeSet; matrices: Float64Array } {
   const glue = checked(packet, call, 'change packet', isChangePacket);
   return { changes: decode(glue.changesJson, call, 'change set', isChangeSet), matrices: glue.matrices };

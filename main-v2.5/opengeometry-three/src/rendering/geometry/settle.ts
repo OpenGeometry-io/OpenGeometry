@@ -1,21 +1,34 @@
-import { runtime } from '../../runtime/runtime-state.js';
-import { ensureGeometry, flush } from './geometry-scheduler.js';
+import { OGError } from '../../errors.js';
+import { runtime, type Runtime } from '../../runtime/runtime-state.js';
+import { capturedError, displayedBodies, setTemporaryTarget, settleNow, wantedKey } from '../lod/lod-controller.js';
+import { flush } from './geometry-scheduler.js';
+import { refreshDisplayed } from './render-pass.js';
 
-export async function settled(
-  options: { deflection?: number } = {},
-): Promise<{ failed: { ogId: string; error: unknown }[] }> {
+type Failure = { ogId: string; error: unknown };
+
+export async function settled(options: { deflection?: number } = {}): Promise<{ failed: Failure[] }> {
   const state = runtime();
-  const failed: { ogId: string; error: unknown }[] = [];
-  for (const body of state.displayed) {
-    if (options.deflection !== undefined) body.setAppearance({ deflection: options.deflection });
-    ensureGeometry(body);
+  const prior = state.lod.temporary;
+  if (options.deflection !== undefined) setTemporaryTarget(state, options.deflection);
+  try {
+    settleNow(state);
+    refreshDisplayed(state);
+    await Promise.all([...state.pending.values()]);
+    flush();
+    return { failed: failures(state) };
+  } finally {
+    if (options.deflection !== undefined) setTemporaryTarget(state, prior);
   }
-  await Promise.all([...state.pending.values()]);
-  flush();
-  for (const body of state.displayed) {
-    if (!body.record || body.record.revision !== body.lastInfo.shapeRevision) {
-      failed.push({ ogId: body.ogId, error: 'No current geometry record' });
-    }
+}
+
+function failures(state: Runtime): Failure[] {
+  const failed: Failure[] = [];
+  for (const body of displayedBodies(state)) {
+    const { record, lastInfo } = body;
+    const current = record?.shapeId === lastInfo.shapeId && record.revision === lastInfo.shapeRevision;
+    if (current && record.bucket === wantedKey(state, body)) continue;
+    const error = capturedError(state, body) ?? new OGError('Cancelled', 'OpenGeometry.settled', 'no current record');
+    failed.push({ ogId: body.ogId, error });
   }
-  return { failed };
+  return failed;
 }

@@ -5,10 +5,10 @@ import type { Placement } from '../dto/placement.js';
 import { OGError } from '../errors.js';
 import { call } from '../kernel/kernel-session.js';
 import { enterLimbo, revive } from '../marks/limbo.js';
-import { ensureGeometry, flush, wanted } from '../rendering/geometry/geometry-scheduler.js';
+import { flush, wanted } from '../rendering/geometry/geometry-scheduler.js';
 import { noteDisplayed } from '../rendering/geometry/render-pass.js';
-import { deflectionBucket } from '../rendering/lod/deflection.js';
-import { worldUnitsPerPixel } from '../rendering/lod/screen-metrics.js';
+import { observeCamera } from '../rendering/lod/camera-observer.js';
+import { overrideChanged } from '../rendering/lod/lod-controller.js';
 import {
   lineMaterial, releaseLine, releaseSurface, surfaceMaterial, type MaterialAppearance,
 } from '../rendering/materials/material-pool.js';
@@ -25,8 +25,6 @@ import {
   localBounds, removeChild,
 } from './node-methods.js';
 import type { SystemAssembly } from './system-assembly.js';
-
-type DisplaySize = { shapeId: string | null; revision: number | null; diagonal: number; floor: number };
 
 function singleMaterial(material: THREE.Material | THREE.Material[], label: string): THREE.Material {
   if (Array.isArray(material)) throw new OGError('InvalidOperand', label, 'display material must be a single material');
@@ -50,8 +48,6 @@ export abstract class Body extends THREE.Group {
   inLimbo = false;
   private surfaceKey: string;
   private lineKey: string;
-  private lastCameraEvaluation = -Infinity;
-  private sizeCache?: DisplaySize | undefined;
   private readonly epoch = runtime().epoch;
   private readonly pose = poseMemory();
 
@@ -80,39 +76,15 @@ export abstract class Body extends THREE.Group {
     this.outline = new THREE.LineSegments(placeholder ?? new THREE.BufferGeometry(), outlineStyle.material);
     this.outline.visible = Boolean(placeholder) && this.appearance.outline;
     this.add(this.surface, this.outline);
-    this.surface.onBeforeRender = (renderer, _scene, camera) => { this.observeCamera(renderer, camera); };
-    this.outline.onBeforeRender = (renderer, _scene, camera) => { this.observeCamera(renderer, camera); };
+    this.surface.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); };
+    this.outline.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); };
     register(this);
     this.applyWorldMatrix(call(`${bodyType}.constructor`, () => worldGraph().worldMatrix(ogId)));
   }
 
   protected check(call: string): void { checkNode(call, 'body', this.epoch, this.handle, this.generation); }
 
-  private observeCamera(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void {
-    const state = runtime();
-    if (this.appearance.deflection !== undefined || state.displayDeflection !== undefined) return;
-    const now = performance.now();
-    if (now - this.lastCameraEvaluation < 100) return;
-    this.lastCameraEvaluation = now;
-    const bounds = this.getBounds();
-    if (!bounds) return;
-    const height = renderer.getDrawingBufferSize(new THREE.Vector2()).y;
-    const target = worldUnitsPerPixel(camera, bounds, height) * (runtime().moving ? 2 : 0.5);
-    const scale = Math.cbrt(Math.abs(this.matrixWorld.determinant()));
-    if (Number.isFinite(target) && target > 0 && scale > 0) {
-      const bucket = deflectionBucket(target / scale);
-      if (this.lastInfo.shapeId && state.buckets.get(this.lastInfo.shapeId) !== bucket) {
-        state.cameraBuckets.set(this.lastInfo.shapeId, bucket);
-        state.buckets.delete(this.lastInfo.shapeId);
-        queueMicrotask(() => { ensureGeometry(this); });
-      }
-    }
-  }
-
   applyWorldMatrix(values: ArrayLike<number>): void {
-    if ([0, 1, 2, 4, 5, 6, 8, 9, 10].some((index) => this.matrixWorld.elements[index] !== values[index])) {
-      this.sizeCache = undefined;
-    }
     this.matrixWorld.fromArray(values);
     derivePose(this.pose, this);
     super.updateMatrixWorld(true);
@@ -127,6 +99,7 @@ export abstract class Body extends THREE.Group {
   swapReadyRecord(): void {
     if (!this.visible || !this.lastInfo.shapeId || this.lastInfo.shapeRevision === null) return;
     const bucket = wanted(this);
+    if (bucket === undefined) return;
     const record = runtime().records.get(this.lastInfo.shapeId, this.lastInfo.shapeRevision, bucket);
     if (record) this.install(record);
   }
@@ -162,7 +135,8 @@ export abstract class Body extends THREE.Group {
       this.outline.material = outlineStyle.material;
     }
     this.outline.visible = this.appearance.outline;
-    if (this.appearance.deflection !== undefined) runtime().buckets.delete(this.lastInfo.shapeId ?? '');
+    const shapeId = this.lastInfo.shapeId;
+    if (shapeId && previous.deflection !== this.appearance.deflection) overrideChanged(runtime(), shapeId);
   }
 
   transform(kind: string, params: Record<string, unknown>): void {
@@ -197,18 +171,6 @@ export abstract class Body extends THREE.Group {
   getBounds(): [number, number, number, number, number, number] | null {
     this.check(`${this.bodyType}.getBounds`);
     return getBounds(this.bodyType, this.ogId);
-  }
-
-  displaySize(): { shapeId: string | null; revision: number | null; diagonal: number; floor: number } {
-    const { shapeId, shapeRevision } = this.lastInfo;
-    if (this.sizeCache && this.sizeCache.shapeId === shapeId && this.sizeCache.revision === shapeRevision) {
-      return this.sizeCache;
-    }
-    const bounds = this.getBounds();
-    const diagonal = bounds ? Math.hypot(bounds[3] - bounds[0], bounds[4] - bounds[1], bounds[5] - bounds[2]) : 1;
-    const floor = deflectionBucket(Math.max(1e-7, diagonal * 2 ** -22));
-    this.sizeCache = { shapeId, revision: shapeRevision, diagonal, floor };
-    return this.sizeCache;
   }
 
   getBrep(): Brep { this.check(`${this.bodyType}.getBrep`); return getBrep(this.bodyType, this.ogId); }
