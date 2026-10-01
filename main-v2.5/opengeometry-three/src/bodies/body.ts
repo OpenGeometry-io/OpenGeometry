@@ -15,6 +15,10 @@ import { node, worldGraph } from '../world-graph/world-graph-client.js';
 import type { Appearance, BodyOptions } from './body-options.js';
 import { register, unregister } from './body-registry.js';
 import { DisplayClone } from './display-clone.js';
+import {
+  addChild, checkNode, getBounds, getBrep, getChildren, getInstanceCount, getParent, getPlacement, getWorldPlacement,
+  removeChild,
+} from './node-methods.js';
 import type { SystemAssembly } from './system-assembly.js';
 
 type DisplaySize = { shapeId: string | null; revision: number | null; diagonal: number; floor: number };
@@ -40,6 +44,7 @@ export abstract class Body extends THREE.Group {
   private lineKey: string;
   private lastCameraEvaluation = -Infinity;
   private sizeCache?: DisplaySize | undefined;
+  private readonly epoch = runtime().epoch;
 
   protected constructor(ogId: string, bodyType: 'Wire' | 'Solid', options: BodyOptions) {
     super();
@@ -70,7 +75,7 @@ export abstract class Body extends THREE.Group {
     this.applyWorldMatrix(call('Body.constructor', () => worldGraph().worldMatrix(ogId)));
   }
 
-  protected check(): void { call('Body', () => worldGraph().nodeByHandle(this.handle, this.generation)); }
+  protected check(): void { checkNode('Body', 'body', this.epoch, this.handle, this.generation); }
 
   private observeCamera(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void {
     const state = runtime();
@@ -151,43 +156,27 @@ export abstract class Body extends THREE.Group {
     call(`${this.bodyType}.transform`, () => worldGraph().transform(this.ogId, encode({ kind, ...params })));
   }
 
-  getPlacement(): Placement {
-    this.check();
-    return JSON.parse(call(`${this.bodyType}.getPlacement`, () => worldGraph().placement(this.ogId)));
-  }
+  getPlacement(): Placement { this.check(); return getPlacement(this.bodyType, this.ogId); }
 
-  getWorldPlacement(): Placement {
-    this.check();
-    return JSON.parse(call(`${this.bodyType}.getWorldPlacement`, () => worldGraph().worldPlacement(this.ogId)));
-  }
+  getWorldPlacement(): Placement { this.check(); return getWorldPlacement(this.bodyType, this.ogId); }
 
   addChild(children: (Body | SystemAssembly)[], options: { keepWorld?: boolean } = {}): void {
     this.check();
-    call(`${this.bodyType}.addChild`, () => worldGraph().addChild(
-      this.ogId, encode(children.map((child) => child.ogId)), Boolean(options.keepWorld),
-    ));
+    addChild(this.bodyType, this.ogId, children, Boolean(options.keepWorld));
   }
 
   removeChild(child: Body | SystemAssembly, options: { keepWorld?: boolean } = {}): void {
     this.check();
-    call(`${this.bodyType}.removeChild`, () => worldGraph().removeChild(
-      this.ogId, child.ogId, Boolean(options.keepWorld),
-    ));
+    removeChild(this.bodyType, this.ogId, child.ogId, Boolean(options.keepWorld));
   }
 
-  getChildren(): string[] {
-    this.check();
-    return JSON.parse(call(`${this.bodyType}.getChildren`, () => worldGraph().children(this.ogId)));
-  }
+  getChildren(): string[] { this.check(); return getChildren(this.bodyType, this.ogId); }
 
-  getParent(): string | null {
-    this.check();
-    return JSON.parse(call(`${this.bodyType}.getParent`, () => worldGraph().parent(this.ogId)));
-  }
+  getParent(): string | null { this.check(); return getParent(this.bodyType, this.ogId); }
 
   getBounds(): [number, number, number, number, number, number] | null {
     this.check();
-    return JSON.parse(call(`${this.bodyType}.getBounds`, () => worldGraph().bounds(this.ogId)));
+    return getBounds(this.bodyType, this.ogId);
   }
 
   displaySize(): { shapeId: string | null; revision: number | null; diagonal: number; floor: number } {
@@ -202,15 +191,9 @@ export abstract class Body extends THREE.Group {
     return this.sizeCache;
   }
 
-  getBrep() {
-    this.check();
-    return JSON.parse(call(`${this.bodyType}.getBrep`, () => worldGraph().brep(this.ogId)));
-  }
+  getBrep() { this.check(); return getBrep(this.bodyType, this.ogId); }
 
-  getInstanceCount(): number {
-    this.check();
-    return call(`${this.bodyType}.getInstanceCount`, () => worldGraph().instanceCount(this.ogId));
-  }
+  getInstanceCount(): number { this.check(); return getInstanceCount(this.bodyType, this.ogId); }
 
   makeUnique(): void {
     this.check();
@@ -240,12 +223,16 @@ export abstract class Body extends THREE.Group {
 
   hideForDispose(): void {
     if (this.inLimbo) return;
+    const state = runtime();
     this.visible = false;
-    runtime().displayed.delete(this);
-    this.previousParent = this.parent;
-    this.parent?.remove(this);
+    state.displayed.delete(this);
+    const parent = this.parent;
+    this.previousParent = parent;
+    if (state.flushing || state.renderPassActive) {
+      queueMicrotask(() => { if (this.previousParent === parent) parent?.remove(this); });
+    } else parent?.remove(this);
     this.inLimbo = true;
-    if (runtime().marks.size === 0) this.finalize();
+    if (state.marks.size === 0) this.finalize();
   }
 
   reviveIfRestored(): void {
@@ -283,6 +270,9 @@ export abstract class Body extends THREE.Group {
     mesh.position.copy(this.surface.position);
     outline.position.copy(this.outline.position);
     const display = new DisplayClone(this.record, mesh, outline);
+    display.matrix.copy(this.matrixWorld);
+    display.matrix.decompose(display.position, display.quaternion, display.scale);
+    display.matrixWorld.copy(this.matrixWorld);
     return display as unknown as this;
   }
 

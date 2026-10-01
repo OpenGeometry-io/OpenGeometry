@@ -144,7 +144,6 @@ const STOP_FPS_METER = startFpsMeter(RENDERER, SCENE, CAMERA, CONTROLS);
 
 (window as typeof window & { __ogExample?: unknown }).__ogExample = {
   camera: CAMERA, controls: CONTROLS, renderer: RENDERER, scene: SCENE, solids: SOLIDS, level: LEVEL,
-  get backend() { return OpenGeometry.activeBackend; },
   render, resetView,
   exportStep: () => OpenGeometry.exportStep({ nodes: [LEVEL] }),
 };

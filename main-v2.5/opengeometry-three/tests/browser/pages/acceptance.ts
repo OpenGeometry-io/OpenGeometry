@@ -5,6 +5,7 @@ import {
   OG_OPERATION_EXTRUDE, OG_OPERATION_SWEEP, OG_OPERATION_SUBTRACT,
   OG_TRANSFORM_TRANSLATE, OG_TRANSFORM_ROTATE, OG_TRANSFORM_PLACE,
 } from '../../../../dist/index.js';
+import { activeBackend, graph } from '../../../../dist/testing.js';
 import {
   bootKernel, createRenderer, publishFixture, releasePage, required, statusElement,
 } from '../support/test-page.js';
@@ -41,8 +42,8 @@ function meshValue(values: ArrayLike<number>, index: number): number {
 }
 
 function volume(body: Solid, bucket = 0.01): number {
-  const info = JSON.parse(OpenGeometry.graph().node(body.ogId)) as { shapeId: string };
-  const buffers = OpenGeometry.graph().buffers(info.shapeId, bucket, 2_000_000) as {
+  const info = JSON.parse(graph().node(body.ogId)) as { shapeId: string };
+  const buffers = graph().buffers(info.shapeId, bucket, 2_000_000) as {
     positions: Float32Array; indices: Uint32Array; origin: Float64Array;
   };
   let sum = 0;
@@ -147,7 +148,7 @@ const PAGE = { renderer: RENDERER, scene: SCENE, camera: CAMERA, wall: WALL, rai
 publishFixture({
   bodies: BODIES, renderer: RENDERER, scene: SCENE, camera: CAMERA, level: LEVEL, wall: WALL, rail: RAIL, rails: RAILS,
   result: RESULT,
-  get backend() { return OpenGeometry.activeBackend; },
+  get backend() { return activeBackend(); },
   flush: () => { OpenGeometry.flush(); },
   settled: () => OpenGeometry.settled(),
   render: () => { RENDERER.render(SCENE, CAMERA); },

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OGError } from '../errors.js';
 import type { GeometryRecord } from '../rendering/records/geometry-record.js';
 import { runtime } from '../runtime/runtime-state.js';
 
@@ -18,5 +19,9 @@ export class DisplayClone extends THREE.Group {
     this.mesh.material.dispose();
     this.lines.material.dispose();
     this.parent?.remove(this);
+  }
+
+  override clone(): this {
+    throw new OGError('InvalidOperand', 'DisplayClone.clone', 'a display clone cannot be cloned');
   }
 }

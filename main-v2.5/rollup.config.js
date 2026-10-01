@@ -3,19 +3,10 @@ import typescript from '@rollup/plugin-typescript';
 
 export default [
   {
-    input: 'opengeometry-three/index.ts',
+    input: { index: 'opengeometry-three/index.ts', testing: 'opengeometry-three/src/testing/internals.ts' },
     external: ['three', /^three\//],
-    output: { file: 'dist/index.js', format: 'esm', sourcemap: true },
+    output: { dir: 'dist', format: 'esm', sourcemap: true, entryFileNames: '[name].js' },
     plugins: [nodeResolve(), typescript({ tsconfig: './tsconfig.json' })],
-  },
-  {
-    input: 'opengeometry-three/src/testing/internals.ts',
-    external: ['three', /^three\//],
-    output: { file: 'dist/testing.js', format: 'esm', sourcemap: true },
-    plugins: [
-      nodeResolve(),
-      typescript({ tsconfig: './tsconfig.json', declaration: false, declarationDir: undefined }),
-    ],
   },
   {
     input: 'opengeometry-three/src/rendering/tessellation-worker.ts',

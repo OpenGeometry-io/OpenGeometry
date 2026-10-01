@@ -43,7 +43,8 @@ function updateCuboid(): void {
   const started = performance.now();
   try {
     CUBOID.rebuild(OG_PRIMITIVE_CUBOID, { width: CONFIG.width, height: CONFIG.height, depth: CONFIG.depth });
-    OpenGeometry.ensureGeometry(CUBOID, true);
+    SCENE.updateMatrixWorld(true);
+    OpenGeometry.flush({ geometry: 'sync' });
     if (CUBOID.record?.revision !== CUBOID.lastInfo.shapeRevision) {
       throw new Error('Cuboid geometry did not finish');
     }

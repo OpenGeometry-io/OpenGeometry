@@ -5,14 +5,15 @@ import {
   OpenGeometry, OGError, Solid, Wire, OG_PRIMITIVE_CUBOID, OG_PRIMITIVE_PARAMS_RECTANGLE,
   OG_PRIMITIVE_RECTANGLE, OG_TRANSFORM_ROTATE, OG_TRANSFORM_TRANSLATE,
 } from '../../../dist/index.js';
+import { activeBackend, ensureGeometry, noteDisplayed, runtime, wanted } from '../../../dist/testing.js';
 
 const BYTES = readFileSync(new URL('../../../dist/opengeometry_bg.wasm', import.meta.url));
 await OpenGeometry.create({ wasmModule: new WebAssembly.Module(BYTES) });
-assert.equal(OpenGeometry.activeBackend, 'inline');
+assert.equal(activeBackend(), 'inline');
 const BODY = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'node-cube' });
 const EXPORTED = await OpenGeometry.exportStep({ nodes: [BODY] });
 assert.equal(EXPORTED.report.products, 1);
-OpenGeometry.noteDisplayed(BODY);
+noteDisplayed(BODY);
 assert.equal((await OpenGeometry.settled()).failed.length, 0);
 BODY.dispose();
 assert.equal((await OpenGeometry.settled()).failed.length, 0);
@@ -20,7 +21,7 @@ const SIZED = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, 
 const GET_BOUNDS = SIZED.getBounds.bind(SIZED);
 let boundsReads = 0;
 SIZED.getBounds = () => { boundsReads++; return GET_BOUNDS(); };
-for (let index = 0; index < 100; index++) OpenGeometry.wanted(SIZED);
+for (let index = 0; index < 100; index++) wanted(SIZED);
 assert.equal(boundsReads, 1);
 const CAMERA = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
 CAMERA.position.set(3, 3, 3);
@@ -42,16 +43,16 @@ for (let index = 0; index < 100; index++) {
 assert.equal(boundsReads, 2);
 SIZED.transform(OG_TRANSFORM_TRANSLATE, { offset: [1, 0, 0] });
 OpenGeometry.flush();
-OpenGeometry.wanted(SIZED);
+wanted(SIZED);
 assert.equal(boundsReads, 2);
 SIZED.transform(OG_TRANSFORM_ROTATE, { axis: [0, 1, 0], degrees: 30, pivot: [0, 0, 0] });
 OpenGeometry.flush();
-OpenGeometry.wanted(SIZED);
+wanted(SIZED);
 assert.equal(boundsReads, 3);
 SIZED.dispose();
 const VISIBLE = new Solid(OG_PRIMITIVE_CUBOID, { width: 2, height: 1, depth: 1 }, { ogId: 'visible-cube' });
-OpenGeometry.noteDisplayed(VISIBLE);
-const PROVIDER = Object(OpenGeometry.runtime().provider);
+noteDisplayed(VISIBLE);
+const PROVIDER = Object(runtime().provider);
 const COMPUTE = PROVIDER.compute.bind(PROVIDER);
 PROVIDER.compute = undefined;
 PROVIDER.request = async (request) => {
@@ -59,7 +60,7 @@ PROVIDER.request = async (request) => {
   return COMPUTE(request);
 };
 const PREPARED = new Solid(OG_PRIMITIVE_CUBOID, { width: 3, height: 1, depth: 1 }, { ogId: 'prepared-cube' });
-OpenGeometry.ensureGeometry(PREPARED);
+ensureGeometry(PREPARED);
 assert(VISIBLE.record);
 assert.equal(PREPARED.record, undefined);
 assert.equal((await OpenGeometry.settled()).failed.length, 0);
@@ -68,8 +69,8 @@ assert(VISIBLE.record);
 let cancelled = 0;
 PROVIDER.cancelShape = () => { cancelled++; };
 const RAPID = new Solid(OG_PRIMITIVE_CUBOID, { width: 2.5, height: 1, depth: 1 }, { ogId: 'rapid-cube' });
-OpenGeometry.ensureGeometry(RAPID);
-OpenGeometry.ensureGeometry(RAPID, true);
+ensureGeometry(RAPID);
+ensureGeometry(RAPID, true);
 assert(RAPID.record);
 assert.equal(cancelled, 1);
 assert.equal((await OpenGeometry.settled()).failed.length, 0);
@@ -84,7 +85,7 @@ assert.equal((await OpenGeometry.settled()).failed.length, 0);
 for (let index = 0; index < 24; index++) {
   const size = { width: 1 + index / 10, height: 1, depth: 1 };
   const replacement = new Solid(OG_PRIMITIVE_CUBOID, size, { ogId: `replacement-${index}` });
-  OpenGeometry.ensureGeometry(replacement);
+  ensureGeometry(replacement);
   assert(replacement.record);
   replacement.dispose();
   assert.equal((await OpenGeometry.settled()).failed.length, 0);

@@ -7,6 +7,8 @@ import type { LineEntry, SurfaceEntry } from '../rendering/materials/material-po
 import type { TessellationProvider } from '../rendering/provider.js';
 import type { RecordPool } from '../rendering/records/record-pool.js';
 
+export type CreateOptions = { workerURL?: string | URL; tessellation?: 'worker' | 'inline' };
+
 export type Runtime = {
   graph: OGWorldGraph;
   provider: TessellationProvider;
@@ -24,17 +26,21 @@ export type Runtime = {
   cameraBuckets: Map<string, number>;
   failedBuckets: Set<string>;
   module: WebAssembly.Module;
+  createOptions: CreateOptions;
   displayDeflection?: number;
   moving: boolean;
   poisoned: boolean;
   flushes: number;
   marks: Set<OGMark>;
+  flushing: boolean;
+  surfacePool: Map<string, SurfaceEntry>;
+  linePool: Map<string, LineEntry>;
+  epoch: number;
 };
 
 let state: Runtime | undefined;
-
-export const SURFACE_POOL = new Map<string, SurfaceEntry>();
-export const LINE_POOL = new Map<string, LineEntry>();
+let creating: Promise<Runtime> | undefined;
+let epochs = 0;
 
 export function runtime(): Runtime {
   if (!state) throw new OGError('NotInitialised', 'OpenGeometry', 'call OpenGeometry.create() first');
@@ -47,4 +53,16 @@ export function currentRuntime(): Runtime | undefined {
 
 export function setRuntime(value: Runtime | undefined): void {
   state = value;
+}
+
+export function pendingCreate(): Promise<Runtime> | undefined {
+  return creating;
+}
+
+export function setPendingCreate(value: Promise<Runtime> | undefined): void {
+  creating = value;
+}
+
+export function nextEpoch(): number {
+  return ++epochs;
 }

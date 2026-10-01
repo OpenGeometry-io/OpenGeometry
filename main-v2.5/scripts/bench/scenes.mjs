@@ -1,10 +1,11 @@
 import {
-  OpenGeometry, Wire, Solid, OG_PRIMITIVE_RECTANGLE, OG_PRIMITIVE_CUBOID, OG_OPERATION_EXTRUDE,
+  Wire, Solid, OG_PRIMITIVE_RECTANGLE, OG_PRIMITIVE_CUBOID, OG_OPERATION_EXTRUDE,
 } from '../../dist/index.js';
+import { graph } from '../../dist/testing.js';
 
 export function mesh(body) {
-  const info = JSON.parse(OpenGeometry.graph().node(body.ogId));
-  return OpenGeometry.graph().buffers(info.shapeId, 0.01, 2_000_000);
+  const info = JSON.parse(graph().node(body.ogId));
+  return graph().buffers(info.shapeId, 0.01, 2_000_000);
 }
 
 export function cutters(count, prefix, width, step, rotation = 0) {

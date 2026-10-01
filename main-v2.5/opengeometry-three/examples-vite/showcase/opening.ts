@@ -84,11 +84,11 @@ function rebuild(): void {
   const started = performance.now();
   try {
     next = createExample();
-    OpenGeometry.ensureGeometry(next.wall, true);
-    OpenGeometry.ensureGeometry(next.cutter, true);
+    SCENE.add(next.wall, next.cutter);
+    SCENE.updateMatrixWorld(true);
+    OpenGeometry.flush({ geometry: 'sync' });
     if (!finished(next.wall) || !finished(next.cutter)) throw new Error('Opening geometry did not finish');
     const previous = current;
-    SCENE.add(next.wall, next.cutter);
     current = next;
     if (previous) { previous.cutter.dispose(); previous.wall.dispose(); }
     const faces = String(next.wall.getBrep().topology.faces.length);
@@ -137,7 +137,6 @@ const STOP_FPS_METER = startFpsMeter(RENDERER, SCENE, CAMERA, CONTROLS);
 (window as typeof window & { __ogOpeningExample?: unknown }).__ogOpeningExample = {
   camera: CAMERA, controls: CONTROLS, renderer: RENDERER,
   get current() { return current; },
-  get backend() { return OpenGeometry.activeBackend; },
   render, rebuild,
 };
 
