@@ -107,7 +107,7 @@ impl Similarity3 {
         scale(self.frame.vector(vector), self.scale)
     }
 
-    pub(crate) fn compose(&self, child: &Self) -> Self {
+    pub fn compose(&self, child: &Self) -> Self {
         Self {
             frame: Frame3 {
                 origin: self.apply_point(child.frame.origin),
