@@ -72,10 +72,12 @@ const LEVEL = new SystemAssembly({ ogId: 'level-1' });
 const PROFILE = new Wire(OG_PRIMITIVE_RECTANGLE, { width: 6, breadth: 0.2 }, { ogId: 'wall-profile' });
 const WALL = new Solid(OG_OPERATION_EXTRUDE, { profile: PROFILE, distance: 3 }, { ogId: 'wall-1' });
 const CUTTER = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.9, height: 2.1, depth: 0.4 }, { ogId: 'door-cutter' });
-assertNear(volume(WALL), 3.6, 1e-5, 'wall base volume');
+const BASE_VOLUME = volume(WALL);
+assertNear(BASE_VOLUME, 3.6, 1e-5, 'wall base volume');
 CUTTER.transform(OG_TRANSFORM_TRANSLATE, { offset: [2, 0, 0] });
 WALL.operate(OG_OPERATION_SUBTRACT, { tools: [CUTTER] });
-assertNear(volume(WALL), 3.222, 1e-5, 'wall cut volume');
+const CUT_VOLUME = volume(WALL);
+assertNear(CUT_VOLUME, 3.222, 1e-5, 'wall cut volume');
 const PATH = new Wire(
   OG_PRIMITIVE_POLYLINE, { points: [[0, 1, 1], [4, 1, 1], [4, 1, 4]], closed: false }, { ogId: 'rail-path' },
 );
@@ -83,7 +85,8 @@ const DISC = new Wire(OG_PRIMITIVE_CIRCLE, { radius: 0.05 }, {
   ogId: 'rail-disc', plane: { origin: [0, 1, 1], normal: [1, 0, 0], xDirection: [0, 0, 1] },
 });
 const RAIL = new Solid(OG_OPERATION_SWEEP, { profile: DISC, path: PATH }, { ogId: 'rail-1' });
-assertNear(volume(RAIL, 0.002), Math.PI * 0.05 ** 2 * 7, 0.003, 'swept rail volume');
+const RAIL_VOLUME = volume(RAIL, 2 ** -14);
+assertNear(RAIL_VOLUME, Math.PI * 0.05 ** 2 * 7, 5e-5, 'swept rail volume');
 LEVEL.addChild([PROFILE, WALL, CUTTER, PATH, DISC, RAIL]);
 SCENE.add(WALL, RAIL);
 BODIES.push(WALL, RAIL);
@@ -93,12 +96,15 @@ RAIL.transform(OG_TRANSFORM_ROTATE, { axis: [0, 1, 0], degrees: 90 });
 if (WALL.getBrep().revision !== SHAPE_REVISIONS[0] || RAIL.getBrep().revision !== SHAPE_REVISIONS[1]) {
   throw new Error('Placement changed a shape revision');
 }
+const RAIL_BOUNDS = required(RAIL.getBounds(), 'rail bounds');
 const MOVED_BOUNDS = required(WALL.getBounds(), 'wall bounds');
 assertNear(MOVED_BOUNDS[1], 3, 1e-6, 'moved wall low y');
 WALL.rebuild(OG_OPERATION_EXTRUDE, { profile: PROFILE, distance: 4 });
-assertNear(volume(WALL), 4.8, 1e-5, 'wall rebuild volume');
+const REBUILT_VOLUME = volume(WALL);
+assertNear(REBUILT_VOLUME, 4.8, 1e-5, 'wall rebuild volume');
 WALL.operate(OG_OPERATION_SUBTRACT, { tools: [CUTTER] });
-assertNear(volume(WALL), 4.422, 1e-5, 'wall recut volume');
+const RECUT_VOLUME = volume(WALL);
+assertNear(RECUT_VOLUME, 4.422, 1e-5, 'wall recut volume');
 let coverageGap = false;
 try {
   RAIL.operate(OG_OPERATION_SUBTRACT, { tools: [WALL] });
@@ -143,13 +149,14 @@ if (SKIPPED.length !== 3 || !SKIPPED_WIRES.every((id) => SKIPPED.some((item) => 
 }
 if (FIRST_EXPORT.report.pcurvelessEdges <= 0) throw new Error('Swept rail lost pcurve-less edges');
 const RESULT = {
-  baseVolume: 3.6, cutVolume: 3.222, railVolume: Math.PI * 0.05 ** 2 * 7, rebuiltVolume: 4.8, recutVolume: 4.422,
-  coverageGap, products: FIRST_EXPORT.report.products, skipped: SKIPPED.length,
+  baseVolume: BASE_VOLUME, cutVolume: CUT_VOLUME, railVolume: RAIL_VOLUME, rebuiltVolume: REBUILT_VOLUME,
+  recutVolume: RECUT_VOLUME, railBounds: RAIL_BOUNDS, wallBounds: MOVED_BOUNDS, coverageGap,
+  products: FIRST_EXPORT.report.products, skipped: SKIPPED.length,
   pcurvelessEdges: FIRST_EXPORT.report.pcurvelessEdges, stepBytes: FIRST_EXPORT.text.length,
 };
 const PAGE = { renderer: RENDERER, scene: SCENE, camera: CAMERA, wall: WALL, rail: RAIL };
 
-publishFixture({
+publishFixture('ogAcceptance', {
   bodies: BODIES, renderer: RENDERER, scene: SCENE, camera: CAMERA, level: LEVEL, wall: WALL, rail: RAIL, rails: RAILS,
   result: RESULT,
   get backend() { return activeBackend(); },

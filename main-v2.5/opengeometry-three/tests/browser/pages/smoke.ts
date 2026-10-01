@@ -1,7 +1,9 @@
 import * as THREE from 'three';
-import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID } from '../../../../dist/index.js';
+import { OpenGeometry, Solid, Wire, OG_PRIMITIVE_CUBOID, OG_PRIMITIVE_RECTANGLE } from '../../../../dist/index.js';
 import { activeBackend, graph } from '../../../../dist/testing.js';
+import type { SmokeFixture } from '../support/fixture-types.js';
 import { bootKernel, createRenderer, publishFixture, releasePage, required } from '../support/test-page.js';
+import { reservedNameCollisions } from './smoke/reserved-names.js';
 
 const WORKER_URL = await bootKernel();
 const SCENE = new THREE.Scene();
@@ -15,24 +17,27 @@ CAMERA.position.set(3, 3, 5);
 CAMERA.lookAt(0, 0.5, 0);
 const RENDERER = createRenderer(320, 240);
 const BODY = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'smoke-cube' });
+const WIRE = new Wire(OG_PRIMITIVE_RECTANGLE, { width: 1, breadth: 1 }, { ogId: 'smoke-wire' });
 SCENE.add(BODY);
 RENDERER.render(SCENE, CAMERA);
 const READY = await OpenGeometry.settled();
 if (READY.failed.length) throw new Error('Cube geometry did not settle');
 RENDERER.render(SCENE, CAMERA);
-const RESERVED = new Set<string>();
-for (let object: object | null = new THREE.Group(); object; object = Reflect.getPrototypeOf(object)) {
-  for (const key of Object.getOwnPropertyNames(object)) RESERVED.add(key);
-}
+const RESERVED = reservedNameCollisions({ solid: BODY, wire: WIRE });
 const WORKER_PROBES = [
   { kind: 'init', request: 0, module: 'invalid' }, { kind: 'nonsense', request: 7 }, { kind: 'snapshot', request: 8 },
 ];
-const ADDED_NAMES = [
-  'ogId', 'handle', 'generation', 'bodyType', 'appearance', 'lastInfo', 'record', 'inLimbo', 'surface', 'outline',
-  'transform', 'getPlacement', 'getWorldPlacement', 'addChild', 'removeChild', 'getChildren', 'getParent', 'getBounds',
-  'getBrep', 'rebuild', 'operate', 'instance', 'duplicate', 'makeUnique', 'getInstanceCount', 'setAppearance',
-  'getReport', 'dispose',
-];
+
+function sceneHit(): ReturnType<SmokeFixture['resolveSceneHit']> {
+  const origin = new THREE.Vector3(0.9, 0.5, 5);
+  const ray = new THREE.Raycaster(origin, new THREE.Vector3(0.45, 0.5, 0.5).sub(origin).normalize());
+  const hits = ray.intersectObjects(SCENE.children, true);
+  const first = hits[0];
+  return {
+    hit: first && OpenGeometry.resolveHit(first),
+    outlineHit: hits.some((hit) => hit.object === BODY.outline),
+  };
+}
 
 function nextReply(worker: Worker, message: object): Promise<unknown> {
   return new Promise((resolve) => {
@@ -45,10 +50,11 @@ function nextReply(worker: Worker, message: object): Promise<unknown> {
   });
 }
 
-publishFixture({
+publishFixture('ogSmoke', {
   body: BODY, renderer: RENDERER, scene: SCENE, camera: CAMERA,
   threeRevision: THREE.REVISION,
-  reservedNameCollisions: ADDED_NAMES.filter((name) => RESERVED.has(name)),
+  reservedNameCollisions: RESERVED.collisions,
+  reservedNamesDerived: RESERVED.derived,
   get backend() { return activeBackend(); },
   render: () => { RENDERER.render(SCENE, CAMERA); },
   settled: () => OpenGeometry.settled(),
@@ -59,6 +65,7 @@ publishFixture({
     const hit = ray.intersectObject(BODY.surface)[0];
     return hit && OpenGeometry.resolveHit(hit);
   },
+  resolveSceneHit: sceneHit,
   getInlineBuffers: () => {
     const info = JSON.parse(graph().node(BODY.ogId)) as { shapeId: string };
     return graph().buffers(info.shapeId, required(BODY.record, 'a cube record').bucket, 2_000_000);
@@ -71,5 +78,9 @@ publishFixture({
       return replies;
     } finally { worker.terminate(); }
   },
-  dispose: () => { BODY.dispose(); releasePage(RENDERER); },
+  dispose: () => {
+    WIRE.dispose();
+    BODY.dispose();
+    releasePage(RENDERER);
+  },
 }, 'Kernel loaded');

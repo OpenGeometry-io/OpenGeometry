@@ -32,22 +32,6 @@
       ],
       "rules": ["@typescript-eslint/no-unsafe-return", "@typescript-eslint/no-unsafe-type-assertion"],
       "reason": "The pages read graph() payloads through dist/testing.js, whose glue methods return any or JSON text, and assert them."
-    },
-    {
-      "owner": "C7",
-      "files": [
-        "opengeometry-three/tests/browser/specs/scene.spec.ts",
-        "opengeometry-three/tests/browser/specs/storey.spec.ts",
-        "opengeometry-three/tests/browser/specs/lod.spec.ts",
-        "opengeometry-three/tests/browser/specs/worker.spec.ts",
-        "opengeometry-three/tests/browser/specs/transactions.spec.ts",
-        "opengeometry-three/tests/browser/specs/memory.spec.ts",
-        "opengeometry-three/tests/browser/specs/placement.spec.ts",
-        "opengeometry-three/tests/browser/specs/examples.spec.ts",
-        "opengeometry-three/tests/browser/specs/smoke.spec.ts"
-      ],
-      "rules": ["@typescript-eslint/no-unsafe-type-assertion"],
-      "reason": "The specs read page fixtures from window through asserted fixture types. C7 types the fixtures the pages publish."
     }
   ]
 }

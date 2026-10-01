@@ -4,6 +4,10 @@ import {
   OG_PRIMITIVE_RECTANGLE, OG_PRIMITIVE_CUBOID, OG_OPERATION_EXTRUDE, OG_OPERATION_SUBTRACT, OG_TRANSFORM_TRANSLATE,
 } from '../../../../dist/index.js';
 import { activeBackend, flushCount, graph, postToWorker, runtime, workerSendLog } from '../../../../dist/testing.js';
+import type {
+  CrashResult, FailureResult, InstanceMemory, MemoryResult, PixelResult, ReuseResult, StaleResult, StoreyPerformance,
+  StoreyResult, TransactionResult,
+} from '../support/fixture-types.js';
 import { recordedErrors, required } from '../support/test-page.js';
 
 export type AcceptancePage = {
@@ -12,15 +16,6 @@ export type AcceptancePage = {
   camera: THREE.PerspectiveCamera;
   wall: Solid;
   rail: Solid;
-};
-type StoreyResult = {
-  walls: number;
-  openingsPerWall: number;
-  instances: number;
-  flushCount: number;
-  renderFlushes: number;
-  geometryCount: number;
-  renderMs: number;
 };
 
 let storeyData: { root: SystemAssembly; bodies: Solid[] } | undefined;
@@ -61,13 +56,14 @@ export async function buildStorey(page: AcceptancePage): Promise<StoreyResult> {
   const renderMs = performance.now() - beforeRender;
   const renderFlushes = flushCount() - beforeRenderFlush;
   await OpenGeometry.settled();
+  page.renderer.render(page.scene, page.camera);
   return {
     walls: walls.length, openingsPerWall: 4, instances: instances.length, flushCount: flushCount(),
     renderFlushes, geometryCount: page.renderer.info.memory.geometries, renderMs,
   };
 }
 
-export async function storeyPerformanceProbe(): Promise<Record<string, number>> {
+export async function storeyPerformanceProbe(): Promise<StoreyPerformance> {
   if (!storeyData) throw new Error('buildStorey must run first');
   const startTransform = performance.now();
   storeyData.root.transform(OG_TRANSFORM_TRANSLATE, { offset: [1, 0, 0] });
@@ -85,13 +81,24 @@ export async function storeyPerformanceProbe(): Promise<Record<string, number>> 
   };
 }
 
-export async function memoryProbe(page: AcceptancePage): Promise<Record<string, unknown>> {
+export async function memoryProbe(page: AcceptancePage): Promise<MemoryResult> {
   const { renderer, scene, camera } = page;
   renderer.render(scene, camera);
   await OpenGeometry.settled();
   const baseline = renderer.info.memory.geometries;
-  const target = new Solid(OG_PRIMITIVE_CUBOID, { width: 2, height: 2, depth: 2 }, { ogId: 'memory-target' });
-  const tool = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.5, height: 0.5, depth: 0.5 }, { ogId: 'memory-tool' });
+  const plain = await instanceMemory(page, 'memory', false);
+  const outlined = await instanceMemory(page, 'memory-outline', true);
+  return {
+    baseline, ...plain, outlineOne: outlined.one, outlineShared: outlined.shared, outlineUnique: outlined.unique,
+    outlineAfter: outlined.after,
+  };
+}
+
+async function instanceMemory(page: AcceptancePage, prefix: string, outline: boolean): Promise<InstanceMemory> {
+  const { renderer, scene, camera } = page;
+  const size = { width: 2, height: 2, depth: 2 };
+  const target = new Solid(OG_PRIMITIVE_CUBOID, size, { ogId: `${prefix}-target`, appearance: { outline } });
+  const tool = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.5, height: 0.5, depth: 0.5 }, { ogId: `${prefix}-tool` });
   tool.transform(OG_TRANSFORM_TRANSLATE, { offset: [0.5, 0, 0] });
   scene.add(target);
   renderer.render(scene, camera);
@@ -99,7 +106,8 @@ export async function memoryProbe(page: AcceptancePage): Promise<Record<string, 
   renderer.render(scene, camera);
   await OpenGeometry.settled();
   const one = renderer.info.memory.geometries;
-  const copy = target.instance({ ogId: 'memory-instance' });
+  const copy = target.instance({ ogId: `${prefix}-instance` });
+  copy.setAppearance({ outline });
   scene.add(copy);
   renderer.render(scene, camera);
   await OpenGeometry.settled();
@@ -115,8 +123,7 @@ export async function memoryProbe(page: AcceptancePage): Promise<Record<string, 
   target.dispose();
   tool.dispose();
   renderer.render(scene, camera);
-  const after = renderer.info.memory.geometries;
-  return { baseline, one, shared, unique, after, sharedDetails };
+  return { one, shared, unique, after: renderer.info.memory.geometries, sharedDetails };
 }
 
 function errorCodes(): string[] {
@@ -127,7 +134,7 @@ export function tessellateSends(shapeId: string): number {
   return workerSendLog().filter((send) => send.shapeId === shapeId).length;
 }
 
-export async function workerCrashProbe(page: AcceptancePage): Promise<Record<string, unknown>> {
+export async function workerCrashProbe(page: AcceptancePage): Promise<CrashResult> {
   const { renderer, scene, camera, wall } = page;
   const record = wall.record;
   await postToWorker({ kind: 'throw' }, { awaitCrash: true });
@@ -145,13 +152,13 @@ export async function workerCrashProbe(page: AcceptancePage): Promise<Record<str
   return { afterRestart, afterFallback, sameRecord: wall.record === record, errors, drawnInSameRender };
 }
 
-export async function workerFailureProbe(page: AcceptancePage): Promise<Record<string, unknown>> {
+export async function workerFailureProbe(page: AcceptancePage): Promise<FailureResult> {
   const { failed } = await OpenGeometry.settled();
   const hasRecord = Boolean(page.wall.record);
   return { failed: failed.length, hasRecord, errors: errorCodes(), backend: activeBackend() };
 }
 
-export function placementPixelProbe(page: AcceptancePage): Record<string, unknown> {
+export function placementPixelProbe(page: AcceptancePage): PixelResult {
   const { renderer } = page;
   const isolated = new THREE.Scene();
   isolated.background = new THREE.Color(0xffffff);
@@ -216,7 +223,7 @@ export async function onDemandProbe(page: AcceptancePage): Promise<{ events: num
   return { events, appeared };
 }
 
-export async function staleWorkerProbe(page: AcceptancePage): Promise<Record<string, unknown>> {
+export async function staleWorkerProbe(page: AcceptancePage): Promise<StaleResult> {
   const { renderer, scene, camera } = page;
   const body = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'rapid-rebuild' });
   scene.add(body);
@@ -248,7 +255,7 @@ export async function snapshotResendProbe(page: AcceptancePage): Promise<{ trian
   return { triangles: buffers.triangles };
 }
 
-export function transactionProbe(): Record<string, unknown> {
+export function transactionProbe(): TransactionResult {
   const body = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'transaction-cube' });
   const before = JSON.stringify(body.getBrep());
   const placement = JSON.stringify(body.getPlacement());
@@ -273,7 +280,7 @@ export function transactionProbe(): Record<string, unknown> {
   } finally { body.dispose(); }
 }
 
-export async function reuseProbe(page: AcceptancePage): Promise<Record<string, unknown>> {
+export async function reuseProbe(page: AcceptancePage): Promise<ReuseResult> {
   const { renderer, scene, camera } = page;
   const errors: unknown[] = [];
   const stopErrors = OpenGeometry.on('error', (event) => { errors.push(event); });

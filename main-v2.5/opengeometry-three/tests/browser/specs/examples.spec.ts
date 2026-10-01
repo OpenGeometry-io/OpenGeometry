@@ -1,8 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { EXAMPLES_URL } from '../support/servers.js';
 
-type AnalyticExample = { current: { faces: number } };
-
 test('source pages explain how to start the local server when opened as files', async ({ page }) => {
   for (const source of ['../../../examples-vite/index.html', '../pages/acceptance.html']) {
     await page.goto(new URL(source, import.meta.url).href);
@@ -43,9 +41,12 @@ for (const backend of ['inline', 'worker'] as const) {
     });
     await expect(page.locator('#report')).toContainText('union · analytic');
     await expect.poll(async () => page.evaluate(() => {
-      const example = (window as typeof window & { __ogAnalyticBooleanExample: AnalyticExample })
-        .__ogAnalyticBooleanExample;
-      return example.current.faces;
+      const example: unknown = Reflect.get(window, '__ogAnalyticBooleanExample');
+      const current: unknown = typeof example === 'object' && example !== null
+        ? Reflect.get(example, 'current') : undefined;
+      const faces: unknown = typeof current === 'object' && current !== null
+        ? Reflect.get(current, 'faces') : undefined;
+      return typeof faces === 'number' ? faces : 0;
     })).toBeGreaterThan(0);
     await expect(page.locator('#error')).toBeEmpty();
 
