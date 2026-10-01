@@ -281,3 +281,24 @@ test("the unit cube's floor and static bucket are the kernel's", async () => {
     aligned.dispose();
   }
 });
+
+test('overlapping settled calls leave no temporary target behind', async () => {
+  await fresh();
+  const scene = new THREE.Scene();
+  const body = cuboid('overlapping-cube');
+  scene.add(body);
+  try {
+    scene.updateMatrixWorld(true);
+    assert.deepEqual((await OpenGeometry.settled()).failed, []);
+    const before = TESTING.wanted(body);
+    assert.equal(before, 2 ** -9);
+    const first = OpenGeometry.settled({ deflection: 2 ** -6 });
+    const second = await OpenGeometry.settled({ deflection: 2 ** -8 });
+    await first;
+    assert.deepEqual(second.failed, []);
+    assert.deepEqual((await OpenGeometry.settled()).failed, []);
+    assert.equal(TESTING.wanted(body), before);
+  } finally {
+    body.dispose();
+  }
+});

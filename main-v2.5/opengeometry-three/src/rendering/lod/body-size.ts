@@ -25,13 +25,13 @@ function readBuckets(ogId: string, revision: number): ShapeBuckets {
   }
 }
 
-export function worldScale(body: Body): number {
-  return Math.cbrt(Math.abs(body.matrixWorld.determinant()));
-}
-
 export function localTarget(world: number, body: Body): number | undefined {
   const scale = worldScale(body);
   return scale > 0 && Number.isFinite(scale) ? world / scale : undefined;
+}
+
+function worldScale(body: Body): number {
+  return Math.cbrt(Math.abs(body.matrixWorld.determinant()));
 }
 
 export function finestLocal(bodies: Iterable<Body>, valueOf: (body: Body) => number | undefined): number | undefined {

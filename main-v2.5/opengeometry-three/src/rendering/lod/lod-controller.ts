@@ -9,8 +9,9 @@ import { worldUnitsPerPixel } from './screen-metrics.js';
 type Tiers = { temporary: number | undefined; own: number | undefined; global: number | undefined };
 type SeenCamera = { camera: THREE.Camera; height: number };
 type ShapeTarget = { target: number; body: Body };
+type TemporaryTarget = { deflection: number };
 
-export type ShapeLod = {
+type ShapeLod = {
   shapeId: string;
   target?: number;
   previous?: number;
@@ -29,14 +30,14 @@ export type LodState = {
   lastSchedule: number;
   settleTimer?: ReturnType<typeof setTimeout>;
   lastSeen?: SeenCamera;
-  temporary?: number;
+  temporaries: TemporaryTarget[];
   refresh: () => void;
 };
 
 export function createLodState(refresh: () => void): LodState {
   return {
     shapes: new Map(), camera: new Float64Array(33), initialised: false, lastMotion: -Infinity,
-    lastSchedule: -Infinity, refresh,
+    lastSchedule: -Infinity, temporaries: [], refresh,
   };
 }
 
@@ -152,7 +153,7 @@ function overrideTarget(state: Runtime, body: Body, entry: ShapeLod): number | u
 
 function tiers(state: Runtime, bodies: Body[]): Tiers {
   return {
-    temporary: finestLocal(bodies, () => state.lod.temporary),
+    temporary: finestLocal(bodies, () => state.lod.temporaries.at(-1)?.deflection),
     own: finestLocal(bodies, (body) => body.appearance.deflection),
     global: finestLocal(bodies, () => state.displayDeflection),
   };
@@ -176,12 +177,6 @@ function failedKey(revision: number, bucket: number): string {
   return `${String(revision)}#${String(bucket)}`;
 }
 
-function clearMarks(entry: ShapeLod): void {
-  entry.failed.clear();
-  delete entry.pinned;
-  delete entry.overrides;
-}
-
 export function overrideChanged(state: Runtime, shapeId?: string): void {
   const entries = shapeId === undefined ? [...state.lod.shapes.values()] : [state.lod.shapes.get(shapeId)];
   for (const entry of entries) {
@@ -191,10 +186,27 @@ export function overrideChanged(state: Runtime, shapeId?: string): void {
   }
 }
 
-export function setTemporaryTarget(state: Runtime, value: number | undefined): void {
-  if (value === undefined) delete state.lod.temporary;
-  else state.lod.temporary = value;
+export function pushTemporaryTarget(state: Runtime, deflection: number): TemporaryTarget {
+  const token = { deflection };
+  state.lod.temporaries.push(token);
+  clearAllMarks(state);
+  return token;
+}
+
+export function popTemporaryTarget(state: Runtime, token: TemporaryTarget): void {
+  const temporaries = state.lod.temporaries;
+  temporaries.splice(temporaries.indexOf(token), 1);
+  clearAllMarks(state);
+}
+
+function clearAllMarks(state: Runtime): void {
   for (const entry of state.lod.shapes.values()) clearMarks(entry);
+}
+
+function clearMarks(entry: ShapeLod): void {
+  entry.failed.clear();
+  delete entry.pinned;
+  delete entry.overrides;
 }
 
 export function markFailed(state: Runtime, shapeId: string, revision: number, bucket: number): boolean {

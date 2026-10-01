@@ -1,6 +1,8 @@
 import { OGError } from '../../errors.js';
 import { runtime, type Runtime } from '../../runtime/runtime-state.js';
-import { capturedError, displayedBodies, setTemporaryTarget, settleNow, wantedKey } from '../lod/lod-controller.js';
+import {
+  capturedError, displayedBodies, popTemporaryTarget, pushTemporaryTarget, settleNow, wantedKey,
+} from '../lod/lod-controller.js';
 import { flush } from './geometry-scheduler.js';
 import { refreshDisplayed } from './render-pass.js';
 
@@ -8,8 +10,7 @@ type Failure = { ogId: string; error: unknown };
 
 export async function settled(options: { deflection?: number } = {}): Promise<{ failed: Failure[] }> {
   const state = runtime();
-  const prior = state.lod.temporary;
-  if (options.deflection !== undefined) setTemporaryTarget(state, options.deflection);
+  const token = options.deflection === undefined ? undefined : pushTemporaryTarget(state, options.deflection);
   try {
     settleNow(state);
     refreshDisplayed(state);
@@ -17,7 +18,7 @@ export async function settled(options: { deflection?: number } = {}): Promise<{ 
     flush();
     return { failed: failures(state) };
   } finally {
-    if (options.deflection !== undefined) setTemporaryTarget(state, prior);
+    if (token) popTemporaryTarget(state, token);
   }
 }
 
