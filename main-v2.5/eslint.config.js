@@ -90,7 +90,7 @@ export const RESTRICTED_SYNTAX = {
   'json-parse': [{
     selector: "MemberExpression:matches([object.name='JSON'], [object.property.name='JSON'])"
       + ":matches([property.name='parse'], [property.value='parse'])",
-    message: 'JSON.parse only in world-graph/codec.ts and the worker message code.',
+    message: 'JSON.parse only in world-graph/codec.ts and kernel/kernel-errors.ts.',
   }],
   'og-error-throw': [
     { selector: "ThrowStatement > NewExpression:not([callee.name='OGError'])", message: 'Every throw is an OGError.' },
@@ -112,7 +112,7 @@ const SYNTAX_HOMES = [
   { file: `${SDK}/world-graph/codec.ts`, allows: ['json-parse'] },
   { file: `${SDK}/kernel/kernel-errors.ts`, allows: ['json-parse'] },
   { file: `${SDK}/runtime/runtime-state.ts`, allows: ['module-state'] },
-  { file: WORKER_ENTRY, allows: ['json-parse', 'module-state'] },
+  { file: WORKER_ENTRY, allows: ['module-state'] },
 ];
 
 function layerOf(file) {
