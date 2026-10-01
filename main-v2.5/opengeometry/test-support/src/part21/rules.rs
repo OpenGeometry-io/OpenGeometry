@@ -140,7 +140,7 @@ impl Document {
         Ok((edge, from, to, forward))
     }
 
-    fn face_edges(&self, face_id: usize) -> Result<Vec<(usize, bool)>, String> {
+    pub(super) fn face_edges(&self, face_id: usize) -> Result<Vec<(usize, bool)>, String> {
         let face = self.entity(face_id)?;
         if !face.starts_with("ADVANCED_FACE(") {
             return Err(format!("#{face_id} is not ADVANCED_FACE"));

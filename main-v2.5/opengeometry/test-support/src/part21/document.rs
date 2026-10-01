@@ -39,7 +39,7 @@ impl Document {
             .collect()
     }
 
-    fn coordinates(&self, id: usize) -> Result<[f64; 3], String> {
+    pub(super) fn coordinates(&self, id: usize) -> Result<[f64; 3], String> {
         let expression = self.entity(id)?;
         if !expression.starts_with("CARTESIAN_POINT(") && !expression.starts_with("DIRECTION(") {
             return Err(format!("#{id} is not a point or direction"));
@@ -61,7 +61,7 @@ impl Document {
         self.coordinates(reference(&args[1])?)
     }
 
-    fn axis(&self, id: usize) -> Result<Axis3, String> {
+    pub(super) fn axis(&self, id: usize) -> Result<Axis3, String> {
         let expression = self.entity(id)?;
         if !expression.starts_with("AXIS2_PLACEMENT_3D(") {
             return Err(format!("#{id} is not a 3D placement"));
@@ -139,7 +139,7 @@ impl Document {
         Err(format!("#{id} has no comparable parameterization"))
     }
 
-    fn coordinates2(&self, id: usize) -> Result<[f64; 2], String> {
+    pub(super) fn coordinates2(&self, id: usize) -> Result<[f64; 2], String> {
         let expression = self.entity(id)?;
         if !expression.starts_with("CARTESIAN_POINT(") && !expression.starts_with("DIRECTION(") {
             return Err(format!("#{id} is not a point or direction"));
