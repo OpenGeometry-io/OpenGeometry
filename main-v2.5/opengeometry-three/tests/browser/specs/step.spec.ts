@@ -22,7 +22,7 @@ async function expectOracle(args: string[], log: string): Promise<void> {
 for (const backend of ['inline', 'worker'] as const) {
   const title = `acceptance STEP passes the Part-21 oracle and equals the native scene with ${backend}`;
   test(title, async ({ page }, testInfo) => {
-    test.setTimeout(600_000);
+    test.setTimeout(120_000);
     await page.goto(`/acceptance.html?backend=${backend}`);
     await expect(page.locator('#status')).toHaveText('Acceptance ready', { timeout: 20_000 });
     try {
@@ -45,7 +45,7 @@ for (const backend of ['inline', 'worker'] as const) {
 }
 
 test('storey STEP passes the Part-21 oracle', async ({ page }, testInfo) => {
-  test.setTimeout(600_000);
+  test.setTimeout(240_000);
   await page.goto('/acceptance.html?backend=inline');
   await expect(page.locator('#status')).toHaveText('Acceptance ready', { timeout: 20_000 });
   try {
