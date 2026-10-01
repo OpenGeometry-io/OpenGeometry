@@ -10,10 +10,11 @@ import {
   bootKernel, createRenderer, publishFixture, releasePage, required, statusElement,
 } from '../support/test-page';
 import {
-  buildStorey, memoryProbe, onDemandProbe, placementPixelProbe, reuseProbe, snapshotResendProbe, staleWorkerProbe,
-  storeyPerformanceProbe, transactionProbe, workerCrashProbe, workerFailureProbe,
+  memoryProbe, onDemandProbe, placementPixelProbe, reuseProbe, snapshotResendProbe, staleWorkerProbe,
+  transactionProbe, workerCrashProbe, workerFailureProbe,
 } from './acceptance-probes';
 import { coarserRetryProbe, lodHysteresisProbe, lodProbe, orbitProbe } from './acceptance/probes/lod';
+import { buildStorey, storeyPerformanceProbe } from './acceptance/probes/storey';
 
 type Point = [number, number, number];
 
