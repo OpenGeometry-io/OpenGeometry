@@ -1,6 +1,7 @@
 import { cp, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { REPOSITORY_ROOT } from '../lib/paths.mjs';
+import { withJsSpecifiers } from './declaration-specifiers.mjs';
 
 const DIST = path.join(REPOSITORY_ROOT, 'dist');
 const PKG = path.join(REPOSITORY_ROOT, 'opengeometry', 'pkg');
@@ -33,7 +34,7 @@ for (const file of await declarationFiles(DIST)) {
   const source = await readFile(file, 'utf8');
   const target = path.relative(path.dirname(file), path.join(DIST_PKG, 'opengeometry.js')).split(path.sep).join('/');
   const specifier = target.startsWith('.') ? target : `./${target}`;
-  const rewritten = source.replace(/(?:\.\.\/)+opengeometry\/pkg\/opengeometry(?:\.js)?/g, specifier);
+  const rewritten = withJsSpecifiers(source.replace(/(?:\.\.\/)+opengeometry\/pkg\/opengeometry(?:\.js)?/g, specifier));
   if (rewritten !== source) await writeFile(file, rewritten);
 }
 
