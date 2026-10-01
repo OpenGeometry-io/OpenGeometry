@@ -1,8 +1,10 @@
+use crate::support::{export_matched, parse_and_match, placed_export_bodies, unit_scale};
 use opengeometry::world_graph::{
     CopyOptions, CreateOptions, CreatingOperation, ErrorCode, Primitive, StepOptions, Transform,
+    WorldGraph,
 };
-use opengeometry_test_support::part21;
 use opengeometry_test_support::world_graph::{graph, named};
+use serde_json::{json, Value};
 
 #[test]
 fn world_export_expands_assemblies_deduplicates_and_preserves_state() {
@@ -63,10 +65,9 @@ fn world_export_expands_assemblies_deduplicates_and_preserves_state() {
     assert_eq!(report.skipped[0].og_id, "profile");
     assert!(first.contains("PRODUCT('wall','wall'"));
     assert!(first.contains("PRODUCT('wall-copy','wall-copy'"));
-    let parsed = part21::Document::parse(&first).unwrap();
-    assert_eq!(parsed.entity_count(), report.entities);
-    assert_eq!(parsed.count("ADVANCED_FACE"), report.faces);
-    assert_eq!(parsed.count("EDGE_CURVE"), report.edges);
+    let bodies = placed_export_bodies(&world, &report, &options);
+    let report = serde_json::to_value(&report).unwrap();
+    let parsed = parse_and_match(&first, &report, &options.unit, &bodies);
     assert_eq!(parsed.product_names().unwrap(), ["'wall'", "'wall-copy'"]);
     assert_eq!(world.revision(), revision);
     assert_eq!(world.brep("wall").unwrap().to_json().unwrap(), before);
@@ -113,14 +114,15 @@ fn world_export_applies_z_up_and_escapes_file_name() {
         name: "quote'\\#12\tø".into(),
         ..StepOptions::default()
     };
-    let (text, report) = world.export_step(&["body".into()], &options).unwrap();
-    assert!(text.contains("quote''\\\\#12\\X2\\0009\\X0\\\\X2\\00F8\\X0\\"));
-    assert!(text.contains(
+    let exported = export_matched(&world, &["body"], &options);
+    assert!(exported
+        .text
+        .contains("quote''\\\\#12\\X2\\0009\\X0\\\\X2\\00F8\\X0\\"));
+    assert!(exported.text.contains(
         "CARTESIAN_POINT('',(1.00000000000000000E0,-3.00000000000000000E0,2.00000000000000000E0))"
     ));
-    assert_eq!(report.up_axis, "Z");
-    assert_eq!(report.products, 1);
-    part21::Document::parse(&text).unwrap();
+    assert_eq!(exported.report["upAxis"], "Z");
+    assert_eq!(exported.report["products"], 1);
 }
 
 #[test]
@@ -148,9 +150,7 @@ fn world_export_handles_far_body_and_rejects_options_without_mutation() {
         )
         .unwrap();
     let revision = world.revision();
-    assert!(world
-        .export_step(&["far".into()], &StepOptions::default())
-        .is_ok());
+    export_matched(&world, &["far"], &StepOptions::default());
     for options in [
         StepOptions {
             unit: "inch".into(),
@@ -256,24 +256,24 @@ fn body_children_are_exported_or_skipped_in_stored_order() {
         up_axis: "Y".into(),
         ..StepOptions::default()
     };
-    let (text, report) = world.export_step(&["parent".into()], &options).unwrap();
-    assert_eq!(report.products, 2);
+    let exported = export_matched(&world, &["parent"], &options);
+    assert_eq!(exported.report["products"], 2);
     assert_eq!(
-        report
-            .bodies
+        exported.report["bodies"]
+            .as_array()
+            .unwrap()
             .iter()
-            .map(|body| body.og_id.as_str())
+            .map(|body| &body["ogId"])
             .collect::<Vec<_>>(),
         ["parent", "child"]
     );
     assert_eq!(
-        serde_json::to_value(&report.skipped).unwrap(),
-        serde_json::json!([{"ogId": "rail", "reason": "Wire"}])
+        exported.report["skipped"],
+        json!([{"ogId": "rail", "reason": "Wire"}])
     );
-    assert!(text.contains(
+    assert!(exported.text.contains(
         "CARTESIAN_POINT('',(9.00000000000000000E0,0.00000000000000000E0,1.90000000000000000E1))"
     ));
-    part21::Document::parse(&text).unwrap();
     assert_eq!(world.revision(), revision);
 }
 
@@ -301,18 +301,32 @@ fn sweep_rail_exports_projected_edges_without_pcurves() {
             named("rail"),
         )
         .unwrap();
-    let (text, report) = world
-        .export_step(&["rail".into()], &StepOptions::default())
-        .unwrap();
-    assert_eq!(report.pcurveless_edges, 2);
-    assert_eq!(report.bodies[0].pcurveless_edges, report.pcurveless_edges);
-    assert_eq!(text.matches("=EDGE_CURVE(").count(), report.edges);
-    let parsed = part21::Document::parse(&text).unwrap();
-    assert_eq!(parsed.pcurveless_edges().unwrap(), report.pcurveless_edges);
+    let exported = export_matched(&world, &["rail"], &StepOptions::default());
+    assert_eq!(exported.report["pcurvelessEdges"], 2);
+    assert_eq!(exported.report["bodies"][0]["pcurvelessEdges"], 2);
+    assert_eq!(exported.document.pcurveless_edges().unwrap(), 2);
+}
+
+fn bits(values: &[f64]) -> Vec<u64> {
+    values.iter().map(|value| value.to_bits()).collect()
+}
+
+fn circle_edges(world: &WorldGraph, og_id: &str) -> usize {
+    let brep: Value = serde_json::from_str(&world.brep(og_id).unwrap().to_json().unwrap()).unwrap();
+    let curves = &brep["geometry"]["curves"];
+    brep["topology"]["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|edge| {
+            edge["geometry"]["kind"] == "Curve"
+                && curves[edge["geometry"]["curve"].as_u64().unwrap() as usize]["kind"] == "Circle"
+        })
+        .count()
 }
 
 #[test]
-fn cylinders_and_circle_extrusions_export_one_exact_cylindrical_surface() {
+fn circle_extrusion_and_cylinder_edges_are_circles_of_the_source_radius() {
     let mut world = graph();
     world
         .create_primitive(Primitive::Circle { radius: 1.75 }, named("circle"))
@@ -336,18 +350,33 @@ fn cylinders_and_circle_extrusions_export_one_exact_cylindrical_surface() {
             named("primitive"),
         )
         .unwrap();
-    let options = StepOptions {
+    let metre_y = StepOptions {
         unit: "metre".into(),
         up_axis: "Y".into(),
         ..StepOptions::default()
     };
-    for name in ["extruded", "primitive"] {
-        let (text, report) = world.export_step(&[name.into()], &options).unwrap();
-        let parsed = part21::Document::parse(&text).unwrap();
-        assert_eq!(parsed.count("CYLINDRICAL_SURFACE"), 1);
-        assert!(parsed.count("CIRCLE") >= 2);
-        assert_eq!(parsed.count("POLY_LOOP"), 0);
-        assert_eq!(report.solids, 1);
-        assert!(text.contains("1.75000000000000000E0"));
+    for options in [metre_y, StepOptions::default()] {
+        let radius = (1.75 * unit_scale(&options.unit)).to_bits();
+        for name in ["extruded", "primitive"] {
+            let exported = export_matched(&world, &[name], &options);
+            let circles = exported
+                .document
+                .edge_supports()
+                .unwrap()
+                .into_iter()
+                .filter(|support| support.kind == "CIRCLE")
+                .collect::<Vec<_>>();
+            assert_eq!(circles.len(), circle_edges(&world, name), "{name}");
+            for circle in circles {
+                assert!(circle.with_pcurves, "{name}");
+                assert_eq!(bits(&circle.radii), [radius], "{name}");
+            }
+            let surfaces = exported.document.surface_radii().unwrap();
+            assert_eq!(surfaces.len(), 1, "{name}");
+            assert_eq!(surfaces[0].0, "cylinder", "{name}");
+            assert_eq!(bits(&surfaces[0].1), [radius], "{name}");
+            assert_eq!(exported.report["solids"], 1);
+            assert_eq!(exported.document.count("POLY_LOOP"), 0);
+        }
     }
 }

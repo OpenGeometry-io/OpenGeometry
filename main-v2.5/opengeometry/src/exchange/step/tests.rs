@@ -1,4 +1,4 @@
-use super::export_step;
+use super::{export_bodies, export_step, StepBodyInput};
 use crate::brep::{
     coarse_accuracy, BrepEnvelope, Curve, CurveGeometry, EdgeGeometry, Frame3, GeometryError,
     IntersectionDefinition, IntersectionSide, PcurveGeometry, Surface, TraceAnchor,
@@ -192,4 +192,35 @@ fn rejects_unrepresentable_exchange_and_preserves_large_revisions() {
         export_step(&brep, "inch"),
         Err(GeometryError::InvalidGeometry(_))
     ));
+}
+
+#[test]
+fn two_million_entity_export_is_limit_exceeded() {
+    let brep = primitives::cuboid(
+        "cap".into(),
+        Frame3::IDENTITY,
+        [1.0, 2.0, 3.0],
+        coarse_accuracy(1e-6),
+    )
+    .unwrap();
+    let inputs = (0..7_000)
+        .map(|_| StepBodyInput {
+            og_id: "cap",
+            shape_id: "cap",
+            shape_revision: 0,
+            brep: &brep,
+        })
+        .collect::<Vec<_>>();
+    let failure = export_bodies(
+        &inputs,
+        "metre",
+        "Y",
+        "cap",
+        "1970-01-01T00:00:00",
+        Vec::new(),
+    )
+    .unwrap_err();
+    assert!(
+        matches!(&failure.error, GeometryError::LimitExceeded(message) if message.contains("2,000,000"))
+    );
 }
