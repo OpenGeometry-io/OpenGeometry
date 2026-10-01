@@ -8,6 +8,7 @@ type TransactionResult = {
   dryRestored: boolean;
   thenableCode: string;
 };
+type ReuseResult = { revived: boolean; gone: boolean; errors: unknown[] };
 
 test('nested transaction rollback revives a disposed body and dry run restores placement', async ({ page }) => {
   test.setTimeout(45_000);
@@ -26,3 +27,22 @@ test('nested transaction rollback revives a disposed body and dry run restores p
     await disposeFixture(page);
   }
 });
+
+for (const backend of ['inline', 'worker'] as const) {
+  test(`dispose, reuse the ogId and rollback revive the old object with ${backend}`, async ({ page }) => {
+    test.setTimeout(45_000);
+    await page.goto(`/acceptance.html?backend=${backend}`);
+    await expect(page.locator('#status')).toHaveText('Acceptance ready', { timeout: 20_000 });
+    try {
+      await page.evaluate(async () => {
+        const fixture = (window as FixtureWindow<{ reuseProbe(): Promise<ReuseResult> }>).__ogTest;
+        const result = await fixture.reuseProbe();
+        if (!result.revived || !result.gone || result.errors.length !== 0) {
+          throw new Error(`Reuse rollback failed: ${JSON.stringify(result)}`);
+        }
+      });
+    } finally {
+      await disposeFixture(page);
+    }
+  });
+}

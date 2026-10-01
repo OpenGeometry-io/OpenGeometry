@@ -92,6 +92,10 @@ export function decodeChangeSet(packet: unknown, call: string): { changes: Chang
   return { changes: decode(glue.changesJson, call, 'change set', isChangeSet), matrices: glue.matrices };
 }
 
+export function decodeChanges(text: string, call: string): ChangeSet {
+  return decode(text, call, 'change set', isChangeSet);
+}
+
 export function decodeStepExport(value: unknown, call: string): StepExport {
   const glue = checked(value, call, 'STEP export', isStepGlue);
   return { text: glue.text, report: decode(glue.reportJson, call, 'STEP report', isStepReport) };
@@ -173,7 +177,9 @@ function isChangePacket(value: unknown): value is ChangePacket {
 
 function isChangeSet(value: unknown): value is ChangeSet {
   const isChanges = (list: unknown): boolean => Array.isArray(list)
-    && list.every((item: unknown) => isFields(item) && isString(item['ogId']));
+    && list.every((item: unknown) => isFields(item) && isString(item['ogId']) && isNumber(item['handle'])
+      && isNumber(item['generation']) && isNullable(item['shapeId'], isString)
+      && isNullable(item['shapeRevision'], isNumber));
   return isFields(value) && isNumber(value['revision'])
     && isChanges(value['added']) && isChanges(value['changed']) && isChanges(value['removed']);
 }

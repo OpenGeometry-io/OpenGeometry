@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import * as THREE from 'three';
-import { OpenGeometry, OGError, Solid, OG_PRIMITIVE_CUBOID, OG_TRANSFORM_TRANSLATE } from '../../../dist/index.js';
+import { OpenGeometry, OGError, Solid, OG_TRANSFORM_TRANSLATE } from '../../../dist/index.js';
 import * as TESTING from '../../../dist/testing.js';
-
-const MODULE = new WebAssembly.Module(readFileSync(new URL('../../../dist/opengeometry_bg.wasm', import.meta.url)));
+import { boot, cuboid, failsWith, nextTask } from './support.mjs';
 
 function runtime() {
   return (Reflect.get(TESTING, 'runtime') ?? Reflect.get(OpenGeometry, 'runtime'))();
@@ -14,22 +12,6 @@ function runtime() {
 function flushCount() {
   const read = Reflect.get(TESTING, 'flushCount');
   return read ? read() : Reflect.get(OpenGeometry, 'flushCount');
-}
-
-function boot() {
-  return OpenGeometry.create({ wasmModule: MODULE });
-}
-
-function nextTask() {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-function cuboid(ogId, width = 1) {
-  return new Solid(OG_PRIMITIVE_CUBOID, { width, height: 1, depth: 1 }, { ogId });
-}
-
-function failsWith(code) {
-  return (error) => error instanceof OGError && error.code === code;
 }
 
 function thrownBy(block) {
@@ -68,12 +50,12 @@ test('instance and duplicate wrap the new node without the __existing kind', asy
   const rail = cuboid('rail');
   const instance = rail.instance({ ogId: 'rail-instance' });
   const copy = rail.duplicate({ ogId: 'rail-copy' });
-  assert.equal(runtime().bodies.get('rail-instance'), instance);
-  assert.equal(runtime().bodies.get('rail-copy'), copy);
+  assert.equal([...runtime().bodies.values()].find((body) => body.ogId === 'rail-instance'), instance);
+  assert.equal([...runtime().bodies.values()].find((body) => body.ogId === 'rail-copy'), copy);
   const wall = cuboid('wall', 2);
   const count = runtime().bodies.size;
   assert.throws(() => new Solid('__existing', {}, { ogId: 'wall' }), (error) => error instanceof OGError);
-  assert.equal(runtime().bodies.get('wall'), wall);
+  assert.equal([...runtime().bodies.values()].find((body) => body.ogId === 'wall'), wall);
   assert.equal(runtime().bodies.size, count);
 });
 
@@ -157,7 +139,7 @@ test('reset leaves a usable empty document', async () => {
   assert.notEqual(runtime(), before);
   assert.equal(runtime().bodies.size, 0);
   const body = cuboid('after-reset');
-  assert.equal(runtime().bodies.get('after-reset'), body);
+  assert.equal([...runtime().bodies.values()].find((body) => body.ogId === 'after-reset'), body);
 });
 
 test('a Solid inside a Solid flushes once on updateMatrixWorld', async () => {

@@ -159,6 +159,10 @@ export function placementPixelProbe(page: AcceptancePage): Record<string, unknow
   const { renderer } = page;
   const isolated = new THREE.Scene();
   isolated.background = new THREE.Color(0xffffff);
+  isolated.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+  const light = new THREE.DirectionalLight(0xffffff, 2);
+  light.position.set(5, 8, 5);
+  isolated.add(light);
   const view = new THREE.OrthographicCamera(-2, 2, 1.5, -1.5, 0.1, 20);
   view.position.set(0, 1, 5);
   view.lookAt(0, 0.5, 0);
@@ -321,4 +325,32 @@ export function transactionProbe(): Record<string, unknown> {
     catch (error) { if (error instanceof OGError) thenableCode = error.code; }
     return { threw, revived, dryResult, dryRestored, thenableCode };
   } finally { body.dispose(); }
+}
+
+export async function reuseProbe(page: AcceptancePage): Promise<Record<string, unknown>> {
+  const { renderer, scene, camera } = page;
+  const errors: unknown[] = [];
+  const stopErrors = OpenGeometry.on('error', (event) => { errors.push(event); });
+  const size = { width: 1, height: 1, depth: 1 };
+  const first = new Solid(OG_PRIMITIVE_CUBOID, size, { ogId: 'reuse-cube' });
+  try {
+    scene.add(first);
+    renderer.render(scene, camera);
+    await OpenGeometry.settled();
+    const mark = OpenGeometry.mark();
+    first.dispose();
+    const second = new Solid(OG_PRIMITIVE_CUBOID, size, { ogId: 'reuse-cube' });
+    scene.add(second);
+    renderer.render(scene, camera);
+    await OpenGeometry.settled();
+    mark.rollback();
+    mark.release();
+    renderer.render(scene, camera);
+    await OpenGeometry.settled();
+    const revived = first.parent === scene && !first.inLimbo && Boolean(first.record);
+    return { revived, gone: second.parent === null && !second.inLimbo, errors };
+  } finally {
+    stopErrors();
+    first.dispose();
+  }
 }

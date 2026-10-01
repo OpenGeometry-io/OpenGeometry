@@ -1,11 +1,11 @@
+import type { ChangeSet } from '../../dto/change-set.js';
 import type { DisplayBuffers } from '../../dto/display-buffers.js';
 import { OGError } from '../../errors.js';
 import { call } from '../../kernel/kernel-session.js';
 import type { Body } from '../../bodies/body.js';
 import { emit } from '../../runtime/event-bus.js';
-import { currentRuntime, runtime, type Runtime } from '../../runtime/runtime-state.js';
+import { bodyKey, currentRuntime, reindexShape, runtime, type Runtime } from '../../runtime/runtime-state.js';
 import { decodeChangeSet } from '../../world-graph/codec.js';
-import { node } from '../../world-graph/world-graph-client.js';
 import { wantedBucket } from '../lod/deflection.js';
 import type { TessellationRequest } from '../provider.js';
 import { GeometryRecord } from '../records/geometry-record.js';
@@ -23,22 +23,9 @@ export function flush(options: { geometry?: 'sync' } = {}): void {
       const packet = call('OpenGeometry.flush', (): unknown => state.graph.changesSince(state.revision));
       const { changes, matrices } = decodeChangeSet(packet, 'OpenGeometry.flush');
       state.revision = revision;
-      let offset = 0;
-      for (const changed of [...changes.added, ...changes.changed]) {
-        const body = state.bodies.get(changed.ogId);
-        if (body) {
-          body.lastInfo = node(body.ogId, 'OpenGeometry.flush');
-          body.applyWorldMatrix(matrices.subarray(offset, offset + 16));
-        }
-        offset += 16;
-      }
-      for (const removed of changes.removed) state.bodies.get(removed.ogId)?.hideForDispose();
+      applyChanges(state, changes, matrices);
       for (const body of state.bodies.values()) body.swapReadyRecord();
-      for (const body of state.bodies.values()) {
-        if (body.lastInfo.shapeId && body.lastInfo.shapeRevision !== null) {
-          state.records.purge(body.lastInfo.shapeId, body.lastInfo.shapeRevision);
-        }
-      }
+      purgeChanged(state, changes);
       state.flushedReadyVersion = state.readyVersion;
       state.flushes++;
     } finally {
@@ -49,6 +36,31 @@ export function flush(options: { geometry?: 'sync' } = {}): void {
     for (const body of state.displayed) ensureGeometry(body, true);
     if (state.readyVersion !== state.flushedReadyVersion) flush();
   }
+}
+
+function applyChanges(state: Runtime, changes: ChangeSet, matrices: Float64Array): void {
+  let offset = 0;
+  for (const change of [...changes.added, ...changes.changed]) {
+    const body = state.bodies.get(bodyKey(change.handle, change.generation));
+    if (body) {
+      const previous = body.lastInfo.shapeId;
+      body.lastInfo = { ...body.lastInfo, shapeId: change.shapeId, shapeRevision: change.shapeRevision };
+      reindexShape(state, body, previous);
+      body.applyWorldMatrix(matrices.subarray(offset, offset + 16));
+    }
+    offset += 16;
+  }
+  for (const change of changes.removed) state.bodies.get(bodyKey(change.handle, change.generation))?.hideForDispose();
+}
+
+function purgeChanged(state: Runtime, changes: ChangeSet): void {
+  const shapes = new Map<string, { shapeId: string; revision: number }>();
+  for (const { shapeId, shapeRevision } of [...changes.added, ...changes.changed]) {
+    if (shapeId !== null && shapeRevision !== null) {
+      shapes.set(`${shapeId}@${String(shapeRevision)}`, { shapeId, revision: shapeRevision });
+    }
+  }
+  for (const { shapeId, revision } of shapes.values()) state.records.purge(shapeId, revision);
 }
 
 export function wanted(body: Body): number {
@@ -151,15 +163,16 @@ function requestFor(body: Body, bucket: number): TessellationRequest {
 
 function receive(shapeId: string, revision: number, bucket: number, buffers: DisplayBuffers): void {
   const state = runtime();
-  const showsShape = (body: Body): boolean =>
-    body.lastInfo.shapeId === shapeId && body.lastInfo.shapeRevision === revision;
-  if (![...state.bodies.values()].some(showsShape)) return;
+  const holders = [...(state.byShape.get(shapeId) ?? [])];
+  const current = holders.filter((body) => body.lastInfo.shapeRevision === revision);
+  if (current.length === 0) return;
   const record = state.records.put(new GeometryRecord(shapeId, buffers));
   state.readyVersion++;
   if (state.renderPassActive) {
-    for (const body of state.bodies.values()) if (showsShape(body)) body.install(record);
+    for (const body of current) body.install(record);
   }
-  const ogIds = [...state.bodies.values()].filter((body) => body.lastInfo.shapeId === shapeId).map((body) => body.ogId);
+  const ogIds = holders.map((body) => body.ogId);
   emit('geometry', { shapeId, revision, bucket, ogIds, stats: { triangles: record.triangles } });
   if (!state.renderPassActive) flush();
+  state.records.purge(shapeId, revision);
 }

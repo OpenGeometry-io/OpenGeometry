@@ -1,18 +1,20 @@
-import { runtime } from '../runtime/runtime-state.js';
+import { bodyKey, reindexShape, releaseShapeIfEmpty, runtime } from '../runtime/runtime-state.js';
 import type { Body } from './body.js';
 
 export function register(body: Body): void {
-  runtime().bodies.set(body.ogId, body);
+  const state = runtime();
+  state.bodies.set(bodyKey(body.handle, body.generation), body);
+  reindexShape(state, body, null);
 }
 
 export function unregister(body: Body): void {
   const state = runtime();
   state.displayed.delete(body);
-  state.bodies.delete(body.ogId);
+  state.limbo.delete(body);
+  state.bodies.delete(bodyKey(body.handle, body.generation));
   if (body.record) state.records.release(body.record);
   const info = body.lastInfo;
-  if (info.shapeId && ![...state.bodies.values()].some((other) => other.lastInfo.shapeId === info.shapeId)) {
-    state.records.purge(info.shapeId);
-    state.provider.drop(info.shapeId, info.shapeRevision ?? 0);
-  }
+  if (!info.shapeId) return;
+  state.byShape.get(info.shapeId)?.delete(body);
+  releaseShapeIfEmpty(state, info.shapeId, info.shapeRevision ?? 0);
 }

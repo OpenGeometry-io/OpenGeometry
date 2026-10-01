@@ -41,10 +41,10 @@ export function createRuntime(module: WebAssembly.Module, options: CreateOptions
       (error) => { emit('error', error); },
     );
   const state: Runtime = {
-    graph, provider, records: new RecordPool(), bodies: new Map(), listeners,
+    graph, provider, records: new RecordPool(), bodies: new Map(), byShape: new Map(), limbo: new Map(), listeners,
     revision: 0n, readyVersion: 0, flushedReadyVersion: -1, renderPassActive: false, displayed: new Set(),
     pending: new Map(), generations: new Map(), buckets: new Map(), cameraBuckets: new Map(), failedBuckets: new Set(),
-    module, createOptions: options, moving: false, poisoned: false, flushes: 0, marks: new Set(),
+    module, createOptions: options, moving: false, poisoned: false, flushes: 0, marks: new Map(),
     flushing: false, surfacePool: new Map(), linePool: new Map(), epoch: nextEpoch(),
   };
   return state;

@@ -11,7 +11,7 @@ import {
 } from '../support/test-page.js';
 import {
   buildStorey, coarserRetryProbe, lodHysteresisProbe, lodProbe, memoryProbe, onDemandProbe, orbitProbe,
-  placementPixelProbe, snapshotResendProbe, staleWorkerProbe, storeyPerformanceProbe, transactionProbe,
+  placementPixelProbe, reuseProbe, snapshotResendProbe, staleWorkerProbe, storeyPerformanceProbe, transactionProbe,
   workerCrashProbe,
 } from './acceptance-probes.js';
 
@@ -25,6 +25,10 @@ window.addEventListener('unhandledrejection', (event) => {
 await bootKernel();
 const SCENE = new THREE.Scene();
 SCENE.background = new THREE.Color(0xf7f8fb);
+SCENE.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+const LIGHT = new THREE.DirectionalLight(0xffffff, 2);
+LIGHT.position.set(5, 8, 5);
+SCENE.add(LIGHT);
 const CAMERA = new THREE.PerspectiveCamera(50, 640 / 480, 0.1, 1000);
 CAMERA.position.set(9, 9, 14);
 CAMERA.lookAt(2, 3, 1);
@@ -166,6 +170,7 @@ publishFixture({
   orbitProbe: () => orbitProbe(PAGE),
   coarserRetryProbe,
   transactionProbe,
+  reuseProbe: () => reuseProbe(PAGE),
   dispose: () => {
     for (const body of [...BODIES].reverse()) { try { body.dispose(); } catch { continue; } }
     releasePage(RENDERER);

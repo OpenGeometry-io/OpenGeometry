@@ -9,11 +9,15 @@ import type { RecordPool } from '../rendering/records/record-pool.js';
 
 export type CreateOptions = { workerURL?: string | URL; tessellation?: 'worker' | 'inline' };
 
+export type LimboEntry = { watermark: number; parent: Body['parent'] };
+
 export type Runtime = {
   graph: OGWorldGraph;
   provider: TessellationProvider;
   records: RecordPool;
   bodies: Map<string, Body>;
+  byShape: Map<string, Set<Body>>;
+  limbo: Map<Body, LimboEntry>;
   listeners: Map<Events, Set<Listener>>;
   revision: bigint;
   readyVersion: number;
@@ -31,7 +35,7 @@ export type Runtime = {
   moving: boolean;
   poisoned: boolean;
   flushes: number;
-  marks: Set<OGMark>;
+  marks: Map<number, OGMark>;
   flushing: boolean;
   surfacePool: Map<string, SurfaceEntry>;
   linePool: Map<string, LineEntry>;
@@ -65,4 +69,26 @@ export function setPendingCreate(value: Promise<Runtime> | undefined): void {
 
 export function nextEpoch(): number {
   return ++epochs;
+}
+
+export function bodyKey(handle: number, generation: number): string {
+  return `${String(handle)}:${String(generation)}`;
+}
+
+export function reindexShape(state: Runtime, body: Body, previousShapeId: string | null): void {
+  const shapeId = body.lastInfo.shapeId;
+  if (shapeId === previousShapeId) return;
+  if (previousShapeId) {
+    const previous = state.byShape.get(previousShapeId);
+    previous?.delete(body);
+    if (previous?.size === 0) state.byShape.delete(previousShapeId);
+  }
+  if (shapeId) state.byShape.set(shapeId, (state.byShape.get(shapeId) ?? new Set<Body>()).add(body));
+}
+
+export function releaseShapeIfEmpty(state: Runtime, shapeId: string, revision: number): void {
+  if (state.byShape.get(shapeId)?.size) return;
+  state.byShape.delete(shapeId);
+  state.records.purge(shapeId);
+  state.provider.drop(shapeId, revision);
 }

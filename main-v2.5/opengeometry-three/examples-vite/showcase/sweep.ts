@@ -27,6 +27,10 @@ await bootExample('./');
 
 const SCENE = new THREE.Scene();
 SCENE.background = new THREE.Color(0xeef2ff);
+SCENE.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+const LIGHT = new THREE.DirectionalLight(0xffffff, 2);
+LIGHT.position.set(5, 8, 5);
+SCENE.add(LIGHT);
 const CAMERA = new THREE.PerspectiveCamera(48, 1, 0.1, 100);
 const RENDERER = new THREE.WebGLRenderer({ antialias: true });
 RENDERER.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));

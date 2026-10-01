@@ -47,6 +47,10 @@ export function getBounds(owner: string, ogId: string): Bounds | null {
   return decodeBounds(call(label, () => worldGraph().bounds(ogId)), label);
 }
 
+export function localBounds(label: string, ogId: string): Bounds | null {
+  return decodeBounds(call(label, () => worldGraph().localBounds(ogId)), label);
+}
+
 export function getBrep(owner: string, ogId: string): Brep {
   const label = `${owner}.getBrep`;
   return decodeBrep(call(label, () => worldGraph().brep(ogId)), label);
