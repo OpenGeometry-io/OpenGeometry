@@ -9,13 +9,13 @@ use opengeometry_test_support::world_graph::named;
 use serde_json::Value;
 use std::{fs, path::Path};
 
-pub struct MatchedExport {
-    pub text: String,
-    pub report: Value,
-    pub document: Document,
+pub(super) struct MatchedExport {
+    pub(super) text: String,
+    pub(super) report: Value,
+    pub(super) document: Document,
 }
 
-pub fn fixture_text(relative: &str) -> Option<String> {
+pub(super) fn fixture_text(relative: &str) -> Option<String> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/parity")
         .join(relative);
@@ -23,7 +23,7 @@ pub fn fixture_text(relative: &str) -> Option<String> {
         .then(|| fs::read_to_string(&path).unwrap_or_else(|error| panic!("{relative}: {error}")))
 }
 
-pub fn fixture_names(directory: &str) -> Vec<String> {
+pub(super) fn fixture_names(directory: &str) -> Vec<String> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/parity")
         .join(directory);
@@ -35,7 +35,7 @@ pub fn fixture_names(directory: &str) -> Vec<String> {
     names
 }
 
-pub fn unit_scale(unit: &str) -> f64 {
+pub(super) fn unit_scale(unit: &str) -> f64 {
     if unit == "millimetre" {
         1000.0
     } else {
@@ -43,7 +43,7 @@ pub fn unit_scale(unit: &str) -> f64 {
     }
 }
 
-pub fn export_placement(world: &WorldGraph, og_id: &str, up_axis: &str) -> Similarity3 {
+fn export_placement(world: &WorldGraph, og_id: &str, up_axis: &str) -> Similarity3 {
     let mut conversion = Similarity3::IDENTITY;
     if up_axis == "Z" {
         conversion.frame = Frame3 {
@@ -56,7 +56,7 @@ pub fn export_placement(world: &WorldGraph, og_id: &str, up_axis: &str) -> Simil
     conversion.compose(&world.world_placement(og_id).unwrap())
 }
 
-pub fn placed_export_bodies(
+pub(super) fn placed_export_bodies(
     world: &WorldGraph,
     report: &StepExportReport,
     options: &StepOptions,
@@ -97,7 +97,7 @@ fn similarity_scale(placement: Similarity3) -> f64 {
         .unwrap()
 }
 
-pub fn parse_and_match(
+pub(super) fn parse_and_match(
     text: &str,
     report: &Value,
     unit: &str,
@@ -137,7 +137,11 @@ fn solid_entries(bodies: &[BrepEnvelope]) -> Vec<SolidEntry> {
     entries
 }
 
-pub fn export_matched(world: &WorldGraph, nodes: &[&str], options: &StepOptions) -> MatchedExport {
+pub(super) fn export_matched(
+    world: &WorldGraph,
+    nodes: &[&str],
+    options: &StepOptions,
+) -> MatchedExport {
     let nodes = nodes
         .iter()
         .map(|node| node.to_string())
@@ -153,7 +157,7 @@ pub fn export_matched(world: &WorldGraph, nodes: &[&str], options: &StepOptions)
     }
 }
 
-pub fn add_cuboid(world: &mut WorldGraph, og_id: &str, size: [f64; 3], offset: [f64; 3]) {
+pub(super) fn add_cuboid(world: &mut WorldGraph, og_id: &str, size: [f64; 3], offset: [f64; 3]) {
     world
         .create_primitive(
             Primitive::Cuboid {
@@ -166,5 +170,17 @@ pub fn add_cuboid(world: &mut WorldGraph, og_id: &str, size: [f64; 3], offset: [
         .unwrap();
     world
         .transform(og_id, Transform::Translate { offset })
+        .unwrap();
+}
+
+pub(super) fn cylinder(world: &mut WorldGraph, og_id: &str) {
+    world
+        .create_primitive(
+            Primitive::Cylinder {
+                radius: 1.0,
+                height: 2.0,
+            },
+            named(og_id),
+        )
         .unwrap();
 }

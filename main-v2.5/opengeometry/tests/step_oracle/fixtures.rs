@@ -1,9 +1,9 @@
 use crate::support::{fixture_names, fixture_text, parse_and_match, unit_scale};
 use opengeometry::{brep::BrepEnvelope, exchange::export_step};
-use opengeometry_test_support::part21::{normalise_step, Document};
+use opengeometry_test_support::part21::{
+    normalise_step, pcurve_expectations, references, Document,
+};
 use serde_json::Value;
-use std::collections::BTreeMap;
-use std::f64::consts::TAU;
 use std::slice::from_ref;
 
 const UNITS: [(&str, &str); 2] = [("metre", "m"), ("millimetre", "mm")];
@@ -12,11 +12,6 @@ struct ConePcurve {
     point: usize,
     point_line: String,
     pair: [u64; 4],
-}
-
-struct ConeUse {
-    pair: [u64; 4],
-    axial: f64,
 }
 
 fn single_body_fixtures() -> Vec<(String, BrepEnvelope)> {
@@ -138,101 +133,51 @@ fn nonparallel_cylinder_step_has_fitted_curves_within_exchange_budget() {
     assert_eq!(direction.assessed, direction.aligned + direction.reversed);
 }
 
-fn entity_lines(text: &str) -> BTreeMap<usize, &str> {
-    text.lines()
-        .filter_map(|line| {
-            let (id, expression) = line.strip_prefix('#')?.split_once('=')?;
-            Some((id.parse().unwrap(), expression))
-        })
-        .collect()
-}
-
-fn references(expression: &str) -> Vec<usize> {
-    expression
-        .split('#')
-        .skip(1)
-        .map(|part| {
-            let digits = part
-                .find(|c: char| !c.is_ascii_digit())
-                .unwrap_or(part.len());
-            part[..digits].parse().unwrap()
-        })
-        .collect()
-}
-
-fn cone_pcurves(text: &str, parsed: &Document) -> Vec<ConePcurve> {
-    let entities = entity_lines(text);
-    let (cone, surface) = entities
-        .iter()
-        .find(|(_, expression)| expression.starts_with("CONICAL_SURFACE("))
+fn cone_pcurves(parsed: &Document) -> Vec<ConePcurve> {
+    let entity = |id: usize| parsed.entity(id).unwrap();
+    let cone = (1..=parsed.entity_count())
+        .find(|id| entity(*id).starts_with("CONICAL_SURFACE("))
         .unwrap();
-    assert_eq!(surface.split(',').nth(2), Some("0."));
+    assert_eq!(entity(cone).split(',').nth(2), Some("0."));
     let points = parsed.points2().unwrap();
     let directions = parsed.directions2().unwrap();
     let mut pcurves = Vec::new();
-    for expression in entities.values() {
-        if !expression.starts_with("PCURVE(") || references(expression)[0] != *cone {
+    for id in 1..=parsed.entity_count() {
+        let expression = entity(id);
+        if !expression.starts_with("PCURVE(") || references(expression)[0] != cone {
             continue;
         }
-        let line = references(entities[&references(expression)[1]])[0];
-        let [point, vector] = references(entities[&line])[..] else {
+        let line = references(entity(references(expression)[1]))[0];
+        let [point, vector] = references(entity(line))[..] else {
             panic!("#{line} is not a pcurve LINE");
         };
-        let direction = references(entities[&vector])[0];
+        let direction = references(entity(vector))[0];
         let ([u, v], [du, dv]) = (points[&point], directions[&direction]);
         pcurves.push(ConePcurve {
             point,
-            point_line: format!("#{point}={}", entities[&point]),
+            point_line: format!("#{point}={};", entity(point)),
             pair: [u, v, du, dv].map(f64::to_bits),
         });
     }
     pcurves
 }
 
-fn cone_uses(body: &Value, scale: f64) -> Vec<ConeUse> {
-    let number = |value: &Value| value.as_f64().unwrap();
-    let item = |key: &str, id: &Value| &body["topology"][key][id.as_u64().unwrap() as usize];
-    let mut uses = Vec::new();
-    for use_ in body["topology"]["halfedges"].as_array().unwrap() {
-        let surface = &body["geometry"]["surfaces"]
-            [item("faces", &use_["face"])["surface"].as_u64().unwrap() as usize];
-        if surface["kind"] != "Cone" || item("edges", &use_["edge"])["geometry"]["kind"] != "Curve"
-        {
-            continue;
-        }
-        let metric = scale / number(&surface["semi_angle"]).cos();
-        let geometry = &use_["geometry_use"];
-        let pcurve = &body["geometry"]["pcurves"][geometry["pcurve"].as_u64().unwrap() as usize];
-        let lift = [0, 1].map(|axis| number(&geometry["periodic_lift"][axis]));
-        let [u, v] = [0, 1].map(|axis| number(&pcurve["origin"][axis]));
-        let velocity = [
-            number(&pcurve["direction"][0]) * 1.0,
-            number(&pcurve["direction"][1]) * metric,
-        ];
-        let length = velocity.iter().fold(0.0_f64, |n, v| n.hypot(*v));
-        let pair = [
-            (u + lift[0] * TAU) * 1.0,
-            (v + lift[1] * 0.0) * metric,
-            velocity[0] / length,
-            velocity[1] / length,
-        ];
-        uses.push(ConeUse {
-            pair: pair.map(|v| if v == 0.0 { 0.0_f64 } else { v }.to_bits()),
-            axial: (v + lift[1] * 0.0) * scale,
-        });
-    }
-    uses
+fn cone_expectations(brep: &BrepEnvelope, unit: &str) -> Vec<[u64; 4]> {
+    pcurve_expectations(brep, unit_scale(unit))
+        .into_iter()
+        .filter(|expectation| expectation.surface == "Cone")
+        .filter_map(|expectation| expectation.bits)
+        .collect()
 }
 
-fn axial_rewrite(text: &str, pcurves: &[ConePcurve], uses: &[ConeUse]) -> String {
+fn axial_rewrite(text: &str, pcurves: &[ConePcurve], semi_angle: f64) -> String {
     let mut rewritten = text.to_string();
     for pcurve in pcurves {
-        let use_ = uses.iter().find(|use_| use_.pair == pcurve.pair).unwrap();
         let line = format!(
             "#{}=CARTESIAN_POINT('',({:.17E},{:.17E}));",
             pcurve.point,
-            f64::from_bits(use_.pair[0]),
-            use_.axial
+            f64::from_bits(pcurve.pair[0]),
+            f64::from_bits(pcurve.pair[1]) * semi_angle.cos()
         );
         rewritten = rewritten.replace(&pcurve.point_line, &line);
     }
@@ -243,18 +188,25 @@ fn axial_rewrite(text: &str, pcurves: &[ConePcurve], uses: &[ConeUse]) -> String
 fn cone_pcurve_v_measures_distance_along_the_generator() {
     let body: Value = serde_json::from_str(&fixture_text("cone.brep.json").unwrap()).unwrap();
     let brep = BrepEnvelope::from_json(&body.to_string()).unwrap();
+    let semi_angle = body["geometry"]["surfaces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|surface| surface["kind"] == "Cone")
+        .unwrap()["semi_angle"]
+        .as_f64()
+        .unwrap();
     for (unit, _) in UNITS {
         let (text, report) = export_step(&brep, unit).unwrap();
         let report = serde_json::to_value(&report).unwrap();
         let parsed = parse_and_match(&text, &report, unit, from_ref(&brep));
-        let pcurves = cone_pcurves(&text, &parsed);
-        let uses = cone_uses(&body, unit_scale(unit));
+        let pcurves = cone_pcurves(&parsed);
         let mut actual = pcurves.iter().map(|pcurve| pcurve.pair).collect::<Vec<_>>();
-        let mut expected = uses.iter().map(|use_| use_.pair).collect::<Vec<_>>();
+        let mut expected = cone_expectations(&brep, unit);
         actual.sort();
         expected.sort();
         assert_eq!(actual, expected, "{unit}");
-        let rewritten = axial_rewrite(&text, &pcurves, &uses);
+        let rewritten = axial_rewrite(&text, &pcurves, semi_angle);
         assert_ne!(rewritten, text, "{unit}");
         match Document::parse(&rewritten) {
             Ok(_) => panic!("{unit}: the axial-height pcurve parsed"),
@@ -263,37 +215,16 @@ fn cone_pcurve_v_measures_distance_along_the_generator() {
     }
 }
 
-fn conic_uses(body: &Value) -> usize {
-    let pcurve_kind = |use_: &Value| {
-        let halfedge = &body["topology"]["halfedges"][use_.as_u64().unwrap() as usize];
-        let pcurve = halfedge["geometry_use"]["pcurve"].as_u64().unwrap() as usize;
-        body["geometry"]["pcurves"][pcurve]["kind"].clone()
-    };
-    let mut count = 0;
-    for edge in body["topology"]["edges"].as_array().unwrap() {
-        if edge["geometry"]["kind"] != "Curve" {
-            continue;
-        }
-        let curve =
-            &body["geometry"]["curves"][edge["geometry"]["curve"].as_u64().unwrap() as usize];
-        let kinds = [&edge["halfedge"], &edge["twin_halfedge"]]
-            .into_iter()
-            .filter(|use_| !use_.is_null())
-            .map(pcurve_kind)
-            .collect::<Vec<_>>();
-        if (curve["kind"] == "Circle" || curve["kind"] == "Ellipse")
-            && kinds.iter().all(|kind| kind != "ProjectedCurve")
-        {
-            count += kinds.len();
-        }
-    }
-    count
+fn conic_uses(body: &BrepEnvelope) -> usize {
+    pcurve_expectations(body, 1.0)
+        .iter()
+        .filter(|expectation| expectation.curve == "Circle" || expectation.curve == "Ellipse")
+        .count()
 }
 
 #[test]
 fn conic_pcurves_are_assessed_for_parameter_direction() {
     for (name, body) in single_body_fixtures() {
-        let json: Value = serde_json::from_str(&body.to_json().unwrap()).unwrap();
         for (unit, suffix) in UNITS {
             if fixture_text(&format!("{name}.step.{suffix}")).is_none() {
                 continue;
@@ -302,7 +233,7 @@ fn conic_pcurves_are_assessed_for_parameter_direction() {
             let direction = Document::parse(&text)
                 .and_then(|parsed| parsed.parameter_direction_report())
                 .unwrap_or_else(|error| panic!("{name} {unit}: {error}"));
-            assert_eq!(direction.conic_assessed, conic_uses(&json), "{name} {unit}");
+            assert_eq!(direction.conic_assessed, conic_uses(&body), "{name} {unit}");
             assert_eq!(
                 direction.conic_assessed,
                 direction.conic_aligned + direction.conic_reversed,

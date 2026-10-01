@@ -21,7 +21,7 @@ impl Document {
         self.entities.len()
     }
 
-    pub(super) fn entity(&self, id: usize) -> Result<&str, String> {
+    pub fn entity(&self, id: usize) -> Result<&str, String> {
         self.entities
             .get(&id)
             .map(String::as_str)

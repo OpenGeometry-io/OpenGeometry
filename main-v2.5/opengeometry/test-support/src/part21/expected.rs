@@ -14,6 +14,12 @@ pub struct ExpectedValues {
     radii2: BTreeSet<u64>,
 }
 
+pub struct PcurveExpectation {
+    pub curve: String,
+    pub surface: String,
+    pub bits: Option<[u64; 4]>,
+}
+
 struct PcurveUse<'a> {
     pcurve: &'a Value,
     surface: &'a Value,
@@ -21,19 +27,37 @@ struct PcurveUse<'a> {
     scale: f64,
 }
 
-pub fn expected_values(brep: &BrepEnvelope, unit_scale: f64) -> ExpectedValues {
-    let mut expected = ExpectedValues::default();
-    expected.add_body(brep, unit_scale);
-    expected
+struct MappedPcurve {
+    origin: [f64; 2],
+    direction: [f64; 2],
+    radii: Vec<f64>,
+}
+
+pub fn pcurve_expectations(brep: &BrepEnvelope, unit_scale: f64) -> Vec<PcurveExpectation> {
+    let body = body_json(brep);
+    let mut expectations = Vec::new();
+    for edge in array(&body["topology"]["edges"]) {
+        if edge["geometry"]["kind"] != "Curve" {
+            continue;
+        }
+        let curve = kind(&body["geometry"]["curves"][index(&edge["geometry"]["curve"])]);
+        for use_ in pcurve_uses(&body, edge, unit_scale) {
+            expectations.push(PcurveExpectation {
+                curve: curve.to_string(),
+                surface: kind(use_.surface).to_string(),
+                bits: mapped_pcurve(&use_).map(|mapped| {
+                    let ([u, v], [du, dv]) = (bits(mapped.origin), bits(mapped.direction));
+                    [u, v, du, dv]
+                }),
+            });
+        }
+    }
+    expectations
 }
 
 impl ExpectedValues {
     pub fn add_body(&mut self, brep: &BrepEnvelope, unit_scale: f64) {
-        let json = brep
-            .to_json()
-            .unwrap_or_else(|error| panic!("BRep does not serialise: {error}"));
-        let body: Value = serde_json::from_str(&json)
-            .unwrap_or_else(|error| panic!("BRep JSON does not parse: {error}"));
+        let body = body_json(brep);
         let mut surfaces = BTreeSet::new();
         for face in array(&body["topology"]["faces"]) {
             let surface = index(&face["surface"]);
@@ -106,72 +130,97 @@ impl ExpectedValues {
     }
 
     fn add_edge_pcurves(&mut self, body: &Value, edge: &Value, scale: f64) {
-        let halfedges = &body["topology"]["halfedges"];
-        let uses = [&edge["halfedge"], &edge["twin_halfedge"]]
-            .into_iter()
-            .filter(|use_| !use_.is_null())
-            .map(|use_| &halfedges[index(use_)])
-            .collect::<Vec<_>>();
-        let pcurve =
-            |use_: &Value| &body["geometry"]["pcurves"][index(&use_["geometry_use"]["pcurve"])];
-        if uses
-            .iter()
-            .any(|use_| kind(pcurve(use_)) == "ProjectedCurve")
-        {
-            return;
+        for use_ in pcurve_uses(body, edge, scale) {
+            if let Some(mapped) = mapped_pcurve(&use_) {
+                self.points2.insert(bits(mapped.origin));
+                self.directions2.insert(bits(mapped.direction));
+                for radius in mapped.radii {
+                    self.radii2.insert(bits([radius])[0]);
+                }
+            }
         }
-        for use_ in uses {
+    }
+}
+
+fn body_json(brep: &BrepEnvelope) -> Value {
+    let json = brep
+        .to_json()
+        .unwrap_or_else(|error| panic!("BRep does not serialise: {error}"));
+    serde_json::from_str(&json).unwrap_or_else(|error| panic!("BRep JSON does not parse: {error}"))
+}
+
+fn pcurve_uses<'a>(body: &'a Value, edge: &'a Value, scale: f64) -> Vec<PcurveUse<'a>> {
+    let halfedges = &body["topology"]["halfedges"];
+    let uses = [&edge["halfedge"], &edge["twin_halfedge"]]
+        .into_iter()
+        .filter(|use_| !use_.is_null())
+        .map(|use_| &halfedges[index(use_)])
+        .collect::<Vec<_>>();
+    let pcurve =
+        |use_: &Value| &body["geometry"]["pcurves"][index(&use_["geometry_use"]["pcurve"])];
+    if uses
+        .iter()
+        .any(|use_| kind(pcurve(use_)) == "ProjectedCurve")
+    {
+        return Vec::new();
+    }
+    uses.into_iter()
+        .map(|use_| {
             let face = &body["topology"]["faces"][index(&use_["face"])];
-            self.add_pcurve(&PcurveUse {
+            PcurveUse {
                 pcurve: pcurve(use_),
                 surface: &body["geometry"]["surfaces"][index(&face["surface"])],
                 lift: vector::<2>(&use_["geometry_use"]["periodic_lift"]),
                 scale,
-            });
-        }
-    }
+            }
+        })
+        .collect()
+}
 
-    fn add_pcurve(&mut self, use_: &PcurveUse<'_>) {
-        let s = use_.scale;
-        let metric = match kind(use_.surface) {
-            "Plane" => [s, s],
-            "Cylinder" => [1.0, s],
-            "Cone" => [1.0, s / number(&use_.surface["semi_angle"]).cos()],
-            _ => [1.0, 1.0],
-        };
-        let period = match kind(use_.surface) {
-            "Plane" => [0.0, 0.0],
-            "Torus" => [TAU; 2],
-            _ => [TAU, 0.0],
-        };
-        let lift = use_.lift;
-        let mapped = |origin: [f64; 2]| -> [f64; 2] {
-            std::array::from_fn(|i| (origin[i] + lift[i] * period[i]) * metric[i])
-        };
-        let pcurve = use_.pcurve;
-        match kind(pcurve) {
-            "Line2" => {
-                let direction = vector::<2>(&pcurve["direction"]);
-                let velocity: [f64; 2] = std::array::from_fn(|i| direction[i] * metric[i]);
-                let length = fold_length(&velocity);
-                self.points2.insert(bits(mapped(vector(&pcurve["origin"]))));
-                self.directions2.insert(bits(velocity.map(|v| v / length)));
-            }
-            "Conic2" => {
-                let axis_a = vector::<2>(&pcurve["axis_a"]);
-                let axis_b = vector::<2>(&pcurve["axis_b"]);
-                let a = [axis_a[0] * metric[0], axis_a[1] * metric[1], 0.0];
-                let b = [axis_b[0] * metric[0], axis_b[1] * metric[1], 0.0];
-                let (ra, rb) = (fold_length(&a), fold_length(&b));
-                let axis = if ra >= rb { a } else { b };
-                self.points2.insert(bits(mapped(vector(&pcurve["origin"]))));
-                self.directions2.insert(bits([axis[0], axis[1]]));
-                for radius in [ra.max(rb), ra.min(rb)] {
-                    self.radii2.insert(bits([radius])[0]);
-                }
-            }
-            _ => {}
+fn mapped_pcurve(use_: &PcurveUse<'_>) -> Option<MappedPcurve> {
+    let s = use_.scale;
+    let metric = match kind(use_.surface) {
+        "Plane" => [s, s],
+        "Cylinder" => [1.0, s],
+        "Cone" => [1.0, s / number(&use_.surface["semi_angle"]).cos()],
+        _ => [1.0, 1.0],
+    };
+    let period = match kind(use_.surface) {
+        "Plane" => [0.0, 0.0],
+        "Torus" => [TAU; 2],
+        _ => [TAU, 0.0],
+    };
+    let lift = use_.lift;
+    let pcurve = use_.pcurve;
+    let origin = || -> [f64; 2] {
+        let origin = vector::<2>(&pcurve["origin"]);
+        std::array::from_fn(|i| (origin[i] + lift[i] * period[i]) * metric[i])
+    };
+    match kind(pcurve) {
+        "Line2" => {
+            let direction = vector::<2>(&pcurve["direction"]);
+            let velocity: [f64; 2] = std::array::from_fn(|i| direction[i] * metric[i]);
+            let length = fold_length(&velocity);
+            Some(MappedPcurve {
+                origin: origin(),
+                direction: velocity.map(|v| v / length),
+                radii: Vec::new(),
+            })
         }
+        "Conic2" => {
+            let axis_a = vector::<2>(&pcurve["axis_a"]);
+            let axis_b = vector::<2>(&pcurve["axis_b"]);
+            let a = [axis_a[0] * metric[0], axis_a[1] * metric[1], 0.0];
+            let b = [axis_b[0] * metric[0], axis_b[1] * metric[1], 0.0];
+            let (ra, rb) = (fold_length(&a), fold_length(&b));
+            let axis = if ra >= rb { a } else { b };
+            Some(MappedPcurve {
+                origin: origin(),
+                direction: [axis[0], axis[1]],
+                radii: vec![ra.max(rb), ra.min(rb)],
+            })
+        }
+        _ => None,
     }
 }
 
@@ -255,7 +304,7 @@ fn fold_length(values: &[f64]) -> f64 {
     values.iter().fold(0.0_f64, |n, v| n.hypot(*v))
 }
 
-fn bits<const N: usize>(values: [f64; N]) -> [u64; N] {
+pub fn bits<const N: usize>(values: [f64; N]) -> [u64; N] {
     values.map(|v| if v == 0.0 { 0.0_f64 } else { v }.to_bits())
 }
 

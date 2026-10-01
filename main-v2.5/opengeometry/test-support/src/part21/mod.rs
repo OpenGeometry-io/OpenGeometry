@@ -13,7 +13,10 @@ mod tests;
 mod values;
 
 pub use document::Document;
-pub use expected::{check_values_belong, expected_values, ExpectedValues};
+pub use expected::{
+    bits, check_values_belong, pcurve_expectations, ExpectedValues, PcurveExpectation,
+};
+pub use lexer::references;
 pub use normalise::normalise_step;
 pub use report::ParameterDirectionReport;
 pub use report_match::{check_report_matches, check_single_report_matches};
