@@ -8,8 +8,9 @@ import { REPOSITORY_ROOT } from '../lib/paths.mjs';
 const LOG_DIRECTORY = path.join(REPOSITORY_ROOT, '.check');
 const WORKER_BUNDLE = path.join(REPOSITORY_ROOT, 'dist/tessellation-worker.js');
 const THREE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(?\s*)['"]three(?:\/[^'"]*)?['"]/;
-const FLAKY_BROWSER_TEST = 'instance geometry memory returns to baseline after disposal';
-const BROWSER_REPEATS = 5;
+const WASM_CORE = 'tests/wasm_core.rs';
+const WASM_RUNNING = /^\s*Running (?:unittests )?(\S+)/;
+const WASM_PASSED = /^\s*test result: ok\. (\d+) passed/;
 
 function crateSteps(name, directory, lintTargets, withTests) {
   const steps = [
@@ -52,7 +53,7 @@ const CHECK_STEPS = [
   ...crateSteps('opengeometry', 'opengeometry', '--all-targets', true),
   ...crateSteps('test-support', 'opengeometry/test-support', '--all-targets', true),
   ...crateSteps('parity-oracle', 'tools/parity-oracle', '--bins', false),
-  { name: 'test:wasm', cwd: 'opengeometry', commands: [['wasm-pack', 'test', '--node']] },
+  { name: 'test:wasm', cwd: 'opengeometry', commands: [['wasm-pack', 'test', '--node']], logCheck: wasmFloorFindings },
   npmStep('build'),
   { name: 'worker-bundle', check: workerBundleFindings },
   ...['lint:check', 'typecheck', 'check:source', 'check:cycles', 'check:duplicates', 'build-example']
@@ -73,6 +74,21 @@ function workerBundleFindings() {
     .map((line, index) => ({ line, number: index + 1 }))
     .filter((entry) => THREE_IMPORT.test(entry.line))
     .map((entry) => `dist/tessellation-worker.js:${String(entry.number)} imports three: ${entry.line.trim()}`);
+}
+
+export function wasmFloorFindings(log) {
+  let binary = '';
+  let passed = 0;
+  let coreRanNone = false;
+  for (const line of log.split(/\r\n|\r|\n/)) {
+    binary = WASM_RUNNING.exec(line)?.[1] ?? binary;
+    passed += Number(WASM_PASSED.exec(line)?.[1] ?? 0);
+    if (binary === WASM_CORE && line.trim() === 'no tests to run!') coreRanNone = true;
+  }
+  return [
+    ...(passed === 0 ? ['no wasm test binary reported a passing test'] : []),
+    ...(coreRanNone ? [`${WASM_CORE} ran no tests`] : []),
+  ];
 }
 
 function errorText(error) {
@@ -111,31 +127,6 @@ export function selectSteps(argv) {
   return selected;
 }
 
-function failedTests(lines) {
-  const index = lines.findIndex((line) => /^ {2}\d+ failed$/.test(line));
-  if (index < 0) return [];
-  const count = Number.parseInt(lines[index]?.trim() ?? '', 10);
-  return lines.slice(index + 1, index + 1 + count).map((line) => line.replace(/ ─*$/, ''));
-}
-
-function browserFlake(log) {
-  const lines = log.split('\n');
-  const failed = failedTests(lines);
-  const onlyFlaky = failed.length === 1 && failed[0]?.endsWith(` › ${FLAKY_BROWSER_TEST}`);
-  const outside = lines.some((line) => /^ {2}\d+ interrupted$/.test(line) || line.includes('not a part of any test'));
-  return onlyFlaky && !outside ? { verdict: 'KNOWN-FLAKE', detail: FLAKY_BROWSER_TEST } : undefined;
-}
-
-export function classifyFlake(stepName, log) {
-  if (stepName.startsWith('browser:')) return browserFlake(log);
-  return undefined;
-}
-
-export function playwrightCounts(log) {
-  const count = (label) => Number(new RegExp(`^ {2}(\\d+) ${label}\\b`, 'm').exec(log)?.[1] ?? 0);
-  return { passed: count('passed'), failed: count('failed') };
-}
-
 function commandEnvironment(step) {
   const env = { ...process.env };
   if (step.threeVersion !== undefined) env.OG_THREE_VERSION = step.threeVersion;
@@ -167,12 +158,13 @@ function checkFindings(check) {
   }
 }
 
+function writeFindings(findings, log) {
+  writeSync(log, findings.length === 0 ? 'no findings\n' : `${findings.join('\n')}\n`);
+  return findings.length === 0 ? 0 : 1;
+}
+
 async function stepStatus(step, log) {
-  if (step.check) {
-    const findings = checkFindings(step.check);
-    writeSync(log, findings.length === 0 ? 'no findings\n' : `${findings.join('\n')}\n`);
-    return findings.length === 0 ? 0 : 1;
-  }
+  if (step.check) return writeFindings(checkFindings(step.check), log);
   for (const command of step.commands) {
     const status = await commandStatus(command, step, log);
     if (status !== 0) return status;
@@ -180,40 +172,24 @@ async function stepStatus(step, log) {
   return 0;
 }
 
-async function attempt(step, suffix) {
-  const file = path.join(LOG_DIRECTORY, `${step.name}${suffix}.log`);
+async function attempt(step) {
+  const file = path.join(LOG_DIRECTORY, `${step.name}.log`);
   const log = openSync(file, 'w');
   const status = await stepStatus(step, log);
+  const checked = status === 0 && step.logCheck
+    ? writeFindings(checkFindings(() => step.logCheck(readFileSync(file, 'utf8'))), log)
+    : status;
   closeSync(log);
-  return { status, text: readFileSync(file, 'utf8') };
-}
-
-async function browserRepeat(step, status) {
-  const repeat = `--repeat-each=${String(BROWSER_REPEATS)}`;
-  const commands = [['npm', 'run', 'test:browser', '--', repeat, '--grep', FLAKY_BROWSER_TEST]];
-  const rerun = await attempt({ ...step, commands }, '.repeat');
-  const counts = playwrightCounts(rerun.text);
-  const tally = `${String(counts.passed)} passed, ${String(counts.failed)} failed with ${repeat}`;
-  if (counts.passed === 0) return { status, note: `memory test ${tally}` };
-  return { status: 0, note: `KNOWN-FLAKE memory test ${tally}` };
-}
-
-async function stepOutcome(step) {
-  const first = await attempt(step, '');
-  if (first.status === 0) return { status: 0, note: '' };
-  const flake = classifyFlake(step.name, first.text);
-  if (flake === undefined) return { status: first.status, note: '' };
-  return browserRepeat(step, first.status);
+  return checked;
 }
 
 async function runStep(step) {
   const started = performance.now();
-  const outcome = await stepOutcome(step);
+  const status = await attempt(step);
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
-  const verdict = outcome.status === 0 ? 'ok  ' : 'FAIL';
-  const note = outcome.note === '' ? '' : ` ${outcome.note}`;
-  process.stdout.write(`${verdict} ${step.name.padEnd(28)} exit ${String(outcome.status)} ${seconds}s${note}\n`);
-  return { name: step.name, ...outcome };
+  const verdict = status === 0 ? 'ok  ' : 'FAIL';
+  process.stdout.write(`${verdict} ${step.name.padEnd(28)} exit ${String(status)} ${seconds}s\n`);
+  return { name: step.name, status };
 }
 
 function stepBatches(steps) {
@@ -244,11 +220,9 @@ async function main(argv) {
   mkdirSync(LOG_DIRECTORY, { recursive: true });
   const results = await runSteps(steps);
   const failed = results.filter((result) => result.status !== 0).map((result) => result.name);
-  const flakes = results.filter((result) => result.status === 0 && result.note.startsWith('KNOWN-FLAKE'));
-  const flakeNote = flakes.length === 0 ? '' : `; known flakes: ${flakes.map((result) => result.name).join(', ')}`;
   process.stdout.write(failed.length === 0
-    ? `${String(steps.length)} steps passed${flakeNote}; logs in .check/\n`
-    : `failed: ${failed.join(', ')}${flakeNote}; logs in .check/\n`);
+    ? `${String(steps.length)} steps passed; logs in .check/\n`
+    : `failed: ${failed.join(', ')}; logs in .check/\n`);
   process.exitCode = failed.length === 0 ? 0 : 1;
 }
 

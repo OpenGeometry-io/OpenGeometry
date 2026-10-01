@@ -17,7 +17,7 @@
     "test": "cargo test --manifest-path opengeometry/Cargo.toml",
     "test:wasm": "cd opengeometry && wasm-pack test --node",
     "test:bindings": "node scripts/test/bindings.test.mjs",
-    "test:node": "node --test 'opengeometry-three/tests/node/*.test.mjs' 'scripts/check/*.test.mjs' 'scripts/bench/*.test.mjs'",
+    "test:node": "node --test 'opengeometry-three/tests/node/*.test.mjs' 'scripts/check/*.test.mjs' 'scripts/bench/*.test.mjs' 'scripts/build/*.test.mjs'",
     "test:performance": "node --max-old-space-size=512 scripts/bench/performance.mjs --check",
     "test:browser": "playwright test",
     "snapshot:kernel": "node scripts/snapshot/kernel-snapshot.mjs",

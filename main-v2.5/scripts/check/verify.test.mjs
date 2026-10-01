@@ -1,12 +1,36 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { classifyFlake, playwrightCounts, selectSteps } from './verify.mjs';
+import { selectSteps, wasmFloorFindings } from './verify.mjs';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { REPOSITORY_ROOT } from '../lib/paths.mjs';
 
-const MEMORY_TEST = 'instance geometry memory returns to baseline after disposal';
-const SEPARATOR = '─'.repeat(12);
+const PADDING = ' '.repeat(50);
+const NO_TESTS = 'no tests to run!';
+const WASM_CORE = 'tests/wasm_core.rs';
+const PASSED = [
+  `Executing bindgen...${PADDING}\r${PADDING}\rrunning 4 tests`,
+  'test embedded_brep_parity_and_snapshot_buffers ... ok',
+  '',
+  'test result: ok. 4 passed; 0 failed; 0 ignored; 0 filtered out; finished in 1.22s',
+  '',
+];
+const BINARIES = [
+  'unittests src/lib.rs', 'tests/booleans/main.rs', 'tests/errors.rs', WASM_CORE, 'tests/world_graph/main.rs',
+];
+
+function wasmLog(outputs) {
+  const entries = BINARIES.map((binary, index) => [
+    `${index === 0 ? '' : `${PADDING}\r`}     Running ${binary} (target/wasm32-unknown-unknown/debug/deps/x.wasm)`,
+    ...(outputs.get(binary) ?? [NO_TESTS]),
+  ]);
+  return [
+    '$ wasm-pack test --node',
+    '    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s',
+    ...entries.flat(),
+    `${PADDING}\r[WARN]: There's a newer version of wasm-pack available`,
+  ].join('\n');
+}
 
 function names(argv) {
   return selectSteps(argv).map((step) => step.name);
@@ -14,17 +38,6 @@ function names(argv) {
 
 function failsWith(message) {
   return (error) => error instanceof Error && error.message === message;
-}
-
-function browserLog(failed, passed) {
-  return [
-    `Running ${String(failed.length + passed)} tests using 1 worker`,
-    `  1) acceptance.spec.ts:194:5 › ${failed[0] ?? ''} ${SEPARATOR}`,
-    '    Error: Geometry memory changed unexpectedly',
-    `  ${String(failed.length)} failed`,
-    ...failed.map((title, index) => `    acceptance.spec.ts:${String(194 + index)}:5 › ${title} ${SEPARATOR}`),
-    `  ${String(passed)} passed (1.4m)`,
-  ].join('\n');
 }
 
 test('--only keeps the named steps in check order', () => {
@@ -79,35 +92,24 @@ test('an option without a value fails naming the option', () => {
   assert.throws(() => selectSteps(['--from', '--full']), failsWith('--from needs a value'));
 });
 
-test('a performance regression is not classified as a flake', () => {
-  const log = [
-    '> opengeometry@2.5.0 test:performance',
-    'Error: rotated20BooleanMs regressed: 150 ms exceeds 142 ms',
-    '    at file:///repo/scripts/bench/performance.mjs:60:11',
-  ].join('\n');
-  assert.equal(classifyFlake('test:performance', log), undefined);
+test('a wasm log where every binary runs no tests fails the wasm floor', () => {
+  assert.deepEqual(wasmFloorFindings(wasmLog(new Map())), [
+    'no wasm test binary reported a passing test',
+    `${WASM_CORE} ran no tests`,
+  ]);
 });
 
-test('a browser run whose only failure is the memory test is a known flake', () => {
-  assert.deepEqual(classifyFlake('browser:three-184', browserLog([MEMORY_TEST], 39)), {
-    verdict: 'KNOWN-FLAKE', detail: MEMORY_TEST,
-  });
+test('a wasm log whose wasm_core binary runs no tests fails the wasm floor', () => {
+  const log = wasmLog(new Map([['tests/errors.rs', PASSED]]));
+  assert.deepEqual(wasmFloorFindings(log), [`${WASM_CORE} ran no tests`]);
 });
 
-test('a browser run with another failure beside the memory test is not classified', () => {
-  assert.equal(classifyFlake('browser:three-168', browserLog([MEMORY_TEST, 'zoom selects a finer LOD bucket'], 38)),
-    undefined);
+test('the recorded wasm log shape passes the wasm floor', () => {
+  assert.deepEqual(wasmFloorFindings(wasmLog(new Map([[WASM_CORE, PASSED]]))), []);
 });
 
-test('a browser run failing only another test is not classified', () => {
-  assert.equal(classifyFlake('browser:three-168', browserLog(['zoom selects a finer LOD bucket'], 39)), undefined);
-});
-
-test('a failure in any other step is not classified', () => {
-  assert.equal(classifyFlake('typecheck', browserLog([MEMORY_TEST], 39)), undefined);
-});
-
-test('playwright counts read the passed and failed totals', () => {
-  assert.deepEqual(playwrightCounts(browserLog([MEMORY_TEST], 4)), { passed: 4, failed: 1 });
-  assert.deepEqual(playwrightCounts('  5 passed (20.1s)'), { passed: 5, failed: 0 });
+test('the wasm test step carries both its command and the floor', () => {
+  const [step] = selectSteps(['--only', 'test:wasm']);
+  assert.deepEqual(step?.commands, [['wasm-pack', 'test', '--node']]);
+  assert.equal(step?.logCheck, wasmFloorFindings);
 });
