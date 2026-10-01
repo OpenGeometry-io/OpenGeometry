@@ -3,7 +3,7 @@ import {
   OpenGeometry, SystemAssembly, Wire, Solid, OGError,
   OG_PRIMITIVE_RECTANGLE, OG_PRIMITIVE_CUBOID, OG_OPERATION_EXTRUDE, OG_OPERATION_SUBTRACT, OG_TRANSFORM_TRANSLATE,
 } from '../../../../dist/index.js';
-import { wantedBucket } from '../../../../dist/testing.js';
+import { activeBackend, ensureGeometry, flushCount, graph, runtime, wantedBucket } from '../../../../dist/testing.js';
 import { required } from '../support/test-page.js';
 
 export type AcceptancePage = {
@@ -65,14 +65,14 @@ export async function buildStorey(page: AcceptancePage): Promise<StoreyResult> {
   storey.addChild([...walls.slice(1), ...instances]);
   storeyData = { root: storey, bodies: [...walls, ...instances] };
   page.scene.add(...walls, ...instances);
-  const beforeRenderFlush = OpenGeometry.flushCount;
+  const beforeRenderFlush = flushCount();
   const beforeRender = performance.now();
   page.renderer.render(page.scene, page.camera);
   const renderMs = performance.now() - beforeRender;
-  const renderFlushes = OpenGeometry.flushCount - beforeRenderFlush;
+  const renderFlushes = flushCount() - beforeRenderFlush;
   await OpenGeometry.settled();
   return {
-    walls: walls.length, openingsPerWall: 4, instances: instances.length, flushCount: OpenGeometry.flushCount,
+    walls: walls.length, openingsPerWall: 4, instances: instances.length, flushCount: flushCount(),
     renderFlushes, geometryCount: page.renderer.info.memory.geometries, renderMs,
   };
 }
@@ -145,14 +145,14 @@ export async function lodProbe(page: AcceptancePage): Promise<{ before: number; 
 }
 
 export async function workerCrashProbe(page: AcceptancePage): Promise<Record<string, unknown>> {
-  const provider = OpenGeometry.runtime().provider as unknown as WorkerProvider;
+  const provider = runtime().provider as unknown as WorkerProvider;
   const record = page.wall.record;
   provider.crash();
-  const info = JSON.parse(OpenGeometry.graph().node(page.wall.ogId)) as { shapeId: string; shapeRevision: number };
+  const info = JSON.parse(graph().node(page.wall.ogId)) as { shapeId: string; shapeRevision: number };
   await provider.ensureSnapshot(info.shapeId, info.shapeRevision);
-  const afterRestart = OpenGeometry.activeBackend;
+  const afterRestart = activeBackend();
   provider.crash();
-  return { afterRestart, afterFallback: OpenGeometry.activeBackend, sameRecord: page.wall.record === record };
+  return { afterRestart, afterFallback: activeBackend(), sameRecord: page.wall.record === record };
 }
 
 export function placementPixelProbe(page: AcceptancePage): Record<string, unknown> {
@@ -184,7 +184,7 @@ export function placementPixelProbe(page: AcceptancePage): Record<string, unknow
   cube.transform(OG_TRANSFORM_TRANSLATE, { offset: [4, 0, 0] });
   renderer.render(isolated, view);
   const after = pixel();
-  const kernel = OpenGeometry.graph().worldMatrix(cube.ogId);
+  const kernel = graph().worldMatrix(cube.ogId);
   const matrixMatches = cube.matrixWorld.elements
     .every((value, index) => Math.abs(value - (kernel[index] ?? Number.NaN)) <= 1e-12);
   const geometryMatches = cube.surface.geometry === geometry && geometry.getAttribute('position') === position
@@ -222,8 +222,8 @@ export async function staleWorkerProbe(page: AcceptancePage): Promise<Record<str
   scene.add(body);
   renderer.render(scene, camera);
   await OpenGeometry.settled();
-  const info = JSON.parse(OpenGeometry.graph().node(body.ogId)) as { shapeId: string };
-  const provider = OpenGeometry.runtime().provider as unknown as StatsProvider;
+  const info = JSON.parse(graph().node(body.ogId)) as { shapeId: string };
+  const provider = runtime().provider as unknown as StatsProvider;
   const before = (await provider.debugStats())[info.shapeId] ?? 0;
   for (let i = 0; i < 10; i++) {
     body.rebuild(OG_PRIMITIVE_CUBOID, { width: 1 + i * 0.1, height: 1, depth: 1 });
@@ -238,8 +238,8 @@ export async function staleWorkerProbe(page: AcceptancePage): Promise<Record<str
 }
 
 export async function snapshotResendProbe(page: AcceptancePage): Promise<{ triangles: number }> {
-  const info = JSON.parse(OpenGeometry.graph().node(page.rail.ogId)) as { shapeId: string; shapeRevision: number };
-  const provider = OpenGeometry.runtime().provider as unknown as ResendProvider;
+  const info = JSON.parse(graph().node(page.rail.ogId)) as { shapeId: string; shapeRevision: number };
+  const provider = runtime().provider as unknown as ResendProvider;
   await provider.ensureSnapshot(info.shapeId, info.shapeRevision);
   provider.worker.postMessage({ kind: 'drop', shapeId: info.shapeId, revision: info.shapeRevision });
   const buffers = await provider.request({
@@ -264,8 +264,8 @@ export function lodHysteresisProbe(): Record<string, number> {
 
 export async function orbitProbe(page: AcceptancePage): Promise<{ jobs: number }> {
   const { renderer, scene, camera } = page;
-  const info = JSON.parse(OpenGeometry.graph().node(page.wall.ogId)) as { shapeId: string };
-  const provider = OpenGeometry.runtime().provider as unknown as StatsProvider;
+  const info = JSON.parse(graph().node(page.wall.ogId)) as { shapeId: string };
+  const provider = runtime().provider as unknown as StatsProvider;
   const before = (await provider.debugStats())[info.shapeId] ?? 0;
   OpenGeometry.setCameraMotion(true);
   for (let i = 0; i < 10; i++) {
@@ -282,7 +282,7 @@ export async function orbitProbe(page: AcceptancePage): Promise<{ jobs: number }
 
 export function coarserRetryProbe(): Record<string, unknown> {
   const body = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'retry-cube' });
-  const provider = OpenGeometry.runtime().provider;
+  const provider = runtime().provider;
   const original = provider.compute?.bind(provider);
   if (!original) throw new Error('Test page expected an inline compute');
   let calls = 0;
@@ -294,7 +294,7 @@ export function coarserRetryProbe(): Record<string, unknown> {
     return original(request);
   };
   try {
-    OpenGeometry.ensureGeometry(body, true);
+    ensureGeometry(body, true);
     return { calls, warning, bucket: body.record?.bucket };
   } finally {
     provider.compute = original;

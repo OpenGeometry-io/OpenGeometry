@@ -3,7 +3,7 @@ import { call } from '../kernel/kernel-session.js';
 import { encode } from '../world-graph/codec.js';
 import { creation, worldGraph } from '../world-graph/world-graph-client.js';
 import { Body } from './body.js';
-import { createBody } from './body-factory.js';
+import { createBody, existingParams } from './body-factory.js';
 import type { BodyOptions } from './body-options.js';
 import type { SystemAssembly } from './system-assembly.js';
 
@@ -17,13 +17,13 @@ export class Wire extends Body {
     const ogId = creation(call('Wire.instance', () => worldGraph().instance(
       this.ogId, encode({ ogId: options.ogId, parent: options.parent?.ogId }),
     )));
-    return new Wire('__existing', {}, { ogId });
+    return new Wire('', existingParams(ogId));
   }
   duplicate(options: { ogId?: string; parent?: SystemAssembly } = {}): Wire {
     this.check();
     const ogId = creation(call('Wire.duplicate', () => worldGraph().duplicate(
       this.ogId, encode({ ogId: options.ogId, parent: options.parent?.ogId }),
     )));
-    return new Wire('__existing', {}, { ogId });
+    return new Wire('', existingParams(ogId));
   }
 }

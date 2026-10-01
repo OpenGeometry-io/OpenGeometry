@@ -4,7 +4,7 @@ import { OGError } from '../../errors.js';
 import { call } from '../../kernel/kernel-session.js';
 import type { Body } from '../../bodies/body.js';
 import { emit } from '../../runtime/event-bus.js';
-import { runtime, type Runtime } from '../../runtime/runtime-state.js';
+import { currentRuntime, runtime, type Runtime } from '../../runtime/runtime-state.js';
 import { node } from '../../world-graph/world-graph-client.js';
 import { wantedBucket } from '../lod/deflection.js';
 import type { TessellationRequest } from '../provider.js';
@@ -15,31 +15,37 @@ type GeometryTarget = { body: Body; shapeId: string; revision: number; bucket: n
 export function flush(options: { geometry?: 'sync' } = {}): void {
   const state = runtime();
   const revision = state.graph.revision();
-  if (revision !== state.revision || (!state.renderPassActive && state.readyVersion !== state.flushedReadyVersion)) {
-    const packet = call('OpenGeometry.flush', () => state.graph.changesSince(state.revision)) as {
-      changesJson: string;
-      matrices: Float64Array;
-    };
-    const changes = JSON.parse(packet.changesJson) as ChangeSet;
-    let offset = 0;
-    for (const changed of [...changes.added, ...changes.changed]) {
-      const body = state.bodies.get(changed.ogId);
-      if (body) {
-        body.lastInfo = node(body.ogId);
-        body.applyWorldMatrix(packet.matrices.subarray(offset, offset + 16));
+  if (!state.flushing
+    && (revision !== state.revision || (!state.renderPassActive && state.readyVersion !== state.flushedReadyVersion))) {
+    state.flushing = true;
+    try {
+      const packet = call('OpenGeometry.flush', () => state.graph.changesSince(state.revision)) as {
+        changesJson: string;
+        matrices: Float64Array;
+      };
+      state.revision = revision;
+      const changes = JSON.parse(packet.changesJson) as ChangeSet;
+      let offset = 0;
+      for (const changed of [...changes.added, ...changes.changed]) {
+        const body = state.bodies.get(changed.ogId);
+        if (body) {
+          body.lastInfo = node(body.ogId);
+          body.applyWorldMatrix(packet.matrices.subarray(offset, offset + 16));
+        }
+        offset += 16;
       }
-      offset += 16;
-    }
-    for (const removed of changes.removed) state.bodies.get(removed.ogId)?.hideForDispose();
-    for (const body of state.bodies.values()) body.swapReadyRecord();
-    for (const body of state.bodies.values()) {
-      if (body.lastInfo.shapeId && body.lastInfo.shapeRevision !== null) {
-        state.records.purge(body.lastInfo.shapeId, body.lastInfo.shapeRevision);
+      for (const removed of changes.removed) state.bodies.get(removed.ogId)?.hideForDispose();
+      for (const body of state.bodies.values()) body.swapReadyRecord();
+      for (const body of state.bodies.values()) {
+        if (body.lastInfo.shapeId && body.lastInfo.shapeRevision !== null) {
+          state.records.purge(body.lastInfo.shapeId, body.lastInfo.shapeRevision);
+        }
       }
+      state.flushedReadyVersion = state.readyVersion;
+      state.flushes++;
+    } finally {
+      state.flushing = false;
     }
-    state.revision = revision;
-    state.flushedReadyVersion = state.readyVersion;
-    state.flushes++;
   }
   if (options.geometry === 'sync') {
     for (const body of state.displayed) ensureGeometry(body, true);
@@ -109,7 +115,8 @@ function requestLater(state: Runtime, target: GeometryTarget): void {
   const { body, shapeId, revision, bucket, key } = target;
   const request = requestFor(body, bucket);
   const promise = state.provider.request(request).catch(async (error: unknown) => {
-    if (error instanceof OGError && error.code === 'LimitExceeded' && !state.failedBuckets.has(key)) {
+    if (currentRuntime() === state && error instanceof OGError && error.code === 'LimitExceeded'
+      && !state.failedBuckets.has(key)) {
       state.failedBuckets.add(key);
       state.buckets.set(shapeId, bucket * 2);
       emit('warning', { code: 'LimitExceeded', shapeId, revision, bucket, retryBucket: bucket * 2 });
@@ -118,11 +125,11 @@ function requestLater(state: Runtime, target: GeometryTarget): void {
     throw error;
   }).then((buffers) => {
     const current = state.generations.get(shapeId) ?? 0;
-    if (request.generation === current || buffers.bucket === bucket * 2) {
+    if (currentRuntime() === state && (request.generation === current || buffers.bucket === bucket * 2)) {
       receive(shapeId, revision, buffers.bucket, buffers);
     }
   }).catch((error: unknown) => {
-    if (!(error instanceof OGError && error.code === 'Cancelled')) emit('error', error);
+    if (currentRuntime() === state && !(error instanceof OGError && error.code === 'Cancelled')) emit('error', error);
   }).finally(() => { state.pending.delete(key); });
   state.pending.set(key, promise);
 }

@@ -51,11 +51,10 @@ function bodies(example: Example): Solid[] {
 }
 function dispose(example: Example): void { bodies(example).reverse().forEach((body) => { body.dispose(); }); }
 function ready(example: Example): void {
+  SCENE.updateMatrixWorld(true);
+  OpenGeometry.flush({ geometry: 'sync' });
   for (const body of bodies(example)) {
-    OpenGeometry.ensureGeometry(body, true);
-    if (body.record?.revision !== body.lastInfo.shapeRevision || body.record.bucket !== OpenGeometry.wanted(body)) {
-      throw new Error('Boolean geometry did not finish');
-    }
+    if (body.record?.revision !== body.lastInfo.shapeRevision) throw new Error('Boolean geometry did not finish');
   }
 }
 
@@ -100,9 +99,9 @@ function rebuild(): void {
   let next: Example | undefined;
   try {
     next = createExample();
+    for (const body of bodies(next)) SCENE.add(body);
     ready(next);
     const previous = displayed;
-    for (const body of bodies(next)) SCENE.add(body);
     displayed = next;
     if (previous) dispose(previous);
     const counts = `${String(next.faces)} result faces · ${String(next.contacts)} contacts`;
@@ -156,7 +155,6 @@ const STOP_FPS_METER = startFpsMeter(RENDERER, SCENE, CAMERA, CONTROLS);
 (window as typeof window & { __ogAnalyticBooleanExample?: unknown }).__ogAnalyticBooleanExample = {
   camera: CAMERA, controls: CONTROLS, renderer: RENDERER,
   get current() { return displayed; },
-  get backend() { return OpenGeometry.activeBackend; },
   rebuild,
 };
 

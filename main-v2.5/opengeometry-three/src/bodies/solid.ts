@@ -4,7 +4,7 @@ import { flush } from '../rendering/geometry/geometry-scheduler.js';
 import { encode, scope } from '../world-graph/codec.js';
 import { creation, worldGraph } from '../world-graph/world-graph-client.js';
 import { Body } from './body.js';
-import { createBody } from './body-factory.js';
+import { createBody, existingParams } from './body-factory.js';
 import type { BodyOptions } from './body-options.js';
 import type { SystemAssembly } from './system-assembly.js';
 
@@ -28,13 +28,13 @@ export class Solid extends Body {
     const ogId = creation(call('Solid.instance', () => worldGraph().instance(
       this.ogId, encode({ ogId: options.ogId, parent: options.parent?.ogId }),
     )));
-    return new Solid('__existing', {}, { ogId });
+    return new Solid('', existingParams(ogId));
   }
   duplicate(options: { ogId?: string; parent?: SystemAssembly } = {}): Solid {
     this.check();
     const ogId = creation(call('Solid.duplicate', () => worldGraph().duplicate(
       this.ogId, encode({ ogId: options.ogId, parent: options.parent?.ogId }),
     )));
-    return new Solid('__existing', {}, { ogId });
+    return new Solid('', existingParams(ogId));
   }
 }

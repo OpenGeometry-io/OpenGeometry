@@ -10,7 +10,7 @@
       "files": [
         "opengeometry-three/src/bodies/body.ts",
         "opengeometry-three/src/bodies/solid.ts",
-        "opengeometry-three/src/bodies/system-assembly.ts",
+        "opengeometry-three/src/bodies/node-methods.ts",
         "opengeometry-three/src/marks/og-mark.ts"
       ],
       "rules": ["@typescript-eslint/no-unsafe-return"],
@@ -27,13 +27,7 @@
       "owner": "C1",
       "files": ["opengeometry-three/src/bodies/body.ts"],
       "rules": ["@typescript-eslint/no-unsafe-type-assertion"],
-      "reason": "clone() returns a DisplayClone typed as this. C1 settles the clone contract."
-    },
-    {
-      "owner": "C1",
-      "files": ["opengeometry-three/src/bodies/body-factory.ts"],
-      "rules": ["@typescript-eslint/no-non-null-assertion"],
-      "reason": "The '__existing' kind returns options.ogId!. D2 removes the '__existing' path."
+      "reason": "clone() returns a DisplayClone, which cannot be typed as this; a display copy is a plain Group, not a Body."
     },
     {
       "owner": "C2",
@@ -102,12 +96,6 @@
       "files": ["opengeometry-three/src/rendering/tessellation-worker.ts"],
       "rules": ["@typescript-eslint/no-unsafe-type-assertion", "@typescript-eslint/no-non-null-assertion"],
       "reason": "The worker asserts message fields and the tessellator before init. C4 adds message guards."
-    },
-    {
-      "owner": "C1",
-      "files": ["opengeometry-three/src/rendering/provider.ts"],
-      "rules": ["@typescript-eslint/consistent-type-definitions"],
-      "reason": "TessellationProvider is printed as an interface in the API surface through Runtime. C1 removes runtime() from the public surface."
     },
     {
       "owner": "C2",

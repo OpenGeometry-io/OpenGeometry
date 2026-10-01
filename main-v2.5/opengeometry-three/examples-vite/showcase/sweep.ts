@@ -120,7 +120,8 @@ function updateSweep(): void {
     PRIMARY.solid.rebuild(OG_OPERATION_SWEEP, { profile: PRIMARY.profile, path: PRIMARY.path });
     setGuide(PRIMARY.guide, points);
     setGuide(PRIMARY.profileGuide, PROFILE_POINTS(points[0], CONFIG.width, CONFIG.depth));
-    OpenGeometry.ensureGeometry(PRIMARY.solid, true);
+    SCENE.updateMatrixWorld(true);
+    OpenGeometry.flush({ geometry: 'sync' });
     if (PRIMARY.solid.record?.revision !== PRIMARY.solid.lastInfo.shapeRevision) {
       throw new Error('Sweep geometry did not finish');
     }
@@ -174,7 +175,6 @@ const STOP_FPS_METER = startFpsMeter(RENDERER, SCENE, CAMERA, CONTROLS);
 
 (window as typeof window & { __ogSweepExample?: unknown }).__ogSweepExample = {
   camera: CAMERA, controls: CONTROLS, renderer: RENDERER, frames: FRAMES,
-  get backend() { return OpenGeometry.activeBackend; },
   render, resetView, updateSweep,
   exportStep: () => OpenGeometry.exportStep({ nodes: FRAMES.map((frame) => frame.solid) }),
 };

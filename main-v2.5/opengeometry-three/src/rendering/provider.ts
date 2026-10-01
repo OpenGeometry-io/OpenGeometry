@@ -9,7 +9,7 @@ export type TessellationRequest = {
   generation: number;
 };
 
-export interface TessellationProvider {
+export type TessellationProvider = {
   readonly activeBackend: 'worker' | 'inline';
   ensureSnapshot(shapeId: string, revision: number): Promise<void>;
   request(value: TessellationRequest): Promise<DisplayBuffers>;
@@ -17,4 +17,4 @@ export interface TessellationProvider {
   drop(shapeId: string, revision: number): void;
   dispose(): void;
   compute?(value: TessellationRequest): DisplayBuffers;
-}
+};

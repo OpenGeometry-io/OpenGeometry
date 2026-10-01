@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID } from '../../../../dist/index.js';
+import { activeBackend, graph } from '../../../../dist/testing.js';
 import { bootKernel, createRenderer, publishFixture, releasePage, required } from '../support/test-page.js';
 
 const WORKER_URL = await bootKernel();
@@ -30,7 +31,7 @@ publishFixture({
   body: BODY, renderer: RENDERER, scene: SCENE, camera: CAMERA,
   threeRevision: THREE.REVISION,
   reservedNameCollisions: ADDED_NAMES.filter((name) => RESERVED.has(name)),
-  get backend() { return OpenGeometry.activeBackend; },
+  get backend() { return activeBackend(); },
   render: () => { RENDERER.render(SCENE, CAMERA); },
   settled: () => OpenGeometry.settled(),
   exportStep: () => OpenGeometry.exportStep({ nodes: [BODY] }),
@@ -41,8 +42,8 @@ publishFixture({
     return hit && OpenGeometry.resolveHit(hit);
   },
   getInlineBuffers: () => {
-    const info = JSON.parse(OpenGeometry.graph().node(BODY.ogId)) as { shapeId: string };
-    return OpenGeometry.graph().buffers(info.shapeId, required(BODY.record, 'a cube record').bucket, 2_000_000);
+    const info = JSON.parse(graph().node(BODY.ogId)) as { shapeId: string };
+    return graph().buffers(info.shapeId, required(BODY.record, 'a cube record').bucket, 2_000_000);
   },
   workerInitError: async () => {
     const worker = new Worker(WORKER_URL, { type: 'module' });

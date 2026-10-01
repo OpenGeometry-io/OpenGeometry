@@ -87,14 +87,13 @@ function rebuild(): void {
   const started = performance.now();
   try {
     next = createExample();
-    OpenGeometry.ensureGeometry(next.host, true);
-    OpenGeometry.ensureGeometry(next.tool, true);
-    OpenGeometry.ensureGeometry(next.result, true);
+    SCENE.add(next.host, next.tool, next.result);
+    SCENE.updateMatrixWorld(true);
+    OpenGeometry.flush({ geometry: 'sync' });
     if ([next.host, next.tool, next.result].some((body) => body.record?.revision !== body.lastInfo.shapeRevision)) {
       throw new Error('Boolean geometry did not finish');
     }
     const previous = current;
-    SCENE.add(next.host, next.tool, next.result);
     current = next;
     if (previous) disposeBodies([previous.host, previous.tool, previous.result]);
     REPORT.textContent = JSON.stringify(next.result.getReport(), null, 2);
@@ -142,7 +141,6 @@ const STOP_FPS_METER = startFpsMeter(RENDERER, SCENE, CAMERA, CONTROLS);
 (window as typeof window & { __ogBooleanExample?: unknown }).__ogBooleanExample = {
   camera: CAMERA, controls: CONTROLS, renderer: RENDERER,
   get current() { return current; },
-  get backend() { return OpenGeometry.activeBackend; },
   render, rebuild,
 };
 

@@ -68,7 +68,8 @@ function updateCylinder(rebuild: boolean): void {
     }
     CYLINDER.setAppearance({ outline: OUTLINE_INPUT.checked, deflection: 10 ** Number(DEFLECTION_INPUT.value) });
     applyWireframe();
-    OpenGeometry.ensureGeometry(CYLINDER, true);
+    SCENE.updateMatrixWorld(true);
+    OpenGeometry.flush({ geometry: 'sync' });
     if (CYLINDER.record?.revision !== CYLINDER.lastInfo.shapeRevision) {
       throw new Error('Cylinder geometry did not finish');
     }
