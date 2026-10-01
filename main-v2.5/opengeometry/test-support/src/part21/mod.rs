@@ -1,4 +1,5 @@
 mod context;
+mod curves;
 mod document;
 mod lexer;
 mod report;
