@@ -19,12 +19,6 @@
     },
     {
       "owner": "C5",
-      "files": ["opengeometry-three/src/rendering/geometry/geometry-scheduler.ts"],
-      "rules": ["@typescript-eslint/no-non-null-assertion"],
-      "reason": "requestFor re-reads body.lastInfo after asynchronous steps and asserts shapeId and shapeRevision; a guard would change behaviour. C5 reworks the display loop."
-    },
-    {
-      "owner": "C4",
       "files": ["opengeometry-three/src/rendering/inline-backend.ts"],
       "rules": ["@typescript-eslint/no-empty-function"],
       "reason": "The no-op members satisfy TessellationProvider, whose shape C5 owns."

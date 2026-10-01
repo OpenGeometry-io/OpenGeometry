@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
 import * as THREE from 'three';
 import {
   OpenGeometry, OGError, Solid, Wire, OG_PRIMITIVE_CUBOID, OG_PRIMITIVE_PARAMS_RECTANGLE,
   OG_PRIMITIVE_RECTANGLE, OG_TRANSFORM_ROTATE, OG_TRANSFORM_TRANSLATE,
 } from '../../../dist/index.js';
-import { activeBackend, ensureGeometry, noteDisplayed, runtime, wanted } from '../../../dist/testing.js';
+import { activeBackend, ensureGeometry, graph, noteDisplayed, runtime, wanted } from '../../../dist/testing.js';
 
 const BYTES = readFileSync(new URL('../../../dist/opengeometry_bg.wasm', import.meta.url));
 await OpenGeometry.create({ wasmModule: new WebAssembly.Module(BYTES) });
@@ -17,39 +18,13 @@ noteDisplayed(BODY);
 assert.equal((await OpenGeometry.settled()).failed.length, 0);
 BODY.dispose();
 assert.equal((await OpenGeometry.settled()).failed.length, 0);
-const SIZED = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'size-cache' });
-const GET_BOUNDS = SIZED.getBounds.bind(SIZED);
-let boundsReads = 0;
-SIZED.getBounds = () => { boundsReads++; return GET_BOUNDS(); };
-for (let index = 0; index < 100; index++) wanted(SIZED);
-assert.equal(boundsReads, 1);
-const CAMERA = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
-CAMERA.position.set(3, 3, 3);
-CAMERA.lookAt(0, 0, 0);
-CAMERA.updateMatrixWorld();
-const RENDERER = { getDrawingBufferSize: (target) => target.set(800, 600) };
-for (let index = 0; index < 100; index++) {
-  Reflect.apply(SIZED.surface.onBeforeRender, SIZED.surface, [RENDERER, null, CAMERA]);
-}
-assert.equal(boundsReads, 2);
-const MATERIAL = SIZED.surface.material;
-SIZED.setAppearance({ deflection: 0.01 });
-assert.equal(SIZED.surface.material, MATERIAL);
-SIZED.setAppearance({ color: 0x22c55e });
-assert.notEqual(SIZED.surface.material, MATERIAL);
-for (let index = 0; index < 100; index++) {
-  Reflect.apply(SIZED.surface.onBeforeRender, SIZED.surface, [RENDERER, null, CAMERA]);
-}
-assert.equal(boundsReads, 2);
-SIZED.transform(OG_TRANSFORM_TRANSLATE, { offset: [1, 0, 0] });
-OpenGeometry.flush();
-wanted(SIZED);
-assert.equal(boundsReads, 2);
-SIZED.transform(OG_TRANSFORM_ROTATE, { axis: [0, 1, 0], degrees: 30, pivot: [0, 0, 0] });
-OpenGeometry.flush();
-wanted(SIZED);
-assert.equal(boundsReads, 3);
-SIZED.dispose();
+const STYLED = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'styled-cube' });
+const MATERIAL = STYLED.surface.material;
+STYLED.setAppearance({ deflection: 0.01 });
+assert.equal(STYLED.surface.material, MATERIAL);
+STYLED.setAppearance({ color: 0x22c55e });
+assert.notEqual(STYLED.surface.material, MATERIAL);
+STYLED.dispose();
 const VISIBLE = new Solid(OG_PRIMITIVE_CUBOID, { width: 2, height: 1, depth: 1 }, { ogId: 'visible-cube' });
 noteDisplayed(VISIBLE);
 const PROVIDER = Object(runtime().provider);
@@ -99,3 +74,38 @@ new Wire(OG_PRIMITIVE_RECTANGLE, LEAK_PARAMS, { ogId: 'leak' });
 assert.equal((await OpenGeometry.settled()).failed.length, 0);
 OpenGeometry.reset();
 console.log('Node SDK passed');
+
+test('display buckets are read once per shape and revision', () => {
+  const sized = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'size-cache' });
+  const target = Object(graph());
+  const read = target.displayBuckets;
+  let reads = 0;
+  target.displayBuckets = (...args) => { reads++; return Reflect.apply(read, target, args); };
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
+  camera.position.set(3, 3, 3);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  const renderer = { getDrawingBufferSize: (size) => size.set(800, 600) };
+  try {
+    for (let index = 0; index < 100; index++) wanted(sized);
+    assert.equal(reads, 1);
+    for (let index = 0; index < 100; index++) {
+      Reflect.apply(sized.surface.onBeforeRender, sized.surface, [renderer, null, camera]);
+    }
+    assert.equal(reads, 1);
+    sized.transform(OG_TRANSFORM_TRANSLATE, { offset: [1, 0, 0] });
+    OpenGeometry.flush();
+    wanted(sized);
+    assert.equal(reads, 1);
+    sized.transform(OG_TRANSFORM_ROTATE, { axis: [0, 1, 0], degrees: 30, pivot: [0, 0, 0] });
+    OpenGeometry.flush();
+    wanted(sized);
+    assert.equal(reads, 1);
+    sized.rebuild(OG_PRIMITIVE_CUBOID, { width: 2, height: 1, depth: 1 });
+    wanted(sized);
+    assert.equal(reads, 2);
+  } finally {
+    delete target.displayBuckets;
+    sized.dispose();
+  }
+});

@@ -1,12 +1,15 @@
 import type { ChangeSet } from '../../dto/change-set.js';
 import type { DisplayBuffers } from '../../dto/display-buffers.js';
 import { OGError } from '../../errors.js';
+import { MAX_TRIANGLES } from '../../limits.js';
 import { call } from '../../kernel/kernel-session.js';
 import type { Body } from '../../bodies/body.js';
 import { emit } from '../../runtime/event-bus.js';
 import { bodyKey, currentRuntime, reindexShape, runtime, type Runtime } from '../../runtime/runtime-state.js';
 import { decodeChangeSet } from '../../world-graph/codec.js';
-import { wantedBucket } from '../lod/deflection.js';
+import {
+  clearError, displayedBodies, isDisplayed, markFailed, recordError, retryBucket, shapePriority, wantedKey,
+} from '../lod/lod-controller.js';
 import type { TessellationRequest } from '../provider.js';
 import { GeometryRecord } from '../records/geometry-record.js';
 import { validateDisplayBuffers } from '../records/validate-display-buffers.js';
@@ -33,7 +36,7 @@ export function flush(options: { geometry?: 'sync' } = {}): void {
     }
   }
   if (options.geometry === 'sync') {
-    for (const body of state.displayed) ensureGeometry(body, true);
+    for (const body of displayedBodies(state)) ensureGeometry(body, true);
     if (state.readyVersion !== state.flushedReadyVersion) flush();
   }
 }
@@ -63,59 +66,71 @@ function purgeChanged(state: Runtime, changes: ChangeSet): void {
   for (const { shapeId, revision } of shapes.values()) state.records.purge(shapeId, revision);
 }
 
-export function wanted(body: Body): number {
-  const state = runtime();
-  const info = body.lastInfo;
-  if (!info.shapeId) return 0.01;
-  const { diagonal, floor } = body.displaySize();
-  const target = body.appearance.deflection ?? state.displayDeflection
-    ?? state.cameraBuckets.get(info.shapeId) ?? Math.min(1, diagonal / 500);
-  const previous = state.buckets.get(info.shapeId);
-  const bucket = wantedBucket(Math.max(target, floor), floor, previous, state.moving);
-  state.buckets.set(info.shapeId, bucket);
-  return bucket;
+export function wanted(body: Body): number | undefined {
+  return wantedKey(runtime(), body);
 }
 
 export function ensureGeometry(body: Body, sync = false): void {
   const state = runtime();
-  const info = body.lastInfo;
-  if (!info.shapeId || info.shapeRevision === null || !body.visible) return;
-  const bucket = wanted(body);
-  const record = state.records.get(info.shapeId, info.shapeRevision, bucket);
+  const target = geometryTarget(state, body);
+  if (!target) return;
+  const record = state.records.get(target.shapeId, target.revision, target.bucket);
   if (record) {
     body.install(record);
     return;
   }
-  const key = `${info.shapeId}@${String(info.shapeRevision)}#${String(bucket)}`;
-  const target = { body, shapeId: info.shapeId, revision: info.shapeRevision, bucket, key };
   if (sync || state.provider.compute) {
     computeNow(state, target, sync);
     return;
   }
-  if (state.pending.has(key)) return;
+  if (state.pending.has(target.key)) return;
   requestLater(state, target);
 }
 
+function geometryTarget(state: Runtime, body: Body): GeometryTarget | undefined {
+  const { shapeId, shapeRevision: revision } = body.lastInfo;
+  if (!shapeId || revision === null || !body.visible) return undefined;
+  const bucket = wantedKey(state, body);
+  if (bucket === undefined) return undefined;
+  return { body, shapeId, revision, bucket, key: pendingKey(shapeId, revision, bucket) };
+}
+
+function pendingKey(shapeId: string, revision: number, bucket: number): string {
+  return `${shapeId}@${String(revision)}#${String(bucket)}`;
+}
+
 function computeNow(state: Runtime, target: GeometryTarget, sync: boolean): void {
-  const { body, shapeId, revision, bucket, key } = target;
+  const first = computeFailure(state, target, sync);
+  if (!first) return;
+  const retry = coarserRetry(state, target, first.error);
+  const failure = retry ? computeFailure(state, retry, false) : first;
+  if (failure) reportFailure(state, target, failure.error);
+}
+
+function computeFailure(state: Runtime, target: GeometryTarget, sync: boolean): { error: unknown } | undefined {
   try {
-    const request = requestFor(body, bucket);
-    if (sync) state.provider.cancelShape(shapeId, request.generation);
-    receive(shapeId, revision, bucket, computed(state, request));
+    const request = requestFor(state, target);
+    if (sync) state.provider.cancelShape(target.shapeId, request.generation);
+    receive(state, target, computed(state, request));
+    return undefined;
   } catch (error) {
     if (fatal(state, error)) throw error;
-    if (error instanceof OGError && error.code === 'LimitExceeded' && !state.failedBuckets.has(key)) {
-      state.failedBuckets.add(key);
-      state.buckets.set(shapeId, bucket * 2);
-      emit('warning', { code: 'LimitExceeded', shapeId, revision, bucket, retryBucket: bucket * 2 });
-      try {
-        receive(shapeId, revision, bucket * 2, computed(state, requestFor(body, bucket * 2)));
-      } catch (retry) {
-        if (fatal(state, retry)) throw retry;
-        emit('error', retry);
-      }
-    } else emit('error', error);
+    return { error };
   }
+}
+
+function coarserRetry(state: Runtime, target: GeometryTarget, error: unknown): GeometryTarget | undefined {
+  const { shapeId, revision, bucket } = target;
+  if (!(error instanceof OGError && error.code === 'LimitExceeded') || !markFailed(state, shapeId, revision, bucket)) {
+    return undefined;
+  }
+  emit('warning', { code: 'LimitExceeded', shapeId, revision, bucket, retryBucket: bucket * 2 });
+  return { ...target, bucket: bucket * 2, key: pendingKey(shapeId, revision, bucket * 2) };
+}
+
+function reportFailure(state: Runtime, target: GeometryTarget, error: unknown): void {
+  recordError(state, target.shapeId, target.revision, error);
+  emit('error', error);
 }
 
 function computed(state: Runtime, request: TessellationRequest): DisplayBuffers {
@@ -129,50 +144,54 @@ function fatal(state: Runtime, error: unknown): boolean {
 }
 
 function requestLater(state: Runtime, target: GeometryTarget): void {
-  const { body, shapeId, revision, bucket, key } = target;
-  const request = requestFor(body, bucket);
+  let request = requestFor(state, target);
   const promise = state.provider.request(request).catch(async (error: unknown) => {
-    if (currentRuntime() === state && error instanceof OGError && error.code === 'LimitExceeded'
-      && !state.failedBuckets.has(key)) {
-      state.failedBuckets.add(key);
-      state.buckets.set(shapeId, bucket * 2);
-      emit('warning', { code: 'LimitExceeded', shapeId, revision, bucket, retryBucket: bucket * 2 });
-      return state.provider.request(requestFor(body, bucket * 2));
-    }
-    throw error;
+    const retry = currentRuntime() === state ? coarserRetry(state, target, error) : undefined;
+    if (!retry) throw error;
+    request = requestFor(state, retry);
+    return state.provider.request(request);
   }).then((buffers) => {
-    const current = state.generations.get(shapeId) ?? 0;
-    if (currentRuntime() === state && (request.generation === current || buffers.bucket === bucket * 2)) {
-      receive(shapeId, revision, buffers.bucket, buffers);
+    if (currentRuntime() === state && accepted(state, target, buffers, request.generation)) {
+      receive(state, target, buffers);
     }
   }).catch((error: unknown) => {
     if (currentRuntime() !== state || fatal(state, error)) return;
-    if (!(error instanceof OGError && error.code === 'Cancelled')) emit('error', error);
-  }).finally(() => { state.pending.delete(key); });
-  state.pending.set(key, promise);
+    if (!(error instanceof OGError && error.code === 'Cancelled')) reportFailure(state, target, error);
+  }).finally(() => { state.pending.delete(target.key); });
+  state.pending.set(target.key, promise);
 }
 
-function requestFor(body: Body, bucket: number): TessellationRequest {
-  const state = runtime();
-  const info = body.lastInfo;
-  const shapeId = info.shapeId!;
+function accepted(state: Runtime, target: GeometryTarget, buffers: DisplayBuffers, generation: number): boolean {
+  const { body, shapeId, revision } = target;
+  if (generation === (state.generations.get(shapeId) ?? 0)) return true;
+  if (buffers.bucket === retryBucket(state, shapeId, revision)) return true;
+  const wanted = wantedKey(state, body);
+  if (wanted === undefined) return false;
+  const shown = body.record?.shapeId === shapeId && body.record.revision === revision ? body.record.bucket : undefined;
+  return shown === undefined || Math.abs(Math.log2(buffers.bucket / wanted)) < Math.abs(Math.log2(shown / wanted));
+}
+
+function requestFor(state: Runtime, target: GeometryTarget): TessellationRequest {
+  const { shapeId, revision, bucket } = target;
   const generation = (state.generations.get(shapeId) ?? 0) + 1;
   state.generations.set(shapeId, generation);
-  return { shapeId, revision: info.shapeRevision!, bucket, priority: 0, maxTriangles: 2_000_000, generation };
+  const priority = shapePriority(state, shapeId);
+  return { shapeId, revision, bucket, priority, maxTriangles: MAX_TRIANGLES, generation };
 }
 
-function receive(shapeId: string, revision: number, bucket: number, buffers: DisplayBuffers): void {
-  const state = runtime();
+function receive(state: Runtime, target: GeometryTarget, buffers: DisplayBuffers): void {
+  const { shapeId, revision } = target;
   const holders = [...(state.byShape.get(shapeId) ?? [])];
   const current = holders.filter((body) => body.lastInfo.shapeRevision === revision);
   if (current.length === 0) return;
   const record = state.records.put(new GeometryRecord(shapeId, buffers));
   state.readyVersion++;
+  clearError(state, shapeId, revision);
   if (state.renderPassActive) {
-    for (const body of current) body.install(record);
+    for (const body of current) if (isDisplayed(state, body)) body.install(record);
   }
   const ogIds = holders.map((body) => body.ogId);
-  emit('geometry', { shapeId, revision, bucket, ogIds, stats: { triangles: record.triangles } });
+  emit('geometry', { shapeId, revision, bucket: buffers.bucket, ogIds, stats: { triangles: record.triangles } });
   if (!state.renderPassActive) flush();
   state.records.purge(shapeId, revision);
 }

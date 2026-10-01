@@ -3,6 +3,7 @@ import type { Events, Listener } from '../dto/events.js';
 import { OGError } from '../errors.js';
 import type { OGWorldGraph } from '../kernel/kernel-loader.js';
 import type { OGMark } from '../marks/og-mark.js';
+import type { LodState } from '../rendering/lod/lod-controller.js';
 import type { LineEntry, SurfaceEntry } from '../rendering/materials/material-pool.js';
 import type { TessellationProvider } from '../rendering/provider.js';
 import type { RecordPool } from '../rendering/records/record-pool.js';
@@ -23,16 +24,15 @@ export type Runtime = {
   readyVersion: number;
   flushedReadyVersion: number;
   renderPassActive: boolean;
-  displayed: Set<Body>;
+  pass: number;
+  displayed: Map<Body, number>;
   pending: Map<string, Promise<void>>;
   generations: Map<string, number>;
-  buckets: Map<string, number>;
-  cameraBuckets: Map<string, number>;
-  failedBuckets: Set<string>;
+  shapeBuckets: Map<string, { revision: number; floor: number; static: number; error?: unknown }>;
+  lod: LodState;
   module: WebAssembly.Module;
   createOptions: CreateOptions;
   displayDeflection?: number;
-  moving: boolean;
   poisoned: boolean;
   flushes: number;
   marks: Map<number, OGMark>;
@@ -81,7 +81,10 @@ export function reindexShape(state: Runtime, body: Body, previousShapeId: string
   if (previousShapeId) {
     const previous = state.byShape.get(previousShapeId);
     previous?.delete(body);
-    if (previous?.size === 0) state.byShape.delete(previousShapeId);
+    if (previous?.size === 0) {
+      state.byShape.delete(previousShapeId);
+      forgetShape(state, previousShapeId);
+    }
   }
   if (shapeId) state.byShape.set(shapeId, (state.byShape.get(shapeId) ?? new Set<Body>()).add(body));
 }
@@ -89,6 +92,12 @@ export function reindexShape(state: Runtime, body: Body, previousShapeId: string
 export function releaseShapeIfEmpty(state: Runtime, shapeId: string, revision: number): void {
   if (state.byShape.get(shapeId)?.size) return;
   state.byShape.delete(shapeId);
+  forgetShape(state, shapeId);
   state.records.purge(shapeId);
   state.provider.drop(shapeId, revision);
+}
+
+function forgetShape(state: Runtime, shapeId: string): void {
+  state.lod.shapes.delete(shapeId);
+  state.shapeBuckets.delete(shapeId);
 }

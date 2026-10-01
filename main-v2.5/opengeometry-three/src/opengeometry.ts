@@ -11,6 +11,7 @@ import { transaction } from './marks/transaction.js';
 import { resolveHit } from './picking/resolve-hit.js';
 import { flush } from './rendering/geometry/geometry-scheduler.js';
 import { settled } from './rendering/geometry/settle.js';
+import { motionHint, overrideChanged } from './rendering/lod/lod-controller.js';
 import { createRuntimeOnce } from './runtime/create-runtime.js';
 import { on } from './runtime/event-bus.js';
 import { reset } from './runtime/reset.js';
@@ -37,11 +38,13 @@ export class OpenGeometry {
       throw new OGError('InvalidParameter', 'setDisplayDeflection', 'deflection must be positive');
     }
     Object.assign(runtime(), { displayDeflection: world });
-    runtime().buckets.clear();
-    runtime().failedBuckets.clear();
+    overrideChanged(runtime());
   }
 
-  static setCameraMotion(moving: boolean): void { runtime().moving = moving; }
+  static setCameraMotion(moving: boolean): void {
+    const state = runtime();
+    if (moving) motionHint(state, Date.now());
+  }
 
   static resolveHit(
     hit: THREE.Intersection,

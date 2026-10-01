@@ -6,16 +6,11 @@ type RetryResult = {
   bucket?: number;
   errors: unknown[];
 };
-type HysteresisResult = {
-  p: number;
-  lowEdge: number;
-  belowLow: number;
-  highEdge: number;
-  aboveHigh: number;
-  movingHigh: number;
-  movingLow: number;
+type OrbitResult = { jobs: number; buckets: number[]; sendBuckets: number[] };
+type HysteresisFixture = {
+  lodHysteresisProbe(): Promise<{ p: number; buckets: number[] }>;
+  orbitProbe(): Promise<OrbitResult>;
 };
-type HysteresisFixture = { lodHysteresisProbe(): HysteresisResult; orbitProbe(): Promise<{ jobs: number }> };
 
 for (const backend of ['inline', 'worker'] as const) {
   test(`LimitExceeded retries one coarser bucket and reports a warning with ${backend}`, async ({ page }) => {
@@ -61,13 +56,17 @@ test('LOD hysteresis keeps stable buckets and an orbit queues at most one job', 
   try {
     await page.evaluate(async () => {
       const fixture = (window as FixtureWindow<HysteresisFixture>).__ogTest;
-      const values = fixture.lodHysteresisProbe();
-      if (values.lowEdge !== values.p || values.belowLow >= values.p || values.highEdge !== values.p
-        || values.aboveHigh <= values.p || values.movingHigh !== values.p || values.movingLow >= values.p) {
+      const values = await fixture.lodHysteresisProbe();
+      const [kept, raised, held, lowered] = values.buckets;
+      if (kept !== values.p || raised !== 4 * values.p || held !== raised
+        || lowered === undefined || lowered >= raised) {
         throw new Error(`LOD hysteresis edges differ: ${JSON.stringify(values)}`);
       }
       const orbit = await fixture.orbitProbe();
-      if (orbit.jobs > 1) throw new Error(`Orbit queued ${String(orbit.jobs)} jobs`);
+      const start = orbit.buckets[0] ?? 0;
+      const coarsened = orbit.buckets.some((bucket, index) => bucket > (orbit.buckets[index - 1] ?? bucket))
+        || orbit.sendBuckets.some((bucket) => bucket > start);
+      if (orbit.jobs > 1 || coarsened) throw new Error(`Orbit coarsened or queued jobs: ${JSON.stringify(orbit)}`);
     });
   } finally {
     await disposeFixture(page);

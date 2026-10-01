@@ -1,4 +1,5 @@
 import { OGError } from '../errors.js';
+import { forceNextBucket } from '../rendering/lod/lod-controller.js';
 import { WorkerBackend, type WorkerSend } from '../rendering/worker-backend.js';
 import { runtime } from '../runtime/runtime-state.js';
 
@@ -14,6 +15,8 @@ export { worldGraph as graph } from '../world-graph/world-graph-client.js';
 export function activeBackend(): 'worker' | 'inline' { return runtime().provider.activeBackend; }
 
 export function flushCount(): number { return runtime().flushes; }
+
+export function pinWantedBucket(shapeId: string, bucket: number): void { forceNextBucket(runtime(), shapeId, bucket); }
 
 export function workerSendLog(): WorkerSend[] {
   const provider = runtime().provider;

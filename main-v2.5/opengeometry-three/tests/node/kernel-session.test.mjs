@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { OpenGeometry, OGError, Solid, OG_PRIMITIVE_CUBOID, OG_PRIMITIVE_POLYLINE } from '../../../dist/index.js';
-import { ensureGeometry, runtime, wanted } from '../../../dist/testing.js';
+import * as TESTING from '../../../dist/testing.js';
+import { ensureGeometry, graph, runtime, wanted } from '../../../dist/testing.js';
 
 const MODULE = new WebAssembly.Module(readFileSync(new URL('../../../dist/opengeometry_bg.wasm', import.meta.url)));
 await OpenGeometry.create({ wasmModule: MODULE });
@@ -26,7 +27,10 @@ test('a real LimitExceeded from the inline backend gives a warning and a coarser
   const warnings = listen('warning');
   const errors = listen('error');
   try {
-    body.setAppearance({ deflection: 1.5 * body.displaySize().floor });
+    const { floor } = JSON.parse(graph().displayBuckets(body.ogId));
+    const shapeId = body.lastInfo.shapeId;
+    assert(shapeId);
+    Reflect.get(TESTING, 'pinWantedBucket')(shapeId, floor / 2);
     ensureGeometry(body, true);
     assert.deepEqual(errors.events, []);
     assert.equal(warnings.events.length, 1);
@@ -103,7 +107,7 @@ test('a stubbed RuntimeError poisons the runtime emits fatal and names the metho
   const body = cube('panic-cube');
   const graph = Object(runtime().graph);
   const fatal = listen('fatal');
-  runtime().displayed.add(body);
+  runtime().displayed.set(body, runtime().pass);
   graph.buffers = () => { throw new WebAssembly.RuntimeError('unreachable'); };
   Reflect.set(globalThis, '__opengeometryPanic', 'index out of bounds');
   try {
