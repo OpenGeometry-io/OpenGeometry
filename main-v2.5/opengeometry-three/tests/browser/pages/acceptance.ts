@@ -10,10 +10,10 @@ import {
   bootKernel, createRenderer, publishFixture, releasePage, required, statusElement,
 } from '../support/test-page.js';
 import {
-  buildStorey, coarserRetryProbe, lodHysteresisProbe, lodProbe, memoryProbe, onDemandProbe, orbitProbe,
-  placementPixelProbe, reuseProbe, snapshotResendProbe, staleWorkerProbe, storeyPerformanceProbe, transactionProbe,
-  workerCrashProbe, workerFailureProbe,
+  buildStorey, memoryProbe, onDemandProbe, placementPixelProbe, reuseProbe, snapshotResendProbe, staleWorkerProbe,
+  storeyPerformanceProbe, transactionProbe, workerCrashProbe, workerFailureProbe,
 } from './acceptance-probes.js';
+import { coarserRetryProbe, lodHysteresisProbe, lodProbe, orbitProbe } from './acceptance/probes/lod.js';
 
 type Point = [number, number, number];
 
@@ -167,7 +167,7 @@ publishFixture({
   onDemandProbe: () => onDemandProbe(PAGE),
   staleWorkerProbe: () => staleWorkerProbe(PAGE),
   snapshotResendProbe: () => snapshotResendProbe(PAGE),
-  lodHysteresisProbe,
+  lodHysteresisProbe: () => lodHysteresisProbe(PAGE),
   orbitProbe: () => orbitProbe(PAGE),
   coarserRetryProbe,
   transactionProbe,

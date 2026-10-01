@@ -3,9 +3,7 @@ import {
   OpenGeometry, SystemAssembly, Wire, Solid, OGError,
   OG_PRIMITIVE_RECTANGLE, OG_PRIMITIVE_CUBOID, OG_OPERATION_EXTRUDE, OG_OPERATION_SUBTRACT, OG_TRANSFORM_TRANSLATE,
 } from '../../../../dist/index.js';
-import {
-  activeBackend, ensureGeometry, flushCount, graph, postToWorker, runtime, wantedBucket, workerSendLog,
-} from '../../../../dist/testing.js';
+import { activeBackend, flushCount, graph, postToWorker, runtime, workerSendLog } from '../../../../dist/testing.js';
 import { recordedErrors, required } from '../support/test-page.js';
 
 export type AcceptancePage = {
@@ -121,26 +119,11 @@ export async function memoryProbe(page: AcceptancePage): Promise<Record<string, 
   return { baseline, one, shared, unique, after, sharedDetails };
 }
 
-export async function lodProbe(page: AcceptancePage): Promise<{ before: number; after: number }> {
-  const { renderer, scene, camera, wall } = page;
-  renderer.render(scene, camera);
-  await OpenGeometry.settled();
-  const before = required(wall.record, 'a wall record').bucket;
-  const centre = new THREE.Vector3(2, 3, 1);
-  camera.position.sub(centre).multiplyScalar(0.25).add(centre);
-  camera.lookAt(centre);
-  camera.updateMatrixWorld();
-  await new Promise<void>((resolve) => setTimeout(resolve, 120));
-  renderer.render(scene, camera);
-  await OpenGeometry.settled();
-  return { before, after: required(wall.record, 'a wall record').bucket };
-}
-
 function errorCodes(): string[] {
   return recordedErrors().map((event) => (event instanceof OGError ? event.code : String(event)));
 }
 
-function tessellateSends(shapeId: string): number {
+export function tessellateSends(shapeId: string): number {
   return workerSendLog().filter((send) => send.shapeId === shapeId).length;
 }
 
@@ -263,54 +246,6 @@ export async function snapshotResendProbe(page: AcceptancePage): Promise<{ trian
     maxTriangles: 2_000_000, priority: 0, generation: 1,
   });
   return { triangles: buffers.triangles };
-}
-
-export function lodHysteresisProbe(): Record<string, number> {
-  const p = 0.015625;
-  return {
-    lowEdge: wantedBucket(0.75 * p, 1e-7, p),
-    belowLow: wantedBucket(0.75 * p - 1e-9, 1e-7, p),
-    highEdge: wantedBucket(4 * p, 1e-7, p),
-    aboveHigh: wantedBucket(4 * p + 1e-6, 1e-7, p),
-    movingHigh: wantedBucket(8 * p, 1e-7, p, true),
-    movingLow: wantedBucket(0.75 * p - 1e-9, 1e-7, p, true),
-    p,
-  };
-}
-
-export async function orbitProbe(page: AcceptancePage): Promise<{ jobs: number }> {
-  const { renderer, scene, camera } = page;
-  const info = JSON.parse(graph().node(page.wall.ogId)) as { shapeId: string };
-  const before = tessellateSends(info.shapeId);
-  OpenGeometry.setCameraMotion(true);
-  for (let i = 0; i < 10; i++) {
-    camera.position.x += 0.02;
-    camera.lookAt(2, 3, 1);
-    camera.updateMatrixWorld();
-    renderer.render(scene, camera);
-  }
-  await OpenGeometry.settled();
-  OpenGeometry.setCameraMotion(false);
-  const after = tessellateSends(info.shapeId);
-  return { jobs: after - before };
-}
-
-export async function coarserRetryProbe(): Promise<Record<string, unknown>> {
-  const body = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'retry-cube' });
-  let warning: { code: string; bucket: number; retryBucket: number } | undefined;
-  const errors: unknown[] = [];
-  const stopWarnings = OpenGeometry.on('warning', (event) => { warning = event as typeof warning; });
-  const stopErrors = OpenGeometry.on('error', (event) => { errors.push(event); });
-  try {
-    body.setAppearance({ deflection: 1.5 * body.displaySize().floor });
-    ensureGeometry(body);
-    await OpenGeometry.settled();
-    return { warning, bucket: body.record?.bucket, errors };
-  } finally {
-    stopWarnings();
-    stopErrors();
-    body.dispose();
-  }
 }
 
 export function transactionProbe(): Record<string, unknown> {
