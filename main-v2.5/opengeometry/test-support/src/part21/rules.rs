@@ -252,13 +252,7 @@ impl Document {
                 .entity(curve)?
                 .starts_with("B_SPLINE_CURVE_WITH_KNOTS(");
             for pcurve in references(&args[2]) {
-                let pcurve_args = fields(self.entity(pcurve)?)?;
-                let surface = reference(&pcurve_args[1])?;
-                let definition = reference(&pcurve_args[2])?;
-                let representation = fields(self.entity(definition)?)?;
-                let uv_curve = *references(&representation[1])
-                    .first()
-                    .ok_or("empty pcurve representation")?;
+                let (surface, uv_curve) = self.pcurve_support(pcurve)?;
                 for sample in 0..=16 {
                     let parameter = sample as f64 / 16.0;
                     let uv = self.pcurve_point(uv_curve, parameter)?;

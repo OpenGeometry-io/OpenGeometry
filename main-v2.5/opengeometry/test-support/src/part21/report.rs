@@ -1,10 +1,15 @@
+use super::curves::{dot, sub};
 use super::document::Document;
 use super::lexer::{fields, reference, references};
+use std::f64::consts::TAU;
 
 pub struct ParameterDirectionReport {
     pub assessed: usize,
     pub aligned: usize,
     pub reversed: usize,
+    pub conic_assessed: usize,
+    pub conic_aligned: usize,
+    pub conic_reversed: usize,
 }
 
 impl Document {
@@ -69,6 +74,9 @@ impl Document {
             assessed: 0,
             aligned: 0,
             reversed: 0,
+            conic_assessed: 0,
+            conic_aligned: 0,
+            conic_reversed: 0,
         };
         for expression in self.entities.values() {
             if !expression.starts_with("SURFACE_CURVE(") && !expression.starts_with("SEAM_CURVE(") {
@@ -77,44 +85,82 @@ impl Document {
             let args = fields(expression)?;
             let curve = reference(&args[1])?;
             let curve_expression = self.entity(curve)?;
-            if !curve_expression.starts_with("LINE(")
-                && !curve_expression.starts_with("B_SPLINE_CURVE_WITH_KNOTS(")
-            {
+            let sampled = curve_expression.starts_with("LINE(")
+                || curve_expression.starts_with("B_SPLINE_CURVE_WITH_KNOTS(");
+            let conic =
+                curve_expression.starts_with("CIRCLE(") || curve_expression.starts_with("ELLIPSE(");
+            if !sampled && !conic {
                 continue;
             }
             for pcurve in references(&args[2]) {
-                let pcurve_args = fields(self.entity(pcurve)?)?;
-                let surface = reference(&pcurve_args[1])?;
-                let definition = reference(&pcurve_args[2])?;
-                let representation = fields(self.entity(definition)?)?;
-                let uv_curve = *references(&representation[1])
-                    .first()
-                    .ok_or("empty pcurve representation")?;
-                let sample_distance = |reverse: bool| -> Result<f64, String> {
-                    let mut total = 0.0;
-                    for parameter in [0.25, 0.75] {
-                        let uv = self.pcurve_point(
-                            uv_curve,
-                            if reverse { 1.0 - parameter } else { parameter },
-                        )?;
-                        let point = self.surface_point(surface, uv)?;
-                        let support = self.curve_point(curve, parameter)?;
-                        total += point
-                            .iter()
-                            .zip(support)
-                            .map(|(a, b)| (a - b).powi(2))
-                            .sum::<f64>();
-                    }
-                    Ok(total)
-                };
-                report.assessed += 1;
-                if sample_distance(false)? <= sample_distance(true)? {
-                    report.aligned += 1;
+                let (surface, uv_curve) = self.pcurve_support(pcurve)?;
+                if sampled {
+                    self.add_sampled_direction(&mut report, curve, surface, uv_curve)?;
                 } else {
-                    report.reversed += 1;
+                    let turn = self.conic_turn(curve, surface, uv_curve)?;
+                    add_conic_direction(&mut report, pcurve, turn)?;
                 }
             }
         }
         Ok(report)
     }
+
+    fn add_sampled_direction(
+        &self,
+        report: &mut ParameterDirectionReport,
+        curve: usize,
+        surface: usize,
+        uv_curve: usize,
+    ) -> Result<(), String> {
+        let sample_distance = |reverse: bool| -> Result<f64, String> {
+            let mut total = 0.0;
+            for parameter in [0.25, 0.75] {
+                let uv =
+                    self.pcurve_point(uv_curve, if reverse { 1.0 - parameter } else { parameter })?;
+                let point = self.surface_point(surface, uv)?;
+                let support = self.curve_point(curve, parameter)?;
+                total += point
+                    .iter()
+                    .zip(support)
+                    .map(|(a, b)| (a - b).powi(2))
+                    .sum::<f64>();
+            }
+            Ok(total)
+        };
+        report.assessed += 1;
+        if sample_distance(false)? <= sample_distance(true)? {
+            report.aligned += 1;
+        } else {
+            report.reversed += 1;
+        }
+        Ok(())
+    }
+
+    fn conic_turn(&self, curve: usize, surface: usize, uv_curve: usize) -> Result<f64, String> {
+        let conic = self.conic(curve)?;
+        let mut angles = [0.0; 2];
+        for (angle, parameter) in angles.iter_mut().zip([0.25, 0.25 + 1.0 / 64.0]) {
+            let point = self.surface_point(surface, self.pcurve_point(uv_curve, parameter)?)?;
+            let delta = sub(point, conic.origin);
+            *angle = (dot(delta, conic.y) / conic.b).atan2(dot(delta, conic.x) / conic.a);
+        }
+        let turn = angles[1] - angles[0];
+        Ok(turn - TAU * (turn / TAU).round())
+    }
+}
+
+fn add_conic_direction(
+    report: &mut ParameterDirectionReport,
+    pcurve: usize,
+    turn: f64,
+) -> Result<(), String> {
+    report.conic_assessed += 1;
+    if turn > 0.0 {
+        report.conic_aligned += 1;
+    } else if turn < 0.0 {
+        report.conic_reversed += 1;
+    } else {
+        return Err(format!("conic pcurve #{pcurve} has no direction"));
+    }
+    Ok(())
 }

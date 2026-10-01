@@ -175,6 +175,17 @@ impl Document {
         Err(format!("#{id} is not a supported pcurve"))
     }
 
+    pub(super) fn pcurve_support(&self, pcurve: usize) -> Result<(usize, usize), String> {
+        let pcurve_args = fields(self.entity(pcurve)?)?;
+        let surface = reference(&pcurve_args[1])?;
+        let definition = reference(&pcurve_args[2])?;
+        let representation = fields(self.entity(definition)?)?;
+        let uv_curve = *references(&representation[1])
+            .first()
+            .ok_or("empty pcurve representation")?;
+        Ok((surface, uv_curve))
+    }
+
     pub(super) fn surface_point(&self, id: usize, uv: [f64; 2]) -> Result<[f64; 3], String> {
         let expression = self.entity(id)?;
         let args = fields(expression)?;
