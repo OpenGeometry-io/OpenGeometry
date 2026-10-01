@@ -1,12 +1,10 @@
 import * as THREE from 'three';
 import {
-  OpenGeometry, SystemAssembly, Wire, Solid, OGError,
-  OG_PRIMITIVE_RECTANGLE, OG_PRIMITIVE_CUBOID, OG_OPERATION_EXTRUDE, OG_OPERATION_SUBTRACT, OG_TRANSFORM_TRANSLATE,
+  OpenGeometry, Solid, OGError, OG_PRIMITIVE_CUBOID, OG_OPERATION_SUBTRACT, OG_TRANSFORM_TRANSLATE,
 } from '../../../../dist/index.js';
-import { activeBackend, flushCount, graph, postToWorker, runtime, workerSendLog } from '../../../../dist/testing.js';
+import { activeBackend, graph, postToWorker, runtime, workerSendLog } from '../../../../dist/testing.js';
 import type {
-  CrashResult, FailureResult, InstanceMemory, MemoryResult, PixelResult, ReuseResult, StaleResult, StoreyPerformance,
-  StoreyResult, TransactionResult,
+  CrashResult, FailureResult, InstanceMemory, MemoryResult, PixelResult, ReuseResult, StaleResult, TransactionResult,
 } from '../support/fixture-types';
 import { recordedErrors, required } from '../support/test-page';
 
@@ -17,69 +15,6 @@ export type AcceptancePage = {
   wall: Solid;
   rail: Solid;
 };
-
-let storeyData: { root: SystemAssembly; bodies: Solid[] } | undefined;
-
-export async function buildStorey(page: AcceptancePage): Promise<StoreyResult> {
-  const storey = new SystemAssembly({ ogId: 'storey' });
-  const storeyProfile = new Wire(OG_PRIMITIVE_RECTANGLE, { width: 6, breadth: 0.2 }, { ogId: 'storey-profile' });
-  const prototype = new Solid(OG_OPERATION_EXTRUDE, { profile: storeyProfile, distance: 3 }, { ogId: 'storey-wall-0' });
-  const tools: Solid[] = [];
-  for (let i = 0; i < 4; i++) {
-    const opening = { width: 0.6, height: 2.0, depth: 0.4 };
-    const tool = new Solid(OG_PRIMITIVE_CUBOID, opening, { ogId: `storey-opening-${String(i)}` });
-    tool.transform(OG_TRANSFORM_TRANSLATE, { offset: [-2.1 + i * 1.4, 0, 0] });
-    tools.push(tool);
-  }
-  prototype.operate(OG_OPERATION_SUBTRACT, { tools });
-  storey.addChild([storeyProfile, prototype]);
-  const walls: Solid[] = [prototype];
-  const instances: Solid[] = [];
-  for (let i = 1; i < 200; i++) {
-    const copy = prototype.instance({ ogId: `storey-wall-${String(i)}` });
-    copy.transform(OG_TRANSFORM_TRANSLATE, { offset: [(i % 20) * 8, 0, Math.floor(i / 20) * 8] });
-    walls.push(copy);
-    if (i % 50 === 0) await new Promise<void>((resolve) => requestAnimationFrame(() => { resolve(); }));
-  }
-  for (let i = 0; i < 1000; i++) {
-    const copy = page.rail.instance({ ogId: `storey-rail-${String(i)}` });
-    copy.transform(OG_TRANSFORM_TRANSLATE, { offset: [(i % 40) * 8, 0, Math.floor(i / 40) * 8] });
-    instances.push(copy);
-    if (i % 50 === 0) await new Promise<void>((resolve) => requestAnimationFrame(() => { resolve(); }));
-  }
-  storey.addChild([...walls.slice(1), ...instances]);
-  storeyData = { root: storey, bodies: [...walls, ...instances] };
-  page.scene.add(...walls, ...instances);
-  const beforeRenderFlush = flushCount();
-  const beforeRender = performance.now();
-  page.renderer.render(page.scene, page.camera);
-  const renderMs = performance.now() - beforeRender;
-  const renderFlushes = flushCount() - beforeRenderFlush;
-  await OpenGeometry.settled();
-  page.renderer.render(page.scene, page.camera);
-  return {
-    walls: walls.length, openingsPerWall: 4, instances: instances.length, flushCount: flushCount(),
-    renderFlushes, geometryCount: page.renderer.info.memory.geometries, renderMs,
-  };
-}
-
-export async function storeyPerformanceProbe(): Promise<StoreyPerformance> {
-  if (!storeyData) throw new Error('buildStorey must run first');
-  const startTransform = performance.now();
-  storeyData.root.transform(OG_TRANSFORM_TRANSLATE, { offset: [1, 0, 0] });
-  const transformMs = performance.now() - startTransform;
-  const startFlush = performance.now();
-  OpenGeometry.flush();
-  const flushMs = performance.now() - startFlush;
-  const transformFlushMs = transformMs + flushMs;
-  const startStep = performance.now();
-  const exported = await OpenGeometry.exportStep({ nodes: storeyData.bodies });
-  const stepMs = performance.now() - startStep;
-  return {
-    transformFlushMs, transformMs, flushMs, stepMs, bytes: exported.text.length,
-    products: exported.report.products, entities: exported.report.entities,
-  };
-}
 
 export async function memoryProbe(page: AcceptancePage): Promise<MemoryResult> {
   const { renderer, scene, camera } = page;
