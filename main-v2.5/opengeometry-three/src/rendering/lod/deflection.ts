@@ -1,6 +1,8 @@
+import { OGError } from '../../errors.js';
+
 export function deflectionBucket(target: number): number {
   if (!Number.isFinite(target) || target <= 0) {
-    throw new RangeError('invalid display deflection');
+    throw new OGError('InvalidParameter', 'deflection', 'invalid display deflection');
   }
   return 2 ** Math.floor(Math.log2(target));
 }

@@ -110,6 +110,7 @@ export const RESTRICTED_SYNTAX = {
 };
 const SYNTAX_HOMES = [
   { file: `${SDK}/world-graph/codec.ts`, allows: ['json-parse'] },
+  { file: `${SDK}/kernel/kernel-errors.ts`, allows: ['json-parse'] },
   { file: `${SDK}/runtime/runtime-state.ts`, allows: ['module-state'] },
   { file: WORKER_ENTRY, allows: ['json-parse', 'module-state'] },
 ];
@@ -241,6 +242,11 @@ const NAMING = [
     format: null,
   },
 ];
+const KERNEL_KEY_FILES = [`${SDK}/dto/brep.ts`, `${SDK}/dto/boolean-report.ts`];
+const KERNEL_KEY_NAMING = [
+  ...NAMING,
+  { selector: 'typeProperty', filter: { regex: '_', match: true }, format: ['snake_case'] },
+];
 
 function sharedRules(returnTypeNames) {
   return {
@@ -297,6 +303,7 @@ export function lintConfig(exceptions, returnTypeNames) {
       },
     },
     { files: SDK_FILES, rules: { 'max-lines': ['error', { max: 300 }] } },
+    { files: KERNEL_KEY_FILES, rules: { '@typescript-eslint/naming-convention': KERNEL_KEY_NAMING } },
     ...importConfigs(),
     ...syntaxConfigs(exceptions),
     consumerConfig(),

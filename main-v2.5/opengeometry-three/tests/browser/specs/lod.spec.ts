@@ -1,7 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { disposeFixture, type FixtureWindow } from '../support/acceptance-page.js';
 
-type RetryResult = { calls: number; warning?: { code: string; bucket: number; retryBucket: number }; bucket?: number };
+type RetryResult = {
+  warning?: { code: string; bucket: number; retryBucket: number };
+  bucket?: number;
+  errors: unknown[];
+};
 type HysteresisResult = {
   p: number;
   lowEdge: number;
@@ -13,23 +17,25 @@ type HysteresisResult = {
 };
 type HysteresisFixture = { lodHysteresisProbe(): HysteresisResult; orbitProbe(): Promise<{ jobs: number }> };
 
-test('LimitExceeded retries one coarser bucket and reports a warning', async ({ page }) => {
-  test.setTimeout(45_000);
-  await page.goto('/acceptance.html?backend=inline');
-  await expect(page.locator('#status')).toHaveText('Acceptance ready', { timeout: 20_000 });
-  try {
-    await page.evaluate(() => {
-      const fixture = (window as FixtureWindow<{ coarserRetryProbe(): RetryResult }>).__ogTest;
-      const result = fixture.coarserRetryProbe();
-      if (result.calls !== 2 || result.warning?.code !== 'LimitExceeded'
-        || result.warning.retryBucket !== result.warning.bucket * 2 || result.bucket !== result.warning.retryBucket) {
-        throw new Error(`Coarser retry failed: ${JSON.stringify(result)}`);
-      }
-    });
-  } finally {
-    await disposeFixture(page);
-  }
-});
+for (const backend of ['inline', 'worker'] as const) {
+  test(`LimitExceeded retries one coarser bucket and reports a warning with ${backend}`, async ({ page }) => {
+    test.setTimeout(45_000);
+    await page.goto(`/acceptance.html?backend=${backend}`);
+    await expect(page.locator('#status')).toHaveText('Acceptance ready', { timeout: 20_000 });
+    try {
+      await page.evaluate(async () => {
+        const fixture = (window as FixtureWindow<{ coarserRetryProbe(): Promise<RetryResult> }>).__ogTest;
+        const result = await fixture.coarserRetryProbe();
+        if (result.errors.length !== 0 || result.warning?.code !== 'LimitExceeded'
+          || result.warning.retryBucket !== result.warning.bucket * 2 || result.bucket !== result.warning.retryBucket) {
+          throw new Error(`Coarser retry failed: ${JSON.stringify(result)}`);
+        }
+      });
+    } finally {
+      await disposeFixture(page);
+    }
+  });
+}
 
 test('zoom selects a finer LOD bucket', async ({ page }) => {
   test.setTimeout(45_000);

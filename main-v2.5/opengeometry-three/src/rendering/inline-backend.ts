@@ -1,5 +1,6 @@
 import type { DisplayBuffers } from '../dto/display-buffers.js';
 import type { OGWorldGraph } from '../kernel/kernel-loader.js';
+import { call } from '../kernel/kernel-session.js';
 import type { TessellationProvider, TessellationRequest } from './provider.js';
 
 export class InlineBackend implements TessellationProvider {
@@ -12,7 +13,8 @@ export class InlineBackend implements TessellationProvider {
   }
 
   compute(value: TessellationRequest): DisplayBuffers {
-    return this.graph.buffers(value.shapeId, value.bucket, value.maxTriangles) as DisplayBuffers;
+    const { shapeId, bucket, maxTriangles } = value;
+    return call('tessellation', (): unknown => this.graph.buffers(shapeId, bucket, maxTriangles)) as DisplayBuffers;
   }
 
   async request(value: TessellationRequest): Promise<DisplayBuffers> {

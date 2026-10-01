@@ -2,6 +2,8 @@ import type * as THREE from 'three';
 import type { Body } from './bodies/body.js';
 import type { SystemAssembly } from './bodies/system-assembly.js';
 import type { Events, Listener } from './dto/events.js';
+import type { MarkStats } from './dto/mark-stats.js';
+import type { StepExport } from './dto/step-export.js';
 import { OGError } from './errors.js';
 import { exportStep } from './export/export-step.js';
 import { createMark, markStats, type OGMark } from './marks/og-mark.js';
@@ -53,10 +55,10 @@ export class OpenGeometry {
     upAxis?: 'Y' | 'Z';
     name?: string;
     timestamp?: string;
-  }) { return exportStep(options); }
+  }): Promise<StepExport> { return exportStep(options); }
 
   static mark(): OGMark { return createMark(); }
-  static markStats() { return markStats(); }
+  static markStats(): MarkStats { return markStats(); }
   static transaction<T>(fn: () => T, options: { dryRun?: boolean } = {}): T { return transaction(fn, options); }
 
   static reset(): void { reset(); }

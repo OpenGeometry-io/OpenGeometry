@@ -280,25 +280,20 @@ export async function orbitProbe(page: AcceptancePage): Promise<{ jobs: number }
   return { jobs: after - before };
 }
 
-export function coarserRetryProbe(): Record<string, unknown> {
+export async function coarserRetryProbe(): Promise<Record<string, unknown>> {
   const body = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'retry-cube' });
-  const provider = runtime().provider;
-  const original = provider.compute?.bind(provider);
-  if (!original) throw new Error('Test page expected an inline compute');
-  let calls = 0;
   let warning: { code: string; bucket: number; retryBucket: number } | undefined;
-  const unsubscribe = OpenGeometry.on('warning', (event) => { warning = event as typeof warning; });
-  provider.compute = (request) => {
-    calls++;
-    if (calls === 1) throw new OGError('LimitExceeded', 'tessellation', 'injected budget');
-    return original(request);
-  };
+  const errors: unknown[] = [];
+  const stopWarnings = OpenGeometry.on('warning', (event) => { warning = event as typeof warning; });
+  const stopErrors = OpenGeometry.on('error', (event) => { errors.push(event); });
   try {
-    ensureGeometry(body, true);
-    return { calls, warning, bucket: body.record?.bucket };
+    body.setAppearance({ deflection: 1.5 * body.displaySize().floor });
+    ensureGeometry(body);
+    await OpenGeometry.settled();
+    return { warning, bucket: body.record?.bucket, errors };
   } finally {
-    provider.compute = original;
-    unsubscribe();
+    stopWarnings();
+    stopErrors();
     body.dispose();
   }
 }

@@ -1,28 +1,10 @@
 {
   "returnTypeNames": {
     "owner": "C2",
-    "reason": "These public members return JSON.parse results typed any, so any explicit return type other than any changes the API surface. C2 gives kernel payloads DTO types.",
-    "names": ["exportStep", "getBrep", "getReport", "markStats"]
+    "reason": "No public member needs an implicit return type now that kernel payloads have DTO types; the list stays so a later exemption is declared here.",
+    "names": []
   },
   "exceptions": [
-    {
-      "owner": "C2",
-      "files": [
-        "opengeometry-three/src/bodies/body.ts",
-        "opengeometry-three/src/bodies/solid.ts",
-        "opengeometry-three/src/bodies/node-methods.ts",
-        "opengeometry-three/src/marks/og-mark.ts"
-      ],
-      "rules": ["@typescript-eslint/no-unsafe-return"],
-      "syntax": ["json-parse"],
-      "reason": "Node getters, getReport and markStats return JSON.parse results. C2 decodes kernel payloads in world-graph/codec.ts into validated DTOs."
-    },
-    {
-      "owner": "C2",
-      "files": ["opengeometry-three/src/bodies/body.ts", "opengeometry-three/src/bodies/body-factory.ts"],
-      "rules": ["@typescript-eslint/no-unsafe-type-assertion"],
-      "reason": "Polyline create and rebuild assert params['points'] from Record<string, unknown>. C2 gives creation and operation params DTO types."
-    },
     {
       "owner": "C1",
       "files": ["opengeometry-three/src/bodies/body.ts"],
@@ -30,50 +12,10 @@
       "reason": "clone() returns a DisplayClone, which cannot be typed as this; a display copy is a plain Group, not a Body."
     },
     {
-      "owner": "C2",
-      "files": ["opengeometry-three/src/opengeometry.ts"],
-      "rules": ["@typescript-eslint/no-unsafe-return"],
-      "reason": "OpenGeometry.markStats returns the any from markStats(). C2 types mark stats."
-    },
-    {
-      "owner": "C2",
-      "files": ["opengeometry-three/src/export/export-step.ts"],
-      "rules": [
-        "@typescript-eslint/no-unsafe-assignment",
-        "@typescript-eslint/no-unsafe-return",
-        "@typescript-eslint/no-unsafe-type-assertion"
-      ],
-      "syntax": ["json-parse"],
-      "reason": "exportStep asserts the glue's any result and parses reportJson. C2 types the STEP export DTO."
-    },
-    {
       "owner": "C6",
       "files": ["opengeometry-three/src/export/export-step.ts"],
       "rules": ["@typescript-eslint/require-await"],
       "reason": "exportStep stays async so a kernel throw becomes a rejection; removing async changes behaviour and adding an await changes timing. C6 reworks the export contract."
-    },
-    {
-      "owner": "C2",
-      "files": [
-        "opengeometry-three/src/kernel/kernel-session.ts",
-        "opengeometry-three/src/world-graph/world-graph-client.ts"
-      ],
-      "rules": ["@typescript-eslint/no-unsafe-type-assertion"],
-      "syntax": ["json-parse"],
-      "reason": "Kernel error JSON, node info and creation results are parsed and asserted. C2 routes every graph call through kernel-session.ts and decodes in codec.ts."
-    },
-    {
-      "owner": "C2",
-      "files": ["opengeometry-three/src/world-graph/codec.ts"],
-      "rules": ["@typescript-eslint/no-unsafe-type-assertion"],
-      "reason": "operationParams asserts profile, holes and path from Record<string, unknown>. C2 gives operation params DTO types."
-    },
-    {
-      "owner": "C2",
-      "files": ["opengeometry-three/src/rendering/geometry/geometry-scheduler.ts"],
-      "rules": ["@typescript-eslint/no-unsafe-return", "@typescript-eslint/no-unsafe-type-assertion"],
-      "syntax": ["json-parse"],
-      "reason": "flush asserts the changesSince packet and parses changesJson, and the sync path asserts graph.buffers. C2 types the change feed and display buffers."
     },
     {
       "owner": "C5",
@@ -100,30 +42,12 @@
     {
       "owner": "C2",
       "files": [
-        "opengeometry-three/src/rendering/lod/deflection.ts",
-        "opengeometry-three/src/rendering/records/geometry-record.ts"
-      ],
-      "syntax": ["og-error-throw"],
-      "reason": "deflectionBucket throws RangeError and GeometryRecord throws Error; an OGError changes the error users see. C2 makes every throw an OGError."
-    },
-    {
-      "owner": "C2",
-      "files": [
-        "opengeometry-three/examples-vite/showcase/boolean.ts",
-        "opengeometry-three/examples-vite/showcase/opening.ts",
-        "opengeometry-three/examples-vite/operations/analytic-boolean-operations.ts",
-        "opengeometry-three/examples-vite/shapes/cylinder.ts",
         "opengeometry-three/tests/browser/pages/acceptance.ts",
         "opengeometry-three/tests/browser/pages/acceptance-probes.ts",
         "opengeometry-three/tests/browser/pages/smoke.ts"
       ],
-      "rules": [
-        "@typescript-eslint/no-unsafe-assignment",
-        "@typescript-eslint/no-unsafe-member-access",
-        "@typescript-eslint/no-unsafe-return",
-        "@typescript-eslint/no-unsafe-type-assertion"
-      ],
-      "reason": "Consumers read getBrep, getReport, the exportStep report and graph() payloads, which are any until C2's DTOs."
+      "rules": ["@typescript-eslint/no-unsafe-return", "@typescript-eslint/no-unsafe-type-assertion"],
+      "reason": "The pages read graph() payloads through dist/testing.js, whose glue methods return any or JSON text, and assert them."
     },
     {
       "owner": "C4",

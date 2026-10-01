@@ -18,44 +18,50 @@ export class SystemAssembly {
   constructor(options: { ogId?: string; parent?: SystemAssembly } = {}) {
     this.ogId = creation(call('SystemAssembly.constructor', () => worldGraph().createSystemAssembly(
       encode({ ogId: options.ogId, parent: options.parent?.ogId }),
-    )));
-    const info = node(this.ogId);
+    )), 'SystemAssembly.constructor');
+    const info = node(this.ogId, 'SystemAssembly.constructor');
     this.handle = info.handle;
     this.generation = info.generation;
   }
 
-  protected check(): void { checkNode('SystemAssembly', 'assembly', this.epoch, this.handle, this.generation); }
+  protected check(call: string): void { checkNode(call, 'assembly', this.epoch, this.handle, this.generation); }
 
   transform(kind: string, params: Record<string, unknown>): void {
-    this.check();
+    this.check('SystemAssembly.transform');
     call('SystemAssembly.transform', () => worldGraph().transform(this.ogId, encode({ kind, ...params })));
   }
 
-  getPlacement(): Placement { this.check(); return getPlacement('SystemAssembly', this.ogId); }
+  getPlacement(): Placement {
+    this.check('SystemAssembly.getPlacement');
+    return getPlacement('SystemAssembly', this.ogId);
+  }
 
-  getWorldPlacement(): Placement { this.check(); return getWorldPlacement('SystemAssembly', this.ogId); }
+  getWorldPlacement(): Placement {
+    this.check('SystemAssembly.getWorldPlacement');
+    return getWorldPlacement('SystemAssembly', this.ogId);
+  }
 
   addChild(children: (Body | SystemAssembly)[], options: { keepWorld?: boolean } = {}): void {
-    this.check();
+    this.check('SystemAssembly.addChild');
     addChild('SystemAssembly', this.ogId, children, Boolean(options.keepWorld));
   }
 
   removeChild(child: Body | SystemAssembly, options: { keepWorld?: boolean } = {}): void {
-    this.check();
+    this.check('SystemAssembly.removeChild');
     removeChild('SystemAssembly', this.ogId, child.ogId, Boolean(options.keepWorld));
   }
 
-  getChildren(): string[] { this.check(); return getChildren('SystemAssembly', this.ogId); }
+  getChildren(): string[] { this.check('SystemAssembly.getChildren'); return getChildren('SystemAssembly', this.ogId); }
 
-  getParent(): string | null { this.check(); return getParent('SystemAssembly', this.ogId); }
+  getParent(): string | null { this.check('SystemAssembly.getParent'); return getParent('SystemAssembly', this.ogId); }
 
   getBounds(): [number, number, number, number, number, number] | null {
-    this.check();
+    this.check('SystemAssembly.getBounds');
     return getBounds('SystemAssembly', this.ogId);
   }
 
   dispose(): void {
-    this.check();
+    this.check('SystemAssembly.dispose');
     call('SystemAssembly.dispose', () => worldGraph().dispose(this.ogId));
     flush();
   }

@@ -1,7 +1,9 @@
+import type { MarkStats } from '../dto/mark-stats.js';
 import { OGError } from '../errors.js';
 import { call } from '../kernel/kernel-session.js';
 import { flush } from '../rendering/geometry/geometry-scheduler.js';
 import { runtime } from '../runtime/runtime-state.js';
+import { decodeMarkStats } from '../world-graph/codec.js';
 import { worldGraph } from '../world-graph/world-graph-client.js';
 
 export class OGMark {
@@ -30,4 +32,6 @@ export function createMark(): OGMark {
   return mark;
 }
 
-export function markStats() { return JSON.parse(call('OpenGeometry.markStats', () => worldGraph().markStats())); }
+export function markStats(): MarkStats {
+  return decodeMarkStats(call('OpenGeometry.markStats', () => worldGraph().markStats()), 'OpenGeometry.markStats');
+}
