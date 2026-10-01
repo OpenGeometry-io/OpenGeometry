@@ -12,7 +12,7 @@ import {
 import {
   buildStorey, coarserRetryProbe, lodHysteresisProbe, lodProbe, memoryProbe, onDemandProbe, orbitProbe,
   placementPixelProbe, reuseProbe, snapshotResendProbe, staleWorkerProbe, storeyPerformanceProbe, transactionProbe,
-  workerCrashProbe,
+  workerCrashProbe, workerFailureProbe,
 } from './acceptance-probes.js';
 
 type Point = [number, number, number];
@@ -162,6 +162,7 @@ publishFixture({
   memoryProbe: () => memoryProbe(PAGE),
   lodProbe: () => lodProbe(PAGE),
   workerCrashProbe: () => workerCrashProbe(PAGE),
+  workerFailureProbe: () => workerFailureProbe(PAGE),
   placementPixelProbe: () => placementPixelProbe(PAGE),
   onDemandProbe: () => onDemandProbe(PAGE),
   staleWorkerProbe: () => staleWorkerProbe(PAGE),

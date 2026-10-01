@@ -1,4 +1,5 @@
 import type { Events, Listener } from '../dto/events.js';
+import type { OGError } from '../errors.js';
 import { compileKernel, initKernel, OGWorldGraph } from '../kernel/kernel-loader.js';
 import { ACCURACY } from '../limits.js';
 import { InlineBackend } from '../rendering/inline-backend.js';
@@ -38,7 +39,7 @@ export function createRuntime(module: WebAssembly.Module, options: CreateOptions
       graph,
       module,
       options.workerURL ?? new URL('./tessellation-worker.js', import.meta.url),
-      (error) => { emit('error', error); },
+      (error) => { fallBack(state, error); },
     );
   const state: Runtime = {
     graph, provider, records: new RecordPool(), bodies: new Map(), byShape: new Map(), limbo: new Map(), listeners,
@@ -48,4 +49,11 @@ export function createRuntime(module: WebAssembly.Module, options: CreateOptions
     flushing: false, surfacePool: new Map(), linePool: new Map(), epoch: nextEpoch(),
   };
   return state;
+}
+
+function fallBack(state: Runtime, error: OGError): void {
+  const worker = state.provider;
+  state.provider = new InlineBackend(state.graph);
+  worker.dispose();
+  emit('error', error);
 }

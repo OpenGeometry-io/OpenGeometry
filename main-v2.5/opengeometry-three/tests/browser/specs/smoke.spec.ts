@@ -41,7 +41,7 @@ type SmokeFixture = {
   exportStep(): Promise<{ text: string; report: { products: number } }>;
   resolveHit(): { ogId: string; faceId?: number } | undefined;
   getInlineBuffers(): InlineBuffers;
-  workerInitError(): Promise<{ request: number; error?: { code: string } }>;
+  workerReplies(): Promise<({ request?: number; error?: { code: string } } | undefined)[]>;
   dispose(): void;
 };
 
@@ -98,8 +98,11 @@ async function checkSmokeScene({ expected, version }: { expected: string; versio
     throw new Error('STEP export failed');
   }
   if (expected === 'worker') {
-    const init = await fixture.workerInitError();
-    if (init.request !== 0 || !init.error) throw new Error('Worker init error was lost');
+    const [init, nonsense, snapshot] = await fixture.workerReplies();
+    if (init?.request !== 0 || !init.error || nonsense?.request !== 7 || nonsense.error?.code !== 'InvalidParameter'
+      || snapshot?.request !== 8 || snapshot.error?.code !== 'InvalidParameter') {
+      throw new Error(`Worker guard replies differ: ${JSON.stringify([init, nonsense, snapshot])}`);
+    }
   }
 }
 

@@ -24,12 +24,26 @@ const RESERVED = new Set<string>();
 for (let object: object | null = new THREE.Group(); object; object = Reflect.getPrototypeOf(object)) {
   for (const key of Object.getOwnPropertyNames(object)) RESERVED.add(key);
 }
+const WORKER_PROBES = [
+  { kind: 'init', request: 0, module: 'invalid' }, { kind: 'nonsense', request: 7 }, { kind: 'snapshot', request: 8 },
+];
 const ADDED_NAMES = [
   'ogId', 'handle', 'generation', 'bodyType', 'appearance', 'lastInfo', 'record', 'inLimbo', 'surface', 'outline',
   'transform', 'getPlacement', 'getWorldPlacement', 'addChild', 'removeChild', 'getChildren', 'getParent', 'getBounds',
   'getBrep', 'rebuild', 'operate', 'instance', 'duplicate', 'makeUnique', 'getInstanceCount', 'setAppearance',
   'getReport', 'dispose',
 ];
+
+function nextReply(worker: Worker, message: object): Promise<unknown> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => { resolve(undefined); }, 2_000);
+    worker.onmessage = (event) => {
+      clearTimeout(timer);
+      resolve(event.data);
+    };
+    worker.postMessage(message);
+  });
+}
 
 publishFixture({
   body: BODY, renderer: RENDERER, scene: SCENE, camera: CAMERA,
@@ -49,14 +63,12 @@ publishFixture({
     const info = JSON.parse(graph().node(BODY.ogId)) as { shapeId: string };
     return graph().buffers(info.shapeId, required(BODY.record, 'a cube record').bucket, 2_000_000);
   },
-  workerInitError: async () => {
+  workerReplies: async () => {
     const worker = new Worker(WORKER_URL, { type: 'module' });
+    const replies: unknown[] = [];
     try {
-      return await new Promise<unknown>((resolve, reject) => {
-        worker.onmessage = (event) => { resolve(event.data); };
-        worker.onerror = (event) => { reject(new Error(event.message)); };
-        worker.postMessage({ kind: 'init', request: 0, module: 'invalid' });
-      });
+      for (const message of WORKER_PROBES) replies.push(await nextReply(worker, message));
+      return replies;
     } finally { worker.terminate(); }
   },
   dispose: () => { BODY.dispose(); releasePage(RENDERER); },

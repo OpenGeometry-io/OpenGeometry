@@ -1,26 +1,15 @@
 import { parseKernelError } from '../kernel/kernel-errors.js';
 import { initSync, OGTessellator, takePanicMessage } from '../kernel/kernel-loader.js';
-import type { DisplayBuffers } from '../dto/display-buffers.js';
-
-type Job = {
-  request: number;
-  shapeId: string;
-  revision: number;
-  bucket: number;
-  maxTriangles: number;
-  generation: number;
-  priority: number;
-};
-type Snapshot = { slot: number; bytes: number; lastUse: number };
-type WorkerError = { code: string; message: string; details?: unknown };
+import { validateDisplayBuffers } from './records/validate-display-buffers.js';
+import { JobQueue } from './worker/job-queue.js';
+import { parseWorkerMessage } from './worker/message-guards.js';
+import { SnapshotCache } from './worker/snapshot-cache.js';
+import type { TessellateMessage, WorkerError, WorkerMessage, WorkerReply } from './worker-protocol.js';
 
 let tessellator: OGTessellator | undefined;
-let totalBytes = 0;
-let clock = 0;
 let scheduled = false;
-const SNAPSHOTS = new Map<string, Snapshot>();
-const JOBS = new Map<string, Job>();
-const JOBS_STARTED = new Map<string, number>();
+const SNAPSHOTS = new SnapshotCache();
+const JOBS = new JobQueue();
 const CHANNEL = new MessageChannel();
 
 function error(value: unknown): WorkerError {
@@ -31,19 +20,17 @@ function error(value: unknown): WorkerError {
   return parsed ?? { code: 'WorkerFailure', message: String(value), details: {} };
 }
 
-function evict(except: string): void {
-  while (totalBytes > 128 * 1024 * 1024) {
-    const oldest = [...SNAPSHOTS.entries()]
-      .filter(([key]) => key !== except)
-      .sort((a, b) => a[1].lastUse - b[1].lastUse)[0];
-    if (!oldest) break;
-    const [key, value] = oldest;
-    tessellator?.drop(value.slot);
-    SNAPSHOTS.delete(key);
-    totalBytes -= value.bytes;
-    const at = key.lastIndexOf('@');
-    self.postMessage({ kind: 'evicted', shapeId: key.slice(0, at), revision: Number(key.slice(at + 1)) });
-  }
+function reply(message: WorkerReply, transfer: Transferable[] = []): void {
+  self.postMessage(message, transfer);
+}
+
+function postEvicted(key: string): void {
+  const at = key.lastIndexOf('@');
+  reply({ kind: 'evicted', shapeId: key.slice(0, at), revision: Number(key.slice(at + 1)) });
+}
+
+function answerSuperseded(request: number | undefined): void {
+  if (request !== undefined) reply({ request, superseded: true });
 }
 
 function schedule(): void {
@@ -52,79 +39,68 @@ function schedule(): void {
   CHANNEL.port2.postMessage(null);
 }
 
+function run(job: TessellateMessage): void {
+  const slot = SNAPSHOTS.touch(`${job.shapeId}@${String(job.revision)}`);
+  if (slot === undefined || !tessellator) {
+    reply({ request: job.request, missingSnapshot: true });
+    return;
+  }
+  try {
+    const buffers = validateDisplayBuffers(tessellator.buffers(slot, job.bucket, job.maxTriangles));
+    reply({ request: job.request, ok: true, buffers }, [
+      buffers.positions.buffer, buffers.normals.buffer, buffers.indices.buffer,
+      buffers.faceRanges.buffer, buffers.outline.buffer, buffers.edgeIds.buffer, buffers.origin.buffer,
+    ]);
+  } catch (cause) {
+    reply({ request: job.request, error: error(cause) });
+  }
+}
+
 CHANNEL.port1.onmessage = () => {
   scheduled = false;
-  const next = [...JOBS.values()].sort((a, b) => a.priority - b.priority)[0];
+  const next = JOBS.next();
   if (!next) return;
-  JOBS.delete(next.shapeId);
-  JOBS_STARTED.set(next.shapeId, (JOBS_STARTED.get(next.shapeId) ?? 0) + 1);
-  const snapshot = SNAPSHOTS.get(`${next.shapeId}@${String(next.revision)}`);
-  if (!snapshot || !tessellator) {
-    self.postMessage({ request: next.request, missingSnapshot: true });
-  } else {
-    snapshot.lastUse = ++clock;
-    try {
-      const buffers = tessellator.buffers(snapshot.slot, next.bucket, next.maxTriangles) as DisplayBuffers;
-      self.postMessage({ request: next.request, ok: true, buffers }, [
-        buffers.positions.buffer, buffers.normals.buffer, buffers.indices.buffer,
-        buffers.faceRanges.buffer, buffers.outline.buffer, buffers.edgeIds.buffer, buffers.origin.buffer,
-      ]);
-    } catch (cause) {
-      self.postMessage({ request: next.request, error: error(cause) });
-    }
-  }
+  run(next);
   schedule();
 };
 
-self.onmessage = (event: MessageEvent<Record<string, unknown>>) => {
-  const message = event.data;
-  const kind = message['kind'];
-  const request = Number(message['request']);
-  try {
-    if (kind === 'init') {
-      initSync({ module: message['module'] as WebAssembly.Module });
-      tessellator = new OGTessellator();
-      self.postMessage({ request, ok: true });
-    } else if (kind === 'snapshot') {
-      const shapeId = String(message['shapeId']);
-      const revision = Number(message['revision']);
-      const bytes = message['bytes'] as Uint8Array;
-      const key = `${shapeId}@${String(revision)}`;
-      const old = SNAPSHOTS.get(key);
-      if (old) {
-        tessellator?.drop(old.slot);
-        totalBytes -= old.bytes;
-      }
-      const slot = tessellator!.load(bytes);
-      SNAPSHOTS.set(key, { slot, bytes: bytes.byteLength, lastUse: ++clock });
-      totalBytes += bytes.byteLength;
-      evict(key);
-      self.postMessage({ request, ok: true });
-    } else if (kind === 'tessellate') {
-      const job = message as unknown as Job;
-      const previous = JOBS.get(job.shapeId);
-      if (previous) self.postMessage({ request: previous.request, superseded: true });
-      JOBS.set(job.shapeId, job);
-      schedule();
-    } else if (kind === 'cancel') {
-      const shapeId = String(message['shapeId']);
-      const previous = JOBS.get(shapeId);
-      if (previous && previous.generation <= Number(message['generation'])) {
-        JOBS.delete(shapeId);
-        self.postMessage({ request: previous.request, superseded: true });
-      }
-    } else if (kind === 'drop') {
-      const key = `${String(message['shapeId'])}@${String(message['revision'])}`;
-      const old = SNAPSHOTS.get(key);
-      if (old) {
-        tessellator?.drop(old.slot);
-        SNAPSHOTS.delete(key);
-        totalBytes -= old.bytes;
-      }
-    } else if (kind === 'stats') {
-      self.postMessage({ request, ok: true, stats: Object.fromEntries(JOBS_STARTED) });
+function init(module: WebAssembly.Module): void {
+  initSync({ module });
+  tessellator = new OGTessellator();
+  reply({ request: 0, ok: true });
+}
+
+function handle(message: Exclude<WorkerMessage, { kind: 'init' }>, loaded: OGTessellator): void {
+  switch (message.kind) {
+    case 'snapshot': {
+      const key = `${message.shapeId}@${String(message.revision)}`;
+      SNAPSHOTS.load(key, message.bytes, loaded);
+      for (const evicted of SNAPSHOTS.evict(key, loaded)) postEvicted(evicted);
+      reply({ request: message.request, ok: true });
+      break;
     }
+    case 'tessellate':
+      answerSuperseded(JOBS.push(message));
+      schedule();
+      break;
+    case 'cancel':
+      answerSuperseded(JOBS.cancel(message.shapeId, message.generation));
+      break;
+    case 'drop':
+      SNAPSHOTS.drop(`${message.shapeId}@${String(message.revision)}`, loaded);
+      break;
+  }
+}
+
+self.onmessage = (event: MessageEvent<unknown>) => {
+  const message = parseWorkerMessage(event.data);
+  const request = 'request' in message ? message.request : undefined;
+  try {
+    if ('error' in message) reply(message);
+    else if (message.kind === 'init') init(message.module);
+    else if (tessellator) handle(message, tessellator);
+    else reply({ request, error: { code: 'WorkerFailure', message: 'tessellation worker is not initialised' } });
   } catch (cause) {
-    self.postMessage({ request, error: error(cause) });
+    reply({ request, error: error(cause) });
   }
 };

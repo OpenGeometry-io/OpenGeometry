@@ -9,6 +9,7 @@ const CONSUMER_MESSAGE = 'Examples and tests use the built SDK, never src/.';
 const SDK_SOURCE_IMPORTS = ['(^|/)src/', '(^|/)(\\.\\.|opengeometry-three)(/|/index(\\.[jt]s)?)?$'];
 const JS_FILES = ['**/*.js', '**/*.mjs'];
 const WORKER_ENTRY = `${SDK}/rendering/tessellation-worker.ts`;
+const WORKER_FILES = [WORKER_ENTRY, `${SDK}/rendering/worker/**/*.ts`];
 
 const LAYERS = [
   { name: 'dto', files: [`${SDK}/dto/**/*.ts`], imports: ['(^|/)dto/'] },
@@ -168,12 +169,12 @@ function importConfigs() {
   return LAYERS.flatMap((layer, index) => [
     {
       files: layer.files,
-      ignores: layer.name === 'rendering' ? [WORKER_ENTRY] : [],
+      ignores: layer.name === 'rendering' ? WORKER_FILES : [],
       rules: { '@typescript-eslint/no-restricted-imports': importOptions(layer, index, [], new Set()) },
     },
     ...(layer.name === 'rendering'
       ? [{
-        files: [WORKER_ENTRY],
+        files: WORKER_FILES,
         rules: {
           '@typescript-eslint/no-restricted-imports': importOptions(layer, index, WORKER_IMPORTS, WORKER_BARRED_LAYERS),
         },
