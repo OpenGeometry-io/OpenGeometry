@@ -24,7 +24,7 @@ const COMMITTED: [(&str, &str); 2] = [
 
 const UPDATE_ALLOWED_EVENT: &str = "workflow_dispatch";
 
-pub(crate) type Golden = BTreeMap<String, String>;
+type Golden = BTreeMap<String, String>;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Mode {

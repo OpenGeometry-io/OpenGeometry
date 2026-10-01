@@ -61,6 +61,12 @@ test('a missing timing block is only noted when CI is unset', () => {
   });
 });
 
+test('a timing key missing from an existing block is only noted when CI is unset', () => {
+  assert.deepEqual(budgetFindings(timed({ mitred20BooleanMs: 1 }), BASELINE, 'darwin-arm64', false), {
+    findings: [], notes: ['missing timing baseline for mitred20BooleanMs on darwin-arm64'],
+  });
+});
+
 test('the median of five ignores one slow run', () => {
   assert.equal(median([10, 11, 500, 12, 9]), 11);
 });
