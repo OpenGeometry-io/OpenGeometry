@@ -1,16 +1,16 @@
-import { OGError } from '../errors.js';
-import { forceNextBucket } from '../rendering/lod/lod-controller.js';
-import { WorkerBackend, type WorkerSend } from '../rendering/worker-backend.js';
-import { runtime } from '../runtime/runtime-state.js';
+import { OGError } from '../errors';
+import { forceNextBucket } from '../rendering/lod/lod-controller';
+import { WorkerBackend, type WorkerSend } from '../rendering/worker-backend';
+import { runtime } from '../runtime/runtime-state';
 
-export { register, unregister } from '../bodies/body-registry.js';
-export { ensureGeometry, flush, wanted } from '../rendering/geometry/geometry-scheduler.js';
-export { noteDisplayed } from '../rendering/geometry/render-pass.js';
-export { wantedBucket } from '../rendering/lod/deflection.js';
-export { parseWorkerMessage } from '../rendering/worker/message-guards.js';
-export { emit } from '../runtime/event-bus.js';
-export { currentRuntime, runtime } from '../runtime/runtime-state.js';
-export { worldGraph as graph } from '../world-graph/world-graph-client.js';
+export { register, unregister } from '../bodies/body-registry';
+export { ensureGeometry, flush, wanted } from '../rendering/geometry/geometry-scheduler';
+export { noteDisplayed } from '../rendering/geometry/render-pass';
+export { wantedBucket } from '../rendering/lod/deflection';
+export { parseWorkerMessage } from '../rendering/worker/message-guards';
+export { emit } from '../runtime/event-bus';
+export { currentRuntime, runtime } from '../runtime/runtime-state';
+export { worldGraph as graph } from '../world-graph/world-graph-client';
 
 export function activeBackend(): 'worker' | 'inline' { return runtime().provider.activeBackend; }
 

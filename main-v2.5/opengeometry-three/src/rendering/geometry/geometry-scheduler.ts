@@ -1,18 +1,18 @@
-import type { ChangeSet } from '../../dto/change-set.js';
-import type { DisplayBuffers } from '../../dto/display-buffers.js';
-import { OGError } from '../../errors.js';
-import { MAX_TRIANGLES } from '../../limits.js';
-import { call } from '../../kernel/kernel-session.js';
-import type { Body } from '../../bodies/body.js';
-import { emit } from '../../runtime/event-bus.js';
-import { bodyKey, currentRuntime, reindexShape, runtime, type Runtime } from '../../runtime/runtime-state.js';
-import { decodeChangeSet } from '../../world-graph/codec.js';
+import type { ChangeSet } from '../../dto/change-set';
+import type { DisplayBuffers } from '../../dto/display-buffers';
+import { OGError } from '../../errors';
+import { MAX_TRIANGLES } from '../../limits';
+import { call } from '../../kernel/kernel-session';
+import type { Body } from '../../bodies/body';
+import { emit } from '../../runtime/event-bus';
+import { bodyKey, currentRuntime, reindexShape, runtime, type Runtime } from '../../runtime/runtime-state';
+import { decodeChangeSet } from '../../world-graph/codec';
 import {
   clearError, displayedBodies, isDisplayed, markFailed, recordError, retryBucket, shapePriority, wantedKey,
-} from '../lod/lod-controller.js';
-import type { TessellationRequest } from '../provider.js';
-import { GeometryRecord } from '../records/geometry-record.js';
-import { validateDisplayBuffers } from '../records/validate-display-buffers.js';
+} from '../lod/lod-controller';
+import type { TessellationRequest } from '../provider';
+import { GeometryRecord } from '../records/geometry-record';
+import { validateDisplayBuffers } from '../records/validate-display-buffers';
 
 type GeometryTarget = { body: Body; shapeId: string; revision: number; bucket: number; key: string };
 

@@ -1,5 +1,5 @@
-import { createRuntime } from './create-runtime.js';
-import { currentRuntime, setRuntime } from './runtime-state.js';
+import { createRuntime } from './create-runtime';
+import { currentRuntime, setRuntime } from './runtime-state';
 
 export function reset(): void {
   const state = currentRuntime();

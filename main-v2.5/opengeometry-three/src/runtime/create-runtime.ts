@@ -1,17 +1,17 @@
-import type { Events, Listener } from '../dto/events.js';
-import type { OGError } from '../errors.js';
-import { compileKernel, initKernel, OGWorldGraph } from '../kernel/kernel-loader.js';
-import { ACCURACY } from '../limits.js';
-import { refreshDisplayed } from '../rendering/geometry/render-pass.js';
-import { InlineBackend } from '../rendering/inline-backend.js';
-import { createLodState } from '../rendering/lod/lod-controller.js';
-import { RecordPool } from '../rendering/records/record-pool.js';
-import { WorkerBackend } from '../rendering/worker-backend.js';
-import { encode } from '../world-graph/codec.js';
-import { emit } from './event-bus.js';
+import type { Events, Listener } from '../dto/events';
+import type { OGError } from '../errors';
+import { compileKernel, initKernel, OGWorldGraph } from '../kernel/kernel-loader';
+import { ACCURACY } from '../limits';
+import { refreshDisplayed } from '../rendering/geometry/render-pass';
+import { InlineBackend } from '../rendering/inline-backend';
+import { createLodState } from '../rendering/lod/lod-controller';
+import { RecordPool } from '../rendering/records/record-pool';
+import { WorkerBackend } from '../rendering/worker-backend';
+import { encode } from '../world-graph/codec';
+import { emit } from './event-bus';
 import {
   nextEpoch, pendingCreate, setPendingCreate, setRuntime, type CreateOptions, type Runtime,
-} from './runtime-state.js';
+} from './runtime-state';
 
 export type KernelInput = { wasmURL?: string | URL; wasmModule?: WebAssembly.Module };
 

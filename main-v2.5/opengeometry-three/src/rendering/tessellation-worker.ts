@@ -1,10 +1,10 @@
-import { parseKernelError } from '../kernel/kernel-errors.js';
-import { initSync, OGTessellator, takePanicMessage } from '../kernel/kernel-loader.js';
-import { validateDisplayBuffers } from './records/validate-display-buffers.js';
-import { JobQueue } from './worker/job-queue.js';
-import { parseWorkerMessage } from './worker/message-guards.js';
-import { SnapshotCache } from './worker/snapshot-cache.js';
-import type { TessellateMessage, WorkerError, WorkerMessage, WorkerReply } from './worker-protocol.js';
+import { parseKernelError } from '../kernel/kernel-errors';
+import { initSync, OGTessellator, takePanicMessage } from '../kernel/kernel-loader';
+import { validateDisplayBuffers } from './records/validate-display-buffers';
+import { JobQueue } from './worker/job-queue';
+import { parseWorkerMessage } from './worker/message-guards';
+import { SnapshotCache } from './worker/snapshot-cache';
+import type { TessellateMessage, WorkerError, WorkerMessage, WorkerReply } from './worker-protocol';
 
 let tessellator: OGTessellator | undefined;
 let scheduled = false;

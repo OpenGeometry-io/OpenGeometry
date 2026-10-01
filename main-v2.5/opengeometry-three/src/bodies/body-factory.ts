@@ -1,7 +1,7 @@
-import { call } from '../kernel/kernel-session.js';
-import { encode, operationParams, polylinePoints } from '../world-graph/codec.js';
-import { creation, worldGraph } from '../world-graph/world-graph-client.js';
-import type { BodyOptions } from './body-options.js';
+import { call } from '../kernel/kernel-session';
+import { encode, operationParams, polylinePoints } from '../world-graph/codec';
+import { creation, worldGraph } from '../world-graph/world-graph-client';
+import type { BodyOptions } from './body-options';
 
 export function existingParams(ogId: string): Record<string, unknown> {
   return { existing: existingNodeId, ogId };

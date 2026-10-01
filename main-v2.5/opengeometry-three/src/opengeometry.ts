@@ -1,21 +1,21 @@
 import type * as THREE from 'three';
-import type { Body } from './bodies/body.js';
-import type { SystemAssembly } from './bodies/system-assembly.js';
-import type { Events, Listener } from './dto/events.js';
-import type { MarkStats } from './dto/mark-stats.js';
-import type { StepExport } from './dto/step-export.js';
-import { OGError } from './errors.js';
-import { exportStep } from './export/export-step.js';
-import { createMark, markStats, type OGMark } from './marks/og-mark.js';
-import { transaction } from './marks/transaction.js';
-import { resolveHit } from './picking/resolve-hit.js';
-import { flush } from './rendering/geometry/geometry-scheduler.js';
-import { settled } from './rendering/geometry/settle.js';
-import { motionHint, overrideChanged } from './rendering/lod/lod-controller.js';
-import { createRuntimeOnce } from './runtime/create-runtime.js';
-import { on } from './runtime/event-bus.js';
-import { reset } from './runtime/reset.js';
-import { currentRuntime, runtime } from './runtime/runtime-state.js';
+import type { Body } from './bodies/body';
+import type { SystemAssembly } from './bodies/system-assembly';
+import type { Events, Listener } from './dto/events';
+import type { MarkStats } from './dto/mark-stats';
+import type { StepExport } from './dto/step-export';
+import { OGError } from './errors';
+import { exportStep } from './export/export-step';
+import { createMark, markStats, type OGMark } from './marks/og-mark';
+import { transaction } from './marks/transaction';
+import { resolveHit } from './picking/resolve-hit';
+import { flush } from './rendering/geometry/geometry-scheduler';
+import { settled } from './rendering/geometry/settle';
+import { motionHint, overrideChanged } from './rendering/lod/lod-controller';
+import { createRuntimeOnce } from './runtime/create-runtime';
+import { on } from './runtime/event-bus';
+import { reset } from './runtime/reset';
+import { currentRuntime, runtime } from './runtime/runtime-state';
 
 export class OpenGeometry {
   static async create(

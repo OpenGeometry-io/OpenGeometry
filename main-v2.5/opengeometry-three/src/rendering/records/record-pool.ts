@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import type { Bounds } from '../../dto/bounds.js';
-import type { GeometryRecord } from './geometry-record.js';
+import type { Bounds } from '../../dto/bounds';
+import type { GeometryRecord } from './geometry-record';
 
 type Placeholder = { key: string; geometry: THREE.BufferGeometry; holders: number };
 

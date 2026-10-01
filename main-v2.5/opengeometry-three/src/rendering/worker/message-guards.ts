@@ -1,4 +1,4 @@
-import type { WorkerMessage } from '../worker-protocol.js';
+import type { WorkerMessage } from '../worker-protocol';
 
 export type GuardFailure = { request: number | undefined; error: { code: 'InvalidParameter'; message: string } };
 

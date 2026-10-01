@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { runtime } from '../../runtime/runtime-state.js';
-import { acquire, release, type PoolEntry, type PooledMaterial } from './ref-counted-pool.js';
+import { runtime } from '../../runtime/runtime-state';
+import { acquire, release, type PoolEntry, type PooledMaterial } from './ref-counted-pool';
 
 export type MaterialAppearance = { color: number; opacity: number };
 export type SurfaceEntry = PoolEntry<THREE.MeshStandardMaterial>;

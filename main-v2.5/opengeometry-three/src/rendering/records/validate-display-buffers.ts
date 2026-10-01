@@ -1,5 +1,5 @@
-import type { DisplayBuffers } from '../../dto/display-buffers.js';
-import { OGError } from '../../errors.js';
+import type { DisplayBuffers } from '../../dto/display-buffers';
+import { OGError } from '../../errors';
 
 const SCALARS = ['revision', 'bucket', 'achievedDeflection', 'triangles'] as const;
 

@@ -1,4 +1,4 @@
-import type { FaceSource, GeometryQuality } from './brep.js';
+import type { FaceSource, GeometryQuality } from './brep';
 
 export type FaceMapping = { source: FaceSource; result_faces: number[] };
 

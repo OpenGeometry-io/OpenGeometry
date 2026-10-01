@@ -1,10 +1,10 @@
-import { OGError } from '../../errors.js';
-import { runtime, type Runtime } from '../../runtime/runtime-state.js';
+import { OGError } from '../../errors';
+import { runtime, type Runtime } from '../../runtime/runtime-state';
 import {
   capturedError, displayedBodies, popTemporaryTarget, pushTemporaryTarget, settleNow, wantedKey,
-} from '../lod/lod-controller.js';
-import { flush } from './geometry-scheduler.js';
-import { refreshDisplayed } from './render-pass.js';
+} from '../lod/lod-controller';
+import { flush } from './geometry-scheduler';
+import { refreshDisplayed } from './render-pass';
 
 type Failure = { ogId: string; error: unknown };
 

@@ -1,7 +1,7 @@
-import type { Body } from '../bodies/body.js';
-import { call } from '../kernel/kernel-session.js';
-import { bodyKey, reindexShape, runtime, type Runtime } from '../runtime/runtime-state.js';
-import { node, worldGraph } from '../world-graph/world-graph-client.js';
+import type { Body } from '../bodies/body';
+import { call } from '../kernel/kernel-session';
+import { bodyKey, reindexShape, runtime, type Runtime } from '../runtime/runtime-state';
+import { node, worldGraph } from '../world-graph/world-graph-client';
 
 export function enterLimbo(body: Body): void {
   if (body.inLimbo) return;

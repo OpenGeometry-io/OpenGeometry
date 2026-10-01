@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { OpenGeometry, Solid, Wire, OG_PRIMITIVE_CUBOID, OG_PRIMITIVE_RECTANGLE } from '../../../../dist/index.js';
 import { activeBackend, graph } from '../../../../dist/testing.js';
-import type { SmokeFixture } from '../support/fixture-types.js';
-import { bootKernel, createRenderer, publishFixture, releasePage, required } from '../support/test-page.js';
-import { reservedNameCollisions } from './smoke/reserved-names.js';
+import type { SmokeFixture } from '../support/fixture-types';
+import { bootKernel, createRenderer, publishFixture, releasePage, required } from '../support/test-page';
+import { reservedNameCollisions } from './smoke/reserved-names';
 
 const WORKER_URL = await bootKernel();
 const SCENE = new THREE.Scene();

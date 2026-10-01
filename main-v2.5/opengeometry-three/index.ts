@@ -1,7 +1,7 @@
-export { OpenGeometry } from './src/opengeometry.js';
-export { OGMark } from './src/marks/og-mark.js';
-export { SystemAssembly } from './src/bodies/system-assembly.js';
-export { Wire } from './src/bodies/wire.js';
-export { Solid } from './src/bodies/solid.js';
-export { OGError } from './src/errors.js';
-export * from './src/constants/index.js';
+export { OpenGeometry } from './src/opengeometry';
+export { OGMark } from './src/marks/og-mark';
+export { SystemAssembly } from './src/bodies/system-assembly';
+export { Wire } from './src/bodies/wire';
+export { Solid } from './src/bodies/solid';
+export { OGError } from './src/errors';
+export * from './src/constants/index';

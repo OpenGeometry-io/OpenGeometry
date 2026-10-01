@@ -1,8 +1,8 @@
-import type { NodeInfo } from '../dto/node-info.js';
-import type { OGWorldGraph } from '../kernel/kernel-loader.js';
-import { call } from '../kernel/kernel-session.js';
-import { runtime } from '../runtime/runtime-state.js';
-import { decodeCreation, decodeDisplayBuckets, decodeNodeInfo } from './codec.js';
+import type { NodeInfo } from '../dto/node-info';
+import type { OGWorldGraph } from '../kernel/kernel-loader';
+import { call } from '../kernel/kernel-session';
+import { runtime } from '../runtime/runtime-state';
+import { decodeCreation, decodeDisplayBuckets, decodeNodeInfo } from './codec';
 
 export function worldGraph(): OGWorldGraph {
   return runtime().graph;

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { disposeFixture } from '../support/acceptance-page.js';
+import { disposeFixture } from '../support/acceptance-page';
 
 for (const backend of ['inline', 'worker'] as const) {
   test(`LimitExceeded retries one coarser bucket and reports a warning with ${backend}`, async ({ page }) => {

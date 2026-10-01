@@ -7,8 +7,8 @@ import { activeBackend, flushCount, graph, postToWorker, runtime, workerSendLog 
 import type {
   CrashResult, FailureResult, InstanceMemory, MemoryResult, PixelResult, ReuseResult, StaleResult, StoreyPerformance,
   StoreyResult, TransactionResult,
-} from '../support/fixture-types.js';
-import { recordedErrors, required } from '../support/test-page.js';
+} from '../support/fixture-types';
+import { recordedErrors, required } from '../support/test-page';
 
 export type AcceptancePage = {
   renderer: THREE.WebGLRenderer;

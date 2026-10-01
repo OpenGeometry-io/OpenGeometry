@@ -1,4 +1,4 @@
-import type { SystemAssembly } from './system-assembly.js';
+import type { SystemAssembly } from './system-assembly';
 
 export type BodyOptions = {
   ogId?: string;

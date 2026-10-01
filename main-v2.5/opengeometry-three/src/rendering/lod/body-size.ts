@@ -1,7 +1,7 @@
-import type { Body } from '../../bodies/body.js';
-import { OGError } from '../../errors.js';
-import type { Runtime } from '../../runtime/runtime-state.js';
-import { displayBuckets } from '../../world-graph/world-graph-client.js';
+import type { Body } from '../../bodies/body';
+import { OGError } from '../../errors';
+import type { Runtime } from '../../runtime/runtime-state';
+import { displayBuckets } from '../../world-graph/world-graph-client';
 
 export type ShapeBuckets = { revision: number; floor: number; static: number; error?: unknown };
 

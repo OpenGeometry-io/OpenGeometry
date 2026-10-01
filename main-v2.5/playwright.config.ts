@@ -1,5 +1,5 @@
 import { defineConfig } from '@playwright/test';
-import { EXAMPLES_URL, PAGES_URL, PORT_BASE } from './opengeometry-three/tests/browser/support/servers.js';
+import { EXAMPLES_URL, PAGES_URL, PORT_BASE } from './opengeometry-three/tests/browser/support/servers';
 
 export default defineConfig({
   testDir: './opengeometry-three/tests/browser/specs',

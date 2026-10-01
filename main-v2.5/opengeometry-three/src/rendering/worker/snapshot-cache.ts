@@ -1,4 +1,4 @@
-import type { OGTessellator } from '../../kernel/kernel-loader.js';
+import type { OGTessellator } from '../../kernel/kernel-loader';
 
 type Slot = { slot: number; bytes: number; lastUse: number };
 

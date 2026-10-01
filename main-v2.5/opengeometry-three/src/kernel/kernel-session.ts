@@ -1,8 +1,8 @@
-import { OGError } from '../errors.js';
-import { emit } from '../runtime/event-bus.js';
-import { runtime as runtimeState } from '../runtime/runtime-state.js';
-import { parseKernelError } from './kernel-errors.js';
-import { takePanicMessage } from './kernel-loader.js';
+import { OGError } from '../errors';
+import { emit } from '../runtime/event-bus';
+import { runtime as runtimeState } from '../runtime/runtime-state';
+import { parseKernelError } from './kernel-errors';
+import { takePanicMessage } from './kernel-loader';
 
 export function kernelCall<T>(call: string, fn: () => T): T {
   try {
