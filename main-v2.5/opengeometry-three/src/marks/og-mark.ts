@@ -2,33 +2,42 @@ import type { MarkStats } from '../dto/mark-stats.js';
 import { OGError } from '../errors.js';
 import { call } from '../kernel/kernel-session.js';
 import { flush } from '../rendering/geometry/geometry-scheduler.js';
-import { runtime } from '../runtime/runtime-state.js';
-import { decodeMarkStats } from '../world-graph/codec.js';
+import { bodyKey, runtime } from '../runtime/runtime-state.js';
+import { decodeChanges, decodeMarkStats } from '../world-graph/codec.js';
 import { worldGraph } from '../world-graph/world-graph-client.js';
+import { finalizeNow, finalizeSettled, revive } from './limbo.js';
 
 export class OGMark {
-  private active = true;
   constructor(private slot: number) {}
+  private get active(): boolean { return runtime().marks.get(this.slot) === this; }
   rollback(): void {
     if (!this.active) throw new OGError('InvalidMark', 'OGMark.rollback', 'mark is released');
-    call('OGMark.rollback', () => worldGraph().rollback(this.slot));
+    const changes = decodeChanges(call('OGMark.rollback', () => worldGraph().rollback(this.slot)), 'OGMark.rollback');
+    const state = runtime();
+    for (const slot of [...state.marks.keys()]) if (slot > this.slot) state.marks.delete(slot);
+    for (const change of changes.removed) {
+      const body = state.bodies.get(bodyKey(change.handle, change.generation));
+      if (body) finalizeNow(body);
+    }
     flush();
-    for (const body of runtime().bodies.values()) body.reviveIfRestored();
+    for (const change of changes.added) {
+      const body = state.bodies.get(bodyKey(change.handle, change.generation));
+      if (body) revive(body);
+    }
   }
   release(): void {
     if (!this.active) throw new OGError('InvalidMark', 'OGMark.release', 'mark is released');
     call('OGMark.release', () => { worldGraph().release(this.slot); });
-    this.active = false;
-    runtime().marks.delete(this);
-    if (runtime().marks.size === 0) {
-      for (const body of [...runtime().bodies.values()]) if (body.inLimbo) body.finalize();
-    }
+    const state = runtime();
+    state.marks.delete(this.slot);
+    finalizeSettled(state);
   }
 }
 
 export function createMark(): OGMark {
-  const mark = new OGMark(call('OpenGeometry.mark', () => worldGraph().mark()));
-  runtime().marks.add(mark);
+  const slot = call('OpenGeometry.mark', () => worldGraph().mark());
+  const mark = new OGMark(slot);
+  runtime().marks.set(slot, mark);
   return mark;
 }
 

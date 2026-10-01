@@ -20,6 +20,10 @@ await bootExample('../');
 
 const SCENE = new THREE.Scene();
 SCENE.background = new THREE.Color(0xeef2ff);
+SCENE.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+const LIGHT = new THREE.DirectionalLight(0xffffff, 2);
+LIGHT.position.set(5, 8, 5);
+SCENE.add(LIGHT);
 SCENE.add(new THREE.GridHelper(16, 16, 0x7188aa, 0xcbd5e1));
 const CAMERA = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
 CAMERA.position.set(6, 4.5, 6);

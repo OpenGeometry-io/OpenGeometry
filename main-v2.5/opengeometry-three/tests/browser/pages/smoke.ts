@@ -6,6 +6,10 @@ import { bootKernel, createRenderer, publishFixture, releasePage, required } fro
 const WORKER_URL = await bootKernel();
 const SCENE = new THREE.Scene();
 SCENE.background = new THREE.Color(0xf7f8fb);
+SCENE.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+const LIGHT = new THREE.DirectionalLight(0xffffff, 2);
+LIGHT.position.set(5, 8, 5);
+SCENE.add(LIGHT);
 const CAMERA = new THREE.PerspectiveCamera(60, 1, 0.1, 100);
 CAMERA.position.set(3, 3, 5);
 CAMERA.lookAt(0, 0.5, 0);

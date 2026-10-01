@@ -159,6 +159,10 @@ export function placementPixelProbe(page: AcceptancePage): Record<string, unknow
   const { renderer } = page;
   const isolated = new THREE.Scene();
   isolated.background = new THREE.Color(0xffffff);
+  isolated.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+  const light = new THREE.DirectionalLight(0xffffff, 2);
+  light.position.set(5, 8, 5);
+  isolated.add(light);
   const view = new THREE.OrthographicCamera(-2, 2, 1.5, -1.5, 0.1, 20);
   view.position.set(0, 1, 5);
   view.lookAt(0, 0.5, 0);

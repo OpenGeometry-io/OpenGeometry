@@ -1,7 +1,21 @@
+import * as THREE from 'three';
+import type { Bounds } from '../../dto/bounds.js';
 import type { GeometryRecord } from './geometry-record.js';
+
+type Placeholder = { key: string; geometry: THREE.BufferGeometry; holders: number };
+
+function placeholderGeometry(bounds: Bounds | null): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(0), 3));
+  geometry.boundingBox = bounds ? new THREE.Box3().setFromArray(bounds) : new THREE.Box3();
+  geometry.boundingSphere = geometry.boundingBox.getBoundingSphere(new THREE.Sphere());
+  return geometry;
+}
 
 export class RecordPool {
   private records = new Map<string, GeometryRecord>();
+  private placeholders = new Map<string, Placeholder>();
+  private placeholderOf = new Map<THREE.BufferGeometry, Placeholder>();
   private clock = 0;
 
   get(shapeId: string, revision: number, bucket: number): GeometryRecord | undefined {
@@ -42,9 +56,35 @@ export class RecordPool {
     }
   }
 
+  placeholder(shapeId: string, revision: number, bounds: () => Bounds | null): THREE.BufferGeometry {
+    const key = `${shapeId}@${String(revision)}`;
+    let entry = this.placeholders.get(key);
+    if (!entry) {
+      entry = { key, geometry: placeholderGeometry(bounds()), holders: 0 };
+      this.placeholders.set(key, entry);
+      this.placeholderOf.set(entry.geometry, entry);
+    }
+    entry.holders++;
+    return entry.geometry;
+  }
+
+  releasePlaceholder(geometry: THREE.BufferGeometry): boolean {
+    const entry = this.placeholderOf.get(geometry);
+    if (!entry) return false;
+    if (--entry.holders <= 0) {
+      geometry.dispose();
+      this.placeholders.delete(entry.key);
+      this.placeholderOf.delete(geometry);
+    }
+    return true;
+  }
+
   clear(): void {
     for (const record of this.records.values()) record.dispose();
     this.records.clear();
+    for (const entry of this.placeholders.values()) entry.geometry.dispose();
+    this.placeholders.clear();
+    this.placeholderOf.clear();
   }
 
   private evict(): void {

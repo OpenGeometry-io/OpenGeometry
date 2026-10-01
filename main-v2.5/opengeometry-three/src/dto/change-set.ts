@@ -1,6 +1,14 @@
+export type NodeChange = {
+  ogId: string;
+  handle: number;
+  generation: number;
+  shapeId: string | null;
+  shapeRevision: number | null;
+};
+
 export type ChangeSet = {
   revision: number;
-  added: { ogId: string }[];
-  changed: { ogId: string }[];
-  removed: { ogId: string }[];
+  added: NodeChange[];
+  changed: NodeChange[];
+  removed: NodeChange[];
 };
