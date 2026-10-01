@@ -12,12 +12,6 @@
       "reason": "clone() returns a DisplayClone, which cannot be typed as this; a display copy is a plain Group, not a Body."
     },
     {
-      "owner": "C6",
-      "files": ["opengeometry-three/src/export/export-step.ts"],
-      "rules": ["@typescript-eslint/require-await"],
-      "reason": "exportStep stays async so a kernel throw becomes a rejection; removing async changes behaviour and adding an await changes timing. C6 reworks the export contract."
-    },
-    {
       "owner": "C5",
       "files": ["opengeometry-three/src/rendering/inline-backend.ts"],
       "rules": ["@typescript-eslint/no-empty-function"],

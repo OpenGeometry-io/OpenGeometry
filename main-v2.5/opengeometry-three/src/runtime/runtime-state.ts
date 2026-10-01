@@ -17,6 +17,7 @@ export type Runtime = {
   provider: TessellationProvider;
   records: RecordPool;
   bodies: Map<string, Body>;
+  pickTargets: WeakMap<object, Body>;
   byShape: Map<string, Set<Body>>;
   limbo: Map<Body, LimboEntry>;
   listeners: Map<Events, Set<Listener>>;

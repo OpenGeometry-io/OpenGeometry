@@ -10,4 +10,10 @@ export type BodyOptions = {
   };
   appearance?: Partial<Appearance>;
 };
-export type Appearance = { color: number; opacity: number; outline: boolean; deflection?: number };
+export type Appearance = {
+  color: number;
+  opacity: number;
+  outline: boolean;
+  pickOutline: boolean;
+  deflection?: number;
+};
