@@ -1,5 +1,5 @@
-use opengeometry::world_graph::{EditScope, ErrorCode, ErrorDetails, ModifyingOperation};
-use opengeometry_test_support::scenes::acceptance::recut_scene;
+use opengeometry::world_graph::{ErrorCode, ErrorDetails};
+use opengeometry_test_support::scenes::acceptance::{attempt_rail_minus_wall, recut_scene};
 use opengeometry_test_support::scenes::coverage_gap::rail_minus_wall_clearance;
 
 #[test]
@@ -12,15 +12,7 @@ fn rail_minus_wall_returns_coverage_gap_with_clearance_and_leaves_graph_unchange
     let node_count = scene.graph.node_count();
     let rail_before = scene.graph.brep(&scene.rail).unwrap().to_json().unwrap();
     let wall_before = scene.graph.brep(&scene.wall).unwrap().to_json().unwrap();
-    let error = scene
-        .graph
-        .operate(
-            &scene.rail,
-            ModifyingOperation::Subtract,
-            &[scene.wall.clone()],
-            EditScope::Node,
-        )
-        .unwrap_err();
+    let error = attempt_rail_minus_wall(&mut scene);
     assert_eq!(error.error_code(), ErrorCode::CoverageGap, "{error:?}");
     assert_eq!(
         error.details(),

@@ -1,7 +1,7 @@
-use super::acceptance::{create_cutter, create_wall, subtract, AcceptanceScene};
+use super::acceptance::{create_cutter, create_wall, instance_rail, subtract, AcceptanceScene};
 use crate::world_graph::named;
 use opengeometry::brep::{BrepEnvelope, FaceRole};
-use opengeometry::world_graph::{CopyOptions, Transform, WorldGraph};
+use opengeometry::world_graph::{Transform, WorldGraph};
 use std::collections::BTreeSet;
 
 pub struct StoreySize {
@@ -23,7 +23,10 @@ pub fn build_storey(scene: &mut AcceptanceScene, size: StoreySize) -> Storey {
         .map(|index| add_storey_wall(graph, index, &mut members))
         .collect();
     let rails: Vec<String> = (0..size.rail_instances)
-        .map(|index| add_rail_instance(graph, &scene.rail, index))
+        .map(|index| {
+            let og_id = format!("storey-rail-{index}");
+            instance_rail(graph, &scene.rail, &og_id, grid(index, 40))
+        })
         .collect();
     members.extend(rails.iter().cloned());
     graph.add_child(&root, &members, false).unwrap();
@@ -64,23 +67,6 @@ fn add_storey_wall(graph: &mut WorldGraph, index: usize, members: &mut Vec<Strin
         .unwrap();
     members.extend([profile, wall.clone()]);
     wall
-}
-
-fn add_rail_instance(graph: &mut WorldGraph, rail: &str, index: usize) -> String {
-    let options = CopyOptions {
-        og_id: Some(format!("storey-rail-{index}")),
-        parent: None,
-    };
-    let (copy, _) = graph.instance(rail, options).unwrap();
-    graph
-        .transform(
-            &copy,
-            Transform::Translate {
-                offset: grid(index, 40),
-            },
-        )
-        .unwrap();
-    copy
 }
 
 fn grid(index: usize, columns: usize) -> [f64; 3] {

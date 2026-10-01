@@ -48,34 +48,29 @@ impl Document {
     }
 
     pub fn points3(&self) -> Result<BTreeMap<usize, [f64; 3]>, String> {
-        let tuples = self.tuples("CARTESIAN_POINT(", 3)?;
-        Ok(tuples
-            .into_iter()
-            .map(|(id, v)| (id, [v[0], v[1], v[2]]))
-            .collect())
+        self.typed_tuples("CARTESIAN_POINT(")
     }
 
     pub fn points2(&self) -> Result<BTreeMap<usize, [f64; 2]>, String> {
-        let tuples = self.tuples("CARTESIAN_POINT(", 2)?;
-        Ok(tuples
-            .into_iter()
-            .map(|(id, v)| (id, [v[0], v[1]]))
-            .collect())
+        self.typed_tuples("CARTESIAN_POINT(")
     }
 
     pub fn directions3(&self) -> Result<BTreeMap<usize, [f64; 3]>, String> {
-        let tuples = self.tuples("DIRECTION(", 3)?;
-        Ok(tuples
-            .into_iter()
-            .map(|(id, v)| (id, [v[0], v[1], v[2]]))
-            .collect())
+        self.typed_tuples("DIRECTION(")
     }
 
     pub fn directions2(&self) -> Result<BTreeMap<usize, [f64; 2]>, String> {
-        let tuples = self.tuples("DIRECTION(", 2)?;
+        self.typed_tuples("DIRECTION(")
+    }
+
+    fn typed_tuples<const N: usize>(
+        &self,
+        prefix: &str,
+    ) -> Result<BTreeMap<usize, [f64; N]>, String> {
+        let tuples = self.tuples(prefix, N)?;
         Ok(tuples
             .into_iter()
-            .map(|(id, v)| (id, [v[0], v[1]]))
+            .map(|(id, v)| (id, std::array::from_fn(|axis| v[axis])))
             .collect())
     }
 

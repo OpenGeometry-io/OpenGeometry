@@ -31,10 +31,11 @@ pub fn check_report_matches(document: &Document, text: &str, report: &Value) -> 
 }
 
 pub fn check_single_report_matches(document: &Document, report: &Value) -> Result<(), String> {
-    let keys = ["solids", "faces", "edges", "cavity_shells"];
-    for (key, counted) in keys.into_iter().zip(shape_figures(document)?) {
-        check_figure(key, figure(report, key)?, counted)?;
-    }
+    check_shape_figures(
+        document,
+        report,
+        ["solids", "faces", "edges", "cavity_shells"],
+    )?;
     let unit = report["length_unit"]
         .as_str()
         .ok_or("report has no length_unit")?;
@@ -67,10 +68,11 @@ fn check_body_sums(report: &Value, bodies: &[Value]) -> Result<(), String> {
 }
 
 fn check_totals(document: &Document, text: &str, report: &Value) -> Result<(), String> {
-    let keys = ["solids", "faces", "edges", "cavityShells"];
-    for (key, counted) in keys.into_iter().zip(shape_figures(document)?) {
-        check_figure(key, figure(report, key)?, counted)?;
-    }
+    check_shape_figures(
+        document,
+        report,
+        ["solids", "faces", "edges", "cavityShells"],
+    )?;
     let fitted = document
         .edge_supports()?
         .into_iter()
@@ -91,6 +93,13 @@ fn check_totals(document: &Document, text: &str, report: &Value) -> Result<(), S
     }
     let unit = report["unit"].as_str().ok_or("report has no unit")?;
     document.check_length_unit(unit)
+}
+
+fn check_shape_figures(document: &Document, report: &Value, keys: [&str; 4]) -> Result<(), String> {
+    for (key, counted) in keys.into_iter().zip(shape_figures(document)?) {
+        check_figure(key, figure(report, key)?, counted)?;
+    }
+    Ok(())
 }
 
 fn shape_figures(document: &Document) -> Result<[usize; 4], String> {

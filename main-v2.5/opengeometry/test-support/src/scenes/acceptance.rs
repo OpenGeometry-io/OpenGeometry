@@ -1,8 +1,8 @@
 use crate::world_graph::{graph, named};
 use opengeometry::exchange::StepExportReport;
 use opengeometry::world_graph::{
-    CopyOptions, CreateOptions, CreatingOperation, EditScope, ErrorCode, ModifyingOperation, Plane,
-    Primitive, StepOptions, Transform, WorldGraph,
+    CopyOptions, CreateOptions, CreatingOperation, EditScope, ErrorCode, GraphError,
+    ModifyingOperation, Plane, Primitive, StepOptions, Transform, WorldGraph,
 };
 
 pub struct AcceptanceScene {
@@ -41,7 +41,7 @@ pub fn recut_scene() -> AcceptanceScene {
 
 pub fn acceptance_scene() -> AcceptanceScene {
     let mut scene = recut_scene();
-    attempt_rail_minus_wall(&mut scene);
+    let _ = attempt_rail_minus_wall(&mut scene);
     trial_rebuild(&mut scene);
     add_rail_instances(&mut scene);
     reparent_test_child(&mut scene.graph);
@@ -118,7 +118,7 @@ fn place_and_recut(scene: &mut AcceptanceScene) {
     subtract(graph, &scene.wall, &["door-cutter".into()]);
 }
 
-fn attempt_rail_minus_wall(scene: &mut AcceptanceScene) {
+pub fn attempt_rail_minus_wall(scene: &mut AcceptanceScene) -> GraphError {
     let error = scene
         .graph
         .operate(
@@ -129,6 +129,7 @@ fn attempt_rail_minus_wall(scene: &mut AcceptanceScene) {
         )
         .unwrap_err();
     assert_eq!(error.error_code(), ErrorCode::CoverageGap, "{error:?}");
+    error
 }
 
 fn trial_rebuild(scene: &mut AcceptanceScene) {
@@ -144,18 +145,28 @@ fn trial_rebuild(scene: &mut AcceptanceScene) {
 
 fn add_rail_instances(scene: &mut AcceptanceScene) {
     for index in 2..=11 {
-        let options = CopyOptions {
-            og_id: Some(format!("rail-{index}")),
-            parent: None,
-        };
-        let (copy, _) = scene.graph.instance(&scene.rail, options).unwrap();
+        let og_id = format!("rail-{index}");
         let offset = [0.0, 0.0, f64::from(index) * 2.0];
-        scene
-            .graph
-            .transform(&copy, Transform::Translate { offset })
-            .unwrap();
+        let copy = instance_rail(&mut scene.graph, &scene.rail, &og_id, offset);
         scene.rails.push(copy);
     }
+}
+
+pub(super) fn instance_rail(
+    graph: &mut WorldGraph,
+    rail: &str,
+    og_id: &str,
+    offset: [f64; 3],
+) -> String {
+    let options = CopyOptions {
+        og_id: Some(og_id.into()),
+        parent: None,
+    };
+    let (copy, _) = graph.instance(rail, options).unwrap();
+    graph
+        .transform(&copy, Transform::Translate { offset })
+        .unwrap();
+    copy
 }
 
 fn reparent_test_child(graph: &mut WorldGraph) {
@@ -170,7 +181,7 @@ fn reparent_test_child(graph: &mut WorldGraph) {
     graph.add_child(&reparent, &child, false).unwrap();
 }
 
-pub(crate) fn create_wall(graph: &mut WorldGraph, profile: &str, wall: &str) -> String {
+pub(super) fn create_wall(graph: &mut WorldGraph, profile: &str, wall: &str) -> String {
     let rectangle = Primitive::Rectangle {
         width: 6.0,
         breadth: 0.2,
@@ -180,7 +191,7 @@ pub(crate) fn create_wall(graph: &mut WorldGraph, profile: &str, wall: &str) -> 
     graph.create_operation(extrusion, named(wall)).unwrap().0
 }
 
-pub(crate) fn create_cutter(graph: &mut WorldGraph, og_id: &str, size: [f64; 3], x: f64) -> String {
+pub(super) fn create_cutter(graph: &mut WorldGraph, og_id: &str, size: [f64; 3], x: f64) -> String {
     let cutter = create_cuboid(graph, og_id, size);
     let offset = [x, 0.0, 0.0];
     graph
@@ -198,7 +209,7 @@ fn create_cuboid(graph: &mut WorldGraph, og_id: &str, size: [f64; 3]) -> String 
     graph.create_primitive(cuboid, named(og_id)).unwrap().0
 }
 
-pub(crate) fn subtract(graph: &mut WorldGraph, target: &str, tools: &[String]) {
+pub(super) fn subtract(graph: &mut WorldGraph, target: &str, tools: &[String]) {
     graph
         .operate(target, ModifyingOperation::Subtract, tools, EditScope::Node)
         .unwrap();

@@ -76,7 +76,7 @@ impl Document {
         ))
     }
 
-    pub(super) fn coordinates2(&self, id: usize) -> Result<[f64; 2], String> {
+    fn coordinates2(&self, id: usize) -> Result<[f64; 2], String> {
         let expression = self.entity(id)?;
         if !expression.starts_with("CARTESIAN_POINT(") && !expression.starts_with("DIRECTION(") {
             return Err(format!("#{id} is not a point or direction"));
