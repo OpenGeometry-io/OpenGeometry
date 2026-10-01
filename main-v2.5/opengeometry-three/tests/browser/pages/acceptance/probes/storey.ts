@@ -8,7 +8,7 @@ import type { StoreyPerformance, StoreyResult } from '../../../support/fixture-t
 import { required } from '../../../support/test-page';
 import type { AcceptancePage } from '../../acceptance-probes';
 
-type StoreyRender = Pick<StoreyResult, 'renderMs' | 'renderFlushes' | 'geometryCount'>;
+type StoreyRender = Pick<StoreyResult, 'renderMs' | 'renderFlushes' | 'geometryCount' | 'failed'>;
 
 const WALLS = 200;
 const RAIL_INSTANCES = 1000;
@@ -94,9 +94,9 @@ async function renderStorey(page: AcceptancePage, camera: THREE.PerspectiveCamer
   page.renderer.render(page.scene, camera);
   const renderMs = performance.now() - beforeRender;
   const renderFlushes = flushCount() - beforeRenderFlush;
-  await OpenGeometry.settled();
+  const { failed } = await OpenGeometry.settled();
   page.renderer.render(page.scene, camera);
-  return { renderMs, renderFlushes, geometryCount: page.renderer.info.memory.geometries };
+  return { renderMs, renderFlushes, geometryCount: page.renderer.info.memory.geometries, failed: failed.length };
 }
 
 export async function buildStorey(page: AcceptancePage): Promise<StoreyResult> {

@@ -1,5 +1,6 @@
 mod display;
 mod seams;
+mod short_loops;
 mod support;
 
 use super::cache::TessellationCache;

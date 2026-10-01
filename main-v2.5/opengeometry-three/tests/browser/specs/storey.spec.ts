@@ -31,6 +31,9 @@ for (const backend of ['inline', 'worker'] as const) {
           if (result.geometryCount < geometry.floor || result.geometryCount > geometry.bound) {
             throw new Error(`Storey scene uploaded ${String(result.geometryCount)} geometries`);
           }
+          if (result.failed !== 0) {
+            throw new Error(`Storey scene left ${String(result.failed)} bodies without current geometry`);
+          }
           return { geometryCount: result.geometryCount, buildMs };
         }, { floor: GEOMETRY_FLOOR, bound: GEOMETRY_BOUND });
         console.log(`Storey scene with ${backend}: ${JSON.stringify(measured)}`);
