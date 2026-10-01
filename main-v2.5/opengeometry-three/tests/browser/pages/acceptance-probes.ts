@@ -322,3 +322,31 @@ export function transactionProbe(): Record<string, unknown> {
     return { threw, revived, dryResult, dryRestored, thenableCode };
   } finally { body.dispose(); }
 }
+
+export async function reuseProbe(page: AcceptancePage): Promise<Record<string, unknown>> {
+  const { renderer, scene, camera } = page;
+  const errors: unknown[] = [];
+  const stopErrors = OpenGeometry.on('error', (event) => { errors.push(event); });
+  const size = { width: 1, height: 1, depth: 1 };
+  const first = new Solid(OG_PRIMITIVE_CUBOID, size, { ogId: 'reuse-cube' });
+  try {
+    scene.add(first);
+    renderer.render(scene, camera);
+    await OpenGeometry.settled();
+    const mark = OpenGeometry.mark();
+    first.dispose();
+    const second = new Solid(OG_PRIMITIVE_CUBOID, size, { ogId: 'reuse-cube' });
+    scene.add(second);
+    renderer.render(scene, camera);
+    await OpenGeometry.settled();
+    mark.rollback();
+    mark.release();
+    renderer.render(scene, camera);
+    await OpenGeometry.settled();
+    const revived = first.parent === scene && !first.inLimbo && Boolean(first.record);
+    return { revived, gone: second.parent === null && !second.inLimbo, errors };
+  } finally {
+    stopErrors();
+    first.dispose();
+  }
+}

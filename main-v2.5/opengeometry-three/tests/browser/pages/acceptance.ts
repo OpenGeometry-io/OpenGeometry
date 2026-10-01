@@ -11,7 +11,7 @@ import {
 } from '../support/test-page.js';
 import {
   buildStorey, coarserRetryProbe, lodHysteresisProbe, lodProbe, memoryProbe, onDemandProbe, orbitProbe,
-  placementPixelProbe, snapshotResendProbe, staleWorkerProbe, storeyPerformanceProbe, transactionProbe,
+  placementPixelProbe, reuseProbe, snapshotResendProbe, staleWorkerProbe, storeyPerformanceProbe, transactionProbe,
   workerCrashProbe,
 } from './acceptance-probes.js';
 
@@ -166,6 +166,7 @@ publishFixture({
   orbitProbe: () => orbitProbe(PAGE),
   coarserRetryProbe,
   transactionProbe,
+  reuseProbe: () => reuseProbe(PAGE),
   dispose: () => {
     for (const body of [...BODIES].reverse()) { try { body.dispose(); } catch { continue; } }
     releasePage(RENDERER);
