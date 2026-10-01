@@ -1,3 +1,4 @@
+mod context;
 mod document;
 mod lexer;
 mod report;

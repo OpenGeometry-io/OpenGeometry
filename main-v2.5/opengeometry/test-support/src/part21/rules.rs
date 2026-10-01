@@ -101,20 +101,8 @@ impl Document {
             }
         }
         let document = Self { entities };
+        document.check_contexts()?;
         document.check_solids()?;
-        for kind in [
-            "LENGTH_UNIT",
-            "PLANE_ANGLE_UNIT",
-            "SOLID_ANGLE_UNIT",
-            "UNCERTAINTY_MEASURE_WITH_UNIT",
-            "GLOBAL_UNIT_ASSIGNED_CONTEXT",
-            "GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT",
-            "PRODUCT_CONTEXT",
-        ] {
-            if document.count(kind) == 0 {
-                return Err(format!("missing {kind}"));
-            }
-        }
         document.validate_loops_and_shells()?;
         document.validate_curve_endpoints()?;
         document.validate_pcurves()?;
