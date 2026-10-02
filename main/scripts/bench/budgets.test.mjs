@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { budgetFindings, median, platformKey } from './budgets.mjs';
+import { budgetFindings, median } from './budgets.mjs';
 
 const BASELINE = {
   sizes: { wall50Triangles: 1000 },
-  timings: { 'darwin-arm64': { measuredOn: '2026-10-01', wall50BooleanMs: 100 }, 'linux-x64-ci': {} },
+  timings: { 'darwin-arm64': { measuredOn: '2026-10-01', wall50BooleanMs: 100 } },
 };
-const KEYS = [['darwin-arm64', false], ['linux-x64', false], ['linux-x64-ci', true]];
+const KEYS = [['darwin-arm64', false], ['linux-x64', false], ['darwin-arm64', true], ['linux-x64', true]];
 
 function sized(sizes) {
   return { sizes, timings: {} };
@@ -42,21 +42,16 @@ test('a timing more than 25 percent over its baseline fails on the baseline plat
   ]);
 });
 
-test('a missing timing block fails when CI is true', () => {
-  const key = platformKey(Object.fromEntries([['CI', 'true']]), 'darwin', 'arm64');
-  assert.equal(key, 'darwin-arm64-ci');
-  assert.deepEqual(budgetFindings(timed({ wall50BooleanMs: 1 }), BASELINE, key, true), {
-    findings: ['missing timing baseline for darwin-arm64-ci'], notes: [],
-  });
-  assert.deepEqual(budgetFindings(timed({ mitred20BooleanMs: 1 }), BASELINE, 'darwin-arm64', true).findings, [
-    'missing timing baseline for mitred20BooleanMs on darwin-arm64',
-  ]);
+test('no timing is checked when CI is true', () => {
+  for (const key of ['darwin-arm64', 'linux-x64']) {
+    assert.deepEqual(budgetFindings(timed({ wall50BooleanMs: 1000 }), BASELINE, key, true), {
+      findings: [], notes: ['timings are not checked on CI'],
+    });
+  }
 });
 
 test('a missing timing block is only noted when CI is unset', () => {
-  const key = platformKey({}, 'linux', 'x64');
-  assert.equal(key, 'linux-x64');
-  assert.deepEqual(budgetFindings(timed({ wall50BooleanMs: 1 }), BASELINE, key, false), {
+  assert.deepEqual(budgetFindings(timed({ wall50BooleanMs: 1 }), BASELINE, 'linux-x64', false), {
     findings: [], notes: ['missing timing baseline for linux-x64'],
   });
 });

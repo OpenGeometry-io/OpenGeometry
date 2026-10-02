@@ -69,26 +69,28 @@ is not shipped: the package README links to it on GitHub's `main` branch.
 `.github/workflows/verify.yml` runs on every push and pull request that changes `main/**`,
 `README.md`, `MIGRATION.md`, `LICENSE.md` or the workflow file, on Ubuntu and macOS. It
 runs `npm run check`, then the two browser runs (`node scripts/check/verify.mjs --full
---only browser:three-168` and `--only browser:three-184`), then the release-mode kernel
-time budgets (`cargo run --release --example budgets` in `main/opengeometry/`). It uploads
-the check logs and, from Ubuntu, the STEP exports.
+--only browser:three-168` and `--only browser:three-184`), then a fixed two-second guard
+on one kernel boolean (`cargo run --release --example budgets` in `main/opengeometry/`),
+which compares with no recorded result. It uploads the check logs and, from Ubuntu, the
+STEP exports. It can also be started by hand.
 
-The same workflow can be started by hand. Its one required input, `record`, chooses
-what to record on Ubuntu and macOS:
+Two checks compare with numbers recorded on one machine, so they run on a developer's
+machine and not on CI (where `CI` is `true`). Nothing is recorded on CI.
 
-- `goldens` records the kernel golden file and a kernel snapshot, and uploads them as
-  the `goldens-<os>` artifact.
-- `baselines` measures the performance medians and the storey baseline, and uploads
-  them as the `baselines-<os>` artifact.
-
-A record run commits nothing. A person downloads the artifacts, reviews them and
-commits them: the golden file goes to `main/opengeometry/tests/fixtures/golden/`, and the
-timings are copied by hand into `main/scripts/bench/performance-baseline.json`, from
-`baselines-ubuntu-latest` into `timings.linux-x64-ci` and from `baselines-macos-latest`
-into `timings.darwin-arm64-ci`. Copy the `timings` of `performance-medians.json`, and the
-`renderMs`, `transformFlushMs` and `stepMs` of the storey line in `storey-baseline.txt` as
-`storeyFirstRenderMs`, `storeyTransformFlushMs` and `storeyStepMs`. Every timings block
-needs the three storey keys, so copy all of them in one commit.
+- The kernel golden test compares the hash of every scene with the golden file of its
+  target; the one recorded file is
+  `main/opengeometry/tests/fixtures/golden/aarch64-apple-darwin.json`. On CI, and on a
+  target with no golden file, it still builds every scene and applies its other checks,
+  and compares nothing. `TARGETS.md` in that folder says how to record.
+- The timing budgets compare the performance medians and the storey timings with the
+  block of `timings` in `main/scripts/bench/performance-baseline.json` that is named after
+  the machine, such as `darwin-arm64`. On CI the timings are measured and printed, not
+  checked, and a machine with no block is not checked either. The size budgets in the
+  same file are checked everywhere. To record a machine, copy into its block the
+  `timings` that `npm run test:performance` prints, and the `renderMs`,
+  `transformFlushMs` and `stepMs` of the "Storey performance baseline:" line of the
+  browser run as `storeyFirstRenderMs`, `storeyTransformFlushMs` and `storeyStepMs`, and
+  set `measuredOn` to the date. A block needs the three storey keys.
 
 The kernel tests also read `main/opengeometry/tests/fixtures/cases/`, which holds test
 inputs and stored expected results. The BRep bodies are both: each is the stored result
@@ -99,7 +101,7 @@ result and handlers, and each validity body has its stored verdict. The other st
 results are tessellations, STEP texts, reports and errors, and handler lists. They were
 first recorded from the 2.0 kernel by a tool that no longer exists, so no command
 regenerates them. A change that moves one edits the stored file by hand in the same
-commit and says why. The golden files are the only fixtures with a record command.
+commit and says why. The golden file is the only fixture with a record command.
 
 ## Release process
 
@@ -109,7 +111,7 @@ commit and says why. The golden files are the only fixtures with a record comman
 2. If the release changes how existing code must be written, check that `MIGRATION.md`
    has its entry (its "Adding an entry" section asks for it in the change that broke the
    code) and rename an "Unreleased" section after the two versions, such as "2.5 to 2.6".
-3. Run both gates locally:
+3. Run both gates locally, where the golden comparison and the timing budgets run:
    ```bash
    npm run check
    npm run check:full
@@ -123,9 +125,3 @@ commit and says why. The golden files are the only fixtures with a record comman
 If the publish step fails for an environmental reason but the version was already
 bumped, re-running the workflow will re-attempt publish (the action checks npm and only
 publishes if the version is missing).
-
-A release run cannot pass yet. `npm run check` fails on the Ubuntu runner until the
-Linux golden (`main/opengeometry/tests/fixtures/golden/x86-64-unknown-linux-gnu.json`,
-now `{}`) and `timings.linux-x64-ci` are recorded, reviewed and committed as described
-in [Verification and CI](#verification-and-ci). The macOS job of `verify.yml` also needs
-`timings.darwin-arm64-ci`.

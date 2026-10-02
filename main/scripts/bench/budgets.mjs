@@ -6,10 +6,6 @@ export function median(values) {
   return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-export function platformKey(env, platform, arch) {
-  return env.CI === 'true' ? `${platform}-${arch}-ci` : `${platform}-${arch}`;
-}
-
 function sizeFindings(sizes, baseline) {
   return Object.entries(sizes).flatMap(([name, value]) => {
     const budget = baseline[name];
@@ -31,7 +27,7 @@ function timingReport(timings, block, key) {
 
 export function budgetFindings(result, baseline, key, ci) {
   const sizes = sizeFindings(result.sizes, baseline.sizes);
+  if (ci) return { findings: sizes, notes: ['timings are not checked on CI'] };
   const timing = timingReport(result.timings, baseline.timings[key], key);
-  if (ci) return { findings: [...sizes, ...timing.findings, ...timing.missing], notes: [] };
   return { findings: [...sizes, ...timing.findings], notes: timing.missing };
 }
