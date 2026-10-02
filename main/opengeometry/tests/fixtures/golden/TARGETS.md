@@ -1,10 +1,11 @@
 # Golden targets
 
-Each `<target>.json` maps every golden scene key to the SHA-256 of its record text,
-sorted, one key per line. The `golden` test binary (`tests/golden/`) builds every
-scene, hashes it and, on a recorded target off CI, fails on any key that is missing from
-the file, any key in the file with no scene, and any key whose hash differs. The texts
-of the differing scenes are written under `target/tmp/golden/<target>/`.
+Each `<target>.json` maps every golden scene key to the SHA-256 of its record text
+(`sweep-3d` excepted, see below), sorted, one key per line. The `golden` test binary
+(`tests/golden/`) builds every scene, hashes it and, on a recorded target off CI, fails
+on any key that is missing from the file, any key in the file with no scene, and any key
+whose hash differs. The texts of the differing scenes are written under
+`target/tmp/golden/<target>/`.
 
 The file stem is the target triple with `_` written as `-`, because file names in the
 tree are kebab-case.
@@ -17,7 +18,7 @@ tree are kebab-case.
 
 The comparison runs only on a recorded target and never on CI (where `CI` is `true`). On
 CI, and on a target with no golden file, the test still builds every scene and applies
-the corpus checks, and compares nothing; with `-- --nocapture` it prints which it did.
+the corpus checks, and compares no hash; with `-- --nocapture` it prints which it did.
 On CI a boolean matrix row that differs from its stored result is not a failure either.
 The golden file was recorded on the macOS version the table names; a run on another macOS
 version can differ if its math library rounds differently (the first of the 'Known

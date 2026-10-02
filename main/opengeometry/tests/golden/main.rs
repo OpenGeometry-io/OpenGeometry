@@ -175,7 +175,7 @@ fn every_golden_scene_matches_the_recorded_golden_for_this_target() {
     }
     let Some(golden) = golden_file::committed(&target).unwrap() else {
         println!(
-            "{} scenes built; no golden is recorded for {target}, so nothing is compared",
+            "{} scenes built; no golden is recorded for {target}, so no hash is compared",
             actual.len()
         );
         return;
