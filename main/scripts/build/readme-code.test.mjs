@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import path from 'node:path';
 import ts from 'typescript';
 import { REPOSITORY_ROOT } from '../lib/paths.mjs';
 
-const README = path.join(REPOSITORY_ROOT, '..', 'README.md');
+const README = {
+  label: 'the README', file: path.join(REPOSITORY_ROOT, '..', 'README.md'), prefix: 'readme-block',
+};
+const MIGRATION = {
+  label: 'MIGRATION.md', file: path.join(REPOSITORY_ROOT, '..', 'MIGRATION.md'), prefix: 'migration-block',
+};
 const TS_BLOCK = /^```ts\n([\s\S]*?)^```$/gm;
 const TS_OPENER = /^[ \t]*(?:`{3,}|~{3,})[ \t]*(?:typescript|tsx|ts)(?![\w-])/gim;
 const QUICK_START_PAGE = path.join(
@@ -23,10 +28,15 @@ const OPTIONS = {
   paths: { opengeometry: [path.join(REPOSITORY_ROOT, 'dist', 'index.d.ts')] },
 };
 
-function readmeBlocks() {
+function documentText(source) {
+  assert(existsSync(source.file), `${source.label} does not exist at ${source.file}`);
+  return readFileSync(source.file, 'utf8');
+}
+
+function tsBlocks(source) {
   const blocks = new Map();
-  for (const match of readFileSync(README, 'utf8').matchAll(TS_BLOCK)) {
-    blocks.set(path.join(REPOSITORY_ROOT, `readme-block-${String(blocks.size + 1)}.ts`), match[1]);
+  for (const match of documentText(source).matchAll(TS_BLOCK)) {
+    blocks.set(path.join(REPOSITORY_ROOT, `${source.prefix}-${String(blocks.size + 1)}.ts`), match[1]);
   }
   return blocks;
 }
@@ -61,25 +71,27 @@ function blockDiagnostics(program, names) {
   });
 }
 
-test('every ts block in the README type-checks against the built package', () => {
-  const blocks = readmeBlocks();
-  assert(blocks.size > 0, 'the README has no ts block');
-  const program = ts.createProgram([...blocks.keys()], OPTIONS, blockHost(blocks));
-  const diagnostics = [
-    ...program.getOptionsDiagnostics(),
-    ...program.getGlobalDiagnostics(),
-    ...blockDiagnostics(program, [...blocks.keys()]),
-  ];
-  assert.deepEqual(diagnostics.map(diagnosticText), []);
-});
+for (const source of [README, MIGRATION]) {
+  test(`every ts block in ${source.label} type-checks against the built package`, () => {
+    const blocks = tsBlocks(source);
+    assert(blocks.size > 0, `${source.label} has no ts block`);
+    const program = ts.createProgram([...blocks.keys()], OPTIONS, blockHost(blocks));
+    const diagnostics = [
+      ...program.getOptionsDiagnostics(),
+      ...program.getGlobalDiagnostics(),
+      ...blockDiagnostics(program, [...blocks.keys()]),
+    ];
+    assert.deepEqual(diagnostics.map(diagnosticText), []);
+  });
 
-test('every ts fence in the README is one the type check reads', () => {
-  const openers = [...readFileSync(README, 'utf8').matchAll(TS_OPENER)].length;
-  assert.equal(openers, readmeBlocks().size);
-});
+  test(`every ts fence in ${source.label} is one the type check reads`, () => {
+    const openers = [...documentText(source).matchAll(TS_OPENER)].length;
+    assert.equal(openers, tsBlocks(source).size);
+  });
+}
 
 test('the browser quick-start page boots with the README\'s create call', () => {
-  const [first] = readmeBlocks().values();
+  const [first] = tsBlocks(README).values();
   assert(first !== undefined, 'the README has no ts block');
   const create = first.split('\n').find((line) => line.includes('OpenGeometry.create('));
   assert(create !== undefined, 'the first ts block of the README has no OpenGeometry.create call');
