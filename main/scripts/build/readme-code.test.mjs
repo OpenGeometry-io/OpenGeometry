@@ -7,6 +7,10 @@ import { REPOSITORY_ROOT } from '../lib/paths.mjs';
 
 const README = path.join(REPOSITORY_ROOT, '..', 'README.md');
 const TS_BLOCK = /^```ts\n([\s\S]*?)^```$/gm;
+const TS_OPENER = /^[ \t]*(?:`{3,}|~{3,})[ \t]*(?:typescript|tsx|ts)(?![\w-])/gim;
+const QUICK_START_PAGE = path.join(
+  REPOSITORY_ROOT, 'opengeometry-three', 'tests', 'browser', 'pages', 'quick-start.ts',
+);
 const OPTIONS = {
   noEmit: true,
   strict: true,
@@ -41,7 +45,7 @@ function blockHost(blocks) {
   };
 }
 
-function describe(diagnostic) {
+function diagnosticText(diagnostic) {
   const { file, start } = diagnostic;
   const where = file === undefined || start === undefined
     ? ''
@@ -66,5 +70,19 @@ test('every ts block in the README type-checks against the built package', () =>
     ...program.getGlobalDiagnostics(),
     ...blockDiagnostics(program, [...blocks.keys()]),
   ];
-  assert.deepEqual(diagnostics.map(describe), []);
+  assert.deepEqual(diagnostics.map(diagnosticText), []);
+});
+
+test('every ts fence in the README is one the type check reads', () => {
+  const openers = [...readFileSync(README, 'utf8').matchAll(TS_OPENER)].length;
+  assert.equal(openers, readmeBlocks().size);
+});
+
+test('the browser quick-start page boots with the README\'s create call', () => {
+  const [first] = readmeBlocks().values();
+  assert(first !== undefined, 'the README has no ts block');
+  const create = first.split('\n').find((line) => line.includes('OpenGeometry.create('));
+  assert(create !== undefined, 'the first ts block of the README has no OpenGeometry.create call');
+  const page = readFileSync(QUICK_START_PAGE, 'utf8').split('\n').map((line) => line.trim());
+  assert(page.includes(create.trim()), `quick-start.ts does not contain: ${create.trim()}`);
 });

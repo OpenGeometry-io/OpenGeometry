@@ -170,6 +170,7 @@ export type QuickStartFixture = {
   renderer: THREE.WebGLRenderer;
   settled: Awaited<Settled>;
   report: StepExport['report'];
+  text: StepExport['text'];
   errors: unknown[];
   readonly backend: string;
   dispose(): void;

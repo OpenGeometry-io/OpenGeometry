@@ -5,8 +5,8 @@ const FENCE = /^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?^ {0,3}\1[ \t]*$/gm;
 const INLINE_CODE = /(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g;
 const HELD = /\uE000(\d+)\uE000/g;
 const LINK = /(!?)\[((?:[^[\]]|!\[[^[\]]*\]\([^()\s]*\))*)\]\(([^()\s]+)((?:\s+"[^"]*")?)\)/g;
-const REFERENCE = /^( {0,3}\[[^\]]+\]:[ \t]*)(\S+)/gm;
-const ATTRIBUTE = /\b(href|src)="([^"]*)"/g;
+const REFERENCE = /^( {0,3}\[(?!\^)[^\]]+\]:[ \t]*)(\S+)/gm;
+const ATTRIBUTE = /(?<=\s)(href|src)="([^"]*)"/g;
 
 export function distManifest(manifest) {
   return {
