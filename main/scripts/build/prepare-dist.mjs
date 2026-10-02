@@ -2,10 +2,12 @@ import { cp, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path';
 import { REPOSITORY_ROOT } from '../lib/paths.mjs';
 import { withJsSpecifiers } from './declaration-specifiers.mjs';
+import { distManifest, packageReadme } from './dist-package.mjs';
 
 const DIST = path.join(REPOSITORY_ROOT, 'dist');
 const PKG = path.join(REPOSITORY_ROOT, 'opengeometry', 'pkg');
 const DIST_PKG = path.join(DIST, 'opengeometry', 'pkg');
+const PUBLIC_ROOT = path.join(REPOSITORY_ROOT, '..');
 
 async function declarationFiles(directory) {
   const files = [];
@@ -39,19 +41,7 @@ for (const file of await declarationFiles(DIST)) {
 }
 
 const MANIFEST = JSON.parse(await readFile(path.join(REPOSITORY_ROOT, 'package.json'), 'utf8'));
-await writeFile(path.join(DIST, 'package.json'), `${JSON.stringify({
-  name: MANIFEST.name,
-  version: MANIFEST.version,
-  description: MANIFEST.description,
-  license: MANIFEST.license,
-  type: 'module',
-  main: './index.js',
-  types: './index.d.ts',
-  exports: {
-    '.': { types: './index.d.ts', import: './index.js' },
-    './tessellation-worker.js': './tessellation-worker.js',
-    './opengeometry_bg.wasm': './opengeometry_bg.wasm',
-    './package.json': './package.json',
-  },
-  peerDependencies: MANIFEST.peerDependencies,
-}, null, 2)}\n`);
+await writeFile(path.join(DIST, 'package.json'), `${JSON.stringify(distManifest(MANIFEST), null, 2)}\n`);
+const README = await readFile(path.join(PUBLIC_ROOT, 'README.md'), 'utf8');
+await writeFile(path.join(DIST, 'README.md'), packageReadme(README));
+await cp(path.join(PUBLIC_ROOT, 'LICENSE.md'), path.join(DIST, 'LICENSE.md'));

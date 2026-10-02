@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'main/**'
+      - 'README.md'
       - '.github/workflows/verify.yml'
   pull_request:
     paths:
       - 'main/**'
+      - 'README.md'
       - '.github/workflows/verify.yml'
   workflow_dispatch:
     inputs:
