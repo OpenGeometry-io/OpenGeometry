@@ -42,13 +42,13 @@ fn named_lines(text: &str) -> Vec<&str> {
         .collect()
 }
 
-fn assert_report_fixture(report: &Value, source: &str, label: &str) {
-    let source: Value = serde_json::from_str(source).unwrap();
-    let (actual, source) = (report.as_object().unwrap(), source.as_object().unwrap());
-    assert!(actual.keys().eq(source.keys()), "{label} report keys");
+fn assert_report_fixture(report: &Value, stored: &str, label: &str) {
+    let stored: Value = serde_json::from_str(stored).unwrap();
+    let (actual, stored) = (report.as_object().unwrap(), stored.as_object().unwrap());
+    assert!(actual.keys().eq(stored.keys()), "{label} report keys");
     for (key, value) in actual {
         if key != "validation_level" {
-            assert_eq!(value, &source[key], "{label} report {key}");
+            assert_eq!(value, &stored[key], "{label} report {key}");
         }
     }
 }
@@ -66,10 +66,10 @@ fn checked_export(name: &str, unit: &str, body: &BrepEnvelope) -> (String, Value
     (text, report)
 }
 
-fn assert_export_matches_source(name: &str, body: &BrepEnvelope) {
+fn assert_export_matches_stored(name: &str, body: &BrepEnvelope) {
     for (unit, suffix) in UNITS {
         let stem = format!("{name}.step.{suffix}");
-        let Some(source) = fixture_text(&stem) else {
+        let Some(stored) = fixture_text(&stem) else {
             let error = fixture_text(&format!("{stem}.error.json"))
                 .unwrap_or_else(|| panic!("missing STEP oracle outcome for {name} {unit}"));
             assert_eq!(
@@ -80,7 +80,7 @@ fn assert_export_matches_source(name: &str, body: &BrepEnvelope) {
             continue;
         };
         let (text, report) = checked_export(name, unit, body);
-        assert_eq!(named_lines(&text), named_lines(&source), "{name} {unit}");
+        assert_eq!(named_lines(&text), named_lines(&stored), "{name} {unit}");
         assert_report_fixture(
             &report,
             &fixture_text(&format!("{stem}.report.json")).unwrap(),
@@ -88,18 +88,18 @@ fn assert_export_matches_source(name: &str, body: &BrepEnvelope) {
         );
         assert_eq!(
             normalise_step(&text),
-            normalise_step(&source),
+            normalise_step(&stored),
             "{name} {unit}"
         );
     }
 }
 
 #[test]
-fn single_body_step_matches_source_fixtures_in_both_units() {
+fn single_body_step_matches_stored_fixtures_in_both_units() {
     let fixtures = single_body_fixtures();
     assert_eq!(fixtures.len(), 17);
     for (name, body) in fixtures {
-        assert_export_matches_source(&name, &body);
+        assert_export_matches_stored(&name, &body);
     }
 }
 

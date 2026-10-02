@@ -7,7 +7,7 @@ use serde_json::json;
 use std::collections::BTreeSet;
 
 #[test]
-fn batch_subtraction_matches_source_brep_and_handlers() {
+fn batch_subtraction_matches_stored_brep_and_handlers() {
     let files = case_files("batch-matrix", |name| !name.contains(".fallback."));
     assert_eq!(files.len(), 23);
     for path in files {
@@ -46,7 +46,7 @@ fn fallback_rows_parse() {
 }
 
 #[test]
-fn fallback_rows_match_source_serial_results() {
+fn fallback_rows_match_stored_serial_results() {
     for path in case_files("batch-matrix", |name| name.contains(".fallback.")) {
         let stem = path.file_stem().unwrap().to_str().unwrap();
         let name = stem.strip_suffix(".fallback").unwrap();

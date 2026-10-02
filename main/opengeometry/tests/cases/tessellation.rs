@@ -3,7 +3,7 @@ use opengeometry::tessellation::tessellate;
 use serde_json::json;
 
 #[test]
-fn source_tessellation_matches_for_supported_primitive_fixtures() {
+fn primitive_tessellation_matches_stored_fixtures() {
     macro_rules! check {
         ($name:literal) => {{
             let body = BrepEnvelope::from_json(include_str!(concat!("../fixtures/cases/", $name, ".brep.json"))).unwrap();

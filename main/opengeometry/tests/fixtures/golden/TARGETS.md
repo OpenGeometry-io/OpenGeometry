@@ -16,6 +16,10 @@ tree are kebab-case.
 | aarch64-apple-darwin | `aarch64-apple-darwin.json` | `OG_GOLDEN_UPDATE=1 cargo test --offline --test golden` from `opengeometry/`, debug profile, rustc 1.88.0 (6b00bc388 2025-06-23), macOS 26.4.1 (25E253), Apple silicon |
 | x86-64-unknown-linux-gnu | `x86-64-unknown-linux-gnu.json` | not recorded yet: the file is `{}`, so the test fails with the record instruction until a manual start of `.github/workflows/verify.yml` with `record: goldens` uploads it as an artifact and the file is reviewed and committed |
 
+CI's macOS job compares with `aarch64-apple-darwin.json`, which was recorded on the macOS
+version the table names; a runner on another macOS version can differ for the reasons
+listed under 'Known sources of difference between targets'.
+
 ## Recording
 
 Only `OG_GOLDEN_UPDATE=1` writes a golden file. It is refused when `GITHUB_ACTIONS`
@@ -47,8 +51,8 @@ golden binary fails by design.
 ## Not recorded
 
 wasm32 is not recorded. It waits for the embedded fixtures of the deferred wasm comparison
-work: the corpus reads its matrix fixtures and the boolean handler sources from disk,
-which a wasm test run cannot do.
+work: the golden test reads the boolean matrix rows, the three batch-matrix fallback rows
+and the kernel's boolean handler source files from disk, which a wasm test run cannot do.
 
 ## Differing keys per target
 
@@ -62,8 +66,9 @@ aarch64-apple-darwin file, and the reason.
 ## What the goldens carry
 
 - Every case of the corpus (461): builders, profiles, the boolean matrix (its rows read
-  from `tests/fixtures/cases/boolean-matrix`) and the five single-body boolean fixtures,
-  the cylinder, sphere, direct, planar, oblique and curved booleans, the
+  from `tests/fixtures/cases/boolean-matrix`) and the five single-body boolean cases
+  (`booleans.fixture.*`, built in code in `tests/golden/boolean_fixtures.rs`; they read no
+  file), the cylinder, sphere, direct, planar, oblique and curved booleans, the
   batch and staged batch subtractions, shells, creating operations and the world graph
   session, operate and scenario cases.
 - The three handler listings: `handlers-expected`, `handlers-covered`,

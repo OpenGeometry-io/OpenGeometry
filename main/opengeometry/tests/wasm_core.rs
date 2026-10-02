@@ -6,7 +6,7 @@ use serde_json::Value;
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 #[cfg_attr(not(target_arch = "wasm32"), test)]
-fn embedded_source_corpus_roundtrips_with_cross_target_float_tolerance() {
+fn embedded_stored_corpus_roundtrips_with_cross_target_float_tolerance() {
     let corpus = [
         ("cuboid", include_str!("fixtures/cases/cuboid.brep.json")),
         (
@@ -68,7 +68,7 @@ fn embedded_source_corpus_roundtrips_with_cross_target_float_tolerance() {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 #[cfg_attr(not(target_arch = "wasm32"), test)]
-fn embedded_source_tessellation_corpus_matches_within_four_ulp() {
+fn embedded_stored_tessellation_corpus_matches_within_four_ulp() {
     macro_rules! check {
         ($name:literal) => {{
             let body = BrepEnvelope::from_json(include_str!(concat!("fixtures/cases/", $name, ".brep.json"))).unwrap();
@@ -103,7 +103,7 @@ fn embedded_source_tessellation_corpus_matches_within_four_ulp() {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 #[cfg_attr(not(target_arch = "wasm32"), test)]
-fn embedded_source_step_corpus_keeps_entity_structure_and_four_ulp_reals() {
+fn embedded_stored_step_corpus_keeps_entity_structure_and_four_ulp_reals() {
     macro_rules! check {
         ($name:literal) => {{
             let body = BrepEnvelope::from_json(include_str!(concat!(
@@ -158,7 +158,7 @@ fn embedded_source_step_corpus_keeps_entity_structure_and_four_ulp_reals() {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
 #[cfg_attr(not(target_arch = "wasm32"), test)]
-fn embedded_brep_parity_and_snapshot_buffers() {
+fn embedded_brep_round_trip_and_snapshot_buffers() {
     let bytes = include_bytes!("fixtures/cases/cuboid.brep.json");
     let json = std::str::from_utf8(bytes).unwrap();
     let brep = BrepEnvelope::from_json(json).unwrap();

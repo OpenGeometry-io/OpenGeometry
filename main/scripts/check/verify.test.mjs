@@ -10,7 +10,7 @@ const NO_TESTS = 'no tests to run!';
 const WASM_CORE = 'tests/wasm_core.rs';
 const PASSED = [
   `Executing bindgen...${PADDING}\r${PADDING}\rrunning 4 tests`,
-  'test embedded_brep_parity_and_snapshot_buffers ... ok',
+  'test embedded_brep_round_trip_and_snapshot_buffers ... ok',
   '',
   'test result: ok. 4 passed; 0 failed; 0 ignored; 0 filtered out; finished in 1.22s',
   '',
