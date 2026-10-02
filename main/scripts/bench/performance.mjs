@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 import { OpenGeometry, OG_OPERATION_EXTRUDE, OG_OPERATION_SUBTRACT } from '../../dist/index.js';
 import { createInlineKernel } from '../lib/kernel.mjs';
-import { budgetFindings, median, platformKey } from './budgets.mjs';
+import { budgetFindings, median } from './budgets.mjs';
 import { cutters, mesh, mitredWall, wall } from './scenes.mjs';
 
 const RUNS = 5;
@@ -30,7 +30,7 @@ function measured() {
 function checkBudgets(medianResult) {
   const baseline = JSON.parse(readFileSync(new URL('./performance-baseline.json', import.meta.url), 'utf8'));
   const ci = process.env.CI === 'true';
-  const key = platformKey(process.env, process.platform, process.arch);
+  const key = `${process.platform}-${process.arch}`;
   const { findings, notes } = budgetFindings(medianResult, baseline, key, ci);
   for (const note of notes) console.log(note);
   if (findings.length > 0) throw new Error(findings.join('\n'));

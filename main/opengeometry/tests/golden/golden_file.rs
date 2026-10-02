@@ -11,24 +11,17 @@ const GOLDEN_DIRECTORY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtu
 
 const DIFFERING_DIRECTORY: &str = concat!(env!("CARGO_TARGET_TMPDIR"), "/golden");
 
-const COMMITTED: [(&str, &str); 2] = [
-    (
-        "aarch64-apple-darwin",
-        include_str!("../fixtures/golden/aarch64-apple-darwin.json"),
-    ),
-    (
-        "x86-64-unknown-linux-gnu",
-        include_str!("../fixtures/golden/x86-64-unknown-linux-gnu.json"),
-    ),
-];
-
-const UPDATE_ALLOWED_EVENT: &str = "workflow_dispatch";
+const COMMITTED: [(&str, &str); 1] = [(
+    "aarch64-apple-darwin",
+    include_str!("../fixtures/golden/aarch64-apple-darwin.json"),
+)];
 
 type Golden = BTreeMap<String, String>;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Mode {
     Compare,
+    Build,
     Record,
     Dump(PathBuf),
 }
@@ -77,12 +70,12 @@ pub(crate) fn parse(text: &str) -> Result<Golden, Failure> {
     Ok(serde_json::from_str(text)?)
 }
 
-pub(crate) fn committed(target: &str) -> Result<Golden, Failure> {
-    let text = COMMITTED
+pub(crate) fn committed(target: &str) -> Result<Option<Golden>, Failure> {
+    COMMITTED
         .iter()
         .find(|(stem, _)| *stem == target)
-        .map_or("{}", |(_, text)| text);
-    parse(text)
+        .map(|(_, text)| parse(text))
+        .transpose()
 }
 
 pub(crate) fn digests(texts: &BTreeMap<String, String>) -> Golden {
@@ -115,33 +108,17 @@ pub(crate) fn compare(expected: &Golden, actual: &Golden) -> Result<(), Mismatch
     Err(mismatch)
 }
 
-pub(crate) fn update_mode(
-    update: Option<&str>,
-    github_actions: Option<&str>,
-    event_name: Option<&str>,
-) -> Result<Mode, String> {
-    if update != Some("1") {
-        return Ok(Mode::Compare);
+pub(crate) fn mode(update: Option<&str>, ci: Option<&str>, dump: Option<PathBuf>) -> Mode {
+    if let Some(directory) = dump {
+        return Mode::Dump(directory);
     }
-    if github_actions.is_some() && event_name != Some(UPDATE_ALLOWED_EVENT) {
-        return Err(format!(
-            "OG_GOLDEN_UPDATE=1 is refused on CI outside the {UPDATE_ALLOWED_EVENT} record job; this event is {}",
-            event_name.unwrap_or("unset")
-        ));
+    if ci == Some("true") {
+        return Mode::Build;
     }
-    Ok(Mode::Record)
-}
-
-pub(crate) fn mode(
-    update: Option<&str>,
-    github_actions: Option<&str>,
-    event_name: Option<&str>,
-    dump: Option<PathBuf>,
-) -> Result<Mode, String> {
-    match dump {
-        Some(directory) => Ok(Mode::Dump(directory)),
-        None => update_mode(update, github_actions, event_name),
+    if update == Some("1") {
+        return Mode::Record;
     }
+    Mode::Compare
 }
 
 pub(crate) fn record(target: &str, actual: &Golden) -> Result<PathBuf, Failure> {

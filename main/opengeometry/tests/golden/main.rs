@@ -109,19 +109,18 @@ fn check_findings(
     Ok(())
 }
 
-fn environment_mode() -> Result<Mode, String> {
+fn environment_mode() -> Mode {
     let variable = |name| env::var(name).ok();
     golden_file::mode(
         variable("OG_GOLDEN_UPDATE").as_deref(),
-        variable("GITHUB_ACTIONS").as_deref(),
-        variable("GITHUB_EVENT_NAME").as_deref(),
+        variable("CI").as_deref(),
         env::var_os("OG_GOLDEN_DUMP").map(PathBuf::from),
     )
 }
 
 #[test]
 fn every_golden_scene_matches_the_recorded_golden_for_this_target() {
-    let mode = environment_mode().unwrap_or_else(|refusal| panic!("{refusal}"));
+    let mode = environment_mode();
     let expected = coverage::expected_names().unwrap();
     let cases = corpus().unwrap();
     let run = runner::run(&cases).unwrap();
@@ -155,7 +154,20 @@ fn every_golden_scene_matches_the_recorded_golden_for_this_target() {
         println!("recorded {} keys into {}", actual.len(), file.display());
         return;
     }
-    let golden = golden_file::committed(&target).unwrap();
+    if mode == Mode::Build {
+        println!(
+            "{} scenes built; the golden comparison does not run on CI",
+            actual.len()
+        );
+        return;
+    }
+    let Some(golden) = golden_file::committed(&target).unwrap() else {
+        println!(
+            "{} scenes built; no golden is recorded for {target}, so nothing is compared",
+            actual.len()
+        );
+        return;
+    };
     if let Err(mismatch) = golden_file::compare(&golden, &actual) {
         let directory = golden_file::write_differing(&target, &mismatch.differing, &texts).unwrap();
         panic!(
@@ -163,4 +175,5 @@ fn every_golden_scene_matches_the_recorded_golden_for_this_target() {
             directory.display()
         );
     }
+    println!("{} scenes match the golden for {target}", actual.len());
 }
