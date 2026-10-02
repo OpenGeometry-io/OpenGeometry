@@ -46,6 +46,7 @@ mod step;
 mod volume;
 
 use golden_file::Mode;
+use opengeometry_test_support::stored;
 use record::{Failure, Findings};
 use runner::Case;
 use std::collections::BTreeSet;
@@ -81,6 +82,7 @@ fn check_findings(
     expected: &BTreeSet<String>,
     findings: Findings,
     uncovered: &[String],
+    compared: bool,
 ) -> Result<(), Failure> {
     let seen = findings.covered.union(&findings.staged_handlers);
     let unscanned = coverage::unscanned_names(expected, seen);
@@ -102,8 +104,12 @@ fn check_findings(
     if !uncovered.is_empty() {
         return Err(format!("uncovered handlers or routes: {}", uncovered.join(", ")).into());
     }
-    if !findings.disagreements.is_empty() {
-        let disagreements = findings.disagreements.into_iter().collect::<Vec<_>>();
+    let disagreements = findings
+        .disagreements
+        .into_iter()
+        .filter(|disagreement| compared || !disagreement.ends_with(" result"))
+        .collect::<Vec<_>>();
+    if !disagreements.is_empty() {
         return Err(format!("fixture disagreements: {}", disagreements.join(", ")).into());
     }
     Ok(())
@@ -138,7 +144,13 @@ fn every_golden_scene_matches_the_recorded_golden_for_this_target() {
     if let Mode::Dump(directory) = &mode {
         golden_file::dump(directory, &texts).unwrap();
     }
-    check_findings(&expected, run.findings, &listings.uncovered).unwrap();
+    check_findings(
+        &expected,
+        run.findings,
+        &listings.uncovered,
+        stored::compared(),
+    )
+    .unwrap();
     if matches!(mode, Mode::Dump(_)) {
         return;
     }

@@ -74,14 +74,15 @@ on one kernel boolean (`cargo run --release --example budgets` in `main/opengeom
 which compares with no recorded result. It uploads the check logs and, from Ubuntu, the
 STEP exports. It can also be started by hand.
 
-Two checks compare with numbers recorded on one machine, so they run on a developer's
+Three checks compare with numbers recorded on one machine, so they run on a developer's
 machine and not on CI (where `CI` is `true`). Nothing is recorded on CI.
 
 - The kernel golden test compares the hash of every scene with the golden file of its
   target; the one recorded file is
   `main/opengeometry/tests/fixtures/golden/aarch64-apple-darwin.json`. On CI, and on a
-  target with no golden file, it still builds every scene and applies its other checks,
-  and compares nothing. `TARGETS.md` in that folder says how to record.
+  target with no golden file, it still builds every scene and compares no hash. Its other
+  checks apply there too, except that on CI a boolean matrix row that differs from its
+  stored result is not a failure. `TARGETS.md` in that folder says how to record.
 - The timing budgets compare the performance medians and the storey timings with the
   block of `timings` in `main/scripts/bench/performance-baseline.json` that is named after
   the machine, such as `darwin-arm64`. On CI the timings are measured and printed, not
@@ -91,6 +92,15 @@ machine and not on CI (where `CI` is `true`). Nothing is recorded on CI.
   `transformFlushMs` and `stepMs` of the "Storey performance baseline:" line of the
   browser run as `storeyFirstRenderMs`, `storeyTransformFlushMs` and `storeyStepMs`, and
   set `measuredOn` to the date. A block needs the three storey keys.
+- The kernel tests of the `cases` and `step_oracle` test binaries that compare a body
+  built by the kernel or returned by a boolean, a tessellation, a STEP text or a STEP
+  report digit for digit with one stored under `main/opengeometry/tests/fixtures/cases/`
+  make that comparison off CI only. On CI they still run every case and keep their other
+  checks, such as validity, volumes, handler lists and stored errors. A stored body that
+  is only read and written back is still compared digit for digit everywhere, and
+  `main/opengeometry/tests/wasm_core.rs` compares, on every machine, the stored
+  tessellations within four ULP and the stored metre STEP texts entity for entity with
+  their numbers within four ULP.
 
 The kernel tests also read `main/opengeometry/tests/fixtures/cases/`, which holds test
 inputs and stored expected results. The BRep bodies are both: each is the stored result
@@ -111,7 +121,8 @@ commit and says why. The golden file is the only fixture with a record command.
 2. If the release changes how existing code must be written, check that `MIGRATION.md`
    has its entry (its "Adding an entry" section asks for it in the change that broke the
    code) and rename an "Unreleased" section after the two versions, such as "2.5 to 2.6".
-3. Run both gates locally, where the golden comparison and the timing budgets run:
+3. Run both gates locally, where the golden comparison, the comparisons with stored
+   results and the timing budgets run:
    ```bash
    npm run check
    npm run check:full

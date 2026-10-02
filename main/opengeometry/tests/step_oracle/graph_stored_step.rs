@@ -1,6 +1,7 @@
 use crate::support::{add_cuboid, cylinder, export_matched, fixture_text};
 use opengeometry::world_graph::{EditScope, ModifyingOperation, StepOptions};
 use opengeometry_test_support::part21::normalise_step;
+use opengeometry_test_support::stored;
 use opengeometry_test_support::world_graph::graph;
 
 #[test]
@@ -26,12 +27,14 @@ fn graph_export_of_fixture_primitives_matches_stored_text_after_normalisation() 
         };
         for name in ["cylinder", "cuboid", "box-cut"] {
             let exported = export_matched(&world, &[name], &options);
-            let stored = fixture_text(&format!("{name}.step.{suffix}")).unwrap();
-            assert_eq!(
-                normalise_step(&exported.text),
-                normalise_step(&stored),
-                "{name} {unit}"
-            );
+            if stored::compared() {
+                let stored = fixture_text(&format!("{name}.step.{suffix}")).unwrap();
+                assert_eq!(
+                    normalise_step(&exported.text),
+                    normalise_step(&stored),
+                    "{name} {unit}"
+                );
+            }
         }
     }
 }

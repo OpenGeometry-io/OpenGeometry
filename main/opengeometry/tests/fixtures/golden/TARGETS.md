@@ -18,7 +18,8 @@ tree are kebab-case.
 The comparison runs only on a recorded target and never on CI (where `CI` is `true`). On
 CI, and on a target with no golden file, the test still builds every scene and applies
 the corpus checks, and compares nothing; with `-- --nocapture` it prints which it did.
-The file was recorded on the macOS version the table names; a run on another macOS
+On CI a boolean matrix row that differs from its stored result is not a failure either.
+The golden file was recorded on the macOS version the table names; a run on another macOS
 version can differ if its math library rounds differently (the first of the 'Known
 sources of difference between targets').
 
