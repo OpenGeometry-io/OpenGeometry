@@ -7,13 +7,14 @@ Contributor-facing notes. For end-user docs see [README.md](./README.md);
 
 - Node.js 26 (what CI uses)
 - Rust toolchain 1.88.0
-- `wasm-pack` — `brew install wasm-pack` on macOS, or `cargo install wasm-pack`
+- `wasm-pack` (CI uses 0.13.1) — `brew install wasm-pack` on macOS, or
+  `cargo install wasm-pack`
 
 ## Project layout
 
 - `main/opengeometry/` — Rust core compiled to WebAssembly
 - `main/opengeometry-three/` — Three.js wrapper (the published TypeScript SDK)
-- `main/dist/` — generated NPM bundle (do not edit)
+- `main/dist/` — generated npm bundle (do not edit)
 
 ## Local build
 
@@ -48,7 +49,8 @@ write their logs to `main/.check/`.
   lint, type checks, source rules, import cycles, duplicates, the example build, and the
   binding, Node and performance tests.
 - `npm run check:full` runs the same 18 steps plus the Playwright browser tests on
-  three 0.168 and 0.184 (20 steps).
+  three 0.168 and 0.184 (20 steps). It needs Playwright's Chromium:
+  `npx playwright install chromium` in `main/` (on Linux with `--with-deps`, as CI does).
 
 `.github/workflows/verify.yml` runs on every push and pull request that changes
 `main/**`, `README.md` or the workflow file, on Ubuntu and macOS. It runs `npm run check`,
@@ -82,16 +84,16 @@ medians are copied by hand into `timings.linux-x64-ci` and `timings.darwin-arm64
    ```
 3. Merge to the `main` branch, then start the GitHub Action at
    `.github/workflows/release.yml` by hand on the `main` branch; a push does not publish.
-   It rebuilds, runs `npm run check` (required to pass), and publishes `main/dist/` to NPM
+   It rebuilds, runs `npm run check` (required to pass), and publishes `main/dist/` to npm
    if the version is not already on the registry.
 4. The action also creates a GitHub release tagged `v<version>`.
 
 If the publish step fails for an environmental reason but the version was already
-bumped, re-running the workflow will re-attempt publish (the action checks NPM and only
+bumped, re-running the workflow will re-attempt publish (the action checks npm and only
 publishes if the version is missing).
 
-A release run cannot pass yet. `npm run check` fails on a GitHub runner until the Linux
-golden (`main/opengeometry/tests/fixtures/golden/x86-64-unknown-linux-gnu.json`, now
-`{}`) and the two CI timing blocks (`timings.linux-x64-ci` and `timings.darwin-arm64-ci`)
-are recorded, reviewed and committed as described in
-[Verification and CI](#verification-and-ci).
+A release run cannot pass yet. `npm run check` fails on the Ubuntu runner until the
+Linux golden (`main/opengeometry/tests/fixtures/golden/x86-64-unknown-linux-gnu.json`,
+now `{}`) and `timings.linux-x64-ci` are recorded, reviewed and committed as described
+in [Verification and CI](#verification-and-ci). The macOS job of `verify.yml` also needs
+`timings.darwin-arm64-ci`.

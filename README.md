@@ -24,7 +24,7 @@
 
 ---
 
-> **Actively maintained and growing.** We're building OpenGeometry in the open. APIs, examples, and package structure are evolving, we are actively improving and expanding the project. Star the repo to follow along. If you have questions or want to get involved, join the [Discord](https://discord.com/invite/9wJpbfgGGA) or check out the [issues](https://github.com/OpenGeometry-io/OpenGeometry/issues)
+> **Actively maintained and growing.** We're building OpenGeometry in the open. APIs, examples, and package structure are evolving, and we are actively improving and expanding the project. Star the repo to follow along. If you have questions or want to get involved, join the [Discord](https://discord.com/invite/9wJpbfgGGA) or check out the [issues](https://github.com/OpenGeometry-io/OpenGeometry/issues).
 
 > **Version note.** This README describes OpenGeometry 2.5. Until 2.5.0 is published, `npm install opengeometry` installs the 2.0 line, whose API is different. The hosted documentation also still describes 2.0.
 
@@ -61,7 +61,7 @@ npm install opengeometry three
 
 - `three` is a peer dependency: versions `>=0.168.0 <0.185.0` are supported.
 - The package is ES modules only, and its TypeScript types are included.
-- The package ships `opengeometry_bg.wasm` (the kernel) and `tessellation-worker.js` (the display worker), and your page must be able to fetch both. By default they are loaded from the package's own folder. If your bundler does not serve them from there, copy them to your public folder and pass their URLs to `OpenGeometry.create`, as the quick start does.
+- The package ships `opengeometry_bg.wasm` (the kernel) and `tessellation-worker.js` (the display worker), and your page must be able to fetch both. With no arguments, `OpenGeometry.create()` looks for them next to the package's own `index.js`. If your bundler moves or rewrites `index.js` without the two files, that lookup fails, so the dependable way is the one the quick start uses: copy both files from `node_modules/opengeometry/` into the folder your site serves at its root (in Vite, the `public/` folder by default) and pass their URLs to `create`.
 
 ## Quick start
 
@@ -93,9 +93,19 @@ renderer.setAnimationLoop(() => renderer.render(scene, camera));
 const { text, report } = await OpenGeometry.exportStep({ nodes: [wall], unit: 'millimetre', upAxis: 'Z' });
 ```
 
-This loads the kernel, draws a 6 m by 0.2 m rectangle on the ground, extrudes it 3 m up into a wall, and cuts a door through the wall with a cuboid. The wall is a `THREE.Group`, so it goes into the scene like any other object and is drawn on every frame. The last line writes the wall as a STEP file: `text` is the file and `report` counts what was written.
+This loads the kernel, makes a 6 m by 0.2 m rectangle wire on the ground plane, extrudes it 3 m up into a wall, and cuts a door opening through the wall with a cuboid placed at x = 2. The wall is a `THREE.Group`, so it goes into the scene like any other object and is drawn on every frame. The last line writes the wall as a STEP file: `text` is the file and `report` counts what was written.
 
-Runnable examples live in [`main/opengeometry-three/examples-vite/`](./main/opengeometry-three/examples-vite/): a showcase, a sweep, booleans, an opening, a cuboid, a cylinder and STEP export. From a clone, run `npm run build` and then `npm run dev-example`.
+The two URLs assume both files were copied to the site root, as described under Installation. The block uses top-level `await`, so it must run as a module. If your build rejects top-level `await`, raise its target (the examples set Vite's `build.target` to `'esnext'`) or move the code after the imports into an `async` function and call it.
+
+Runnable examples live in [`main/opengeometry-three/examples-vite/`](./main/opengeometry-three/examples-vite/): a showcase, a sweep, booleans, an opening, a cuboid, a cylinder and STEP export. From a clone, run `npm --prefix main ci`, `npm run build` and then `npm run dev-example`.
+
+## Demos
+
+See OpenGeometry in action — interactive, browser-based demos showcasing the kernel's capabilities:
+
+**[demos.opengeometry.io](https://demos.opengeometry.io?utm_source=github)**
+
+Demos include primitives rendering, shape generation, sweep operations, boolean operations, file exports, and more. All running client-side via WebAssembly.
 
 ## When to use OpenGeometry
 
@@ -103,7 +113,7 @@ Use OpenGeometry when you need:
 
 - browser-based parametric modeling with Rust + WebAssembly performance
 - cutout subtraction and other solid boolean workflows
-- polygon extrusion into solids for CAD or AEC modeling
+- profile extrusion into solids for CAD or AEC modeling
 - STEP export in web apps
 - a Three.js-friendly CAD kernel instead of ad hoc mesh math
 - a deterministic geometry engine behind AI-assisted CAD or design workflows
@@ -116,7 +126,7 @@ Good examples include:
 
 - AI assistants that translate user intent into concrete modeling operations
 - prompt-to-geometry or agent-driven editing flows inside browser CAD tools
-- AI first design interfaces that still need reliable extrusion, boolean, and export workflows
+- AI-first design interfaces that still need reliable extrusion, boolean, and export workflows
 
 ## Good fit / Not the right fit
 
@@ -124,13 +134,22 @@ Good examples include:
 
 - browser CAD, mechanical design, and geometry-heavy web applications
 - Three.js-based modeling tools that need a real kernel behind them
-- AI first CAD frontends that need deterministic geometry execution in the browser
+- AI-first CAD frontends that need deterministic geometry execution in the browser
 
 **Not the default fit**
 
 - desktop-native CAD products instead of an embeddable web SDK
 - non-browser runtimes with no WebAssembly or browser delivery story
 - pure visualization-only apps where raw Three.js is enough and kernel-backed modeling is unnecessary
+
+## Who is this for?
+
+- Teams building **browser-based CAD and geometry tools**
+- Developers evaluating **WebAssembly-powered 3D** for the web
+- Contributors interested in the **Rust → WASM geometry pipeline**
+- Anyone exploring **open-source CAD kernel internals**
+
+If you just want a quick look, start with the [hosted demos](https://demos.opengeometry.io?utm_source=github) or the [examples](./main/opengeometry-three/examples-vite/).
 
 ## Using OpenGeometry with AI coding assistants
 
@@ -153,7 +172,7 @@ This section is a compact reference for writing OpenGeometry 2.5 code, by hand o
 | Edits | `body.rebuild(kind, params, { instances? })` with the kinds and parameters above; a wire stays a wire and a solid a solid. |
 | Copies | `body.duplicate({ ogId?, parent? })` makes an independent copy; `body.instance({ ogId?, parent? })` shares the shape. `getInstanceCount()`, `makeUnique()`. |
 | `SystemAssembly` | `new SystemAssembly({ ogId?, parent? })`. `addChild(children, { keepWorld? })`, `removeChild(child, { keepWorld? })`, `getChildren()`, `getParent()`, `getBounds()`, `transform`, `dispose()`. Bodies have the same tree methods. |
-| Queries | `getBounds()` (six numbers, or `null`), `getBrep()`, `solid.getReport()` (the last boolean's report, or `null`). |
+| Queries | `getBounds()` (`[minX, minY, minZ, maxX, maxY, maxZ]`, or `null`), `getBrep()`, `solid.getReport()` (the last boolean's report, or `null`). |
 | Appearance | `appearance` in the options, or `body.setAppearance({ color?, opacity?, outline?, pickOutline?, deflection? })`. |
 | Display | `OpenGeometry.settled({ deflection? })` resolves to `{ failed }`; `OpenGeometry.flush({ geometry?: 'sync' })`; `OpenGeometry.setDisplayDeflection(world?)`; `OpenGeometry.setCameraMotion(moving)`. |
 | Picking | `OpenGeometry.resolveHit(intersection)` takes a Three.js raycast hit and returns `{ ogId, shapeRevision, faceId?, edgeId? }` or `undefined`. |
@@ -193,14 +212,6 @@ This section is a compact reference for writing OpenGeometry 2.5 code, by hand o
 
 **Where the truth is.** `index.d.ts` in the installed package lists every export and its types. The examples in [`main/opengeometry-three/examples-vite/`](./main/opengeometry-three/examples-vite/) are working 2.5 code.
 
-## Demos
-
-See OpenGeometry in action — interactive, browser-based demos showcasing the kernel's capabilities:
-
-**[demos.opengeometry.io](https://demos.opengeometry.io?utm_source=github)**
-
-Demos include primitives rendering, shape generation, sweep operations, boolean operations, file exports, and more. All running client-side via WebAssembly.
-
 ## Documentation
 
 The hosted documentation at **[docs.opengeometry.io](https://docs.opengeometry.io?utm_source=github)** still describes the 2.0 API. For 2.5, use this README, the types in the package and the examples.
@@ -232,7 +243,7 @@ npm run check:full
 - `npm run dev-example` serves the example pages on a local Vite server; build first.
 - `npm test` runs the kernel's Rust tests.
 - `npm run check` runs the gate: formatting, lints, type checks, source rules, the build, the Rust, WebAssembly and Node tests, and the performance budgets.
-- `npm run check:full` runs the same gate plus the browser tests on three 0.168 and 0.184.
+- `npm run check:full` runs the same gate plus the browser tests on three 0.168 and 0.184. The browser tests need Playwright's Chromium, installed with `npx playwright install chromium` in `main/` (on Linux, add `--with-deps` to install the system libraries, as CI does).
 
 More in [developer.md](./developer.md).
 
@@ -247,15 +258,6 @@ If your project uses OpenGeometry, please add the badge to your README and link 
 ```
 
 Then tell us about it on [Discord](https://discord.com/invite/9wJpbfgGGA): we like to see what you build.
-
-## Who is this for?
-
-- Teams building **browser-based CAD and geometry tools**
-- Developers evaluating **WebAssembly-powered 3D** for the web
-- Contributors interested in the **Rust → WASM geometry pipeline**
-- Anyone exploring **open-source CAD kernel internals**
-
-If you just want a quick look, start with the [hosted demos](https://demos.opengeometry.io?utm_source=github) or the [examples](./main/opengeometry-three/examples-vite/).
 
 ## Community
 
