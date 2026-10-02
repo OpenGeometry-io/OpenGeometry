@@ -61,8 +61,10 @@ against `main/dist/`, fails on a `ts`, `typescript` or `tsx` block it does not r
 checks that `main/opengeometry-three/tests/browser/pages/quick-start.ts` holds the README's
 `OpenGeometry.create(` line. The browser suite runs that page, which is a hand copy of the
 README's quick start, so a change to the quick start changes `pages/quick-start.ts` too.
-The same test checks the `ts` blocks of `MIGRATION.md` the same way. The build ships the
-README, with its relative links made absolute, and `LICENSE.md` in `main/dist/`.
+The same test type-checks the `ts` blocks of `MIGRATION.md` and fails on a fence it does
+not read there; the quick-start check covers the README only. The build ships the README,
+with its relative links made absolute, and `LICENSE.md` in `main/dist/`. `MIGRATION.md`
+is not shipped: the package README links to it on GitHub's `main` branch.
 
 `.github/workflows/verify.yml` runs on every push and pull request that changes `main/**`,
 `README.md`, `MIGRATION.md`, `LICENSE.md` or the workflow file, on Ubuntu and macOS. It
@@ -88,25 +90,34 @@ into `timings.darwin-arm64-ci`. Copy the `timings` of `performance-medians.json`
 `storeyFirstRenderMs`, `storeyTransformFlushMs` and `storeyStepMs`. Every timings block
 needs the three storey keys, so copy all of them in one commit.
 
+The kernel tests also read `main/opengeometry/tests/fixtures/cases/`, which holds test
+inputs and stored expected results. The BRep bodies are both: each is the stored result
+of a builder or of one of five booleans, and the input of the tessellation, STEP and
+round-trip tests. The boolean and batch matrix rows hold their inputs with their stored
+result and handlers, and each validity body has its stored verdict. The other stored
+results are tessellations, STEP texts, reports and errors, and handler lists. They were
+first recorded from the 2.0 kernel by a tool that no longer exists, so no command
+regenerates them. A change that moves one edits the stored file by hand in the same
+commit and says why. The golden file is the only fixture with a record command.
+
 ## Release process
 
 1. Bump `version` in `main/package.json`, `main/package-lock.json`,
    `main/opengeometry/Cargo.toml`, `main/opengeometry/Cargo.lock` and
    `main/opengeometry/test-support/Cargo.lock` so they match (CI fetches with `--locked`).
-2. For the first 2.5 release, remove the version note near the top of `README.md`. The
-   build copies the README into the package, so the published page would carry it.
-3. If the release changes how existing code must be written, add an entry to
-   `MIGRATION.md`, as its "Adding an entry" section describes.
-4. Run both gates locally:
+2. If the release changes how existing code must be written, check that `MIGRATION.md`
+   has its entry (its "Adding an entry" section asks for it in the change that broke the
+   code) and rename an "Unreleased" section after the two versions, such as "2.5 to 2.6".
+3. Run both gates locally:
    ```bash
    npm run check
    npm run check:full
    ```
-5. Merge to the `main` branch, then start the GitHub Action at
+4. Merge to the `main` branch, then start the GitHub Action at
    `.github/workflows/release.yml` by hand on the `main` branch; a push does not publish.
    It rebuilds, runs `npm run check` (required to pass), and publishes `main/dist/` to npm
    if the version is not already on the registry.
-6. The action also creates a GitHub release tagged `v<version>`.
+5. The action also creates a GitHub release tagged `v<version>`.
 
 If the publish step fails for an environmental reason but the version was already
 bumped, re-running the workflow will re-attempt publish (the action checks npm and only
