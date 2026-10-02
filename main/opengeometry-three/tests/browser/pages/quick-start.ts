@@ -35,6 +35,7 @@ publishFixture('ogQuickStart', {
   renderer: RENDERER,
   settled: SETTLED,
   report: STEP.report,
+  text: STEP.text,
   errors: ERRORS,
   get backend() { return activeBackend(); },
   dispose: () => {

@@ -89,3 +89,14 @@ test('the package readme makes relative links absolute and leaves absolute links
   ].join('\n'));
   assert.throws(() => packageReadme('[up](../README.md)'));
 });
+
+test('a footnote definition is left alone', () => {
+  assert.equal(packageReadme('[^1]: A note.'), '[^1]: A note.');
+});
+
+test('a data-src attribute is left alone', () => {
+  assert.equal(
+    packageReadme('<img data-src="./docs/x.png" src="./docs/x.png">'),
+    `<img data-src="./docs/x.png" src="${RAW}/docs/x.png">`,
+  );
+});

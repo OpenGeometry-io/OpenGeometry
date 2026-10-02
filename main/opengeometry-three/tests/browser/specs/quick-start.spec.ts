@@ -10,6 +10,7 @@ function checkQuickStart(): void {
   if (products !== 1 || solids !== 1 || faces !== 22) {
     throw new Error(`STEP counts differ: ${JSON.stringify({ products, solids, faces })}`);
   }
+  if (!fixture.text.startsWith('ISO-10303-21')) throw new Error('The STEP text does not start with ISO-10303-21');
   const bounds = fixture.bounds;
   const near = (actual: number, target: number): boolean => Math.abs(actual - target) <= 1e-6;
   if (!bounds || !near(bounds[0], -3) || !near(bounds[3], 3) || !near(bounds[1], 0) || !near(bounds[4], 3)) {
@@ -30,7 +31,7 @@ function countDrawnPixels(): number {
   let drawn = 0;
   for (let index = 0; index < pixels.length; index += 4) {
     const black = pixels[index] === 0 && pixels[index + 1] === 0 && pixels[index + 2] === 0;
-    if (!black || pixels[index + 3] !== 255) drawn++;
+    if (pixels[index + 3] === 255 && !black) drawn++;
   }
   return drawn;
 }
