@@ -120,7 +120,12 @@ fn matrix_bodies(matrix: &str, count: usize, skipped: &[&str]) -> Vec<(String, B
         .collect()
 }
 
-fn exported_matrix_rows(matrix: &str, count: usize, skipped: &[&str], unexportable: &[&str]) -> usize {
+fn exported_matrix_rows(
+    matrix: &str,
+    count: usize,
+    skipped: &[&str],
+    unexportable: &[&str],
+) -> usize {
     let mut exported = 0;
     for (name, body) in matrix_bodies(matrix, count, skipped) {
         if unexportable.contains(&name.as_str()) {
