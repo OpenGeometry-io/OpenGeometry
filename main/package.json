@@ -4,7 +4,39 @@
   "private": true,
   "type": "module",
   "license": "MPL-2.0",
-  "description": "OpenGeometry analytic kernel and Three.js SDK",
+  "description": "Open-source CAD kernel for the browser: B-rep solids, boolean operations, extrude and sweep, and STEP export, written in Rust, compiled to WebAssembly, with a TypeScript SDK for Three.js.",
+  "keywords": [
+    "cad",
+    "cad-kernel",
+    "brep",
+    "geometry",
+    "geometry-kernel",
+    "solid-modeling",
+    "boolean",
+    "csg",
+    "extrude",
+    "sweep",
+    "step",
+    "step-export",
+    "threejs",
+    "three",
+    "webassembly",
+    "wasm",
+    "rust",
+    "typescript",
+    "browser",
+    "parametric",
+    "3d"
+  ],
+  "homepage": "https://opengeometry.io?utm_source=npm",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenGeometry-io/OpenGeometry.git",
+    "directory": "main"
+  },
+  "bugs": {
+    "url": "https://github.com/OpenGeometry-io/OpenGeometry/issues"
+  },
   "peerDependencies": {
     "three": ">=0.168.0 <0.185.0"
   },

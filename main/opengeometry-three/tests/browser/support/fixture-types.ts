@@ -164,7 +164,19 @@ export type AcceptanceFixture = {
   dispose(): void;
 };
 
+export type QuickStartFixture = {
+  wall: Solid;
+  bounds: Bounds | null;
+  renderer: THREE.WebGLRenderer;
+  settled: Awaited<Settled>;
+  report: StepExport['report'];
+  errors: unknown[];
+  readonly backend: string;
+  dispose(): void;
+};
+
 declare global {
   var ogSmoke: SmokeFixture | undefined;
   var ogAcceptance: AcceptanceFixture | undefined;
+  var ogQuickStart: QuickStartFixture | undefined;
 }

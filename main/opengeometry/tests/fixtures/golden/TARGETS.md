@@ -14,14 +14,16 @@ tree are kebab-case.
 | Target | File | How it was produced |
 | --- | --- | --- |
 | aarch64-apple-darwin | `aarch64-apple-darwin.json` | `OG_GOLDEN_UPDATE=1 cargo test --offline --test golden` from `opengeometry/`, debug profile, rustc 1.88.0 (6b00bc388 2025-06-23), macOS 26.4.1 (25E253), Apple silicon |
-| x86-64-unknown-linux-gnu | `x86-64-unknown-linux-gnu.json` | not recorded yet: the file is `{}`, so the test fails with the record instruction until the record job writes it |
+| x86-64-unknown-linux-gnu | `x86-64-unknown-linux-gnu.json` | not recorded yet: the file is `{}`, so the test fails with the record instruction until a manual start of `.github/workflows/verify.yml` with `record: goldens` uploads it as an artifact and the file is reviewed and committed |
 
 ## Recording
 
 Only `OG_GOLDEN_UPDATE=1` writes a golden file. It is refused when `GITHUB_ACTIONS`
 is set, unless `GITHUB_EVENT_NAME` is `workflow_dispatch`, so a CI run can never
 record the file it then compares against. Review the diff of the recorded file before
-committing it.
+committing it. On CI the recording is the `record` job of `.github/workflows/verify.yml`,
+started by hand with `record: goldens`: it uploads the golden files as the
+`goldens-<os>` artifact and never commits.
 
 `OG_GOLDEN_DUMP=<dir>` (used by `npm run snapshot:kernel -- <dir>`) writes the record
 text of every case and the three handler listings into an empty directory, skips the

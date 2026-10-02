@@ -38,15 +38,13 @@ main/.check/
 .DS_Store
 .vscode/
 settings.json
-# Track .claude/settings.json (team hook config); keep .claude/settings.local.json ignored.
-!.claude/settings.json
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 
 # AI and documentation files
 .requests/*.md
 .github/*.md
-# Agent instructions now live outside the repo (see AGENTS.md stub).
+# Agent instructions are never committed.
 AGENTS.md
 CLAUDE.md
 

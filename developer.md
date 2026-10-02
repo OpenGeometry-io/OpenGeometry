@@ -1,7 +1,7 @@
 # Developer Documentation
 
-Contributor-facing notes. For agent guidance see [AGENTS.md](./AGENTS.md). For end-user
-docs see [README.md](./README.md) and [docs.opengeometry.io](https://docs.opengeometry.io).
+Contributor-facing notes. For end-user docs see [README.md](./README.md);
+[docs.opengeometry.io](https://docs.opengeometry.io) still describes the 2.0 API.
 
 ## Prerequisites
 
@@ -24,9 +24,9 @@ npm test                   # Cargo unit + integration tests
 ```
 
 `npm run build` runs `build-core` (wasm-pack only), then `rollup -c`, then
-`node scripts/build/prepare-dist.mjs` (copy WASM and package metadata) in order, all
-inside `main/`. There is no clean step. Running the stages out of order produces stale
-`pkg/` and bundle mismatches.
+`node scripts/build/prepare-dist.mjs` (copy WASM, package metadata, the README and the
+licence) in order, all inside `main/`. There is no clean step. Running the stages out of
+order produces stale `pkg/` and bundle mismatches.
 
 ## Running the example app
 
@@ -38,21 +38,60 @@ npm --prefix main run build-example    # Static build
 The example catalog lives at `main/opengeometry-three/examples-vite/`. Use it (rather
 than copying the build into a sibling repo) for local validation.
 
+## Verification and CI
+
+Both check commands work from the repository root and from the `main/` folder, and
+write their logs to `main/.check/`.
+
+- `npm run check` runs the 18-step gate: formatting, clippy and tests of the kernel
+  and `test-support` crates, the WebAssembly tests, the build, the worker-bundle check,
+  lint, type checks, source rules, import cycles, duplicates, the example build, and the
+  binding, Node and performance tests.
+- `npm run check:full` runs the same 18 steps plus the Playwright browser tests on
+  three 0.168 and 0.184 (20 steps).
+
+`.github/workflows/verify.yml` runs on every push and pull request that changes
+`main/**`, `README.md` or the workflow file, on Ubuntu and macOS. It runs `npm run check`,
+then the two browser runs (`node scripts/check/verify.mjs --full --only
+browser:three-168` and `--only browser:three-184`), then the release-mode kernel time
+budgets (`cargo run --release --example budgets`). It uploads the check logs and, from
+Ubuntu, the STEP exports.
+
+The same workflow can be started by hand. Its one required input, `record`, chooses
+what to record on Ubuntu and macOS:
+
+- `goldens` records the kernel golden file and a kernel snapshot, and uploads them as
+  the `goldens-<os>` artifact.
+- `baselines` measures the performance medians and the storey baseline, and uploads
+  them as the `baselines-<os>` artifact.
+
+A record run commits nothing. A person downloads the artifacts, reviews them and
+commits them: the golden file goes to `main/opengeometry/tests/fixtures/golden/`, and the
+medians are copied by hand into `timings.linux-x64-ci` and `timings.darwin-arm64-ci` in
+`main/scripts/bench/performance-baseline.json`.
+
 ## Release process
 
 1. Bump `version` in `main/package.json`, `main/package-lock.json`,
    `main/opengeometry/Cargo.toml`, `main/opengeometry/Cargo.lock` and
    `main/opengeometry/test-support/Cargo.lock` so they match (CI fetches with `--locked`).
-2. Run the full build + test locally:
+2. Run both gates locally:
    ```bash
-   npm run build
-   npm test
+   npm run check
+   npm run check:full
    ```
-3. Merge to `main`, then start the GitHub Action at `.github/workflows/release.yml` by
-   hand on `main`; a push does not publish. It rebuilds, runs `npm run check` (required
-   to pass), and publishes to NPM if the version is not already on the registry.
+3. Merge to the `main` branch, then start the GitHub Action at
+   `.github/workflows/release.yml` by hand on the `main` branch; a push does not publish.
+   It rebuilds, runs `npm run check` (required to pass), and publishes `main/dist/` to NPM
+   if the version is not already on the registry.
 4. The action also creates a GitHub release tagged `v<version>`.
 
 If the publish step fails for an environmental reason but the version was already
 bumped, re-running the workflow will re-attempt publish (the action checks NPM and only
 publishes if the version is missing).
+
+A release run cannot pass yet. `npm run check` fails on a GitHub runner until the Linux
+golden (`main/opengeometry/tests/fixtures/golden/x86-64-unknown-linux-gnu.json`, now
+`{}`) and the two CI timing blocks (`timings.linux-x64-ci` and `timings.darwin-arm64-ci`)
+are recorded, reviewed and committed as described in
+[Verification and CI](#verification-and-ci).

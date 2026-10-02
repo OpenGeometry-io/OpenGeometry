@@ -49,7 +49,7 @@ export function statusElement(): Element {
   return status;
 }
 
-export function publishFixture<K extends 'ogSmoke' | 'ogAcceptance'>(
+export function publishFixture<K extends 'ogSmoke' | 'ogAcceptance' | 'ogQuickStart'>(
   key: K, fixture: NonNullable<(typeof globalThis)[K]>, status: string,
 ): void {
   globalThis[key] = fixture;
