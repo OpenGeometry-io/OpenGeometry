@@ -8,7 +8,7 @@ It is written for people and for coding assistants alike: each section says what
 
 1. Find the section for the version you are leaving.
 2. Go through its "Replace this with that" table and change your code row by row.
-3. Read its "Different behaviour" list: these are the changes that still compile but act differently.
+3. Read its "Different behaviour" list: it says what now works differently, even where the names look the same.
 4. Anything listed under "Removed" has no replacement. Take that code out, or stay on the older version.
 
 ## 2.0 to 2.5
@@ -134,7 +134,7 @@ These have no replacement:
 When a change to OpenGeometry breaks code written for the previous version, add a section to this guide in the same change.
 
 - Put the new section at the top, just under "How to use this guide", and name it after the two versions, such as "2.5 to 2.6".
-- Say what changed, show the same code before and after, give the replace table, and list what was removed. Add "Different behaviour" when something keeps compiling but acts differently.
+- Say what changed, show the same code before and after, give the replace table, and list what was removed. Add "Different behaviour" when something now works differently.
 - Code for the current version goes in a code block labelled `ts` that starts at the left margin and is a complete module, imports included. The checks type-check every such block against the built package.
 - Code for an older version goes in a code block labelled `js`, which is not checked.
 - When a later change breaks a `ts` block in an older section, change that block's label to `js`.
@@ -162,7 +162,7 @@ Copy this outline:
 
 ### Different behaviour
 
-- What still compiles but acts differently.
+- What now works differently.
 
 ### Removed in <new>
 
