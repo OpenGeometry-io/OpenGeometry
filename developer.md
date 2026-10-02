@@ -5,37 +5,34 @@ docs see [README.md](./README.md) and [docs.opengeometry.io](https://docs.openge
 
 ## Prerequisites
 
-- Node.js (CI uses 18; any LTS is fine locally)
-- Rust toolchain (stable)
+- Node.js 26 (what CI uses)
+- Rust toolchain 1.88.0
 - `wasm-pack` — `brew install wasm-pack` on macOS, or `cargo install wasm-pack`
 
 ## Project layout
 
 - `main/opengeometry/` — Rust core compiled to WebAssembly
 - `main/opengeometry-three/` — Three.js wrapper (the published TypeScript SDK)
-- `main/opengeometry-{webgl,babylon,ios,export-io,export-schema}/` — empty scaffolds
-- `dist/` — generated NPM bundle (do not edit)
+- `main/dist/` — generated NPM bundle (do not edit)
 
 ## Local build
 
 ```bash
-npm install
-npm run build              # Full pipeline: Rust → WASM → TS bundle → dist/
-npm test                   # Cargo unit + integration tests (no TypeScript tests yet)
+npm --prefix main ci
+npm run build              # Full pipeline: Rust → WASM → TS bundle → main/dist/
+npm test                   # Cargo unit + integration tests
 ```
 
-`npm run build` runs `build-core` (wasm-pack + cargo release), `build-three`
-(clean `dist/`, then Rollup), and `prepare-dist` (copy WASM and package metadata) in
-order. The clean step removes declarations for deleted sources before Rollup emits
-new ones. Running the stages out of order produces stale `pkg/` and bundle
-mismatches — see `.claude/skills/wasm-build-flow.md` if you hit that.
+`npm run build` runs `build-core` (wasm-pack only), then `rollup -c`, then
+`node scripts/build/prepare-dist.mjs` (copy WASM and package metadata) in order, all
+inside `main/`. There is no clean step. Running the stages out of order produces stale
+`pkg/` and bundle mismatches.
 
 ## Running the example app
 
 ```bash
-npm --prefix main/opengeometry-three run dev-example-three      # Vite dev server
-npm --prefix main/opengeometry-three run build-example-three    # Static build
-npm --prefix main/opengeometry-three run preview-example-three  # Preview the build
+npm --prefix main run dev-example      # Vite dev server
+npm --prefix main run build-example    # Static build
 ```
 
 The example catalog lives at `main/opengeometry-three/examples-vite/`. Use it (rather
@@ -43,16 +40,17 @@ than copying the build into a sibling repo) for local validation.
 
 ## Release process
 
-1. Bump `version` in both `package.json` and `main/opengeometry/Cargo.toml` so they
-   match.
+1. Bump `version` in `main/package.json`, `main/package-lock.json`,
+   `main/opengeometry/Cargo.toml`, `main/opengeometry/Cargo.lock` and
+   `main/opengeometry/test-support/Cargo.lock` so they match (CI fetches with `--locked`).
 2. Run the full build + test locally:
    ```bash
    npm run build
    npm test
    ```
-3. Push to `main`. The GitHub Action at `.github/workflows/release.yml` detects the
-   version bump, rebuilds, runs tests (now required to pass), and publishes to NPM if
-   the version is not already on the registry.
+3. Merge to `main`, then start the GitHub Action at `.github/workflows/release.yml` by
+   hand on `main`; a push does not publish. It rebuilds, runs `npm run check` (required
+   to pass), and publishes to NPM if the version is not already on the registry.
 4. The action also creates a GitHub release tagged `v<version>`.
 
 If the publish step fails for an environmental reason but the version was already

@@ -1,0 +1,183 @@
+name: OpenGeometry 2.5 verification
+
+on:
+  push:
+    paths:
+      - 'main/**'
+      - '.github/workflows/verify.yml'
+  pull_request:
+    paths:
+      - 'main/**'
+      - '.github/workflows/verify.yml'
+  workflow_dispatch:
+    inputs:
+      record:
+        description: What to record
+        type: choice
+        required: true
+        options:
+          - goldens
+          - baselines
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.event_name != 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: main
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.88.0'
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: main/package-lock.json
+      - id: wasm-pack
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-pack
+          key: wasm-pack-0.13.1-${{ runner.os }}-${{ runner.arch }}
+      - name: Install wasm-pack
+        if: steps.wasm-pack.outputs.cache-hit != 'true'
+        run: cargo install wasm-pack --version 0.13.1 --locked
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            main/opengeometry/target
+            main/opengeometry/test-support/target
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('main/**/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
+      - name: Install SDK dependencies
+        run: npm ci
+      - name: Fetch crate dependencies
+        run: |
+          git ls-files '*Cargo.lock' | while read -r lock; do
+            cargo fetch --locked --manifest-path "$(dirname "$lock")/Cargo.toml"
+          done
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Check
+        run: npm run check
+      - name: Browser three 0.168
+        if: ${{ !cancelled() }}
+        run: node scripts/check/verify.mjs --full --only browser:three-168
+      - name: Browser three 0.184
+        if: ${{ !cancelled() }}
+        run: node scripts/check/verify.mjs --full --only browser:three-184
+      - name: Kernel time budgets
+        if: ${{ !cancelled() }}
+        run: cargo run --release --offline --manifest-path opengeometry/Cargo.toml --example budgets
+      - name: Pack check logs
+        if: always()
+        run: tar czf "$RUNNER_TEMP/check-logs.tgz" .check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: check-logs-${{ matrix.os }}
+          path: ${{ runner.temp }}/check-logs.tgz
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}
+        with:
+          name: step-exports
+          path: main/test-results/**/*.step
+
+  record:
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: main
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.88.0'
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: main/package-lock.json
+      - id: wasm-pack
+        if: inputs.record == 'baselines'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-pack
+          key: wasm-pack-0.13.1-${{ runner.os }}-${{ runner.arch }}
+      - name: Install wasm-pack
+        if: inputs.record == 'baselines' && steps.wasm-pack.outputs.cache-hit != 'true'
+        run: cargo install wasm-pack --version 0.13.1 --locked
+      - name: Install SDK dependencies
+        run: npm ci
+      - name: Record the golden
+        if: inputs.record == 'goldens'
+        continue-on-error: true
+        working-directory: main/opengeometry
+        env:
+          OG_GOLDEN_UPDATE: '1'
+        run: cargo test --locked --test golden
+      - name: Dump the kernel snapshot
+        if: ${{ !cancelled() && inputs.record == 'goldens' }}
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/kernel-snapshot"
+          npm run snapshot:kernel -- "$RUNNER_TEMP/kernel-snapshot"
+      - name: Pack the kernel snapshot
+        if: ${{ always() && inputs.record == 'goldens' }}
+        run: tar czf "$RUNNER_TEMP/kernel-snapshot.tgz" -C "$RUNNER_TEMP" kernel-snapshot
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && inputs.record == 'goldens' }}
+        with:
+          name: goldens-${{ matrix.os }}
+          path: |
+            main/opengeometry/tests/fixtures/golden/*.json
+            ${{ runner.temp }}/kernel-snapshot.tgz
+      - name: Build
+        if: inputs.record == 'baselines'
+        run: npm run build
+      - name: Install Chromium
+        if: inputs.record == 'baselines'
+        run: npx playwright install --with-deps chromium
+      - name: Measure the performance medians
+        if: inputs.record == 'baselines'
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/baselines"
+          npm run test:performance > "$RUNNER_TEMP/baselines/performance.log" 2>&1
+      - name: Measure the storey baseline
+        if: ${{ !cancelled() && inputs.record == 'baselines' }}
+        continue-on-error: true
+        run: npx playwright test specs/storey.spec.ts > "$RUNNER_TEMP/baselines/storey.log" 2>&1
+      - name: Extract the performance medians
+        if: ${{ always() && inputs.record == 'baselines' }}
+        run: grep -h '^{"sizes"' "$RUNNER_TEMP/baselines/performance.log" > "$RUNNER_TEMP/baselines/performance-medians.json"
+      - name: Extract the storey baseline
+        if: ${{ always() && inputs.record == 'baselines' }}
+        run: grep -h 'Storey performance baseline:' "$RUNNER_TEMP/baselines/storey.log" > "$RUNNER_TEMP/baselines/storey-baseline.txt"
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && inputs.record == 'baselines' }}
+        with:
+          name: baselines-${{ matrix.os }}
+          path: ${{ runner.temp }}/baselines
