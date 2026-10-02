@@ -36,6 +36,9 @@ npm --prefix main run dev-example      # Vite dev server
 npm --prefix main run build-example    # Static build
 ```
 
+Run `npm run build` first, because the examples import `main/dist/index.js` by path and
+are served with `main/dist/` as their public folder.
+
 The example catalog lives at `main/opengeometry-three/examples-vite/`. Use it (rather
 than copying the build into a sibling repo) for local validation.
 
@@ -52,12 +55,21 @@ write their logs to `main/.check/`.
   three 0.168 and 0.184 (20 steps). It needs Playwright's Chromium:
   `npx playwright install chromium` in `main/` (on Linux with `--with-deps`, as CI does).
 
+The root `README.md` is part of the gate. In the Node tests,
+`main/scripts/build/readme-code.test.mjs` type-checks every `ts` block of the README
+against `main/dist/`, fails on a `ts`, `typescript` or `tsx` block it does not read, and
+checks that `main/opengeometry-three/tests/browser/pages/quick-start.ts` holds the README's
+`OpenGeometry.create(` line. The browser suite runs that page, which is a hand copy of the
+README's quick start, so a change to the quick start changes `pages/quick-start.ts` too.
+The build ships the README, with its relative links made absolute, and `LICENSE.md` in
+`main/dist/`.
+
 `.github/workflows/verify.yml` runs on every push and pull request that changes
-`main/**`, `README.md` or the workflow file, on Ubuntu and macOS. It runs `npm run check`,
-then the two browser runs (`node scripts/check/verify.mjs --full --only
+`main/**`, `README.md`, `LICENSE.md` or the workflow file, on Ubuntu and macOS. It runs
+`npm run check`, then the two browser runs (`node scripts/check/verify.mjs --full --only
 browser:three-168` and `--only browser:three-184`), then the release-mode kernel time
-budgets (`cargo run --release --example budgets`). It uploads the check logs and, from
-Ubuntu, the STEP exports.
+budgets (`cargo run --release --example budgets` in `main/opengeometry/`). It uploads the
+check logs and, from Ubuntu, the STEP exports.
 
 The same workflow can be started by hand. Its one required input, `record`, chooses
 what to record on Ubuntu and macOS:
@@ -69,24 +81,30 @@ what to record on Ubuntu and macOS:
 
 A record run commits nothing. A person downloads the artifacts, reviews them and
 commits them: the golden file goes to `main/opengeometry/tests/fixtures/golden/`, and the
-medians are copied by hand into `timings.linux-x64-ci` and `timings.darwin-arm64-ci` in
-`main/scripts/bench/performance-baseline.json`.
+timings are copied by hand into `main/scripts/bench/performance-baseline.json`, from
+`baselines-ubuntu-latest` into `timings.linux-x64-ci` and from `baselines-macos-latest`
+into `timings.darwin-arm64-ci`. Copy the `timings` of `performance-medians.json`, and the
+`renderMs`, `transformFlushMs` and `stepMs` of the storey line in `storey-baseline.txt` as
+`storeyFirstRenderMs`, `storeyTransformFlushMs` and `storeyStepMs`. Every timings block
+needs the three storey keys, so copy all of them in one commit.
 
 ## Release process
 
 1. Bump `version` in `main/package.json`, `main/package-lock.json`,
    `main/opengeometry/Cargo.toml`, `main/opengeometry/Cargo.lock` and
    `main/opengeometry/test-support/Cargo.lock` so they match (CI fetches with `--locked`).
-2. Run both gates locally:
+2. For the first 2.5 release, remove the version note near the top of `README.md`. The
+   build copies the README into the package, so the published page would carry it.
+3. Run both gates locally:
    ```bash
    npm run check
    npm run check:full
    ```
-3. Merge to the `main` branch, then start the GitHub Action at
+4. Merge to the `main` branch, then start the GitHub Action at
    `.github/workflows/release.yml` by hand on the `main` branch; a push does not publish.
    It rebuilds, runs `npm run check` (required to pass), and publishes `main/dist/` to npm
    if the version is not already on the registry.
-4. The action also creates a GitHub release tagged `v<version>`.
+5. The action also creates a GitHub release tagged `v<version>`.
 
 If the publish step fails for an environmental reason but the version was already
 bumped, re-running the workflow will re-attempt publish (the action checks npm and only

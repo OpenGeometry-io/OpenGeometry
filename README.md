@@ -210,7 +210,7 @@ This section is a compact reference for writing OpenGeometry 2.5 code, by hand o
 
 **What does not exist.** IFC, STL and PDF export, projection, offset, loft, public triangulation, arcs, curves, spheres, wedges, and the 2.0 classes. Do not call them.
 
-**Where the truth is.** `index.d.ts` in the installed package lists every export and its types. The examples in [`main/opengeometry-three/examples-vite/`](./main/opengeometry-three/examples-vite/) are working 2.5 code.
+**Where the truth is.** `index.d.ts` in the installed package lists every export and its types. The examples in [`main/opengeometry-three/examples-vite/`](./main/opengeometry-three/examples-vite/) are working 2.5 code, except that they import the built package by path (`../../../dist/index.js`) where an app imports from `'opengeometry'`.
 
 ## Documentation
 
