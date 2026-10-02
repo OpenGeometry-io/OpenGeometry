@@ -61,11 +61,12 @@ against `main/dist/`, fails on a `ts`, `typescript` or `tsx` block it does not r
 checks that `main/opengeometry-three/tests/browser/pages/quick-start.ts` holds the README's
 `OpenGeometry.create(` line. The browser suite runs that page, which is a hand copy of the
 README's quick start, so a change to the quick start changes `pages/quick-start.ts` too.
-The build ships the README, with its relative links made absolute, and `LICENSE.md` in
-`main/dist/`.
+The same test checks the `ts` blocks of `MIGRATION.md` the same way. The build ships the
+README, with its relative links made absolute, and `LICENSE.md` in `main/dist/`.
 
 `.github/workflows/verify.yml` runs on every push and pull request that changes
-`main/**`, `README.md`, `LICENSE.md` or the workflow file, on Ubuntu and macOS. It runs
+`main/**`, `README.md`, `MIGRATION.md`, `LICENSE.md` or the workflow file, on Ubuntu and
+macOS. It runs
 `npm run check`, then the two browser runs (`node scripts/check/verify.mjs --full --only
 browser:three-168` and `--only browser:three-184`), then the release-mode kernel time
 budgets (`cargo run --release --example budgets` in `main/opengeometry/`). It uploads the
@@ -95,16 +96,18 @@ needs the three storey keys, so copy all of them in one commit.
    `main/opengeometry/test-support/Cargo.lock` so they match (CI fetches with `--locked`).
 2. For the first 2.5 release, remove the version note near the top of `README.md`. The
    build copies the README into the package, so the published page would carry it.
-3. Run both gates locally:
+3. If the release changes how existing code must be written, add an entry to
+   `MIGRATION.md`, as its "Adding an entry" section describes.
+4. Run both gates locally:
    ```bash
    npm run check
    npm run check:full
    ```
-4. Merge to the `main` branch, then start the GitHub Action at
+5. Merge to the `main` branch, then start the GitHub Action at
    `.github/workflows/release.yml` by hand on the `main` branch; a push does not publish.
    It rebuilds, runs `npm run check` (required to pass), and publishes `main/dist/` to npm
    if the version is not already on the registry.
-5. The action also creates a GitHub release tagged `v<version>`.
+6. The action also creates a GitHub release tagged `v<version>`.
 
 If the publish step fails for an environmental reason but the version was already
 bumped, re-running the workflow will re-attempt publish (the action checks npm and only
