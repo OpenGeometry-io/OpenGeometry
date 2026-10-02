@@ -158,27 +158,25 @@ Key pages:
 ```
 main/opengeometry          Rust core → WebAssembly
 main/opengeometry-three    Three.js integration layer
-main/opengeometry-webgl    WebGL-oriented package (WIP)
-main/opengeometry-babylon  Babylon.js-oriented package (WIP)
 docs/                      Documentation source (Mintlify)
 ```
 
 ## Building from Source
 
-**Prerequisites:** Node.js, npm, Rust 1.89.0+ with `wasm32-unknown-unknown`, `wasm-pack`
+**Prerequisites:** Node.js, npm, Rust 1.88.0 with `wasm32-unknown-unknown`, `wasm-pack`
 
 ```bash
 # Install dependencies
-npm install
+npm --prefix main ci
 
 # Build Rust core → WebAssembly
-npm run build-core
+npm --prefix main run build-core
 
 # Build everything (core + Three.js + WASM copy)
 npm run build
 
 # Run the Three.js example app locally
-npm --prefix main/opengeometry-three run dev-example-three
+npm run dev-example
 
 # Run tests
 npm test
