@@ -25,9 +25,8 @@ npm test                   # Cargo unit + integration tests
 
 `npm run build` runs `build-core` (wasm-pack only), then `rollup -c`, then
 `node scripts/build/prepare-dist.mjs` (copy WASM, package metadata, the README and the
-licence) in order, all
-inside `main/`. There is no clean step. Running the stages out of order produces stale
-`pkg/` and bundle mismatches.
+licence) in order, all inside `main/`. There is no clean step. Running the stages out of
+order produces stale `pkg/` and bundle mismatches.
 
 ## Running the example app
 
