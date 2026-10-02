@@ -9,7 +9,7 @@ It is written for people and for coding assistants alike: each section says what
 1. Find the section for the version you are leaving.
 2. Go through its "Replace this with that" table and change your code row by row.
 3. Read its "Different behaviour" list: it says what now works differently, even where the names look the same.
-4. Anything listed under "Removed" has no replacement. Take that code out, or stay on the older version.
+4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
 
 ## 2.0 to 2.5
 
@@ -60,25 +60,26 @@ Bodies are Three.js objects in both versions, so `scene.add(body)` does not chan
 
 `[cx, cy, cz]` are the three numbers of the 2.0 `center`, and `[tx, ty, tz]` are those of `translation`.
 Rows that end with "(!)" also behave differently, so read "Different behaviour" before you change them.
+`[rx, ry, rz]` are the three angles of the 2.0 `rotation`, in radians.
 
 | 2.0 | 2.5 |
 | --- | --- |
 | `await OpenGeometry.create({ wasmURL })` | `await OpenGeometry.create({ wasmURL }, { workerURL })`, and serve `tessellation-worker.js` too |
 | `new Vector3(x, y, z)` | `[x, y, z]` |
 | `ogid` option and property | `ogId` option and property |
-| `new Cuboid({ center, width, height, depth })` | `new Solid(OG_PRIMITIVE_CUBOID, { width, height, depth }, { plane: { origin: [cx, cy - height / 2, cz] } })`; the 2.0 constructor also took `translation`, `rotation` and `scale`, which you give as in the `setPlacement` rows (!) |
+| `new Cuboid({ center, width, height, depth })` | `new Solid(OG_PRIMITIVE_CUBOID, { width, height, depth }, { plane: { origin: [cx, cy - height / 2, cz] } })`; the 2.0 constructor also took `translation`, `rotation` and `scale`, which you give as in the `setPlacement` rows, translation first (!) |
 | `new Cylinder({ center, radius, height })` | `new Solid(OG_PRIMITIVE_CYLINDER, { radius, height }, { plane: { origin: [cx, cy - height / 2, cz] } })` (!) |
 | `new AnalyticSolid({ kind: 'cylinder', radius, height, frame })` | `new Solid(OG_PRIMITIVE_CYLINDER, { radius, height }, { plane: { origin: frame.origin, normal: frame.z, xDirection: frame.x } })` |
 | `new Opening({ ... }).subtractFrom(wall)` | make the opening a cuboid `Solid`, then `wall.operate(OG_OPERATION_SUBTRACT, { tools: [opening] })`; do not add the opening solid to the scene (a 2.0 `Opening` was invisible; a 2.5 solid you add is drawn) (!) |
-| `new Rectangle({ center, width, breadth })` | `new Wire(OG_PRIMITIVE_RECTANGLE, { width, breadth }, { plane: { origin: [cx, cy, cz] } })`; the 2.0 constructor also took `translation`, `rotation` and `scale`, which you give as in the `setPlacement` rows |
+| `new Rectangle({ center, width, breadth })` | `new Wire(OG_PRIMITIVE_RECTANGLE, { width, breadth }, { plane: { origin: [cx, cy, cz] } })`; the 2.0 constructor also took `translation`, `rotation` and `scale`, which you give as in the `setPlacement` rows, translation first |
 | `new Line({ start, end })`, `new Polyline({ points })` | `new Wire(OG_PRIMITIVE_POLYLINE, { points, closed? })`; a line is a polyline with two points |
 | `new Arc({ center, radius })` as a full circle | `new Wire(OG_PRIMITIVE_CIRCLE, { radius }, { plane: { origin: [cx, cy, cz] } })` |
 | `new Polygon({ vertices, holes })` as a profile | closed polyline wires, used as `profile` and `holes` |
 | `polygon.extrude(h)`, `Solid.extrude(...)`, `extrudeBrepFace(...)` | `new Solid(OG_OPERATION_EXTRUDE, { profile, holes?, distance: h })` |
-| `new Sweep({ path, profile })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })`, both wires. The path is an open polyline wire of the 2.0 points. Centre the profile on the path's first point P, square to its first direction D: a rectangle or circle wire with `{ plane: { origin: P, normal: D } }` (add `xDirection`, for example `[0, 0, 1]`, when D points along x), or a closed polyline of the 2.0 profile points, centred on `[0, 0, 0]` with y = 0, given the same `plane` (!) |
+| `new Sweep({ path, profile })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })`, both wires: the path an open polyline of the 2.0 path points, the profile placed at the start of the path as "Sweeps" below describes (!) |
 | `setPlacement({ translation })` | `transform(OG_TRANSFORM_TRANSLATE, { offset })`, with `offset` the new `translation` minus the old one; or `transform(OG_TRANSFORM_PLACE, { origin })` with `origin` `[cx + tx, cy + ty - height / 2, cz + tz]` for a cuboid or opening, or `[cx + tx, cy + ty, cz + tz]` for a rectangle (!) |
-| `setPlacement({ rotation })` | `transform(OG_TRANSFORM_ROTATE, { axis, degrees, pivot })`, one call per angle that is not zero, in this order: `[0, 0, 1]` by `rz`, then `[0, 1, 0]` by `ry`, then `[1, 0, 0]` by `rx`. Use `degrees = radians * 180 / Math.PI` and the same `pivot` each time (see Placement) (!) |
-| `setPlacement({ scale })` | `transform(OG_TRANSFORM_SCALE, { factor, pivot })`, where `factor` is `s` from the 2.0 scale `(s, s, s)`. 2.5 has no uneven scale (!) |
+| `setPlacement({ rotation })` | `transform(OG_TRANSFORM_ROTATE, { axis, degrees, pivot })`, one call per angle that is not zero, in this order: `[0, 0, 1]` by `rz`, then `[0, 1, 0]` by `ry`, then `[1, 0, 0]` by `rx`. Use `degrees = radians * 180 / Math.PI` and the same `pivot` each time (see Placement). This is for a body not turned yet: to change a turn, first `PLACE` it at the `origin` the translation row gives (this resets turn and scale), then turn and scale it again. (!) |
+| `setPlacement({ scale })` | `transform(OG_TRANSFORM_SCALE, { factor, pivot })`, where `factor` is the new `s` divided by the current one (`s` itself on a body not scaled yet), for a 2.0 scale `(s, s, s)`. 2.5 has no uneven scale (!) |
 | `getPlacement()` gives `{ translation, rotation, scale }` | `getPlacement()` gives `{ origin, xDirection, normal, scale }` (!) |
 | `setConfig({ width })`, `cuboid.width = 3` | `rebuild(OG_PRIMITIVE_CUBOID, { width, height, depth })`, with every parameter given (!) |
 | `color` option, `body.color = c`, `body.outline = true`, `deflection` option, `setConfig({ deflection })` | `appearance: { color, outline, deflection }` in the options, or `body.setAppearance({ color, outline, deflection })` (!) |
@@ -87,13 +88,13 @@ Rows that end with "(!)" also behave differently, so read "Different behaviour" 
 | `booleanIntersection(a, b)`, `a.intersection(b)` | `a.operate(OG_OPERATION_INTERSECT, { tools: [b] })` (!) |
 | `result.report` | `solid.getReport()?.report`, on the body you called `operate` on |
 | `solid.exportStep()`, `solid.exportStep('metre')` | `await OpenGeometry.exportStep({ nodes: [solid], unit: 'metre', upAxis: 'Y' })`; for `exportStep('millimetre')` pass `unit: 'millimetre'` (!) |
-| `exportBrepToStep(brepJson, configJson)` | `await OpenGeometry.exportStep({ nodes: [solid], unit: 'metre', upAxis: 'Y' })`, which keeps the numbers 2.0 wrote; the result has `report`, an object, where 2.0 had `reportJson` (!) |
-| `getBrepSerialized()` | `getBrep()`, which returns the parsed object, so drop the `JSON.parse`. It has the fields of the 2.0 `AnalyticSolid` JSON; the older layout that `Rectangle.getBrep()` and `Sweep.getBrep()` returned is gone |
+| `exportBrepToStep(brepJson, configJson)` | `await OpenGeometry.exportStep({ nodes: [solid], unit: 'metre', upAxis: 'Y' })`, which keeps the numbers 2.0 wrote with its default config; the result has `report`, an object, where 2.0 had `reportJson` (!) |
+| `getBrepSerialized()` | `getBrep()`, which returns the parsed object, so drop the `JSON.parse`. It describes the shape in the body's own coordinates, without its placement, including the `plane` it was made with. It has the fields of the 2.0 `AnalyticSolid` JSON; the older layout that `Rectangle.getBrep()` and `Sweep.getBrep()` returned is gone |
 | `getModelBounds()` | `getBounds()` (!) |
 | `dispose()` | `dispose()`; `OpenGeometry.reset()` frees every body at once (!) |
 | catch `AnalyticGeometryError` or `WorldGraphError`, read `code` and `detail` | catch `OGError`, read `code`, `call` and `details` (!) |
 
-A `?` marks an optional parameter.
+In the 2.5 column, a `?` after a parameter name marks it as optional.
 
 ### Different behaviour
 
@@ -103,11 +104,11 @@ A `?` marks an optional parameter.
 - **Placement.** `setPlacement` set absolute values and kept the ones you left out. In 2.5, `TRANSLATE`, `ROTATE` and `SCALE` apply on top of the current placement (`SCALE` multiplies), and `PLACE` sets the origin and resets the turn and scale you leave out. 2.0 turned and scaled a `Cuboid` or `Opening` about the point `translation`, a `Rectangle` about `center + translation`, and a `Line`, `Polyline`, `Polygon` or `Sweep` about the middle of the box around its points moved by `translation`. 2.5 turns and scales a body about its own origin unless you pass `pivot`: the middle of the base for a cuboid or cylinder, the `plane` origin for a rectangle or circle, `[0, 0, 0]` for a polyline made from points. To place a cuboid where a 2.0 one sat, lower its origin by half its height.
 - **`getPlacement`.** 2.5's `origin` is the body's origin (the middle of the base for a cuboid), not 2.0's `translation`.
 - **Rebuild keeps the base.** A 2.0 `Cuboid` kept its centre when `setConfig` changed its height; `rebuild` keeps the base where it is, so the centre moves. `setConfig({ center })` becomes `TRANSLATE` by the change in `center`, or `PLACE`.
-- **Sweeps.** 2.0 moved the profile to the path's first point and turned it square to the first segment. 2.5 sweeps the profile where it is. It throws when the profile's plane misses that point or is not square to the first segment, and it sweeps a profile that is in that plane but off-centre beside the path. A closed path has no 2.5 form.
+- **Sweeps.** 2.0 moved the profile to the path's first point P, centred it there and turned it square to the first direction D. 2.5 sweeps the profile where it is, and throws when the profile's plane misses P or is not square to D. So build the profile there: a rectangle or circle wire with `{ plane: { origin: P, normal: D } }`, or, when the 2.0 profile points all had the same y, a closed polyline of those points moved so their average is `[0, 0, 0]`, given the same `plane`; if the points run clockwise seen from above, as a 2.0 `Rectangle`'s did, write each `[x, 0, z]` as `[x, 0, -z]`, or the profile comes out mirrored. `xDirection` sets how the profile is turned about the path: when D points along x you must give it, and for a rectangle `[0, 1, 0]` matches 2.0. In every other case a profile that is not a circle can come out turned about the path: compare with your 2.0 result and set `xDirection` to match. A profile in the right plane but off-centre is swept beside the path. A closed path has no 2.5 form.
 - **Do not write `.position`, `.rotation` or `.scale`.** 2.0 placed some shapes that way. In 2.5 such a change is undone, with a `PlacementOverwritten` warning.
 - **`Solid` is a different class.** 2.0 had `new Solid({ brep, color })`. 2.5 has `new Solid(kind, params, options)`.
 - **No swapping objects.** A body redraws itself after `transform`, `rebuild` or `operate`. There is no `setConfig` and no new object to put into the scene. Geometry is made when the scene is rendered, not when the body is created.
-- **STEP units and axes.** `solid.exportStep()` wrote metres. `exportBrepToStep` and `WorldGraph.exportStep` wrote your numbers unchanged under a millimetre header. 2.5 reads model numbers as metres: `unit: 'metre'` writes them unchanged, `unit: 'millimetre'` multiplies them by 1000, and the default is millimetres with Z up. 2.0 kept Y up, so pass `upAxis: 'Y'`.
+- **STEP units and axes.** `solid.exportStep()` wrote metres. `exportBrepToStep` and `WorldGraph.exportStep` wrote your numbers unchanged under a millimetre header by default. 2.5 reads model numbers as metres: `unit: 'metre'` writes them unchanged, `unit: 'millimetre'` multiplies them by 1000, and the default is millimetres with Z up. 2.0 kept Y up, so pass `upAxis: 'Y'`.
 - **Bounds.** `getModelBounds()` gave the body's own bounds as a `THREE.Box3`. `getBounds()` gives bounds in world space as `[minX, minY, minZ, maxX, maxY, maxZ]`, or `null`.
 - **`dispose()`** also removes the body from its parent.
 - **Colours** are numbers only, such as `0x10b981`. 2.0 `body.color` returned a `THREE.Color`.
@@ -116,9 +117,9 @@ A `?` marks an optional parameter.
 
 ### Partly replaced
 
-- `WorldGraph`: nodes and hierarchy become `SystemAssembly`, `addChild` or the `parent` option; `getWorldBounds` becomes `getBounds()`; `removeNode` becomes `dispose()`; `exportStep` becomes `OpenGeometry.exportStep({ nodes })` (nodes may be bodies or assemblies). Its `clash`, `clearance`, `distance`, `projectLines`, `projectViews` and `bind` are gone.
+- `WorldGraph`: nodes and hierarchy become `SystemAssembly`, `addChild` or the `parent` option; `getWorldBounds(id)` becomes `body.getBounds()`, six numbers instead of a `THREE.Box3`; `removeNode(id)` becomes `parent.removeChild(body)`, which keeps the body (pass `{ keepWorld: true }` to leave it where it is), or `body.dispose()`, which frees it; `exportStep` becomes `OpenGeometry.exportStep({ nodes })` (nodes may be bodies or assemblies). Its `clash`, `clearance`, `distance`, `projectLines`, `projectViews` and `bind` are gone.
 - The pattern helpers (`AnalyticPattern`, `linearPattern`, `rectangularPattern`, `circularPattern`): make copies with `solid.instance()` and move each with `transform`; check the positions, since 2.0 drew a pattern around its own origin. `rebuild` and `operate` on an instanced body need `{ instances: 'all' }` or `makeUnique()` first.
-- `AnalyticSolid` kinds: `linearExtrusion` becomes `OG_OPERATION_EXTRUDE` with closed polyline wires for the outline and each hole; `revolvedRectangle` (a tube) becomes `OG_OPERATION_EXTRUDE` with a circle wire as `profile` and a smaller circle wire with the same centre as the one hole.
+- `AnalyticSolid` kinds: `linearExtrusion` becomes `OG_OPERATION_EXTRUDE` with closed polyline wires for the outline and each hole, each 2.0 point `[u, v]` written `[u, 0, -v]` when the 2.0 `frame` was the default (with another `frame`, also give each wire `plane: { origin: frame.origin, normal: frame.z, xDirection: frame.x }` and check which way it extrudes); `revolvedRectangle` (a tube) becomes `OG_OPERATION_EXTRUDE` with a circle wire as `profile` and a smaller circle wire with the same centre as the one hole.
 
 ### Removed in 2.5
 
@@ -144,7 +145,7 @@ A 2.0 export this guide does not name has no direct 2.5 form; the full 2.5 surfa
 
 1. Open `node_modules/opengeometry/package.json`. Its `version` should start with `2.5`.
 2. Run your type check, for example `npx tsc --noEmit`. Imports that no longer exist, such as `Cuboid` or `Vector3`, fail here.
-3. Run your app. Check that bodies sit where they did before, cuboids and cylinders above all, and that STEP files have the units and up axis you expect.
+3. Run your app. Check that bodies sit and face the way they did before, cuboids, cylinders and sweeps above all, and that STEP files have the units and up axis you expect.
 
 ## Adding an entry
 
