@@ -92,13 +92,14 @@ needs the three storey keys, so copy all of them in one commit.
 
 The kernel tests also read `main/opengeometry/tests/fixtures/cases/`, which holds test
 inputs and stored expected results. The BRep bodies are both: each is the stored result
-of a builder or of one of five booleans, and the input of the tessellation, STEP and
-round-trip tests. The boolean and batch matrix rows hold their inputs with their stored
+of a builder or of one of five booleans, and an input of the STEP and round-trip tests;
+the twelve builder bodies are also inputs of the tessellation tests. The boolean and
+batch matrix rows hold their inputs with their stored
 result and handlers, and each validity body has its stored verdict. The other stored
 results are tessellations, STEP texts, reports and errors, and handler lists. They were
 first recorded from the 2.0 kernel by a tool that no longer exists, so no command
 regenerates them. A change that moves one edits the stored file by hand in the same
-commit and says why. The golden file is the only fixture with a record command.
+commit and says why. The golden files are the only fixtures with a record command.
 
 ## Release process
 

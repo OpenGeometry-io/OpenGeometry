@@ -54,7 +54,7 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2), cuboid);
 ```
 
 Both make the same box: 1.5 m wide, 1.6 m high and 1.2 m deep, standing on the ground at the origin.
-The 2.5 block adds a light because 2.5 surfaces need one to be seen.
+The 2.5 block builds its own scene, which is why it adds a light.
 Bodies are Three.js objects in both versions, so `scene.add(body)` does not change.
 
 ### Replace this with that

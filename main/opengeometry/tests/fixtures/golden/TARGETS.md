@@ -17,8 +17,8 @@ tree are kebab-case.
 | x86-64-unknown-linux-gnu | `x86-64-unknown-linux-gnu.json` | not recorded yet: the file is `{}`, so the test fails with the record instruction until a manual start of `.github/workflows/verify.yml` with `record: goldens` uploads it as an artifact and the file is reviewed and committed |
 
 CI's macOS job compares with `aarch64-apple-darwin.json`, which was recorded on the macOS
-version the table names; a runner on another macOS version can differ for the reasons
-listed under 'Known sources of difference between targets'.
+version the table names; a runner on another macOS version can differ if its math library
+rounds differently (the first of the 'Known sources of difference between targets').
 
 ## Recording
 
