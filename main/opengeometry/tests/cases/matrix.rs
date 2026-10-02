@@ -7,7 +7,7 @@ use opengeometry_test_support::volume;
 use serde_json::json;
 
 #[test]
-fn ported_boolean_handlers_match_source_fixtures() {
+fn boolean_fixtures_match_stored_brep_and_handlers() {
     let accuracy = Accuracy {
         geometric: 1e-8,
         intersection: 1e-9,
@@ -83,7 +83,7 @@ fn ported_boolean_handlers_match_source_fixtures() {
 }
 
 #[test]
-fn boolean_support_matrix_matches_source_outcomes_and_handlers() {
+fn boolean_support_matrix_matches_stored_outcomes_and_handlers() {
     let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/cases/boolean-matrix");
     let mut files = std::fs::read_dir(directory)

@@ -6,6 +6,7 @@ mod batch_route;
 mod batch_staged;
 mod body;
 mod boolean_case;
+mod boolean_fixtures;
 mod booleans_curved;
 mod booleans_cylinders;
 mod booleans_direct;
@@ -36,7 +37,6 @@ mod json;
 mod kernel;
 mod matrix;
 mod mesh;
-mod parity_fixtures;
 mod planar_shapes;
 mod profiles;
 mod record;
@@ -57,7 +57,7 @@ fn corpus() -> Result<Vec<Case>, Failure> {
         builders_solids::cases(),
         builders_profiles::cases(),
         matrix::cases()?,
-        parity_fixtures::cases(),
+        boolean_fixtures::cases(),
         booleans_cylinders::cases(),
         booleans_spheres::cases(),
         booleans_direct::cases(),

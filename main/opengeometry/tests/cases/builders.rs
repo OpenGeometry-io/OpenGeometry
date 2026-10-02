@@ -3,7 +3,7 @@ use opengeometry::primitives;
 use serde_json::json;
 
 #[test]
-fn ported_primitive_builders_match_source_json() {
+fn primitive_builders_match_stored_json() {
     let accuracy = Accuracy {
         geometric: 1e-8,
         intersection: 1e-9,
@@ -97,7 +97,7 @@ fn ported_primitive_builders_match_source_json() {
 }
 
 #[test]
-fn ported_extrusions_match_source_json() {
+fn extrusions_match_stored_json() {
     let accuracy = Accuracy {
         geometric: 1e-8,
         intersection: 1e-9,

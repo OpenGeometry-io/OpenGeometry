@@ -4,7 +4,7 @@ use opengeometry_test_support::part21::normalise_step;
 use opengeometry_test_support::world_graph::graph;
 
 #[test]
-fn graph_export_of_fixture_primitives_matches_main_text_after_normalisation() {
+fn graph_export_of_fixture_primitives_matches_stored_text_after_normalisation() {
     let mut world = graph();
     cylinder(&mut world, "cylinder");
     add_cuboid(&mut world, "cuboid", [2.0, 3.0, 1.0], [1.0, 0.0, -0.5]);
@@ -26,10 +26,10 @@ fn graph_export_of_fixture_primitives_matches_main_text_after_normalisation() {
         };
         for name in ["cylinder", "cuboid", "box-cut"] {
             let exported = export_matched(&world, &[name], &options);
-            let source = fixture_text(&format!("{name}.step.{suffix}")).unwrap();
+            let stored = fixture_text(&format!("{name}.step.{suffix}")).unwrap();
             assert_eq!(
                 normalise_step(&exported.text),
-                normalise_step(&source),
+                normalise_step(&stored),
                 "{name} {unit}"
             );
         }

@@ -1,7 +1,7 @@
 use opengeometry::brep::BrepEnvelope;
 
 #[test]
-fn main_brep_json_round_trips_byte_identically() {
+fn stored_brep_json_round_trips_byte_identically() {
     macro_rules! check {
         ($name:literal) => {{
             let source = include_str!(concat!("../fixtures/cases/", $name, ".brep.json"));

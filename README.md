@@ -26,7 +26,7 @@
 
 > **Actively maintained and growing.** We're building OpenGeometry in the open. APIs, examples, and package structure are evolving, and we are actively improving and expanding the project. Star the repo to follow along. If you have questions or want to get involved, join the [Discord](https://discord.com/invite/9wJpbfgGGA) or check out the [issues](https://github.com/OpenGeometry-io/OpenGeometry/issues).
 
-> **Version note.** This README describes OpenGeometry 2.5. Until 2.5.0 is published, `npm install opengeometry` installs the 2.0 line, whose API is different. The hosted documentation also still describes 2.0.
+> **Version note.** This README describes OpenGeometry 2.5. Check which line you have installed with `npm ls opengeometry`: the 2.0 line has a different API. The hosted documentation still describes 2.0.
 
 ---
 
@@ -51,7 +51,7 @@ It is the geometry engine layer, not a full CAD application. OpenPlans is a down
 | **Queries** | Bounds, placements, the B-rep of a body, and the report of its last boolean. |
 | **Export** | STEP, in millimetres or metres, with Y or Z up, together with an export report. |
 
-Not in 2.5, though 2.0 had them: IFC, STL and PDF export; projection; offset; loft; triangulation as a public call; arcs, curves, spheres and wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
+Not in 2.5, though 2.0 had them: IFC and STL export; projection; offset; loft; triangulation as a public call; arcs, curves, spheres and wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
 
 ## Installation
 

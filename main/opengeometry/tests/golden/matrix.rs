@@ -22,10 +22,7 @@ fn fixture_paths() -> Result<Vec<PathBuf>, Failure> {
         let json = path
             .extension()
             .is_some_and(|extension| extension == "json");
-        let step = path
-            .file_name()
-            .is_some_and(|name| name.to_string_lossy().contains(".step."));
-        if json && !step {
+        if json {
             paths.push(path);
         }
     }

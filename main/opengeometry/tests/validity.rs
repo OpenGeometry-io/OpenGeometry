@@ -5,7 +5,7 @@ use std::path::Path;
 const VERDICT_SUFFIX: &str = ".verdict.json";
 
 #[test]
-fn i10_every_validity_fixture_reproduces_its_source_verdict() {
+fn i10_every_validity_fixture_reproduces_its_stored_verdict() {
     let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/cases/validity");
     let mut names: Vec<String> = std::fs::read_dir(&folder)
         .unwrap()
