@@ -81,15 +81,15 @@ fn ported_primitive_builders_match_source_json() {
             }
         );
         let expected = match name {
-            "cuboid" => include_str!("../fixtures/parity/cuboid.brep.json"),
-            "cylinder" => include_str!("../fixtures/parity/cylinder.brep.json"),
-            "sphere" => include_str!("../fixtures/parity/sphere.brep.json"),
-            "cone" => include_str!("../fixtures/parity/cone.brep.json"),
-            "frustum" => include_str!("../fixtures/parity/frustum.brep.json"),
-            "torus" => include_str!("../fixtures/parity/torus.brep.json"),
-            "annular-cylinder" => include_str!("../fixtures/parity/annular-cylinder.brep.json"),
-            "cylinder-with-hole" => include_str!("../fixtures/parity/cylinder-with-hole.brep.json"),
-            "circle" => include_str!("../fixtures/parity/circle.brep.json"),
+            "cuboid" => include_str!("../fixtures/cases/cuboid.brep.json"),
+            "cylinder" => include_str!("../fixtures/cases/cylinder.brep.json"),
+            "sphere" => include_str!("../fixtures/cases/sphere.brep.json"),
+            "cone" => include_str!("../fixtures/cases/cone.brep.json"),
+            "frustum" => include_str!("../fixtures/cases/frustum.brep.json"),
+            "torus" => include_str!("../fixtures/cases/torus.brep.json"),
+            "annular-cylinder" => include_str!("../fixtures/cases/annular-cylinder.brep.json"),
+            "cylinder-with-hole" => include_str!("../fixtures/cases/cylinder-with-hole.brep.json"),
+            "circle" => include_str!("../fixtures/cases/circle.brep.json"),
             _ => unreachable!(),
         };
         assert_eq!(body.to_json().unwrap(), expected, "{name}");
@@ -162,12 +162,12 @@ fn ported_extrusions_match_source_json() {
     for (name, body) in bodies {
         assert_eq!(body.body_type().unwrap(), BodyType::Solid);
         let expected = match name {
-            "linear-extrusion" => include_str!("../fixtures/parity/linear-extrusion.brep.json"),
+            "linear-extrusion" => include_str!("../fixtures/cases/linear-extrusion.brep.json"),
             "arc-edged-extrusion" => {
-                include_str!("../fixtures/parity/arc-edged-extrusion.brep.json")
+                include_str!("../fixtures/cases/arc-edged-extrusion.brep.json")
             }
             "arc-edged-extrusion-with-holes" => {
-                include_str!("../fixtures/parity/arc-edged-extrusion-with-holes.brep.json")
+                include_str!("../fixtures/cases/arc-edged-extrusion-with-holes.brep.json")
             }
             _ => unreachable!(),
         };

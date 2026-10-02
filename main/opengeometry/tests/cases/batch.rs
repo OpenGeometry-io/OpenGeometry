@@ -1,4 +1,4 @@
-use crate::support::{parity_fixtures, read_fixture};
+use crate::support::{case_files, read_fixture};
 use opengeometry::brep::BrepEnvelope;
 use opengeometry::operations::modifying::boolean::{
     multi_tool_boolean, subtract_planar_cutters_with_handlers, BooleanOp, MultiToolOutcome,
@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 
 #[test]
 fn batch_subtraction_matches_source_brep_and_handlers() {
-    let files = parity_fixtures("batch-matrix", |name| !name.contains(".fallback."));
+    let files = case_files("batch-matrix", |name| !name.contains(".fallback."));
     assert_eq!(files.len(), 23);
     for path in files {
         let name = path.file_stem().unwrap().to_str().unwrap();
@@ -31,7 +31,7 @@ fn batch_subtraction_matches_source_brep_and_handlers() {
 #[test]
 fn fallback_rows_parse() {
     let expected = BTreeSet::from(["cutters", "handlers", "host", "result"]);
-    let files = parity_fixtures("batch-matrix", |name| name.contains(".fallback."));
+    let files = case_files("batch-matrix", |name| name.contains(".fallback."));
     assert_eq!(files.len(), 3);
     for path in files {
         let fixture = read_fixture(&path);
@@ -47,7 +47,7 @@ fn fallback_rows_parse() {
 
 #[test]
 fn fallback_rows_match_source_serial_results() {
-    for path in parity_fixtures("batch-matrix", |name| name.contains(".fallback.")) {
+    for path in case_files("batch-matrix", |name| name.contains(".fallback.")) {
         let stem = path.file_stem().unwrap().to_str().unwrap();
         let name = stem.strip_suffix(".fallback").unwrap();
         let fixture = read_fixture(&path);

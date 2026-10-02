@@ -58,11 +58,11 @@ fn ported_boolean_handlers_match_source_fixtures() {
                 boolean_brep_with_handlers($a, $b, $operation, $name.into()).unwrap();
             assert_eq!(
                 result.brep.to_json().unwrap(),
-                include_str!(concat!("../fixtures/parity/", $name, ".brep.json")),
+                include_str!(concat!("../fixtures/cases/", $name, ".brep.json")),
                 $name
             );
             let expected: Vec<String> = serde_json::from_str(include_str!(concat!(
-                "../fixtures/parity/",
+                "../fixtures/cases/",
                 $name,
                 ".handlers.json"
             )))
@@ -85,7 +85,7 @@ fn ported_boolean_handlers_match_source_fixtures() {
 #[test]
 fn boolean_support_matrix_matches_source_outcomes_and_handlers() {
     let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/parity/boolean-matrix");
+        .join("tests/fixtures/cases/boolean-matrix");
     let mut files = std::fs::read_dir(directory)
         .unwrap()
         .map(|entry| entry.unwrap().path())
@@ -143,7 +143,7 @@ fn boolean_support_matrix_matches_source_outcomes_and_handlers() {
 #[test]
 fn i2_uncovered_rotated_box_returns_coverage_gap_without_mesh_fallback() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/parity/boolean-matrix/rotated-box-union.json");
+        .join("tests/fixtures/cases/boolean-matrix/rotated-box-union.json");
     let fixture: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
     let a: BrepEnvelope = serde_json::from_value(fixture["a"].clone()).unwrap();
     let b: BrepEnvelope = serde_json::from_value(fixture["b"].clone()).unwrap();
@@ -187,7 +187,7 @@ fn i2_uncovered_rotated_box_returns_coverage_gap_without_mesh_fallback() {
 #[test]
 fn parallel_boolean_candidates_have_identical_outputs() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/parity/boolean-matrix/wall-round.json");
+        .join("tests/fixtures/cases/boolean-matrix/wall-round.json");
     let fixture: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
     let a: BrepEnvelope = serde_json::from_value(fixture["a"].clone()).unwrap();
     let b: BrepEnvelope = serde_json::from_value(fixture["b"].clone()).unwrap();

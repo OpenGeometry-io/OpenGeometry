@@ -6,7 +6,7 @@ use serde_json::json;
 fn source_tessellation_matches_for_supported_primitive_fixtures() {
     macro_rules! check {
         ($name:literal) => {{
-            let body = BrepEnvelope::from_json(include_str!(concat!("../fixtures/parity/", $name, ".brep.json"))).unwrap();
+            let body = BrepEnvelope::from_json(include_str!(concat!("../fixtures/cases/", $name, ".brep.json"))).unwrap();
             let mesh = tessellate(&body, 0.01, 2_000_000).unwrap();
             let actual = json!({
                 "positions": mesh.positions,
@@ -18,7 +18,7 @@ fn source_tessellation_matches_for_supported_primitive_fixtures() {
                 "revision": mesh.revision,
                 "achievedDeflection": mesh.achieved_deflection,
             });
-            let expected: serde_json::Value = serde_json::from_str(include_str!(concat!("../fixtures/parity/", $name, ".tess.json"))).unwrap();
+            let expected: serde_json::Value = serde_json::from_str(include_str!(concat!("../fixtures/cases/", $name, ".tess.json"))).unwrap();
             assert_eq!(actual, expected, "{}", $name);
         }};
     }
@@ -39,9 +39,9 @@ fn source_tessellation_matches_for_supported_primitive_fixtures() {
 #[test]
 fn i7_repeated_tessellation_is_bitwise_identical() {
     for source in [
-        include_str!("../fixtures/parity/cylinder.brep.json"),
-        include_str!("../fixtures/parity/torus.brep.json"),
-        include_str!("../fixtures/parity/arc-edged-extrusion.brep.json"),
+        include_str!("../fixtures/cases/cylinder.brep.json"),
+        include_str!("../fixtures/cases/torus.brep.json"),
+        include_str!("../fixtures/cases/arc-edged-extrusion.brep.json"),
     ] {
         let body = BrepEnvelope::from_json(source).unwrap();
         let first = tessellate(&body, 0.01, 2_000_000).unwrap();

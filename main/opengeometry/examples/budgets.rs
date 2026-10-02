@@ -5,7 +5,7 @@ use std::error::Error;
 use std::time::{Duration, Instant};
 
 const ROTATED_BOX_UNION: &str =
-    include_str!("../tests/fixtures/parity/boolean-matrix/rotated-box-union.json");
+    include_str!("../tests/fixtures/cases/boolean-matrix/rotated-box-union.json");
 const COVERAGE_GAP_BOUND: Duration = Duration::from_secs(2);
 
 fn main() -> Result<(), Box<dyn Error>> {

@@ -1,9 +1,9 @@
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-pub(super) fn parity_fixtures(folder: &str, keep: impl Fn(&str) -> bool) -> Vec<PathBuf> {
+pub(super) fn case_files(folder: &str, keep: impl Fn(&str) -> bool) -> Vec<PathBuf> {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/parity")
+        .join("tests/fixtures/cases")
         .join(folder);
     let mut files = std::fs::read_dir(directory)
         .unwrap()

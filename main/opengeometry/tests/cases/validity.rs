@@ -4,7 +4,7 @@ use opengeometry::brep::BrepEnvelope;
 fn main_brep_json_round_trips_byte_identically() {
     macro_rules! check {
         ($name:literal) => {{
-            let source = include_str!(concat!("../fixtures/parity/", $name, ".brep.json"));
+            let source = include_str!(concat!("../fixtures/cases/", $name, ".brep.json"));
             let body = BrepEnvelope::from_json(source).expect($name);
             assert_eq!(body.to_json().expect($name), source, "{}", $name);
         }};
