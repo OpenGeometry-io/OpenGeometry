@@ -13,13 +13,12 @@
   "rustRoots": [
     { "path": "opengeometry/tests", "recursive": true },
     { "path": "opengeometry/test-support", "recursive": true },
-    { "path": "opengeometry/examples", "recursive": true },
-    { "path": "tools/parity-oracle/src", "recursive": true }
+    { "path": "opengeometry/examples", "recursive": true }
   ],
   "exceptionListRoots": [
     { "path": "opengeometry/tests/source_rules", "recursive": false }
   ],
-  "vendoredDirectories": ["traced"],
+  "vendoredDirectories": [],
   "maxFileLines": 600,
   "forbiddenMentions": ["[c]laude", "[a]nthropic", "[o]pencascade", "[p]ythonocc", "\\b[o]cc\\b", "\\b[o]cp\\b"]
 }
