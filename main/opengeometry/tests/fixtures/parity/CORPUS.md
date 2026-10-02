@@ -1,9 +1,10 @@
 # Parity corpus
 
-These fixtures and this table were recorded from the 2.0 kernel by a tool that 2.5
-removed together with the 2.0 tree. They are frozen records that cannot be regenerated
-from this tree (the tool and the 2.0 tree remain only in git history, last present at
-commit c89b64b), so a change to them is a deliberate edit.
+These fixtures and this table were recorded from the 2.0 kernel by a tool
+(`tools/parity-oracle`; at c89b64b it sits at `main-v2.5/tools/parity-oracle`) that 2.5
+removed after the 2.0 tree. They are frozen records that cannot be regenerated from this
+tree. The tool and the 2.0 tree remain only in git history (c89b64b is the last commit
+with the 2.0 tree and a working tool), so a change to them is a deliberate edit.
 
 Accuracy: geometric=1e-8, intersection=1e-9, tessellation=0.01, exchange=1e-6. Frame: origin=[0,0,0], x=[1,0,0], y=[0,0,-1], z=[0,1,0].
 

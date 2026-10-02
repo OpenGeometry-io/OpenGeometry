@@ -38,8 +38,7 @@ main/.check/
 .DS_Store
 .vscode/
 settings.json
-.claude/settings.local.json
-.claude/scheduled_tasks.lock
+.claude/
 
 # AI and documentation files
 .requests/*.md
