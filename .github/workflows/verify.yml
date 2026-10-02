@@ -5,12 +5,14 @@ on:
     paths:
       - 'main/**'
       - 'README.md'
+      - 'MIGRATION.md'
       - 'LICENSE.md'
       - '.github/workflows/verify.yml'
   pull_request:
     paths:
       - 'main/**'
       - 'README.md'
+      - 'MIGRATION.md'
       - 'LICENSE.md'
       - '.github/workflows/verify.yml'
   workflow_dispatch:

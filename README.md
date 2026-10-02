@@ -214,7 +214,7 @@ This section is a compact reference for writing OpenGeometry 2.5 code, by hand o
 
 ## Documentation
 
-The hosted documentation at **[docs.opengeometry.io](https://docs.opengeometry.io?utm_source=github)** still describes the 2.0 API. For 2.5, use this README, the types in the package and the examples.
+The hosted documentation at **[docs.opengeometry.io](https://docs.opengeometry.io?utm_source=github)** still describes the 2.0 API. For 2.5, use this README, the types in the package and the examples. To move code written for 2.0 to 2.5, follow [MIGRATION.md](./MIGRATION.md).
 
 ## Repository structure
 
