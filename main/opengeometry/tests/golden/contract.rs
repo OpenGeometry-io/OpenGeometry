@@ -1,6 +1,8 @@
+use crate::check_findings;
 use crate::extras::{sweep_digest, sweep_outputs, SweepOutputs};
 use crate::golden_file::{committed, compare, dump, mode, parse, Mode, RECORD_INSTRUCTION};
-use std::collections::BTreeMap;
+use crate::record::Findings;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
@@ -99,6 +101,22 @@ fn ci_builds_without_comparing_or_recording() {
     for (update, ci, chosen) in table {
         assert_eq!(mode(update, ci, None), chosen, "{update:?} {ci:?}");
     }
+}
+
+fn lone_disagreement(disagreement: &str, compared: bool) -> bool {
+    let findings = Findings {
+        disagreements: BTreeSet::from([disagreement.to_string()]),
+        ..Findings::default()
+    };
+    check_findings(&BTreeSet::new(), findings, &[], compared).is_ok()
+}
+
+#[test]
+fn matrix_result_disagreements_fail_only_where_stored_results_are_compared() {
+    assert!(!lone_disagreement("booleans.matrix.x result", true));
+    assert!(lone_disagreement("booleans.matrix.x result", false));
+    assert!(!lone_disagreement("booleans.matrix.x handlers", true));
+    assert!(!lone_disagreement("booleans.matrix.x handlers", false));
 }
 
 #[test]
