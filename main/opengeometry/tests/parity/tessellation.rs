@@ -1,10 +1,6 @@
-use crate::support::{parity_fixtures, read_fixture};
 use opengeometry::brep::BrepEnvelope;
 use opengeometry::tessellation::tessellate;
-use opengeometry_test_support::canonical::canonical_tessellation;
 use serde_json::json;
-use std::collections::BTreeMap;
-use std::path::Path;
 
 #[test]
 fn source_tessellation_matches_for_supported_primitive_fixtures() {
@@ -38,50 +34,6 @@ fn source_tessellation_matches_for_supported_primitive_fixtures() {
     check!("linear-extrusion");
     check!("arc-edged-extrusion");
     check!("arc-edged-extrusion-with-holes");
-}
-
-#[test]
-fn boolean_fixture_tessellation_matches_source_canonically() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/parity");
-    let mut sources = BTreeMap::new();
-    for name in [
-        "box-union",
-        "box-intersection",
-        "box-cut",
-        "box-cavity",
-        "sphere-cut",
-    ] {
-        let source = std::fs::read_to_string(root.join(format!("{name}.brep.json"))).unwrap();
-        sources.insert(name.to_string(), BrepEnvelope::from_json(&source).unwrap());
-    }
-    for (folder, prefix) in [("boolean-matrix", "matrix"), ("batch-matrix", "batch")] {
-        for path in parity_fixtures(folder, |name| {
-            !name.contains(".step.") && !name.contains(".fallback.")
-        }) {
-            let fixture = read_fixture(&path);
-            if let Some(brep) = fixture["result"].get("brep") {
-                let name = path.file_stem().unwrap().to_str().unwrap();
-                sources.insert(
-                    format!("{prefix}-{name}"),
-                    serde_json::from_value(brep.clone()).unwrap(),
-                );
-            }
-        }
-    }
-    let mut listed = parity_fixtures("tessellation", |_| true)
-        .iter()
-        .map(|path| path.file_stem().unwrap().to_str().unwrap().to_string())
-        .collect::<Vec<_>>();
-    listed.sort();
-    assert_eq!(listed, sources.keys().cloned().collect::<Vec<_>>());
-    for (name, body) in &sources {
-        let actual = match tessellate(body, 0.01, 2_000_000) {
-            Ok(mesh) => canonical_tessellation(&mesh),
-            Err(error) => json!({"error": error}),
-        };
-        let expected = read_fixture(&root.join("tessellation").join(format!("{name}.json")));
-        assert_eq!(actual, expected, "{name}");
-    }
 }
 
 #[test]

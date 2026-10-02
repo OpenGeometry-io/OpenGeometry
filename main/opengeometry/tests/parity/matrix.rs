@@ -92,11 +92,6 @@ fn boolean_support_matrix_matches_source_outcomes_and_handlers() {
         .filter(|path| {
             path.extension()
                 .is_some_and(|extension| extension == "json")
-                && !path
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .contains(".step.")
         })
         .collect::<Vec<_>>();
     files.sort();

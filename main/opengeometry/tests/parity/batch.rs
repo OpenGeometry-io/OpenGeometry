@@ -8,9 +8,7 @@ use std::collections::BTreeSet;
 
 #[test]
 fn batch_subtraction_matches_source_brep_and_handlers() {
-    let files = parity_fixtures("batch-matrix", |name| {
-        !name.contains(".step.") && !name.contains(".fallback.")
-    });
+    let files = parity_fixtures("batch-matrix", |name| !name.contains(".fallback."));
     assert_eq!(files.len(), 23);
     for path in files {
         let name = path.file_stem().unwrap().to_str().unwrap();
