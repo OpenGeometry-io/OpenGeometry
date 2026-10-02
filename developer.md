@@ -121,8 +121,9 @@ commit and says why. The golden file is the only fixture with a record command.
 2. If the release changes how existing code must be written, check that `MIGRATION.md`
    has its entry (its "Adding an entry" section asks for it in the change that broke the
    code) and rename an "Unreleased" section after the two versions, such as "2.5 to 2.6".
-3. Run both gates locally, where the golden comparison, the comparisons with stored
-   results and the timing budgets run:
+3. Run both gates with `CI` unset on a machine that has a golden file for its target and
+   a `timings` block, where the golden comparison, the comparisons with stored results and
+   the timing budgets run:
    ```bash
    npm run check
    npm run check:full
