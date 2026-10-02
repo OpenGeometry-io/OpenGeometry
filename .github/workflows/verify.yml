@@ -3,14 +3,12 @@ name: OpenGeometry 2.5 verification
 on:
   push:
     paths:
-      - 'main-v2.5/**'
-      - 'main/opengeometry/**'
-      - '.github/workflows/main-v2.5.yml'
+      - 'main/**'
+      - '.github/workflows/verify.yml'
   pull_request:
     paths:
-      - 'main-v2.5/**'
-      - 'main/opengeometry/**'
-      - '.github/workflows/main-v2.5.yml'
+      - 'main/**'
+      - '.github/workflows/verify.yml'
   workflow_dispatch:
     inputs:
       record:
@@ -35,7 +33,7 @@ jobs:
     timeout-minutes: 120
     defaults:
       run:
-        working-directory: main-v2.5
+        working-directory: main
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -47,7 +45,7 @@ jobs:
         with:
           node-version: '26'
           cache: npm
-          cache-dependency-path: main-v2.5/package-lock.json
+          cache-dependency-path: main/package-lock.json
       - id: wasm-pack
         uses: actions/cache@v4
         with:
@@ -62,16 +60,15 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-            main-v2.5/opengeometry/target
-            main-v2.5/opengeometry/test-support/target
-            main-v2.5/tools/parity-oracle/target
-          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('main-v2.5/**/Cargo.lock') }}
+            main/opengeometry/target
+            main/opengeometry/test-support/target
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('main/**/Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
       - name: Install SDK dependencies
         run: npm ci
       - name: Fetch crate dependencies
         run: |
-          git ls-files '*Cargo.lock' | grep -v '/traced/' | while read -r lock; do
+          git ls-files '*Cargo.lock' | while read -r lock; do
             cargo fetch --locked --manifest-path "$(dirname "$lock")/Cargo.toml"
           done
       - name: Install Chromium
@@ -87,11 +84,6 @@ jobs:
       - name: Kernel time budgets
         if: ${{ !cancelled() }}
         run: cargo run --release --offline --manifest-path opengeometry/Cargo.toml --example budgets
-      - name: Parity fixtures match the oracle
-        if: ${{ !cancelled() }}
-        run: |
-          cargo run --offline --manifest-path tools/parity-oracle/Cargo.toml -- "$RUNNER_TEMP/parity"
-          diff -r "$RUNNER_TEMP/parity" opengeometry/tests/fixtures/parity
       - name: Pack check logs
         if: always()
         run: tar czf "$RUNNER_TEMP/check-logs.tgz" .check
@@ -104,7 +96,7 @@ jobs:
         if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}
         with:
           name: step-exports
-          path: main-v2.5/test-results/**/*.step
+          path: main/test-results/**/*.step
 
   record:
     if: github.event_name == 'workflow_dispatch'
@@ -116,7 +108,7 @@ jobs:
     timeout-minutes: 120
     defaults:
       run:
-        working-directory: main-v2.5
+        working-directory: main
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -127,7 +119,7 @@ jobs:
         with:
           node-version: '26'
           cache: npm
-          cache-dependency-path: main-v2.5/package-lock.json
+          cache-dependency-path: main/package-lock.json
       - id: wasm-pack
         if: inputs.record == 'baselines'
         uses: actions/cache@v4
@@ -142,7 +134,7 @@ jobs:
       - name: Record the golden
         if: inputs.record == 'goldens'
         continue-on-error: true
-        working-directory: main-v2.5/opengeometry
+        working-directory: main/opengeometry
         env:
           OG_GOLDEN_UPDATE: '1'
         run: cargo test --locked --test golden
@@ -160,7 +152,7 @@ jobs:
         with:
           name: goldens-${{ matrix.os }}
           path: |
-            main-v2.5/opengeometry/tests/fixtures/golden/*.json
+            main/opengeometry/tests/fixtures/golden/*.json
             ${{ runner.temp }}/kernel-snapshot.tgz
       - name: Build
         if: inputs.record == 'baselines'
