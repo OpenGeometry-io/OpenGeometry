@@ -1,6 +1,6 @@
 # Golden targets
 
-Each `<target>.json` maps every golden scene key to the SHA-256 of its record text
+Each `<target>.json` maps every golden scene key to the SHA-256 of its text
 (`sweep-3d` excepted, see below), sorted, one key per line. The `golden` test binary
 (`tests/golden/`) builds every scene, hashes it and, on a recorded target off CI, fails
 on any key that is missing from the file, any key in the file with no scene, and any key
@@ -54,8 +54,8 @@ wasm32 is not recorded. It waits for the embedded fixtures of the deferred wasm 
 work: the golden test reads the boolean matrix rows, the three batch-matrix fallback rows
 and the kernel's boolean handler source files from disk, which a wasm test run cannot do.
 
-No other native target is recorded. x86-64 Linux, which CI runs on, is left out on purpose:
-CI does not compare.
+No other native target is recorded. x86-64 Linux is left out on purpose: CI, which runs on
+it and on macOS, does not compare.
 
 ## What the goldens carry
 
