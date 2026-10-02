@@ -64,13 +64,12 @@ README's quick start, so a change to the quick start changes `pages/quick-start.
 The same test checks the `ts` blocks of `MIGRATION.md` the same way. The build ships the
 README, with its relative links made absolute, and `LICENSE.md` in `main/dist/`.
 
-`.github/workflows/verify.yml` runs on every push and pull request that changes
-`main/**`, `README.md`, `MIGRATION.md`, `LICENSE.md` or the workflow file, on Ubuntu and
-macOS. It runs
-`npm run check`, then the two browser runs (`node scripts/check/verify.mjs --full --only
-browser:three-168` and `--only browser:three-184`), then the release-mode kernel time
-budgets (`cargo run --release --example budgets` in `main/opengeometry/`). It uploads the
-check logs and, from Ubuntu, the STEP exports.
+`.github/workflows/verify.yml` runs on every push and pull request that changes `main/**`,
+`README.md`, `MIGRATION.md`, `LICENSE.md` or the workflow file, on Ubuntu and macOS. It
+runs `npm run check`, then the two browser runs (`node scripts/check/verify.mjs --full
+--only browser:three-168` and `--only browser:three-184`), then the release-mode kernel
+time budgets (`cargo run --release --example budgets` in `main/opengeometry/`). It uploads
+the check logs and, from Ubuntu, the STEP exports.
 
 The same workflow can be started by hand. Its one required input, `record`, chooses
 what to record on Ubuntu and macOS:

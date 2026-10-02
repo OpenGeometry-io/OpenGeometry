@@ -19,7 +19,7 @@ It is written for people and for coding assistants alike: each section says what
 - Points and vectors are plain arrays, `[x, y, z]`. There is no `Vector3`.
 - Booleans change the body you call them on and return nothing. In 2.0 they returned a new body.
 - Bodies move with `transform`. There is no `setPlacement`.
-- `OpenGeometry.create` takes a second argument with the URL of the display worker, `tessellation-worker.js`, which your site serves next to `opengeometry_bg.wasm`.
+- `OpenGeometry.create` takes a second argument with the URL of the display worker, `tessellation-worker.js`, which your site must serve as well as `opengeometry_bg.wasm`.
 - STEP export is `OpenGeometry.exportStep`. It returns a Promise.
 - Every failure throws one error class, `OGError`.
 
@@ -58,35 +58,40 @@ Bodies are Three.js objects in both versions, so `scene.add(body)` does not chan
 
 ### Replace this with that
 
+`[cx, cy, cz]` are the three numbers of the 2.0 `center`, and `[tx, ty, tz]` are those of `translation`.
+Rows that end with "(!)" also behave differently, so read "Different behaviour" before you change them.
+
 | 2.0 | 2.5 |
 | --- | --- |
 | `await OpenGeometry.create({ wasmURL })` | `await OpenGeometry.create({ wasmURL }, { workerURL })`, and serve `tessellation-worker.js` too |
 | `new Vector3(x, y, z)` | `[x, y, z]` |
-| `ogid` option | `ogId` option |
-| `new Cuboid({ center, width, height, depth })` | `new Solid(OG_PRIMITIVE_CUBOID, { width, height, depth }, { plane: { origin: [cx, cy - height / 2, cz] } })` |
-| `new Cylinder({ center, radius, height })` | `new Solid(OG_PRIMITIVE_CYLINDER, { radius, height }, { plane: { origin: [cx, cy - height / 2, cz] } })` |
-| `new Opening({ ... }).subtractFrom(wall)` | make the opening a cuboid `Solid`, then `wall.operate(OG_OPERATION_SUBTRACT, { tools: [opening] })` |
-| `new Rectangle({ center, width, breadth })` | `new Wire(OG_PRIMITIVE_RECTANGLE, { width, breadth }, { plane: { origin: center } })` |
+| `ogid` option and property | `ogId` option and property |
+| `new Cuboid({ center, width, height, depth })` | `new Solid(OG_PRIMITIVE_CUBOID, { width, height, depth }, { plane: { origin: [cx, cy - height / 2, cz] } })`; the 2.0 constructor also took `translation`, `rotation` and `scale`, which you give as in the `setPlacement` rows (!) |
+| `new Cylinder({ center, radius, height })` | `new Solid(OG_PRIMITIVE_CYLINDER, { radius, height }, { plane: { origin: [cx, cy - height / 2, cz] } })` (!) |
+| `new AnalyticSolid({ kind: 'cylinder', radius, height, frame })` | `new Solid(OG_PRIMITIVE_CYLINDER, { radius, height }, { plane: { origin: frame.origin, normal: frame.z, xDirection: frame.x } })` |
+| `new Opening({ ... }).subtractFrom(wall)` | make the opening a cuboid `Solid`, then `wall.operate(OG_OPERATION_SUBTRACT, { tools: [opening] })`; do not add the opening solid to the scene (a 2.0 `Opening` was invisible; a 2.5 solid you add is drawn) (!) |
+| `new Rectangle({ center, width, breadth })` | `new Wire(OG_PRIMITIVE_RECTANGLE, { width, breadth }, { plane: { origin: [cx, cy, cz] } })`; the 2.0 constructor also took `translation`, `rotation` and `scale`, which you give as in the `setPlacement` rows |
 | `new Line({ start, end })`, `new Polyline({ points })` | `new Wire(OG_PRIMITIVE_POLYLINE, { points, closed? })`; a line is a polyline with two points |
-| `new Arc({ center, radius })` as a full circle | `new Wire(OG_PRIMITIVE_CIRCLE, { radius }, { plane: { origin: center } })` |
+| `new Arc({ center, radius })` as a full circle | `new Wire(OG_PRIMITIVE_CIRCLE, { radius }, { plane: { origin: [cx, cy, cz] } })` |
 | `new Polygon({ vertices, holes })` as a profile | closed polyline wires, used as `profile` and `holes` |
 | `polygon.extrude(h)`, `Solid.extrude(...)`, `extrudeBrepFace(...)` | `new Solid(OG_OPERATION_EXTRUDE, { profile, holes?, distance: h })` |
-| `new Sweep({ path, profile })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })`, where both are wires |
-| `setPlacement({ translation })` | `transform(OG_TRANSFORM_PLACE, { origin })` to set the position, or `transform(OG_TRANSFORM_TRANSLATE, { offset })` to move by an amount |
-| `setPlacement({ rotation })` | `transform(OG_TRANSFORM_ROTATE, { axis, degrees, pivot? })` |
-| `setPlacement({ scale })` | `transform(OG_TRANSFORM_SCALE, { factor, pivot? })` |
-| `getPlacement()` gives `{ translation, rotation, scale }` | `getPlacement()` gives `{ origin, xDirection, normal, scale }` |
-| `setConfig({ width })`, `cuboid.width = 3` | `rebuild(OG_PRIMITIVE_CUBOID, { width, height, depth })`, with every parameter given |
-| `color` option, `body.color = c`, `body.outline = true` | `appearance: { color, outline }` in the options, or `body.setAppearance({ color, outline })` |
-| `booleanUnion(a, b)`, `a.union(b)` | `a.operate(OG_OPERATION_UNION, { tools: [b] })` |
-| `booleanSubtraction(a, b)`, `a.subtract([b, c])`, `executeBooleanSubtractionMany(a, [b, c])` | `a.operate(OG_OPERATION_SUBTRACT, { tools: [b, c] })` |
-| `booleanIntersection(a, b)`, `a.intersection(b)` | `a.operate(OG_OPERATION_INTERSECT, { tools: [b] })` |
-| `result.report` | `solid.getReport()` |
-| `solid.exportStep('metre')`, `exportBrepToStep(...)` | `await OpenGeometry.exportStep({ nodes: [solid], unit: 'metre', upAxis: 'Y' })` |
-| `getBrepSerialized()` | `getBrep()` |
-| `getModelBounds()` | `getBounds()` |
-| `dispose()` | `dispose()`; `OpenGeometry.reset()` frees every body at once |
-| catch `AnalyticGeometryError`, read `code` and `detail` | catch `OGError`, read `code`, `call` and `details` |
+| `new Sweep({ path, profile })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })`, both wires. The path is an open polyline wire of the 2.0 points. Centre the profile on the path's first point P, square to its first direction D: a rectangle or circle wire with `{ plane: { origin: P, normal: D } }` (add `xDirection`, for example `[0, 0, 1]`, when D points along x), or a closed polyline of the 2.0 profile points, centred on `[0, 0, 0]` with y = 0, given the same `plane` (!) |
+| `setPlacement({ translation })` | `transform(OG_TRANSFORM_TRANSLATE, { offset })`, with `offset` the new `translation` minus the old one; or `transform(OG_TRANSFORM_PLACE, { origin })` with `origin` `[cx + tx, cy + ty - height / 2, cz + tz]` for a cuboid or opening, or `[cx + tx, cy + ty, cz + tz]` for a rectangle (!) |
+| `setPlacement({ rotation })` | `transform(OG_TRANSFORM_ROTATE, { axis, degrees, pivot })`, one call per angle that is not zero, in this order: `[0, 0, 1]` by `rz`, then `[0, 1, 0]` by `ry`, then `[1, 0, 0]` by `rx`. Use `degrees = radians * 180 / Math.PI` and the same `pivot` each time (see Placement) (!) |
+| `setPlacement({ scale })` | `transform(OG_TRANSFORM_SCALE, { factor, pivot })`, where `factor` is `s` from the 2.0 scale `(s, s, s)`. 2.5 has no uneven scale (!) |
+| `getPlacement()` gives `{ translation, rotation, scale }` | `getPlacement()` gives `{ origin, xDirection, normal, scale }` (!) |
+| `setConfig({ width })`, `cuboid.width = 3` | `rebuild(OG_PRIMITIVE_CUBOID, { width, height, depth })`, with every parameter given (!) |
+| `color` option, `body.color = c`, `body.outline = true`, `deflection` option, `setConfig({ deflection })` | `appearance: { color, outline, deflection }` in the options, or `body.setAppearance({ color, outline, deflection })` (!) |
+| `booleanUnion(a, b)`, `a.union(b)` | `a.operate(OG_OPERATION_UNION, { tools: [b] })` (!) |
+| `booleanSubtraction(a, b)`, `a.subtract([b, c])`, `executeBooleanSubtractionMany(a, [b, c])` | `a.operate(OG_OPERATION_SUBTRACT, { tools: [b, c] })` (!) |
+| `booleanIntersection(a, b)`, `a.intersection(b)` | `a.operate(OG_OPERATION_INTERSECT, { tools: [b] })` (!) |
+| `result.report` | `solid.getReport()?.report`, on the body you called `operate` on |
+| `solid.exportStep()`, `solid.exportStep('metre')` | `await OpenGeometry.exportStep({ nodes: [solid], unit: 'metre', upAxis: 'Y' })`; for `exportStep('millimetre')` pass `unit: 'millimetre'` (!) |
+| `exportBrepToStep(brepJson, configJson)` | `await OpenGeometry.exportStep({ nodes: [solid], unit: 'metre', upAxis: 'Y' })`, which keeps the numbers 2.0 wrote; the result has `report`, an object, where 2.0 had `reportJson` (!) |
+| `getBrepSerialized()` | `getBrep()`, which returns the parsed object, so drop the `JSON.parse`. It has the fields of the 2.0 `AnalyticSolid` JSON; the older layout that `Rectangle.getBrep()` and `Sweep.getBrep()` returned is gone |
+| `getModelBounds()` | `getBounds()` (!) |
+| `dispose()` | `dispose()`; `OpenGeometry.reset()` frees every body at once (!) |
+| catch `AnalyticGeometryError` or `WorldGraphError`, read `code` and `detail` | catch `OGError`, read `code`, `call` and `details` (!) |
 
 A `?` marks an optional parameter.
 
@@ -94,27 +99,37 @@ A `?` marks an optional parameter.
 
 - **Where a cuboid or cylinder sits.** In 2.0 it was centred on `center`. In 2.5 it stands on its plane origin, which is the middle of its base. That is why the table lowers the origin by `height / 2`.
 - **Booleans change the target.** In 2.0 a boolean returned a new body and left the target alone. In 2.5 `operate` changes the target and returns nothing. In both versions the tools stay as they were.
-- **Placement.** `setPlacement` set absolute values and kept the ones you left out. In 2.5, `TRANSLATE`, `ROTATE` and `SCALE` add to the current placement. `PLACE` sets the placement and resets everything you leave out. Rotation was three Euler angles in radians; it is now one axis and an angle in degrees.
+- **No result object.** Because `operate` returns nothing, `const result = a.union(b)` has no 2.5 form: use `a` afterwards, and call `a.duplicate()` first if your code still needs `a` as it was.
+- **Placement.** `setPlacement` set absolute values and kept the ones you left out. In 2.5, `TRANSLATE`, `ROTATE` and `SCALE` apply on top of the current placement (`SCALE` multiplies), and `PLACE` sets the origin and resets the turn and scale you leave out. 2.0 turned and scaled a `Cuboid` or `Opening` about the point `translation`, a `Rectangle` about `center + translation`, and a `Line`, `Polyline`, `Polygon` or `Sweep` about the middle of the box around its points moved by `translation`. 2.5 turns and scales a body about its own origin unless you pass `pivot`: the middle of the base for a cuboid or cylinder, the `plane` origin for a rectangle or circle, `[0, 0, 0]` for a polyline made from points. To place a cuboid where a 2.0 one sat, lower its origin by half its height.
+- **`getPlacement`.** 2.5's `origin` is the body's origin (the middle of the base for a cuboid), not 2.0's `translation`.
+- **Rebuild keeps the base.** A 2.0 `Cuboid` kept its centre when `setConfig` changed its height; `rebuild` keeps the base where it is, so the centre moves. `setConfig({ center })` becomes `TRANSLATE` by the change in `center`, or `PLACE`.
+- **Sweeps.** 2.0 moved the profile to the path's first point and turned it square to the first segment. 2.5 sweeps the profile where it is. It throws when the profile's plane misses that point or is not square to the first segment, and it sweeps a profile that is in that plane but off-centre beside the path. A closed path has no 2.5 form.
 - **Do not write `.position`, `.rotation` or `.scale`.** 2.0 placed some shapes that way. In 2.5 such a change is undone, with a `PlacementOverwritten` warning.
 - **`Solid` is a different class.** 2.0 had `new Solid({ brep, color })`. 2.5 has `new Solid(kind, params, options)`.
 - **No swapping objects.** A body redraws itself after `transform`, `rebuild` or `operate`. There is no `setConfig` and no new object to put into the scene. Geometry is made when the scene is rendered, not when the body is created.
-- **STEP defaults.** 2.0 exported in metres and kept the model's axes. 2.5 defaults to millimetres and Z up, so pass `unit: 'metre', upAxis: 'Y'` to keep the 2.0 units and axes.
+- **STEP units and axes.** `solid.exportStep()` wrote metres. `exportBrepToStep` and `WorldGraph.exportStep` wrote your numbers unchanged under a millimetre header. 2.5 reads model numbers as metres: `unit: 'metre'` writes them unchanged, `unit: 'millimetre'` multiplies them by 1000, and the default is millimetres with Z up. 2.0 kept Y up, so pass `upAxis: 'Y'`.
 - **Bounds.** `getModelBounds()` gave the body's own bounds as a `THREE.Box3`. `getBounds()` gives bounds in world space as `[minX, minY, minZ, maxX, maxY, maxZ]`, or `null`.
 - **`dispose()`** also removes the body from its parent.
-- **Colours** are numbers only, such as `0x10b981`.
+- **Colours** are numbers only, such as `0x10b981`. 2.0 `body.color` returned a `THREE.Color`.
 - **Errors.** There is one class, `OGError`. Codes are now PascalCase, such as `InvalidParameter`, and `detail` is now `details`.
 - **Extruded solids work in booleans.** 2.0 refused them.
 
+### Partly replaced
+
+- `WorldGraph`: nodes and hierarchy become `SystemAssembly`, `addChild` or the `parent` option; `getWorldBounds` becomes `getBounds()`; `removeNode` becomes `dispose()`; `exportStep` becomes `OpenGeometry.exportStep({ nodes })` (nodes may be bodies or assemblies). Its `clash`, `clearance`, `distance`, `projectLines`, `projectViews` and `bind` are gone.
+- The pattern helpers (`AnalyticPattern`, `linearPattern`, `rectangularPattern`, `circularPattern`): make copies with `solid.instance()` and move each with `transform`; check the positions, since 2.0 drew a pattern around its own origin. `rebuild` and `operate` on an instanced body need `{ instances: 'all' }` or `makeUnique()` first.
+- `AnalyticSolid` kinds: `linearExtrusion` becomes `OG_OPERATION_EXTRUDE` with closed polyline wires for the outline and each hole; `revolvedRectangle` (a tube) becomes `OG_OPERATION_EXTRUDE` with a circle wire as `profile` and a smaller circle wire with the same centre as the one hole.
+
 ### Removed in 2.5
 
-These have no replacement:
+These are gone:
 
-- STL, IFC and PDF export.
+- STL and IFC export. PDF export was never in the browser build.
 - Projection and 2D views, offset, loft, and public triangulation (`tessellate_brep`, `tessellateFacetedBrep`).
 - `Sphere`, `Wedge`, `Curve`, `EllipticalArc`, `AnalyticCurve`, arcs that are not full circles, and cylinder sectors.
-- `AnalyticSolid` kinds other than cuboid and cylinder, `AnalyticSolid.fromBrep`, and `new Solid({ brep })`.
-- `WorldGraph` with `clash`, `clearance`, `distance`, `projectLines`, `projectViews` and `bind`, and the older scene manager (`add*ToScene`, `replaceBrepEntityInScene`, `refreshBrepEntityInScene`). To export several bodies to STEP, pass them all to `OpenGeometry.exportStep({ nodes })`.
-- The pattern helpers: `AnalyticPattern`, `linearPattern`, `rectangularPattern`, `circularPattern`.
+- `AnalyticSolid` kinds other than cuboid, cylinder, `linearExtrusion` and `revolvedRectangle`, `AnalyticSolid.fromBrep`, and `new Solid({ brep })`.
+- `WorldGraph`'s queries and projection: `clash`, `clearance`, `distance`, `projectLines`, `projectViews` and `bind`.
+- The older scene manager (`add*ToScene`, `replaceBrepEntityInScene`, `refreshBrepEntityInScene`), already removed in 2.0.16.
 - `shell`, `classifyPoint` and `normalAtFace`.
 - The freeform geometry and editor classes, such as `FreeformGeometry` and `FreeformEditor`.
 - `SpotLabel`.
@@ -122,6 +137,8 @@ These have no replacement:
 - Sweep caps (`capStart`, `capEnd`).
 - `OpenGeometry.version`, `enableDebug` and the `debugMeshes` option.
 - The `create*Example` builders.
+
+A 2.0 export this guide does not name has no direct 2.5 form; the full 2.5 surface is `index.d.ts` in the package.
 
 ### Check your result
 
@@ -133,9 +150,9 @@ These have no replacement:
 
 When a change to OpenGeometry breaks code written for the previous version, add a section to this guide in the same change.
 
-- Put the new section at the top, just under "How to use this guide", and name it after the two versions, such as "2.5 to 2.6".
+- Put the new section at the top, just under "How to use this guide", and name it after the two versions, such as "2.5 to 2.6". If the next version number is not decided when you make the change, name the section "Unreleased" and rename it at release.
 - Say what changed, show the same code before and after, give the replace table, and list what was removed. Add "Different behaviour" when something now works differently.
-- Code for the current version goes in a code block labelled `ts` that starts at the left margin and is a complete module, imports included. The checks type-check every such block against the built package.
+- Code for the current version goes in a code block labelled `ts` that starts at the left margin, ends with a bare closing fence at the left margin, and is a complete module, imports included. The checks type-check every such block against the built package.
 - Code for an older version goes in a code block labelled `js`, which is not checked.
 - When a later change breaks a `ts` block in an older section, change that block's label to `js`.
 
