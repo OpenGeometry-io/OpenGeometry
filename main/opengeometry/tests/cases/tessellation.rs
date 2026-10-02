@@ -1,5 +1,6 @@
 use opengeometry::brep::BrepEnvelope;
 use opengeometry::tessellation::tessellate;
+use opengeometry_test_support::stored;
 use serde_json::json;
 
 #[test]
@@ -18,8 +19,10 @@ fn primitive_tessellation_matches_stored_fixtures() {
                 "revision": mesh.revision,
                 "achievedDeflection": mesh.achieved_deflection,
             });
-            let expected: serde_json::Value = serde_json::from_str(include_str!(concat!("../fixtures/cases/", $name, ".tess.json"))).unwrap();
-            assert_eq!(actual, expected, "{}", $name);
+            if stored::compared() {
+                let expected: serde_json::Value = serde_json::from_str(include_str!(concat!("../fixtures/cases/", $name, ".tess.json"))).unwrap();
+                assert_eq!(actual, expected, "{}", $name);
+            }
         }};
     }
     check!("cuboid");

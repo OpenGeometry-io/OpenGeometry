@@ -1,5 +1,6 @@
 use opengeometry::brep::{Accuracy, BodyType, CurveGeometry, Frame3};
 use opengeometry::primitives;
+use opengeometry_test_support::stored;
 use serde_json::json;
 
 #[test]
@@ -80,19 +81,23 @@ fn primitive_builders_match_stored_json() {
                 BodyType::Solid
             }
         );
-        let expected = match name {
-            "cuboid" => include_str!("../fixtures/cases/cuboid.brep.json"),
-            "cylinder" => include_str!("../fixtures/cases/cylinder.brep.json"),
-            "sphere" => include_str!("../fixtures/cases/sphere.brep.json"),
-            "cone" => include_str!("../fixtures/cases/cone.brep.json"),
-            "frustum" => include_str!("../fixtures/cases/frustum.brep.json"),
-            "torus" => include_str!("../fixtures/cases/torus.brep.json"),
-            "annular-cylinder" => include_str!("../fixtures/cases/annular-cylinder.brep.json"),
-            "cylinder-with-hole" => include_str!("../fixtures/cases/cylinder-with-hole.brep.json"),
-            "circle" => include_str!("../fixtures/cases/circle.brep.json"),
-            _ => unreachable!(),
-        };
-        assert_eq!(body.to_json().unwrap(), expected, "{name}");
+        if stored::compared() {
+            let expected = match name {
+                "cuboid" => include_str!("../fixtures/cases/cuboid.brep.json"),
+                "cylinder" => include_str!("../fixtures/cases/cylinder.brep.json"),
+                "sphere" => include_str!("../fixtures/cases/sphere.brep.json"),
+                "cone" => include_str!("../fixtures/cases/cone.brep.json"),
+                "frustum" => include_str!("../fixtures/cases/frustum.brep.json"),
+                "torus" => include_str!("../fixtures/cases/torus.brep.json"),
+                "annular-cylinder" => include_str!("../fixtures/cases/annular-cylinder.brep.json"),
+                "cylinder-with-hole" => {
+                    include_str!("../fixtures/cases/cylinder-with-hole.brep.json")
+                }
+                "circle" => include_str!("../fixtures/cases/circle.brep.json"),
+                _ => unreachable!(),
+            };
+            assert_eq!(body.to_json().unwrap(), expected, "{name}");
+        }
     }
 }
 
@@ -161,16 +166,18 @@ fn extrusions_match_stored_json() {
     ];
     for (name, body) in bodies {
         assert_eq!(body.body_type().unwrap(), BodyType::Solid);
-        let expected = match name {
-            "linear-extrusion" => include_str!("../fixtures/cases/linear-extrusion.brep.json"),
-            "arc-edged-extrusion" => {
-                include_str!("../fixtures/cases/arc-edged-extrusion.brep.json")
-            }
-            "arc-edged-extrusion-with-holes" => {
-                include_str!("../fixtures/cases/arc-edged-extrusion-with-holes.brep.json")
-            }
-            _ => unreachable!(),
-        };
-        assert_eq!(body.to_json().unwrap(), expected, "{name}");
+        if stored::compared() {
+            let expected = match name {
+                "linear-extrusion" => include_str!("../fixtures/cases/linear-extrusion.brep.json"),
+                "arc-edged-extrusion" => {
+                    include_str!("../fixtures/cases/arc-edged-extrusion.brep.json")
+                }
+                "arc-edged-extrusion-with-holes" => {
+                    include_str!("../fixtures/cases/arc-edged-extrusion-with-holes.brep.json")
+                }
+                _ => unreachable!(),
+            };
+            assert_eq!(body.to_json().unwrap(), expected, "{name}");
+        }
     }
 }

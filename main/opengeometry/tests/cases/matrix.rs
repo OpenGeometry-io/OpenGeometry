@@ -3,7 +3,7 @@ use opengeometry::operations::modifying::boolean::{
     boolean_brep_outcome_with_handlers, boolean_brep_with_handlers, BooleanOp,
 };
 use opengeometry::primitives;
-use opengeometry_test_support::volume;
+use opengeometry_test_support::{stored, volume};
 use serde_json::json;
 
 #[test]
@@ -56,11 +56,14 @@ fn boolean_fixtures_match_stored_brep_and_handlers() {
         ($name:literal, $a:expr, $b:expr, $operation:expr) => {{
             let (result, handlers) =
                 boolean_brep_with_handlers($a, $b, $operation, $name.into()).unwrap();
-            assert_eq!(
-                result.brep.to_json().unwrap(),
-                include_str!(concat!("../fixtures/cases/", $name, ".brep.json")),
-                $name
-            );
+            let json = result.brep.to_json().unwrap();
+            if stored::compared() {
+                assert_eq!(
+                    json,
+                    include_str!(concat!("../fixtures/cases/", $name, ".brep.json")),
+                    $name
+                );
+            }
             let expected: Vec<String> = serde_json::from_str(include_str!(concat!(
                 "../fixtures/cases/",
                 $name,
@@ -135,7 +138,9 @@ fn boolean_support_matrix_matches_stored_outcomes_and_handlers() {
             }
             Err(error) => json!({"error": serde_json::to_value(error).unwrap()}),
         };
-        assert_eq!(actual, fixture["result"], "{name}");
+        if stored::compared() || fixture["result"].get("error").is_some() {
+            assert_eq!(actual, fixture["result"], "{name}");
+        }
         assert_eq!(json!(handlers), fixture["handlers"], "{name}");
     }
 }

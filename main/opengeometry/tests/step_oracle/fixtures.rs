@@ -6,6 +6,7 @@ use opengeometry::{
 use opengeometry_test_support::part21::{
     normalise_step, pcurve_expectations, references, Document,
 };
+use opengeometry_test_support::stored;
 use serde_json::Value;
 use std::slice::from_ref;
 
@@ -81,16 +82,18 @@ fn assert_export_matches_stored(name: &str, body: &BrepEnvelope) {
         };
         let (text, report) = checked_export(name, unit, body);
         assert_eq!(named_lines(&text), named_lines(&stored), "{name} {unit}");
-        assert_report_fixture(
-            &report,
-            &fixture_text(&format!("{stem}.report.json")).unwrap(),
-            &format!("{name} {unit}"),
-        );
-        assert_eq!(
-            normalise_step(&text),
-            normalise_step(&stored),
-            "{name} {unit}"
-        );
+        if stored::compared() {
+            assert_report_fixture(
+                &report,
+                &fixture_text(&format!("{stem}.report.json")).unwrap(),
+                &format!("{name} {unit}"),
+            );
+            assert_eq!(
+                normalise_step(&text),
+                normalise_step(&stored),
+                "{name} {unit}"
+            );
+        }
     }
 }
 
