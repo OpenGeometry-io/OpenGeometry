@@ -6,7 +6,7 @@ use opengeometry::world_graph::{
     WorldGraph,
 };
 
-const CUBOID: &str = include_str!("fixtures/parity/cuboid.brep.json");
+const CUBOID: &str = include_str!("fixtures/cases/cuboid.brep.json");
 
 #[test]
 fn i5_graph_accepts_only_the_standard_accuracy_and_the_display_bucket_ignores_the_budget() {

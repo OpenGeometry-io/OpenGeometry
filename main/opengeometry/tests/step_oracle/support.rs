@@ -17,7 +17,7 @@ pub(super) struct MatchedExport {
 
 pub(super) fn fixture_text(relative: &str) -> Option<String> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/parity")
+        .join("tests/fixtures/cases")
         .join(relative);
     path.exists()
         .then(|| fs::read_to_string(&path).unwrap_or_else(|error| panic!("{relative}: {error}")))
@@ -25,7 +25,7 @@ pub(super) fn fixture_text(relative: &str) -> Option<String> {
 
 pub(super) fn fixture_names(directory: &str) -> Vec<String> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/parity")
+        .join("tests/fixtures/cases")
         .join(directory);
     let mut names = fs::read_dir(path)
         .unwrap()

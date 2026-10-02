@@ -19,7 +19,7 @@ pub(crate) const SWEEP_KEY: &str = "sweep-3d";
 
 const FALLBACK_DIRECTORY: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/tests/fixtures/parity/batch-matrix"
+    "/tests/fixtures/cases/batch-matrix"
 );
 
 const FALLBACK_ROWS: [&str; 3] = [

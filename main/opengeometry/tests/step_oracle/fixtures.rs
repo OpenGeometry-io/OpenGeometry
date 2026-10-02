@@ -1,5 +1,8 @@
 use crate::support::{fixture_names, fixture_text, parse_and_match, unit_scale};
-use opengeometry::{brep::BrepEnvelope, exchange::export_step};
+use opengeometry::{
+    brep::{BrepEnvelope, GeometryError},
+    exchange::export_step,
+};
 use opengeometry_test_support::part21::{
     normalise_step, pcurve_expectations, references, Document,
 };
@@ -7,6 +10,9 @@ use serde_json::Value;
 use std::slice::from_ref;
 
 const UNITS: [(&str, &str); 2] = [("metre", "m"), ("millimetre", "mm")];
+
+const UNEXPORTABLE_SOLID: &str =
+    "analytic analytic exchange export requires nonempty closed solid regions without wires";
 
 struct ConePcurve {
     point: usize,
@@ -47,25 +53,33 @@ fn assert_report_fixture(report: &Value, source: &str, label: &str) {
     }
 }
 
-fn assert_export_matches_source(directory: &str, name: &str, body: &BrepEnvelope) {
+fn checked_export(name: &str, unit: &str, body: &BrepEnvelope) -> (String, Value) {
+    let (text, report) =
+        export_step(body, unit).unwrap_or_else(|error| panic!("{name} {unit}: {error}"));
+    let report = serde_json::to_value(&report).unwrap();
+    let parsed = parse_and_match(&text, &report, unit, from_ref(body));
+    assert_eq!(parsed.count("POLY_LOOP"), 0, "{name} {unit}");
+    assert!(
+        text.contains("\nFILE_DESCRIPTION(('OpenGeometry analytic BRep'),'2;1');\n"),
+        "{name} {unit}"
+    );
+    (text, report)
+}
+
+fn assert_export_matches_source(name: &str, body: &BrepEnvelope) {
     for (unit, suffix) in UNITS {
-        let stem = format!("{directory}{name}.step.{suffix}");
-        let actual = export_step(body, unit);
+        let stem = format!("{name}.step.{suffix}");
         let Some(source) = fixture_text(&stem) else {
             let error = fixture_text(&format!("{stem}.error.json"))
                 .unwrap_or_else(|| panic!("missing STEP oracle outcome for {name} {unit}"));
             assert_eq!(
-                serde_json::to_value(actual.unwrap_err()).unwrap(),
+                serde_json::to_value(export_step(body, unit).unwrap_err()).unwrap(),
                 serde_json::from_str::<Value>(&error).unwrap(),
                 "{name} {unit}"
             );
             continue;
         };
-        let (text, report) = actual.unwrap_or_else(|error| panic!("{name} {unit}: {error}"));
-        let report = serde_json::to_value(&report).unwrap();
-        let parsed = parse_and_match(&text, &report, unit, from_ref(body));
-        assert_eq!(parsed.count("POLY_LOOP"), 0);
-        assert!(text.contains("\nFILE_DESCRIPTION(('OpenGeometry analytic BRep'),'2;1');\n"));
+        let (text, report) = checked_export(name, unit, body);
         assert_eq!(named_lines(&text), named_lines(&source), "{name} {unit}");
         assert_report_fixture(
             &report,
@@ -85,36 +99,67 @@ fn single_body_step_matches_source_fixtures_in_both_units() {
     let fixtures = single_body_fixtures();
     assert_eq!(fixtures.len(), 17);
     for (name, body) in fixtures {
-        assert_export_matches_source("", &name, &body);
+        assert_export_matches_source(&name, &body);
     }
 }
 
-fn assert_matrix_step_matches_source(matrix: &str, count: usize, skipped: &[&str]) {
+fn matrix_bodies(matrix: &str, count: usize, skipped: &[&str]) -> Vec<(String, BrepEnvelope)> {
     let cases = fixture_names(matrix)
         .into_iter()
         .filter(|name| name.ends_with(".json") && !skipped.iter().any(|part| name.contains(part)))
         .collect::<Vec<_>>();
     assert_eq!(cases.len(), count);
-    for case in cases {
-        let fixture: Value =
-            serde_json::from_str(&fixture_text(&format!("{matrix}/{case}")).unwrap()).unwrap();
-        if fixture["result"].get("error").is_some() {
+    cases
+        .into_iter()
+        .filter_map(|case| {
+            let fixture: Value =
+                serde_json::from_str(&fixture_text(&format!("{matrix}/{case}")).unwrap()).unwrap();
+            let body = serde_json::from_value(fixture["result"].get("brep")?.clone()).unwrap();
+            Some((case.trim_end_matches(".json").to_string(), body))
+        })
+        .collect()
+}
+
+fn exported_matrix_rows(
+    matrix: &str,
+    count: usize,
+    skipped: &[&str],
+    unexportable: &[&str],
+) -> usize {
+    let mut exported = 0;
+    for (name, body) in matrix_bodies(matrix, count, skipped) {
+        if unexportable.contains(&name.as_str()) {
+            for (unit, _) in UNITS {
+                assert_eq!(
+                    export_step(&body, unit).unwrap_err(),
+                    GeometryError::UnsupportedGeometry(UNEXPORTABLE_SOLID.into()),
+                    "{name} {unit}"
+                );
+            }
             continue;
         }
-        let body: BrepEnvelope = serde_json::from_value(fixture["result"]["brep"].clone()).unwrap();
-        let name = case.trim_end_matches(".json");
-        assert_export_matches_source(&format!("{matrix}/"), name, &body);
+        for (unit, _) in UNITS {
+            checked_export(&name, unit, &body);
+        }
+        exported += 1;
     }
+    exported
 }
 
 #[test]
-fn boolean_matrix_step_matches_source_or_pins_an_error() {
-    assert_matrix_step_matches_source("boolean-matrix", 18, &[".step."]);
+fn boolean_matrix_results_export_through_the_oracle_or_pin_an_error() {
+    assert_eq!(
+        exported_matrix_rows("boolean-matrix", 18, &[], &["cylinder-empty"]),
+        14
+    );
 }
 
 #[test]
-fn batch_matrix_step_matches_source_or_pins_an_error() {
-    assert_matrix_step_matches_source("batch-matrix", 23, &[".step.", ".fallback."]);
+fn batch_matrix_results_export_through_the_oracle() {
+    assert_eq!(
+        exported_matrix_rows("batch-matrix", 23, &[".fallback."], &[]),
+        18
+    );
 }
 
 fn cylinder_cross() -> BrepEnvelope {
