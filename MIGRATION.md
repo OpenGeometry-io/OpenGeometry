@@ -10,6 +10,7 @@ It is written for people and for coding assistants alike: each section says what
 2. Go through its "Replace this with that" table and change your code row by row.
 3. Read its "Different behaviour" list: it says what now works differently, even where the names look the same.
 4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
+5. Finish with its "Check your result" steps.
 
 ## 2.0 to 2.5
 
@@ -61,7 +62,7 @@ Bodies are Three.js objects in both versions, so `scene.add(body)` does not chan
 
 `[cx, cy, cz]` are the three numbers of the 2.0 `center`, and `[tx, ty, tz]` are those of `translation`.
 `[rx, ry, rz]` are the three angles of the 2.0 `rotation`, in radians.
-Rows that end with "(!)" also behave differently, so read "Different behaviour" before you change them.
+In the 2.5 column, a `?` after a parameter name marks it as optional, and rows that end with "(!)" also behave differently, so read "Different behaviour" before you change them.
 
 | 2.0 | 2.5 |
 | --- | --- |
@@ -78,7 +79,7 @@ Rows that end with "(!)" also behave differently, so read "Different behaviour" 
 | `new Arc({ center, radius })` as a full circle | `new Wire(OG_PRIMITIVE_CIRCLE, { radius }, { plane: { origin: [cx, cy, cz] } })` |
 | `new Polygon({ vertices, holes })` as a profile | closed polyline wires, used as `profile` and `holes` |
 | `polygon.extrude(h)`, `Solid.extrude(...)`, `extrudeBrepFace(...)` | `new Solid(OG_OPERATION_EXTRUDE, { profile, holes?, distance: h })` |
-| `new Sweep({ path, profile })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })`, both wires: the path an open polyline of the 2.0 path points, the profile placed at the start of the path as "Sweeps" below describes (!) |
+| `new Sweep({ path, profile })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })`, both wires: the path an open polyline of the 2.0 path points, the profile placed at the start of the path as "Sweeps: where the profile goes" below describes (!) |
 | `setPlacement({ translation })` | `transform(OG_TRANSFORM_TRANSLATE, { offset })`, with `offset` the new `translation` minus the old one; or `transform(OG_TRANSFORM_PLACE, { origin })` with `origin` `[cx + tx, cy + ty - height / 2, cz + tz]` for a cuboid or opening, or `[cx + tx, cy + ty, cz + tz]` for a rectangle (!) |
 | `setPlacement({ rotation })` | `transform(OG_TRANSFORM_ROTATE, { axis, degrees, pivot })`, one call per angle that is not zero, in this order: `[0, 0, 1]` by `rz`, then `[0, 1, 0]` by `ry`, then `[1, 0, 0]` by `rx`. Use `degrees = radians * 180 / Math.PI` and the same `pivot` each time (see Placement). This is for a body not turned yet: to change a turn, first `PLACE` it at the `origin` the translation row gives for a cuboid, opening or rectangle, or at `[tx, ty, tz]` for a polyline wire made without a `plane`, a solid extruded from such a wire, or a sweep along such a path (this resets turn and scale), then turn and scale it again. (!) |
 | `setPlacement({ scale })` | `transform(OG_TRANSFORM_SCALE, { factor, pivot })`, where `factor` is the new `s` divided by the current one (`s` itself on a body not scaled yet), for a 2.0 scale `(s, s, s)`. 2.5 has no uneven scale (!) |
@@ -95,8 +96,6 @@ Rows that end with "(!)" also behave differently, so read "Different behaviour" 
 | `getModelBounds()` | `getBounds()` (!) |
 | `dispose()` | `dispose()`; `OpenGeometry.reset()` frees every body at once (!) |
 | catch `AnalyticGeometryError` or `WorldGraphError`, read `code` and `detail` | catch `OGError`, read `code`, `call` and `details` (!) |
-
-In the 2.5 column, a `?` after a parameter name marks it as optional.
 
 ### Different behaviour
 
