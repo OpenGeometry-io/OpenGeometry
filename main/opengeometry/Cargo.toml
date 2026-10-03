@@ -1,27 +1,24 @@
 [package]
 name = "opengeometry"
-version = "1.0.10"
-authors = ["Vishwajeet Mane <manevishwajeet1@gmail.com>"]
-description = "Graphics Kernel for Next Gen"
-license = "MIT/Apache-2.0"
-repository = "https://github.com/OpenGeometry-io/OpenGeometry"
+version = "2.5.0"
 edition = "2021"
+license = "MPL-2.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
+wasm-bindgen = "=0.2.100"
+js-sys = "=0.3.77"
 serde = { version = "1.0", features = ["derive"] }
-serde-wasm-bindgen = "0.4"
-serde_json = { version = "1.0.127", features = ["float_roundtrip"] }
-web-sys = { version = "0.3", features = ["console"] }
-openmaths = "0.2.4"
-uuid = { version = "1.17.0", features = ["v4", "v5", "serde", "js"] }
-getrandom = { version = "0.2", features = ["js"] }
+serde_json = { version = "1.0", features = ["float_roundtrip"] }
 earcutr = "=0.3.0"
-dxf = "0.6.0"
-stl_io = "0.8"
+console_error_panic_hook = "0.1"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-printpdf = "0.5"
+[dev-dependencies]
+wasm-bindgen-test = "=0.3.50"
+sha2 = "0.10"
+opengeometry-test-support = { path = "test-support" }
+
+[profile.release]
+codegen-units = 1

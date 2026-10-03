@@ -1,0 +1,83 @@
+{
+  "name": "opengeometry",
+  "version": "2.5.0",
+  "private": true,
+  "type": "module",
+  "license": "MPL-2.0",
+  "description": "Open-source CAD kernel for the browser: B-rep solids, boolean operations, extrude and sweep, and STEP export, written in Rust, compiled to WebAssembly, with a TypeScript SDK for Three.js.",
+  "keywords": [
+    "cad",
+    "cad-kernel",
+    "brep",
+    "geometry",
+    "geometry-kernel",
+    "solid-modeling",
+    "boolean",
+    "csg",
+    "extrude",
+    "sweep",
+    "step",
+    "step-export",
+    "threejs",
+    "three",
+    "webassembly",
+    "wasm",
+    "rust",
+    "typescript",
+    "browser",
+    "parametric",
+    "3d"
+  ],
+  "homepage": "https://opengeometry.io?utm_source=npm",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenGeometry-io/OpenGeometry.git",
+    "directory": "main"
+  },
+  "bugs": {
+    "url": "https://github.com/OpenGeometry-io/OpenGeometry/issues"
+  },
+  "peerDependencies": {
+    "three": ">=0.168.0 <0.185.0"
+  },
+  "scripts": {
+    "build-core": "cd opengeometry && wasm-pack build --target web --out-dir pkg",
+    "build": "npm run build-core && rollup -c && node scripts/build/prepare-dist.mjs",
+    "lint:check": "eslint .",
+    "lint:fix": "eslint --fix .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.examples.json && tsc --noEmit -p tsconfig.tests.json && tsc --noEmit -p tsconfig.scripts.json",
+    "test": "cargo test --manifest-path opengeometry/Cargo.toml",
+    "test:wasm": "cd opengeometry && wasm-pack test --node",
+    "test:bindings": "node scripts/test/bindings.test.mjs",
+    "test:node": "node --test 'opengeometry-three/tests/node/*.test.mjs' 'scripts/check/*.test.mjs' 'scripts/bench/*.test.mjs' 'scripts/build/*.test.mjs'",
+    "test:performance": "node --max-old-space-size=512 scripts/bench/performance.mjs --check",
+    "test:browser": "playwright test",
+    "snapshot:kernel": "node scripts/snapshot/kernel-snapshot.mjs",
+    "snapshot:sdk": "node scripts/snapshot/sdk-snapshot.mjs",
+    "check:api": "node scripts/check/api-surface.mjs",
+    "check:duplicates": "node scripts/check/duplicates.mjs",
+    "check:source": "node scripts/check/source-rules.mjs && node scripts/check/lint-exceptions.mjs",
+    "check:cycles": "node scripts/check/import-cycles.mjs",
+    "check": "node scripts/check/verify.mjs",
+    "check:full": "node scripts/check/verify.mjs --full",
+    "dev-example": "vite --config opengeometry-three/examples-vite/vite.config.ts",
+    "build-example": "vite build --config opengeometry-three/examples-vite/vite.config.ts",
+    "dev-test-pages": "vite --config opengeometry-three/tests/browser/vite.config.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.35.0",
+    "@playwright/test": "1.59.1",
+    "@rollup/plugin-node-resolve": "15.2.3",
+    "@rollup/plugin-typescript": "11.1.6",
+    "@types/three": "0.168.0",
+    "@typescript-eslint/eslint-plugin": "8.43.0",
+    "@typescript-eslint/parser": "8.43.0",
+    "eslint": "9.35.0",
+    "rollup": "4.36.0",
+    "three": "0.168.0",
+    "three-184": "npm:three@0.184.0",
+    "tslib": "2.7.0",
+    "typescript": "5.6.2",
+    "vite": "6.2.2"
+  }
+}

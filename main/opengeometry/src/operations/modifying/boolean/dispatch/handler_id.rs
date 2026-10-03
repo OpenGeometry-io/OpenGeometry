@@ -1,0 +1,70 @@
+#[derive(Clone, Copy)]
+pub(crate) enum HandlerId {
+    CoincidentBoolean,
+    SeparateBoolean,
+    SphereCylinderBoolean,
+    SphereConicContainment,
+    CylinderConicContainment,
+    ConicBoxContainment,
+    SphereTorusContainment,
+    TorusCylinderContainment,
+    TorusBoxContainment,
+    TorusConicContainment,
+    TorusContainmentBoolean,
+    ConicContainmentBoolean,
+    SphereBoxBoolean,
+    CylinderBoxBoolean,
+    BooleanCylinders,
+    BooleanBoxes,
+    BooleanPlanarExtrusions,
+    BooleanRectilinear,
+    SubtractLayeredExtrusions,
+    SubtractPlanarPolyhedra,
+    BooleanSpheres,
+    SubtractVerticalArcExtrusion,
+    GenericTwoSidedCutterBandSubtraction,
+    GenericMultipleClosedLoopsBoolean,
+    GenericSingleClosedLoopBoolean,
+    GenericNonIntersectingBoolean,
+    SubtractPlanarCutters,
+    SubtractPrismaticProfileBatch,
+    SubtractVerticalArcExtrusionBatch,
+}
+
+impl HandlerId {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::CoincidentBoolean => "coincident_boolean",
+            Self::SeparateBoolean => "separate_boolean",
+            Self::SphereCylinderBoolean => "sphere_cylinder_boolean",
+            Self::SphereConicContainment => "sphere_conic_containment",
+            Self::CylinderConicContainment => "cylinder_conic_containment",
+            Self::ConicBoxContainment => "conic_box_containment",
+            Self::SphereTorusContainment => "sphere_torus_containment",
+            Self::TorusCylinderContainment => "torus_cylinder_containment",
+            Self::TorusBoxContainment => "torus_box_containment",
+            Self::TorusConicContainment => "torus_conic_containment",
+            Self::TorusContainmentBoolean => "torus_containment_boolean",
+            Self::ConicContainmentBoolean => "conic_containment_boolean",
+            Self::SphereBoxBoolean => "sphere_box_boolean",
+            Self::CylinderBoxBoolean => "cylinder_box_boolean",
+            Self::BooleanCylinders => "boolean_cylinders",
+            Self::BooleanBoxes => "boolean_boxes",
+            Self::BooleanPlanarExtrusions => "boolean_planar_extrusions",
+            Self::BooleanRectilinear => "boolean_rectilinear",
+            Self::SubtractLayeredExtrusions => "subtract_layered_extrusions",
+            Self::SubtractPlanarPolyhedra => "subtract_planar_polyhedra",
+            Self::BooleanSpheres => "boolean_spheres",
+            Self::SubtractVerticalArcExtrusion => "subtract_vertical_arc_extrusion",
+            Self::GenericTwoSidedCutterBandSubtraction => {
+                "generic_two_sided_cutter_band_subtraction"
+            }
+            Self::GenericMultipleClosedLoopsBoolean => "generic_multiple_closed_loops_boolean",
+            Self::GenericSingleClosedLoopBoolean => "generic_single_closed_loop_boolean",
+            Self::GenericNonIntersectingBoolean => "generic_non_intersecting_boolean",
+            Self::SubtractPlanarCutters => "subtract_planar_cutters",
+            Self::SubtractPrismaticProfileBatch => "subtract_prismatic_profile_batch",
+            Self::SubtractVerticalArcExtrusionBatch => "subtract_vertical_arc_extrusion_batch",
+        }
+    }
+}

@@ -1,0 +1,96 @@
+name: OpenGeometry 2.5 verification
+
+on:
+  push:
+    paths:
+      - 'main/**'
+      - 'README.md'
+      - 'MIGRATION.md'
+      - 'LICENSE.md'
+      - '.github/workflows/verify.yml'
+  pull_request:
+    paths:
+      - 'main/**'
+      - 'README.md'
+      - 'MIGRATION.md'
+      - 'LICENSE.md'
+      - '.github/workflows/verify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: main
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.88.0'
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: main/package-lock.json
+      - id: wasm-pack
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-pack
+          key: wasm-pack-0.13.1-${{ runner.os }}-${{ runner.arch }}
+      - name: Install wasm-pack
+        if: steps.wasm-pack.outputs.cache-hit != 'true'
+        run: cargo install wasm-pack --version 0.13.1 --locked
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            main/opengeometry/target
+            main/opengeometry/test-support/target
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('main/**/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
+      - name: Install SDK dependencies
+        run: npm ci
+      - name: Fetch crate dependencies
+        run: |
+          git ls-files '*Cargo.lock' | while read -r lock; do
+            cargo fetch --locked --manifest-path "$(dirname "$lock")/Cargo.toml"
+          done
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Check
+        run: npm run check
+      - name: Browser three 0.168
+        if: ${{ !cancelled() }}
+        run: node scripts/check/verify.mjs --full --only browser:three-168
+      - name: Browser three 0.184
+        if: ${{ !cancelled() }}
+        run: node scripts/check/verify.mjs --full --only browser:three-184
+      - name: Kernel time budgets
+        if: ${{ !cancelled() }}
+        run: cargo run --release --offline --manifest-path opengeometry/Cargo.toml --example budgets
+      - name: Pack check logs
+        if: always()
+        run: tar czf "$RUNNER_TEMP/check-logs.tgz" .check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: check-logs-${{ matrix.os }}
+          path: ${{ runner.temp }}/check-logs.tgz
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}
+        with:
+          name: step-exports
+          path: main/test-results/**/*.step

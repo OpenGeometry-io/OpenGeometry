@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Sweep Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Simple OpenGeometry sweep example for Three.js." />
+    <meta name="author" content="Vishwajeet Mane" />
+    <link rel="stylesheet" href="./theme.css" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="./index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Sweep</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>Sweep</h3>
+      <p class="og-control-summary">
+        Three open sweep frames: an adjustable skewed frame in blue, a door-like frame in
+        amber, and a window-like frame in teal. The dark polylines show the sweep paths.
+      </p>
+
+      <label class="og-control-row" data-control="top-right-y">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Top Right Y</span>
+          <code class="og-control-value" data-value>2.3</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="1.4" max="3.2" step="0.05" value="2.3" />
+          <input data-number type="number" min="1.4" max="3.2" step="0.05" value="2.3" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="top-left-x">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Top Left X</span>
+          <code class="og-control-value" data-value>-1.25</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="-1.8" max="-0.4" step="0.05" value="-1.25" />
+          <input data-number type="number" min="-1.8" max="-0.4" step="0.05" value="-1.25" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="frame-width">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Frame Width</span>
+          <code class="og-control-value" data-value>0.24</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.12" max="0.5" step="0.02" value="0.24" />
+          <input data-number type="number" min="0.12" max="0.5" step="0.02" value="0.24" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="frame-depth">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Frame Depth</span>
+          <code class="og-control-value" data-value>0.22</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.1" max="0.45" step="0.02" value="0.22" />
+          <input data-number type="number" min="0.1" max="0.45" step="0.02" value="0.22" />
+        </div>
+      </label>
+      <p id="status" class="og-control-summary" role="status" aria-live="polite">Loading kernel…</p>
+    </aside>
+
+    <div id="app"></div>
+
+    <script>
+      if (location.protocol === 'file:') document.querySelector('#status').textContent = 'Open this page through the Vite server.';
+      window.addEventListener('error', (event) => { document.querySelector('#status').textContent = `Error: ${event.message}`; }, true);
+      window.addEventListener('unhandledrejection', (event) => { document.querySelector('#status').textContent = `Error: ${String(event.reason)}`; });
+    </script>
+    <script type="module" src="./showcase/sweep.ts"></script>
+  </body>
+</html>

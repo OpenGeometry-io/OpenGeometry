@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": true,
+    "noImplicitAny": false,
+    "resolveJsonModule": true,
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": [
+    "opengeometry-three/tests/**/*.mjs",
+    "scripts/**/*.mjs",
+    "scripts/**/*.d.ts",
+    "eslint.config.js",
+    "rollup.config.js"
+  ]
+}

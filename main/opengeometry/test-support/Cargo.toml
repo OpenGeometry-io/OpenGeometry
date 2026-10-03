@@ -1,0 +1,9 @@
+[package]
+name = "opengeometry-test-support"
+version = "2.5.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+opengeometry = { path = ".." }
+serde_json = { version = "1.0", features = ["float_roundtrip"] }
