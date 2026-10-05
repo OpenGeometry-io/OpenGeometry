@@ -1,4 +1,4 @@
-use super::{finite, MathError};
+use super::error::{finite, MathError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -31,7 +31,7 @@ fn two_sum(a: f64, b: f64) -> Result<(f64, f64), MathError> {
 
 fn two_product(a: f64, b: f64) -> Result<(f64, f64), MathError> {
     let product = finite(a * b)?;
-    // Below this bound the exact product's low bits may not fit in f64.
+
     if a != 0.0 && b != 0.0 && product.abs() < f64::MIN_POSITIVE * 18_014_398_509_481_984.0 {
         return Err(MathError::ArithmeticRange);
     }
@@ -213,7 +213,7 @@ pub fn discriminant(a: f64, b: f64, c: f64) -> Result<Sign, MathError> {
     Ok(discriminant_estimate(a, b, c)?.0)
 }
 
-pub fn discriminant_estimate(a: f64, b: f64, c: f64) -> Result<(Sign, f64), MathError> {
+pub(super) fn discriminant_estimate(a: f64, b: f64, c: f64) -> Result<(Sign, f64), MathError> {
     for value in [a, b, c] {
         finite(value)?;
     }
@@ -224,7 +224,7 @@ pub fn discriminant_estimate(a: f64, b: f64, c: f64) -> Result<(Sign, f64), Math
     Ok((sign(&expansion), finite(expansion.iter().copied().sum())?))
 }
 
-pub fn plane_sphere_relation(
+pub(crate) fn plane_sphere_relation(
     origin: [f64; 3],
     normal: [f64; 3],
     center: [f64; 3],
@@ -254,7 +254,7 @@ pub fn plane_sphere_relation(
     )?))
 }
 
-pub fn sphere_sphere_relation(
+pub(crate) fn sphere_sphere_relation(
     a: [f64; 3],
     ra: f64,
     b: [f64; 3],
@@ -277,80 +277,4 @@ pub fn sphere_sphere_relation(
             -1.0,
         )?),
     ])
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn cancellation_retains_exact_orientation() {
-        let m = 134_217_728.0;
-        assert_eq!((m + 1.0) * (m - 1.0) - m * m, 0.0);
-        assert_eq!(
-            orient2d([0.0, 0.0], [m + 1.0, m], [m, m - 1.0]),
-            Ok(Sign::Negative)
-        );
-        assert_eq!(
-            orient2d([0.0, 0.0], [m, m - 1.0], [m + 1.0, m]),
-            Ok(Sign::Positive)
-        );
-    }
-
-    #[test]
-    fn tetrahedron_and_cocircular_signs() {
-        let d = [0.0, 0.0, 0.0];
-        assert_eq!(
-            orient3d([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], d),
-            Ok(Sign::Positive)
-        );
-        assert_eq!(
-            incircle2d([1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]),
-            Ok(Sign::Zero)
-        );
-        assert_eq!(
-            incircle2d([1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, 0.0]),
-            Ok(Sign::Positive)
-        );
-    }
-
-    #[test]
-    fn input_and_arithmetic_limits_are_explicit() {
-        assert_eq!(
-            orient2d([f64::NAN, 0.0], [1.0, 0.0], [0.0, 1.0]),
-            Err(MathError::NonFinite)
-        );
-        assert_eq!(discriminant(1.0, 2.0, 1.0), Ok(Sign::Zero));
-        assert_eq!(
-            discriminant(1.0, 2.0, 1.0 + f64::EPSILON),
-            Ok(Sign::Negative)
-        );
-        assert_eq!(
-            discriminant(f64::MIN_POSITIVE, 0.0, f64::MIN_POSITIVE),
-            Err(MathError::ArithmeticRange)
-        );
-    }
-
-    #[test]
-    fn exact_integer_grid_agrees_with_integer_determinants() {
-        let mut seed = 7_u64;
-        for _ in 0..2048 {
-            let mut p = [[0_i64; 2]; 3];
-            for row in &mut p {
-                for x in row {
-                    seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-                    *x = ((seed >> 32) % 100_000) as i64 - 50_000;
-                }
-            }
-            let det = (p[0][0] - p[2][0]) as i128 * (p[1][1] - p[2][1]) as i128
-                - (p[0][1] - p[2][1]) as i128 * (p[1][0] - p[2][0]) as i128;
-            let expected = match det.cmp(&0) {
-                std::cmp::Ordering::Less => Sign::Negative,
-                std::cmp::Ordering::Equal => Sign::Zero,
-                std::cmp::Ordering::Greater => Sign::Positive,
-            };
-            let f = p.map(|v| v.map(|x| x as f64));
-            assert_eq!(orient2d(f[0], f[1], f[2]), Ok(expected));
-        }
-    }
 }

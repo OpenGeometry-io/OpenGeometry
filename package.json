@@ -1,67 +1,13 @@
 {
-  "name": "opengeometry",
-  "author": "Vishwajeet Vinayak Mane",
-  "license": "MPL-2.0",
-  "version": "2.0.16",
-  "description": "CAD geometry kernel for the web built with Rust, WebAssembly, and Three.js.",
-  "type": "module",
-  "main": "index.js",
+  "name": "opengeometry-repository",
+  "private": true,
   "scripts": {
-    "dev": "vite",
-    "test": "cargo test --manifest-path main/opengeometry/Cargo.toml && cargo test --examples --manifest-path main/opengeometry/Cargo.toml",
-    "lint": "eslint main/opengeometry-three/src/**/*.ts --fix",
-    "lint:check": "eslint main/opengeometry-three/src/**/*.ts",
-    "clean-dist": "node ./scripts/clean-dist.mjs",
-    "build-three": "npm run clean-dist && rollup -c rollup.config.js",
-    "build-example-three": "npm --prefix main/opengeometry-three run build-example-three",
-    "build-core": "cd main/opengeometry && wasm-pack build --target web && cargo build --release",
-    "prepare-dist": "node ./scripts/prepare-dist.mjs",
-    "copy-wasm": "npm run prepare-dist",
-    "build": "npm run build-core && npm run build-three && npm run prepare-dist"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/OpenGeometry-io/OpenGeometry.git"
-  },
-  "keywords": [
-    "opengeometry",
-    "cad",
-    "cad-kernel",
-    "browser-cad",
-    "threejs",
-    "three.js",
-    "geometry",
-    "webassembly",
-    "wasm",
-    "ifc",
-    "step",
-    "stl",
-    "parametric-modeling"
-  ],
-  "bugs": {
-    "url": "https://github.com/OpenGeometry-io/OpenGeometry/issues"
-  },
-  "homepage": "https://docs.opengeometry.io",
-  "peerDependencies": {
-    "three": ">=0.168.0"
-  },
-  "dependencies": {
-    "uuid": "^10.0.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.35.0",
-    "@rollup/plugin-babel": "^6.0.4",
-    "@rollup/plugin-commonjs": "^26.0.1",
-    "@rollup/plugin-node-resolve": "^15.2.3",
-    "@rollup/plugin-typescript": "^11.1.6",
-    "@types/three": "^0.168.0",
-    "@types/uuid": "^10.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.43.0",
-    "@typescript-eslint/parser": "^8.43.0",
-    "eslint": "^9.35.0",
-    "rollup": "^4.21.3",
-    "tslib": "^2.7.0",
-    "vite": "^6.2.2"
-  },
-  "packageManager": "yarn@4.15.0+sha512.07ec708ac11e2eaa4ea2b04cfbb272812f7e74a753f1595eaef4486c663a98306a30cca3e6fc40f7a0b168dcfb3a2490b6a5e0501e20fb69cc36f563dd161c53"
+    "build": "npm --prefix main run build --",
+    "build-core": "npm --prefix main run build-core --",
+    "check": "npm --prefix main run check --",
+    "check:full": "npm --prefix main run check:full --",
+    "test": "npm --prefix main run test --",
+    "lint:check": "npm --prefix main run lint:check --",
+    "dev-example": "npm --prefix main run dev-example --"
+  }
 }

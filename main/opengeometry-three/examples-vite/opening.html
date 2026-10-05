@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Opening Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Simple OpenGeometry opening example for Three.js." />
+    <meta name="author" content="Vishwajeet Mane" />
+    <link rel="stylesheet" href="./theme.css" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="./index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Opening</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>Opening</h3>
+      <p class="og-control-summary">
+        The orange cutter is a kernel solid. Each change subtracts it from the gray wall
+        using the 2.5 Boolean operation.
+      </p>
+
+      <label class="og-control-row" data-control="width">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Width</span>
+          <code class="og-control-value" data-value>1.4</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="2.6" step="0.05" value="1.4" />
+          <input data-number type="number" min="0.5" max="2.6" step="0.05" value="1.4" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="height">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Height</span>
+          <code class="og-control-value" data-value>2</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="2.8" step="0.05" value="2" />
+          <input data-number type="number" min="0.5" max="2.8" step="0.05" value="2" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="depth">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Depth</span>
+          <code class="og-control-value" data-value>0.45</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.35" max="0.9" step="0.05" value="0.45" />
+          <input data-number type="number" min="0.35" max="0.9" step="0.05" value="0.45" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="center-y">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Center Y</span>
+          <code class="og-control-value" data-value>1.35</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="2.4" step="0.05" value="1.35" />
+          <input data-number type="number" min="0.5" max="2.4" step="0.05" value="1.35" />
+        </div>
+      </label>
+      <p id="status" class="og-control-summary" role="status" aria-live="polite">Loading kernel…</p>
+    </aside>
+
+    <div id="app"></div>
+
+    <script>
+      if (location.protocol === 'file:') document.querySelector('#status').textContent = 'Open this page through the Vite server.';
+      window.addEventListener('error', (event) => { document.querySelector('#status').textContent = `Error: ${event.message}`; }, true);
+      window.addEventListener('unhandledrejection', (event) => { document.querySelector('#status').textContent = `Error: ${String(event.reason)}`; });
+    </script>
+    <script type="module" src="./showcase/opening.ts"></script>
+  </body>
+</html>

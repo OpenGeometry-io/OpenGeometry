@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "declaration": true,
+    "declarationDir": "dist",
+    "lib": ["ES2022", "DOM", "WebWorker"]
+  },
+  "include": ["opengeometry-three/index.ts", "opengeometry-three/src/**/*.ts"]
+}
