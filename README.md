@@ -36,7 +36,7 @@ OpenGeometry is an **open-source CAD kernel for the browser**. It models **B-rep
 
 OpenGeometry is best suited for **browser-based CAD, configurators, and geometry-heavy web tools**. Whether you're building a parametric modeler, a solid modeling workflow, a geometry viewer, or a custom Three.js modeling tool, OpenGeometry gives you deterministic, kernel-backed primitives and operations without leaving JavaScript.
 
-It is the geometry engine layer, not a full CAD application. OpenPlans is a downstream application/toolkit built on top of OpenGeometry for AEC workflows. In this repository, OpenGeometry is the primary SDK and engine.
+It is the geometry engine layer, not a full CAD application. Floorkit is a downstream application/toolkit built on top of OpenGeometry for AEC workflows. In this repository, OpenGeometry is the primary SDK and engine.
 
 ## Features
 
