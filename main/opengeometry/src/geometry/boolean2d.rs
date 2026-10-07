@@ -347,26 +347,36 @@ pub fn regions_from_edges_by(
     // Drop coincident duplicates (e.g. two contours sharing a corner emit the
     // same geometric boundary twice): both copies pass the probe test and the
     // stitcher would trace the same loop twice.
-    let mut seen: std::collections::HashSet<((i64, i64), (i64, i64))> =
-        std::collections::HashSet::new();
-    let qkey = |point: Pt2| {
-        let step = (2.0 * eps).max(f64::EPSILON);
-        (
-            (point.x / step).round() as i64,
-            (point.z / step).round() as i64,
-        )
+    let weld = eps.max(f64::EPSILON);
+    let mut vertices: Vec<Pt2> = Vec::new();
+    let mut vertex_id = |point: Pt2| {
+        vertices
+            .iter()
+            .position(|vertex| (vertex.x - point.x).hypot(vertex.z - point.z) <= weld)
+            .unwrap_or_else(|| {
+                vertices.push(point);
+                vertices.len() - 1
+            })
     };
-    boundary.retain(|&(a, b)| seen.insert((qkey(a), qkey(b))));
+    let mut seen: std::collections::HashSet<(usize, usize)> = std::collections::HashSet::new();
+    let mut ends: Vec<(usize, usize)> = Vec::new();
+    boundary.retain(|&(a, b)| {
+        let key = (vertex_id(a), vertex_id(b));
+        let fresh = key.0 != key.1 && seen.insert(key);
+        if fresh {
+            ends.push(key);
+        }
+        fresh
+    });
     if boundary.is_empty() {
         return Vec::new();
     }
 
     // 4. stitch into loops; at each vertex take the next outgoing edge by smallest
     //    clockwise turn from the reverse of the incoming edge (standard face trace).
-    let mut out_edges: std::collections::HashMap<(i64, i64), Vec<usize>> =
-        std::collections::HashMap::new();
-    for (idx, &(a, _)) in boundary.iter().enumerate() {
-        out_edges.entry(qkey(a)).or_default().push(idx);
+    let mut out_edges: Vec<Vec<usize>> = vec![Vec::new(); vertices.len()];
+    for (idx, &(start, _)) in ends.iter().enumerate() {
+        out_edges[start].push(idx);
     }
     let mut used = vec![false; boundary.len()];
     let mut raw_loops: Vec<Vec<Pt2>> = Vec::new();
@@ -385,7 +395,7 @@ pub fn regions_from_edges_by(
             let back = Pt2::new(a.x - b.x, a.z - b.z); // reverse incoming, from b toward a
             let mut best: Option<usize> = None;
             let mut best_cw = f64::INFINITY;
-            for &c in out_edges.get(&qkey(b)).map(|v| v.as_slice()).unwrap_or(&[]) {
+            for &c in &out_edges[ends[cur].1] {
                 if used[c] {
                     continue;
                 }
@@ -567,6 +577,84 @@ mod tests {
             (signed_area2(&subtraction[0].outer) - 72.0).abs() < 1e-6,
             "the cutter opens the original void to the exterior"
         );
+    }
+
+    fn mitered_room_walls(left_face: f64) -> Vec<Vec<Pt2>> {
+        let inner_face = left_face + 0.2;
+        let door_start = 1.5 + left_face + 0.1;
+        vec![
+            vec![
+                p(door_start + 1.0, -0.1),
+                p(door_start + 1.0, 0.1),
+                p(door_start + 2.35, 0.1),
+                p(door_start + 2.35, -0.1),
+            ],
+            vec![
+                p(door_start + 3.65, -0.1),
+                p(door_start + 3.65, 0.1),
+                p(5.9, 0.1),
+                p(6.1, -0.1),
+            ],
+            vec![
+                p(left_face, -0.1),
+                p(inner_face, 0.1),
+                p(door_start, 0.1),
+                p(door_start, -0.1),
+            ],
+            vec![p(5.9, 0.1), p(5.9, 3.9), p(6.1, 4.1), p(6.1, -0.1)],
+            vec![
+                p(left_face, 4.1),
+                p(6.1, 4.1),
+                p(5.9, 3.9),
+                p(inner_face, 3.9),
+            ],
+            vec![
+                p(left_face, -0.1),
+                p(left_face, 4.1),
+                p(inner_face, 3.9),
+                p(inner_face, 0.1),
+            ],
+        ]
+    }
+
+    #[test]
+    fn union_of_mitered_walls_is_stable_at_any_coordinate() {
+        for left_face in [
+            -0.1, -0.044939, 0.030023, -0.066356, 0.072859, 0.137112, -0.077065, 0.104986,
+            0.222783, 0.233492,
+        ] {
+            let walls = mitered_room_walls(left_face);
+            let expected_area: f64 = walls.iter().map(|wall| signed_area2(wall).abs()).sum();
+            let mut merged: Vec<Vec<Pt2>> = Vec::new();
+            let mut regions = Vec::new();
+            for wall in &walls {
+                regions = boolean_oriented_regions(
+                    &merged,
+                    std::slice::from_ref(wall),
+                    PlanarBooleanOp::Union,
+                    DEFAULT_EPS,
+                );
+                merged = regions
+                    .iter()
+                    .flat_map(|region| {
+                        std::iter::once(region.outer.clone()).chain(region.holes.iter().cloned())
+                    })
+                    .collect();
+            }
+            let mut ring_sizes: Vec<usize> =
+                regions.iter().map(|region| region.outer.len()).collect();
+            ring_sizes.sort_unstable();
+            assert_eq!(ring_sizes, vec![4, 12], "left face at {left_face}");
+            assert!(regions.iter().all(|region| region.holes.is_empty()));
+            let area: f64 = regions
+                .iter()
+                .map(|region| signed_area2(&region.outer))
+                .sum();
+            assert!(
+                (area - expected_area).abs() < 1.0e-9,
+                "left face at {left_face}: area {area}, expected {expected_area}"
+            );
+        }
     }
 
     #[test]
