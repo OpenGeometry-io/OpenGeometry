@@ -51,3 +51,6 @@ pub mod freeform;
 pub mod tolerance;
 pub mod units;
 pub mod world;
+
+#[cfg(any(target_arch = "wasm32", test))]
+mod memory;
