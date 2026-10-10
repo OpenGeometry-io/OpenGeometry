@@ -1175,10 +1175,20 @@ mod tests {
                 };
                 assert_eq!(direct, MeshBits::of_result(&by_text), "{case}");
                 assert_eq!(by_text.revision(), body.revision, "{case}");
-                let by_object =
-                    tessellate_cached(&body, deflection, DEFAULT_MAX_TRIANGLES).unwrap();
-                assert_eq!(direct, MeshBits::of_result(&by_object), "{case}");
-                assert_eq!(by_object.revision(), body.revision, "{case}");
+                let (by_object, revision) = std::thread::scope(|scope| {
+                    scope
+                        .spawn(|| {
+                            let mut object = OGAnalyticBrep::from_brep(body.clone());
+                            let Ok(result) = object.tessellate(deflection, None) else {
+                                panic!("{case}: the object entry failed");
+                            };
+                            (MeshBits::of_result(&result), result.revision())
+                        })
+                        .join()
+                })
+                .unwrap();
+                assert_eq!(direct, by_object, "{case}");
+                assert_eq!(revision, body.revision, "{case}");
                 *slot = direct.fnv1a();
             }
             hashes.push(pair);
@@ -1210,6 +1220,7 @@ mod tests {
             panic!("the object entry failed at the exact triangle count");
         };
         assert_eq!(limited.indices(), unlimited.indices());
+        assert!(!Arc::ptr_eq(&limited.mesh, &unlimited.mesh));
         assert_eq!(
             tessellation_limit(Some(r#"{"max_triangles":11}"#.into())).unwrap(),
             11
