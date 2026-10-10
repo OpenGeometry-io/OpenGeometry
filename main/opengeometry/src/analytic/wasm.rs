@@ -763,8 +763,13 @@ impl OGAnalyticBrep {
             .map_err(|e| js_error(GeometryError::InvalidGeometry(e.to_string())))
     }
 
-    pub fn tessellate(&mut self, deflection: f64) -> Result<OGAnalyticTessellation, JsValue> {
-        tessellate_cached(&self.brep, deflection, DEFAULT_MAX_TRIANGLES).map_err(js_error)
+    pub fn tessellate(
+        &mut self,
+        deflection: f64,
+        options_json: Option<String>,
+    ) -> Result<OGAnalyticTessellation, JsValue> {
+        let max_triangles = tessellation_limit(options_json).map_err(js_error)?;
+        tessellate_cached(&self.brep, deflection, max_triangles).map_err(js_error)
     }
 
     pub fn get_face_count(&self) -> u32 {
@@ -1178,5 +1183,54 @@ mod tests {
         if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
             assert_eq!(hashes, PINNED_ON_AARCH64_APPLE_DARWIN, "{hashes:#018x?}");
         }
+    }
+
+    fn wall_box() -> BrepEnvelope {
+        let accuracy = Accuracy {
+            geometric: 1e-9,
+            intersection: 1e-10,
+            tessellation: 0.001,
+            exchange: 1e-5,
+        };
+        primitives::cuboid("wall".into(), Frame3::IDENTITY, [4.0, 0.2, 3.0], accuracy).unwrap()
+    }
+
+    #[test]
+    fn object_entry_reads_the_triangle_limit_from_its_options() {
+        let mut body = OGAnalyticBrep::from_brep(wall_box());
+        let Ok(unlimited) = body.tessellate(0.01, None) else {
+            panic!("the object entry failed without options");
+        };
+        assert_eq!(unlimited.indices().len(), 36);
+        let Ok(limited) = body.tessellate(0.01, Some(r#"{"max_triangles":12}"#.into())) else {
+            panic!("the object entry failed at the exact triangle count");
+        };
+        assert_eq!(limited.indices(), unlimited.indices());
+        assert_eq!(
+            tessellation_limit(Some(r#"{"max_triangles":11}"#.into())).unwrap(),
+            11
+        );
+        assert!(matches!(
+            tessellate_cached(&wall_box(), 0.01, 11),
+            Err(GeometryError::LimitExceeded(_))
+        ));
+    }
+
+    #[test]
+    fn object_entry_tessellates_a_body_whose_text_is_above_the_parse_limit() {
+        let Ok(short) = OGAnalyticBrep::from_brep(wall_box()).tessellate(0.01, None) else {
+            panic!("the object entry failed");
+        };
+        let mut body = wall_box();
+        body.id = "x".repeat(64 * 1024 * 1024);
+        assert!(matches!(
+            BrepEnvelope::from_json(&body.to_json().unwrap()),
+            Err(GeometryError::LimitExceeded(_))
+        ));
+        let Ok(long) = OGAnalyticBrep::from_brep(body).tessellate(0.01, None) else {
+            panic!("the object entry failed for a body whose text is above 64 MiB");
+        };
+        assert_eq!(long.positions(), short.positions());
+        assert_eq!(long.indices(), short.indices());
     }
 }
