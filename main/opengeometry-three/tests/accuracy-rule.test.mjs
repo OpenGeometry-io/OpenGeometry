@@ -167,7 +167,7 @@ test("a gently curved wall gets the accuracy of its own box, near and far", (con
   assert.ok(near < 1e-6);
 });
 
-test("the box of an arc holds each axis extreme that its sweep passes", (context) => {
+test("a short arc beside an axis extreme gets the box of the arc", (context) => {
   const cases = [
     { start: 80 * degrees, sweep: 20 * degrees, extremes: [[0, 1]] },
     { start: -10 * degrees, sweep: 20 * degrees, extremes: [[1, 0]] },
@@ -195,4 +195,33 @@ test("an arc gives the same box in both directions", () => {
     assertRelative(curvedWall(wall), expected, 1e-9, "counter-clockwise ring");
     assertRelative(curvedWall({ ...wall, clockwise: true }), expected, 1e-9, "clockwise ring");
   }
+});
+
+test("the box of an arc reaches each axis extreme that its sweep passes", (context) => {
+  const [radius, halfSweep, depth] = [80, 10 * degrees, 200];
+  const missed = [];
+  for (const quarter of [0, 1, 2, 3]) {
+    const middle = quarter * 90 * degrees;
+    const turned = ([along, across]) => [
+      along * Math.cos(middle) - across * Math.sin(middle),
+      along * Math.sin(middle) + across * Math.cos(middle),
+    ];
+    const halfChord = radius * Math.sin(halfSweep);
+    const arcEnd = (side) => turned([radius * Math.cos(halfSweep), side * halfChord]);
+    const body = keep(new AnalyticSolid({
+      kind: "arcEdgedExtrusion",
+      frame: { origin: [0, 0, 0], ...consumerAxes },
+      outer: [
+        { kind: "arc", center: [0, 0], radius, startAngle: middle - halfSweep, sweepAngle: 2 * halfSweep },
+        { kind: "line", from: arcEnd(1), to: turned([-depth, halfChord]) },
+        { kind: "line", from: turned([-depth, halfChord]), to: turned([-depth, -halfChord]) },
+        { kind: "line", from: turned([-depth, -halfChord]), to: arcEnd(-1) },
+      ],
+      height: 3,
+    }));
+    const geometric = body.getBrepData().accuracy.geometric;
+    context.diagnostic(`arc across the extreme at ${quarter * 90} degrees: geometric ${geometric}`);
+    if (Math.abs(geometric - (radius + depth) * 1e-8) > 1e-9 * geometric) missed.push(quarter * 90);
+  }
+  assert.deepEqual(missed, []);
 });
