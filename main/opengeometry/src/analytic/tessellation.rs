@@ -2002,4 +2002,144 @@ mod tests {
         assert_eq!(cache.len(), 3);
         assert!(tessellate(&b, 0.001, 1).is_err());
     }
+    fn trimmed_curved_bodies() -> [BrepEnvelope; 2] {
+        let accuracy = Accuracy {
+            geometric: 6.3e-8,
+            intersection: 1.575e-8,
+            tessellation: 0.01,
+            exchange: 1e-5,
+        };
+        let sector = primitives::annular_sector_extrusion(
+            "sector".into(),
+            Frame3 {
+                origin: [0.0, 0.0, 0.0],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, -1.0],
+                z: [0.0, 1.0, 0.0],
+            },
+            3.0,
+            0.3,
+            3.0,
+            0.8,
+            -1.6,
+            accuracy,
+        )
+        .unwrap();
+        let round = primitives::cylinder(
+            "round".into(),
+            Frame3 {
+                origin: [2.7, 1.5, 0.0],
+                x: [0.0, 0.0, -1.0],
+                y: [0.0, 1.0, 0.0],
+                z: [1.0, 0.0, 0.0],
+            },
+            0.5,
+            0.6,
+            accuracy,
+        )
+        .unwrap();
+        let round_opening = crate::analytic::booleans::boolean_brep(
+            &sector,
+            &round,
+            crate::analytic::booleans::BooleanOp::Subtraction,
+            "sector with a round opening".into(),
+        )
+        .unwrap()
+        .brep;
+        let raised_cutout = primitives::annular_sector_extrusion_with_openings(
+            "sector with a raised cutout".into(),
+            Frame3::IDENTITY,
+            3.0,
+            0.3,
+            3.0,
+            0.0,
+            2.0,
+            vec![primitives::AnnularSectorOpening {
+                id: "raised_cutout".into(),
+                angle: 1.0,
+                width: 0.8,
+                bottom: 0.9,
+                height: 1.2,
+            }],
+            accuracy,
+        )
+        .unwrap();
+        [round_opening, raised_cutout]
+    }
+    fn array_bits(mesh: &Tessellation) -> (Vec<u64>, Vec<u32>, Vec<u64>, [&Vec<u32>; 3]) {
+        (
+            mesh.positions.iter().map(|v| v.to_bits()).collect(),
+            mesh.normals.iter().map(|v| v.to_bits()).collect(),
+            mesh.outline_positions.iter().map(|v| v.to_bits()).collect(),
+            [
+                &mesh.indices,
+                &mesh.triangle_face_ids,
+                &mesh.outline_edge_ids,
+            ],
+        )
+    }
+    fn triangle_set_hash(mesh: &Tessellation) -> u64 {
+        let corner = |id: u32| {
+            let at = id as usize * 3;
+            let position = mesh.positions[at..at + 3].iter().map(|v| v.to_bits());
+            let normal = mesh.normals[at..at + 3]
+                .iter()
+                .map(|v| u64::from(v.to_bits()));
+            position.chain(normal).collect::<Vec<_>>()
+        };
+        let mut triangles = mesh
+            .indices
+            .chunks_exact(3)
+            .zip(&mesh.triangle_face_ids)
+            .map(|(ids, &face)| {
+                let mut corners = [corner(ids[0]), corner(ids[1]), corner(ids[2])];
+                let first = (0..3).min_by_key(|&i| &corners[i]).unwrap_or(0);
+                corners.rotate_left(first);
+                (face, corners)
+            })
+            .collect::<Vec<_>>();
+        triangles.sort();
+        triangles
+            .iter()
+            .flat_map(|(face, corners)| {
+                std::iter::once(u64::from(*face)).chain(corners.iter().flatten().copied())
+            })
+            .flat_map(u64::to_le_bytes)
+            .fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+                (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+            })
+    }
+    #[test]
+    fn a_trimmed_curved_face_tessellates_to_the_same_arrays_each_time() {
+        let equal_runs = trimmed_curved_bodies().map(|body| {
+            [0.05, 0.01].map(|deflection| {
+                let first = tessellate(&body, deflection, 2_000_000).unwrap();
+                (0..20)
+                    .filter(|_| {
+                        let again = tessellate(&body, deflection, 2_000_000).unwrap();
+                        array_bits(&first) == array_bits(&again)
+                    })
+                    .count()
+            })
+        });
+        assert_eq!(equal_runs, [[20; 2]; 2]);
+    }
+    const TRIANGLE_SETS_ON_AARCH64_APPLE_DARWIN: [[u64; 2]; 2] = [
+        [0xf0d9_a930_15e0_d334, 0x6617_beaa_d081_2100],
+        [0xcea2_8fc6_831d_672a, 0x8b42_bcc8_7643_6dbb],
+    ];
+    #[test]
+    fn a_trimmed_curved_face_keeps_its_triangle_set() {
+        let hashes = trimmed_curved_bodies().map(|body| {
+            [0.05, 0.01].map(|deflection| {
+                triangle_set_hash(&tessellate(&body, deflection, 2_000_000).unwrap())
+            })
+        });
+        if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+            assert_eq!(
+                hashes, TRIANGLE_SETS_ON_AARCH64_APPLE_DARWIN,
+                "{hashes:#018x?}"
+            );
+        }
+    }
 }
