@@ -632,6 +632,22 @@ interface LocalBox {
   hi: [number, number, number];
 }
 
+function arcBoxPointsOf(arc: Extract<AnalyticProfileEdge, { kind: "arc" }>): [number, number][] {
+  const quarterTurn = Math.PI / 2;
+  const axisDirections = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+  const endAngle = arc.startAngle + arc.sweepAngle;
+  const points: [number, number][] = [arc.startAngle, endAngle].map((angle) => [
+    arc.center[0] + arc.radius * Math.cos(angle), arc.center[1] + arc.radius * Math.sin(angle),
+  ]);
+  const firstQuarter = Math.ceil(Math.min(arc.startAngle, endAngle) / quarterTurn);
+  const lastQuarter = Math.min(Math.floor(Math.max(arc.startAngle, endAngle) / quarterTurn), firstQuarter + 3);
+  for (let quarter = firstQuarter; quarter <= lastQuarter; quarter += 1) {
+    const direction = axisDirections[((quarter % 4) + 4) % 4];
+    points.push([arc.center[0] + arc.radius * direction[0], arc.center[1] + arc.radius * direction[1]]);
+  }
+  return points;
+}
+
 function pointBoxOf(options: AnalyticPrimitiveOptions): LocalBox | undefined {
   const points: [number, number, number][] = options.kind === "polygonLoft"
     ? [...options.lower, ...options.upper]
@@ -646,9 +662,7 @@ function pointBoxOf(options: AnalyticPrimitiveOptions): LocalBox | undefined {
   } else if (options.kind === "arcEdgedExtrusion") {
     for (const ring of [options.outer, ...(options.holes ?? [])]) {
       for (const edge of ring) {
-        const corners: [number, number][] = edge.kind === "line"
-          ? [edge.from, edge.to]
-          : [[edge.center[0] - edge.radius, edge.center[1] - edge.radius], [edge.center[0] + edge.radius, edge.center[1] + edge.radius]];
+        const corners = edge.kind === "line" ? [edge.from, edge.to] : arcBoxPointsOf(edge);
         for (const corner of corners) addProfilePoint(corner, options.height);
       }
     }
