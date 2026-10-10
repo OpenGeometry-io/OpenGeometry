@@ -1,11 +1,11 @@
 use super::{
     geometry::{cross, dot, norm, scale, sub, Surface},
-    topology::{BrepEnvelope, EdgeGeometry, Face, Orientation},
+    topology::{BrepEnvelope, EdgeGeometry, Face, Orientation, Topology},
     Curve, CurveGeometry, GeometryError, Point3, SurfaceGeometry,
 };
 use crate::math::interval::Interval;
 use std::{
-    collections::{BTreeSet, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     hash::{DefaultHasher, Hasher},
     io::Write,
     sync::Arc,
@@ -1610,31 +1610,107 @@ pub fn tessellate(
     Ok(mesh)
 }
 
-struct HashWriter(DefaultHasher);
+type CacheKey = [u64; 2];
+
+struct HashWriter([DefaultHasher; 2]);
+impl HashWriter {
+    fn new() -> Self {
+        let mut hashers = [DefaultHasher::new(), DefaultHasher::new()];
+        hashers[0].write_u8(0);
+        hashers[1].write_u8(1);
+        Self(hashers)
+    }
+}
 impl Write for HashWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.write(buf);
+        for hasher in &mut self.0 {
+            hasher.write(buf);
+        }
         Ok(buf.len())
     }
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }
-struct CacheEntry {
-    body: u64,
-    signature: u64,
-    deflection: u64,
+fn cache_key(
+    brep: &BrepEnvelope,
+    deflection: f64,
     max_triangles: usize,
+) -> Result<CacheKey, GeometryError> {
+    let BrepEnvelope {
+        schema_version,
+        id: _,
+        revision: _,
+        geometry,
+        topology,
+        solids,
+        accuracy,
+        quality,
+    } = brep;
+    let Topology {
+        vertices,
+        edges,
+        halfedges,
+        loops,
+        faces,
+        wires,
+        shells,
+    } = topology;
+    let faces = faces
+        .iter()
+        .map(
+            |Face {
+                 id,
+                 key: _,
+                 surface,
+                 sense,
+                 trim,
+                 shell_ref,
+                 provenance: _,
+             }| (id, surface, sense, trim, shell_ref),
+        )
+        .collect::<Vec<_>>();
+    let mut writer = HashWriter::new();
+    serde_json::to_writer(
+        &mut writer,
+        &(
+            schema_version,
+            geometry,
+            vertices,
+            edges,
+            halfedges,
+            loops,
+            faces,
+            wires,
+            shells,
+            solids,
+            accuracy,
+            quality,
+            deflection.to_bits(),
+            max_triangles,
+        ),
+    )
+    .map_err(|e| GeometryError::InvalidGeometry(e.to_string()))?;
+    Ok(writer.0.map(|hasher| hasher.finish()))
+}
+struct CacheEntry {
     mesh: Arc<Tessellation>,
+    stamp: u64,
 }
 pub struct TessellationCache {
-    entries: VecDeque<CacheEntry>,
+    entries: HashMap<CacheKey, CacheEntry>,
+    recency: BTreeMap<u64, CacheKey>,
+    stamp: u64,
+    bytes: usize,
     max_bytes: usize,
 }
 impl TessellationCache {
     pub fn new(max_bytes: usize) -> Self {
         Self {
-            entries: VecDeque::new(),
+            entries: HashMap::new(),
+            recency: BTreeMap::new(),
+            stamp: 0,
+            bytes: 0,
             max_bytes,
         }
     }
@@ -1645,49 +1721,35 @@ impl TessellationCache {
         max_triangles: usize,
     ) -> Result<Arc<Tessellation>, GeometryError> {
         brep.validate()?;
-        let mut writer = HashWriter(DefaultHasher::new());
-        serde_json::to_writer(&mut writer, brep)
-            .map_err(|e| GeometryError::InvalidGeometry(e.to_string()))?;
-        let signature = writer.0.finish();
-        if let Some(i) = self.entries.iter().position(|e| {
-            e.signature == signature
-                && e.deflection == deflection.to_bits()
-                && e.max_triangles == max_triangles
-        }) {
-            let entry = self
-                .entries
-                .remove(i)
-                .ok_or_else(|| GeometryError::InvalidGeometry("cache entry missing".into()))?;
-            let mesh = Arc::clone(&entry.mesh);
-            self.entries.push_back(entry);
-            return Ok(mesh);
+        let key = cache_key(brep, deflection, max_triangles)?;
+        self.stamp += 1;
+        if let Some(entry) = self.entries.get_mut(&key) {
+            self.recency.remove(&entry.stamp);
+            entry.stamp = self.stamp;
+            self.recency.insert(self.stamp, key);
+            return Ok(Arc::clone(&entry.mesh));
         }
         let mesh = Arc::new(tessellate(brep, deflection, max_triangles)?);
         if mesh.bytes() > self.max_bytes {
             return Ok(mesh);
         }
-        let mut hasher = DefaultHasher::new();
-        hasher.write(brep.id.as_bytes());
-        let body = hasher.finish();
-        while self.entries.iter().filter(|e| e.body == body).count() >= 3 {
-            if let Some(i) = self.entries.iter().position(|e| e.body == body) {
-                self.entries.remove(i);
-            } else {
+        self.bytes += mesh.bytes();
+        self.entries.insert(
+            key,
+            CacheEntry {
+                mesh: Arc::clone(&mesh),
+                stamp: self.stamp,
+            },
+        );
+        self.recency.insert(self.stamp, key);
+        while self.bytes > self.max_bytes {
+            let Some((_, oldest)) = self.recency.pop_first() else {
                 break;
+            };
+            if let Some(evicted) = self.entries.remove(&oldest) {
+                self.bytes -= evicted.mesh.bytes();
             }
         }
-        while self.entries.iter().map(|e| e.mesh.bytes()).sum::<usize>() + mesh.bytes()
-            > self.max_bytes
-        {
-            self.entries.pop_front();
-        }
-        self.entries.push_back(CacheEntry {
-            body,
-            signature,
-            deflection: deflection.to_bits(),
-            max_triangles,
-            mesh: Arc::clone(&mesh),
-        });
         Ok(mesh)
     }
     pub fn len(&self) -> usize {
@@ -1993,13 +2055,13 @@ mod tests {
         let a = cache.tessellate(&b, 0.1, 1_000_000).unwrap();
         let again = cache.tessellate(&b, 0.1, 1_000_000).unwrap();
         assert!(Arc::ptr_eq(&a, &again));
-        b.topology.faces[0].key = "changed".into();
+        b = primitives::cylinder("c".into(), Frame3::IDENTITY, 1.5, 2.0, accuracy()).unwrap();
         let changed = cache.tessellate(&b, 0.1, 1_000_000).unwrap();
         assert!(!Arc::ptr_eq(&a, &changed));
         for d in [0.08, 0.06, 0.04, 0.02] {
             cache.tessellate(&b, d, 1_000_000).unwrap();
         }
-        assert_eq!(cache.len(), 3);
+        assert_eq!(cache.len(), 6);
         assert!(tessellate(&b, 0.001, 1).is_err());
     }
     fn trimmed_curved_bodies() -> [BrepEnvelope; 2] {
@@ -2257,5 +2319,13 @@ mod tests {
         let mesh = cache.tessellate(&wall(1.0), 0.05, 1_000_000).unwrap();
         assert_eq!(mesh.bytes(), size);
         assert!(cache.is_empty());
+    }
+    #[test]
+    fn cache_key_is_two_different_hashes_of_one_shape() {
+        let key = cache_key(&wall(4.0), 0.05, 1_000_000).unwrap();
+        assert_ne!(key[0], key[1]);
+        assert_eq!(key, cache_key(&wall(4.0), 0.05, 1_000_000).unwrap());
+        assert_ne!(key, cache_key(&wall(4.0), 0.05, 999_999).unwrap());
+        assert_ne!(key, cache_key(&wall(4.0), 0.04, 1_000_000).unwrap());
     }
 }

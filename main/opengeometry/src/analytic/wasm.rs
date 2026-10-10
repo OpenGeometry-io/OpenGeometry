@@ -77,7 +77,10 @@ fn tessellate_cached(
             })?
             .tessellate(brep, deflection, max_triangles)
     })?;
-    Ok(OGAnalyticTessellation { mesh })
+    Ok(OGAnalyticTessellation {
+        mesh,
+        revision: brep.revision,
+    })
 }
 
 #[derive(Deserialize)]
@@ -803,6 +806,7 @@ impl OGAnalyticBrep {
 #[wasm_bindgen]
 pub struct OGAnalyticTessellation {
     mesh: Arc<Tessellation>,
+    revision: u64,
 }
 #[wasm_bindgen]
 impl OGAnalyticTessellation {
@@ -825,7 +829,7 @@ impl OGAnalyticTessellation {
         self.mesh.outline_edge_ids.clone()
     }
     pub fn revision(&self) -> u64 {
-        self.mesh.revision
+        self.revision
     }
     pub fn achieved_deflection(&self) -> f64 {
         self.mesh.achieved_deflection
