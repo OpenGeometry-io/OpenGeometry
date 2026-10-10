@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { OGAnalyticBrep, tessellate_brep } from "../../../opengeometry/pkg/opengeometry";
+import { OGAnalyticBrep } from "../../../opengeometry/pkg/opengeometry";
 import { getUUID } from "../utils/randomizer";
 import { GEOMETRY_DEFLECTION_SHARE, type AnalyticTessellationData } from "../rendering/analytic-tessellation";
 import { matrixToWorldTransform } from "../world/world-graph";
@@ -365,10 +365,7 @@ export class AnalyticSolid extends THREE.Group {
       throw new Error("STL deflection must be finite and positive");
     }
     const placed = this.worldKernel();
-    const result = tessellate_brep(
-      placed.get_brep_serialized(),
-      deflection * GEOMETRY_DEFLECTION_SHARE,
-    );
+    const result = placed.tessellate(deflection * GEOMETRY_DEFLECTION_SHARE);
     try {
       const positions = result.positions();
       const indices = result.indices();
@@ -502,8 +499,7 @@ export class AnalyticSolid extends THREE.Group {
       && (!Number.isSafeInteger(options.maxTriangles) || options.maxTriangles <= 0 || options.maxTriangles > 2_000_000)) {
       throw new Error("maxTriangles must be an integer between 1 and 2000000");
     }
-    const result = tessellate_brep(
-      this.kernel.get_brep_serialized(),
+    const result = this.kernel.tessellate(
       deflection,
       options.maxTriangles === undefined ? undefined : JSON.stringify({ max_triangles: options.maxTriangles }),
     );
