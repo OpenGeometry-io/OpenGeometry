@@ -640,9 +640,11 @@ function arcBoxPointsOf(arc: Extract<AnalyticProfileEdge, { kind: "arc" }>): [nu
     arc.center[0] + arc.radius * Math.cos(angle), arc.center[1] + arc.radius * Math.sin(angle),
   ]);
   const firstQuarter = Math.ceil(Math.min(arc.startAngle, endAngle) / quarterTurn);
-  const lastQuarter = Math.min(Math.floor(Math.max(arc.startAngle, endAngle) / quarterTurn), firstQuarter + 3);
-  for (let quarter = firstQuarter; quarter <= lastQuarter; quarter += 1) {
-    const direction = axisDirections[((quarter % 4) + 4) % 4];
+  const lastStep = Number.isFinite(firstQuarter)
+    ? Math.min(Math.floor(Math.max(arc.startAngle, endAngle) / quarterTurn) - firstQuarter, 3)
+    : -1;
+  for (let step = 0; step <= lastStep; step += 1) {
+    const direction = axisDirections[(((firstQuarter + step) % 4) + 4) % 4];
     points.push([arc.center[0] + arc.radius * direction[0], arc.center[1] + arc.radius * direction[1]]);
   }
   return points;
