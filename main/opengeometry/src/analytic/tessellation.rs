@@ -2274,6 +2274,80 @@ mod tests {
             provenance.reversed = !provenance.reversed;
         });
     }
+    fn cache_miss_changes_the_result(
+        original: &BrepEnvelope,
+        change: impl Fn(&mut BrepEnvelope),
+    ) -> bool {
+        let mut changed = original.clone();
+        change(&mut changed);
+        changed.validate().unwrap();
+        let fresh = tessellate(original, 0.05, 1_000_000).unwrap();
+        let fresh_changed = tessellate(&changed, 0.05, 1_000_000);
+        let mut cache = TessellationCache::new(16_000_000);
+        let first = cache.tessellate(original, 0.05, 1_000_000).unwrap();
+        match (fresh_changed, cache.tessellate(&changed, 0.05, 1_000_000)) {
+            (Ok(fresh_changed), Ok(second)) => {
+                assert!(!Arc::ptr_eq(&first, &second));
+                assert!(array_bits(&fresh_changed) == array_bits(&second));
+                assert_eq!(cache.len(), 2);
+                array_bits(&fresh) != array_bits(&fresh_changed)
+            }
+            (Err(_), Err(_)) => {
+                assert_eq!(cache.len(), 1);
+                true
+            }
+            _ => panic!("the cache and a fresh tessellation disagree"),
+        }
+    }
+    fn assert_inside_the_key(original: &BrepEnvelope, change: impl Fn(&mut BrepEnvelope)) {
+        assert!(cache_miss_changes_the_result(original, change));
+    }
+    fn unit_cylinder() -> BrepEnvelope {
+        primitives::cylinder("c".into(), Frame3::IDENTITY, 1.0, 2.0, accuracy()).unwrap()
+    }
+    #[test]
+    fn cache_misses_when_the_geometric_accuracy_differs() {
+        assert_inside_the_key(&wall(4.0), |body| body.accuracy.geometric = 0.03);
+    }
+    #[test]
+    fn cache_misses_when_the_intersection_accuracy_differs() {
+        cache_miss_changes_the_result(&wall(4.0), |body| body.accuracy.intersection = 5e-11);
+    }
+    #[test]
+    fn cache_misses_when_a_vertex_position_differs() {
+        assert_inside_the_key(&wall(4.0), |body| {
+            body.topology.vertices[0].position[0] += 2.5e-10
+        });
+    }
+    #[test]
+    fn cache_misses_when_a_face_sense_differs() {
+        assert_inside_the_key(&wall(4.0), |body| {
+            body.topology.faces[0].sense = Orientation::Reverse
+        });
+    }
+    #[test]
+    fn cache_misses_when_a_face_trim_differs() {
+        assert_inside_the_key(&unit_cylinder(), |body| {
+            body.topology.faces[0].trim.uv_bounds[1] = Interval { lo: -0.5, hi: 2.5 }
+        });
+    }
+    #[test]
+    fn cache_misses_when_a_curve_differs() {
+        assert_inside_the_key(&unit_cylinder(), |body| {
+            if let CurveGeometry::Circle { radius, .. } = &mut body.geometry.curves[0] {
+                *radius += 2.5e-10;
+            }
+        });
+    }
+    #[test]
+    fn cache_misses_when_a_surface_differs() {
+        let sphere = primitives::sphere("s".into(), Frame3::IDENTITY, 1.0, accuracy()).unwrap();
+        assert_inside_the_key(&sphere, |body| {
+            if let SurfaceGeometry::Sphere { radius, .. } = &mut body.geometry.surfaces[0] {
+                *radius += 2.5e-10;
+            }
+        });
+    }
     #[test]
     fn cache_keeps_every_shape_of_one_body_id_under_the_byte_bound() {
         let mut cache = TessellationCache::new(16_000_000);
