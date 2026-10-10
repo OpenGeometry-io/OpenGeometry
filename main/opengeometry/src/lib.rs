@@ -54,3 +54,7 @@ pub mod world;
 
 #[cfg(any(target_arch = "wasm32", test))]
 mod memory;
+
+#[cfg(target_arch = "wasm32")]
+#[global_allocator]
+static ALLOCATOR: memory::GrowAhead = memory::GrowAhead;
