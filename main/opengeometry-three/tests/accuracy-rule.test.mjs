@@ -94,6 +94,7 @@ test("a cuboid far on the diagonal with a matrix passes the placement check of t
   const world = JSON.parse(body.getWorldBrepSerialized()).accuracy.geometric;
   context.diagnostic(`1 m cuboid at (3e6, 0, 3e6): geometric ${world}`);
   assert.equal(world, body.getBrepData().accuracy.geometric);
+  assertRelative(world, 128 * Number.EPSILON * Math.hypot(3e6 + 1, 1, 3e6 + 1), 1e-12, "floor of the far cuboid");
 });
 
 test("an explicit accuracy passes through unchanged", () => {
@@ -125,10 +126,10 @@ test("a door cut of a far wall equals the cut at the origin after the translatio
 
 const degrees = Math.PI / 180;
 
-function curvedWall({ start, sweep, origin = [0, 0, 0], clockwise = false }) {
+function curvedWall({ start, sweep, origin = [0, 0, 0], center = [0, 0], clockwise = false }) {
   const [inner, outer] = [80, 80.3];
-  const at = (radius, angle) => [radius * Math.cos(angle), radius * Math.sin(angle)];
-  const arc = (radius, startAngle, sweepAngle) => ({ kind: "arc", center: [0, 0], radius, startAngle, sweepAngle });
+  const at = (radius, angle) => [center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)];
+  const arc = (radius, startAngle, sweepAngle) => ({ kind: "arc", center, radius, startAngle, sweepAngle });
   const ring = [
     arc(outer, start, sweep),
     { kind: "line", from: at(outer, start + sweep), to: at(inner, start + sweep) },
@@ -294,4 +295,48 @@ test("a nearly straight arc body with a matrix passes the placement check of the
     }
   }
   assert.deepEqual(rejected, []);
+});
+
+test("a column gets the accuracy of its height", () => {
+  assertRelative(prism(-0.15, -0.15, 0.3, 0.3, 3).getBrepData().accuracy.geometric, 3 * 1e-8, 1e-12, "column");
+});
+
+test("a polygon loft and a planar polyhedron get the accuracy of their largest side at every distance", (context) => {
+  const moved = (points, shift) => points.map((point) => [point[0] + shift, point[1] + shift, point[2]]);
+  for (const shift of [0, 5000]) {
+    const loft = keep(new AnalyticSolid({
+      kind: "polygonLoft",
+      lower: moved([[0, 0, 0], [4, 0, 0], [4, 3, 0], [0, 3, 0]], shift),
+      upper: moved([[0, 0, 2.5], [4, 0, 2.5], [4, 3, 2.5], [0, 3, 2.5]], shift),
+    })).getBrepData().accuracy.geometric;
+    const polyhedron = keep(new AnalyticSolid({
+      kind: "planarPolyhedron",
+      vertices: moved([[0, 0, 0], [4, 0, 0], [0, 3, 0], [0, 0, 2]], shift),
+      faces: [[0, 2, 1], [0, 1, 3], [1, 2, 3], [0, 3, 2]],
+    })).getBrepData().accuracy.geometric;
+    context.diagnostic(`shift ${shift} m: loft ${loft}, polyhedron ${polyhedron}`);
+    assertRelative(loft, 4 * 1e-8, 1e-9, `polygon loft shifted by ${shift} m`);
+    assertRelative(polyhedron, 4 * 1e-8, 1e-9, `planar polyhedron shifted by ${shift} m`);
+  }
+});
+
+test("an arc wall moved in its profile equals the wall moved by its frame", (context) => {
+  const wall = { start: 80 * degrees, sweep: 20 * degrees, extremes: [[0, 1]] };
+  const byFrame = curvedWall({ ...wall, origin: [5000, 0, -5000] });
+  const byProfile = curvedWall({ ...wall, center: [5000, 5000] });
+  context.diagnostic(`moved by the frame ${byFrame}, moved in the profile ${byProfile}`);
+  assertRelative(byProfile, byFrame, 1e-9, "arc wall moved in its profile against the frame");
+  assertRelative(byProfile, boxRuleOf(wall), 1e-9, "arc wall moved in its profile");
+});
+
+test("a wall in a turned frame gets the accuracy of its own length", () => {
+  const turn = Math.SQRT1_2;
+  const body = keep(new AnalyticSolid({
+    kind: "linearExtrusion",
+    frame: { origin: [5000, 0, 5000], x: [turn, 0, -turn], y: [-turn, 0, -turn], z: [0, 1, 0] },
+    outer: [[0, 0], [5, 0], [5, 0.2], [0, 0.2]],
+    holes: [],
+    height: 3,
+  }));
+  assertRelative(body.getBrepData().accuracy.geometric, 5 * 1e-8, 1e-9, "wall in a frame turned by 45 degrees");
 });
