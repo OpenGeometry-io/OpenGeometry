@@ -9,10 +9,10 @@ fn reserve_bytes(pages: usize) -> usize {
         .clamp(LEAST_RESERVE, MOST_RESERVE)
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 pub use grow_ahead::GrowAhead;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 mod grow_ahead {
     use super::reserve_bytes;
     use core::arch::wasm32::memory_size;

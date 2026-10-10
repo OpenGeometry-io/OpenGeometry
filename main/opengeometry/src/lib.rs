@@ -52,9 +52,9 @@ pub mod tolerance;
 pub mod units;
 pub mod world;
 
-#[cfg(any(target_arch = "wasm32", test))]
+#[cfg(any(all(target_arch = "wasm32", target_os = "unknown"), test))]
 mod memory;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 #[global_allocator]
 static ALLOCATOR: memory::GrowAhead = memory::GrowAhead;
