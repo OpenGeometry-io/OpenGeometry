@@ -1683,7 +1683,7 @@ fn boolean_planar_extrusions(
         &b_contours,
         planar_operation,
         accuracy.intersection,
-    );
+    )?;
     let mut out = BrepEnvelope::new(id, accuracy)?;
     for (region_index, region) in regions.iter().enumerate() {
         let (outer, holes) = region_profiles(region);
@@ -13559,5 +13559,17 @@ mod tests {
         assert_eq!(united.solids.len(), 1);
         assert_eq!(united.topology.faces.len(), 18);
         assert_eq!(material_at(&united, &points), [true, false, true, true]);
+    }
+
+    #[test]
+    fn a_region_boundary_that_cannot_be_closed_is_an_invalid_topology_error() {
+        let long = region_prism("long", [0.0, 0.0, 1000.0, 1.0], None, 1e-5);
+        let beside_its_end = region_prism("beside", [999.9995, 1.0, 1000.5, 2.0], None, 1e-5);
+        let result = boolean_brep(&long, &beside_its_end, BooleanOp::Union, "united".into());
+        assert!(
+            matches!(&result, Err(GeometryError::InvalidTopology(message)) if message == "layered planar Boolean has an open boundary"),
+            "{:?}",
+            result.map(|result| result.brep.topology.faces.len())
+        );
     }
 }

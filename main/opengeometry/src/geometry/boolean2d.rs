@@ -2,6 +2,62 @@
 
 use crate::geometry::poly2d::*;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RegionBooleanError {
+    OpenBoundary,
+    OrphanHole,
+}
+
+pub type RegionResult = Result<Vec<RingRegion>, RegionBooleanError>;
+
+impl std::fmt::Display for RegionBooleanError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::OpenBoundary => "Boolean regions produced an open boundary",
+            Self::OrphanHole => "Boolean regions produced a hole outside every region",
+        })
+    }
+}
+
+fn distance_to_segment(point: Pt2, a: Pt2, b: Pt2) -> f64 {
+    let along = Pt2::new(b.x - a.x, b.z - a.z);
+    let length_squared = dot2(along, along);
+    let t = if length_squared > 0.0 {
+        (dot2(Pt2::new(point.x - a.x, point.z - a.z), along) / length_squared).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    (a.x + t * along.x - point.x).hypot(a.z + t * along.z - point.z)
+}
+
+fn probe_reach(mid: Pt2, len: f64, most: f64, sub_edges: &[Edge2], eps: f64) -> f64 {
+    let mut clearance = 2.0 * (len * 0.25).min(most);
+    for &(a, b) in sub_edges {
+        if a.x.min(b.x) - mid.x >= clearance
+            || mid.x - a.x.max(b.x) >= clearance
+            || a.z.min(b.z) - mid.z >= clearance
+            || mid.z - a.z.max(b.z) >= clearance
+        {
+            continue;
+        }
+        let distance = distance_to_segment(mid, a, b);
+        if distance > eps && distance < clearance {
+            clearance = distance;
+        }
+    }
+    clearance * 0.5
+}
+
+pub fn ring_is_degenerate(ring: &[Pt2], eps: f64) -> bool {
+    let perimeter: f64 = (0..ring.len())
+        .map(|index| {
+            let next = ring[(index + 1) % ring.len()];
+            (ring[index].x - next.x).hypot(ring[index].z - next.z)
+        })
+        .sum();
+    ring.len() < 3 || signed_area2(ring).abs() < eps * perimeter * 0.5
+}
+
 /// Decompose a (possibly self-intersecting) closed ring into simple loops by
 /// splitting at every self-crossing (stack method). Port of `decomposeSelfIntersections`.
 /// The `HashMap` here is keyed by integer node id and only ever LOOKED UP (never
@@ -87,7 +143,7 @@ pub fn decompose_self_intersections(ring: &[Pt2], eps: f64) -> Vec<Vec<Pt2>> {
 
 /// A point just off the midpoint of `loop`'s first usable edge, on the given side.
 /// Port of `edgeProbe2`.
-pub fn edge_probe2(ring: &[Pt2], side: f64) -> Option<Pt2> {
+pub fn edge_probe2(ring: &[Pt2], side: f64, sub_edges: &[Edge2], eps: f64) -> Option<Pt2> {
     for i in 0..ring.len() {
         let a = ring[i];
         let b = ring[(i + 1) % ring.len()];
@@ -99,9 +155,9 @@ pub fn edge_probe2(ring: &[Pt2], side: f64) -> Option<Pt2> {
         }
         let nx = -ez / len;
         let nz = ex / len;
-        let d = (len * 0.25).min(1.0e-3);
         let mx = (a.x + b.x) / 2.0;
         let mz = (a.z + b.z) / 2.0;
+        let d = probe_reach(Pt2::new(mx, mz), len, 1.0e-3, sub_edges, eps);
         return Some(Pt2::new(mx + side * nx * d, mz + side * nz * d));
     }
     None
@@ -142,13 +198,20 @@ pub fn resolve_ring_nonzero(input: &[Pt2], eps: f64) -> Option<RingRegion> {
     let loops: Vec<Vec<Pt2>> = decompose_self_intersections(&ring, eps)
         .into_iter()
         .map(|l| dedupe_ring(&l, eps))
-        .filter(|l| l.len() >= 3 && signed_area2(l).abs() > eps)
+        .filter(|l| !ring_is_degenerate(l, eps))
+        .collect();
+    let sub_edges: Vec<Edge2> = loops
+        .iter()
+        .flat_map(|l| (0..l.len()).map(move |index| (l[index], l[(index + 1) % l.len()])))
         .collect();
 
     let mut outer_rings: Vec<Vec<Pt2>> = Vec::new();
     let mut hole_rings: Vec<Vec<Pt2>> = Vec::new();
     for l in loops {
-        let (Some(p_in), Some(p_out)) = (edge_probe2(&l, 1.0), edge_probe2(&l, -1.0)) else {
+        let (Some(p_in), Some(p_out)) = (
+            edge_probe2(&l, 1.0, &sub_edges, eps),
+            edge_probe2(&l, -1.0, &sub_edges, eps),
+        ) else {
             continue;
         };
         let filled_left = winding_number2(p_in, &ring) != 0;
@@ -202,7 +265,7 @@ pub fn resolve_ring_nonzero(input: &[Pt2], eps: f64) -> Option<RingRegion> {
 
 /// Union CCW polygons by the NONZERO-WINDING rule (the crossing cleanup the
 /// single-ring offset cannot do).
-pub fn union_polygons_nonzero(polys: &[Vec<Pt2>], eps: f64) -> Vec<RingRegion> {
+pub fn union_polygons_nonzero(polys: &[Vec<Pt2>], eps: f64) -> RegionResult {
     winding_regions(polys, eps, |winding| winding != 0)
 }
 
@@ -210,7 +273,7 @@ pub fn union_polygons_nonzero(polys: &[Vec<Pt2>], eps: f64) -> Vec<RingRegion> {
 /// +1, each CW ring −1, and a point is filled when the sum is > 0. With one CCW
 /// base ring and CW cutters this is base-minus-cutters, keeping EVERY disjoint
 /// remainder (a clip can split the base into separate regions).
-pub fn resolve_polygons_positive(polys: &[Vec<Pt2>], eps: f64) -> Vec<RingRegion> {
+pub fn resolve_polygons_positive(polys: &[Vec<Pt2>], eps: f64) -> RegionResult {
     winding_regions(polys, eps, |winding| winding > 0)
 }
 
@@ -222,7 +285,7 @@ pub fn boolean_oriented_regions(
     b: &[Vec<Pt2>],
     operation: PlanarBooleanOp,
     eps: f64,
-) -> Vec<RingRegion> {
+) -> RegionResult {
     let mut contours = Vec::with_capacity(a.len() + b.len());
     contours.extend_from_slice(a);
     contours.extend_from_slice(b);
@@ -245,17 +308,13 @@ pub fn boolean_oriented_regions(
     })
 }
 
-fn winding_regions(polys: &[Vec<Pt2>], eps: f64, filled: impl Fn(i32) -> bool) -> Vec<RingRegion> {
+fn winding_regions(polys: &[Vec<Pt2>], eps: f64, filled: impl Fn(i32) -> bool) -> RegionResult {
     winding_regions_by(polys, eps, |point| {
         filled(polys.iter().map(|poly| winding_number2(point, poly)).sum())
     })
 }
 
-fn winding_regions_by(
-    polys: &[Vec<Pt2>],
-    eps: f64,
-    filled: impl Fn(Pt2) -> bool,
-) -> Vec<RingRegion> {
+fn winding_regions_by(polys: &[Vec<Pt2>], eps: f64, filled: impl Fn(Pt2) -> bool) -> RegionResult {
     // 1. directed edges from all oriented polygons + the vertex set for T-touch splits.
     let mut edges: Vec<Edge2> = Vec::new();
     for poly in polys {
@@ -277,9 +336,9 @@ pub fn regions_from_edges_by(
     edges: &[Edge2],
     eps: f64,
     filled: impl Fn(Pt2) -> bool,
-) -> Vec<RingRegion> {
+) -> RegionResult {
     if edges.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let verts: Vec<Pt2> = edges.iter().flat_map(|&(a, b)| [a, b]).collect();
 
@@ -328,11 +387,11 @@ pub fn regions_from_edges_by(
         if len < eps {
             continue;
         }
-        let probe = (len * 0.25).min(1.0e-4);
         let nx = -dz / len;
         let nz = dx / len;
         let mx = (a.x + b.x) / 2.0;
         let mz = (a.z + b.z) / 2.0;
+        let probe = probe_reach(Pt2::new(mx, mz), len, 1.0e-4, &split, eps);
         let left = filled(Pt2::new(mx + nx * probe, mz + nz * probe));
         let right = filled(Pt2::new(mx - nx * probe, mz - nz * probe));
         if left == right {
@@ -369,7 +428,7 @@ pub fn regions_from_edges_by(
         fresh
     });
     if boundary.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
 
     // 4. stitch into loops; at each vertex take the next outgoing edge by smallest
@@ -386,10 +445,12 @@ pub fn regions_from_edges_by(
         }
         let mut loop_pts: Vec<Pt2> = Vec::new();
         let mut cur = start;
+        let mut last = start;
         let mut guard = 0;
         while !used[cur] && guard <= boundary.len() {
             guard += 1;
             used[cur] = true;
+            last = cur;
             let (a, b) = boundary[cur];
             loop_pts.push(a);
             let back = Pt2::new(a.x - b.x, a.z - b.z); // reverse incoming, from b toward a
@@ -415,6 +476,9 @@ pub fn regions_from_edges_by(
                 None => break,
             }
         }
+        if ends[last].1 != ends[start].0 {
+            return Err(RegionBooleanError::OpenBoundary);
+        }
         if loop_pts.len() >= 3 {
             raw_loops.push(loop_pts);
         }
@@ -425,7 +489,7 @@ pub fn regions_from_edges_by(
     let mut holes: Vec<Vec<Pt2>> = Vec::new();
     for raw in raw_loops {
         let ring = dedupe_ring(&raw, eps);
-        if ring.len() < 3 || signed_area2(&ring).abs() < eps {
+        if ring_is_degenerate(&ring, eps) {
             continue;
         }
         if signed_area2(&ring) > 0.0 {
@@ -438,14 +502,19 @@ pub fn regions_from_edges_by(
         }
     }
     for hole in holes {
-        if let Some(region) = regions
+        regions
             .iter_mut()
-            .find(|region| ring_inside2(&hole, &region.outer, eps))
-        {
-            region.holes.push(hole);
-        }
+            .filter(|region| ring_inside2(&hole, &region.outer, eps))
+            .min_by(|first, second| {
+                signed_area2(&first.outer)
+                    .abs()
+                    .total_cmp(&signed_area2(&second.outer).abs())
+            })
+            .ok_or(RegionBooleanError::OrphanHole)?
+            .holes
+            .push(hole);
     }
-    regions
+    Ok(regions)
 }
 
 #[cfg(test)]
@@ -476,7 +545,8 @@ mod tests {
         edges.push((p(1.0, 0.0), p(1.0, 2.0)));
         let regions = regions_from_edges_by(&edges, DEFAULT_EPS, |point| {
             point.x > 0.0 && point.x < 1.0 && point.z > 0.0 && point.z < 2.0
-        });
+        })
+        .unwrap();
         assert_eq!(regions.len(), 1);
         assert!((signed_area2(&regions[0].outer) - 2.0).abs() < 1.0e-9);
     }
@@ -487,7 +557,7 @@ mod tests {
     fn positive_clip_inner_cutter_makes_a_hole() {
         let base = ccw_square(0.0, 0.0, 10.0, 10.0);
         let cutter = cw(ccw_square(4.0, 4.0, 6.0, 6.0));
-        let regions = resolve_polygons_positive(&[base, cutter], DEFAULT_EPS);
+        let regions = resolve_polygons_positive(&[base, cutter], DEFAULT_EPS).unwrap();
         assert_eq!(regions.len(), 1, "one annular region");
         assert_eq!(regions[0].holes.len(), 1, "the cutter is its hole");
         assert!((signed_area2(&regions[0].outer) - 100.0).abs() < 1e-6);
@@ -503,7 +573,7 @@ mod tests {
     fn positive_clip_keeps_every_disjoint_remainder() {
         let base = ccw_square(0.0, 0.0, 10.0, 10.0);
         let cutter = cw(ccw_square(-1.0, 4.0, 11.0, 6.0));
-        let regions = resolve_polygons_positive(&[base, cutter], DEFAULT_EPS);
+        let regions = resolve_polygons_positive(&[base, cutter], DEFAULT_EPS).unwrap();
         assert_eq!(regions.len(), 2, "the band splits the base in two");
         for region in &regions {
             assert!(
@@ -520,12 +590,16 @@ mod tests {
     fn positive_clip_total_cover_and_lone_cutter_are_empty() {
         let base = ccw_square(0.0, 0.0, 4.0, 4.0);
         let cutter = cw(ccw_square(-1.0, -1.0, 5.0, 5.0));
-        assert!(resolve_polygons_positive(&[base, cutter], DEFAULT_EPS).is_empty());
+        assert!(resolve_polygons_positive(&[base, cutter], DEFAULT_EPS)
+            .unwrap()
+            .is_empty());
 
         let lone = cw(ccw_square(0.0, 0.0, 1.0, 1.0));
-        assert!(resolve_polygons_positive(&[lone.clone()], DEFAULT_EPS).is_empty());
+        assert!(resolve_polygons_positive(&[lone.clone()], DEFAULT_EPS)
+            .unwrap()
+            .is_empty());
         assert_eq!(
-            union_polygons_nonzero(&[lone], DEFAULT_EPS).len(),
+            union_polygons_nonzero(&[lone], DEFAULT_EPS).unwrap().len(),
             1,
             "contrast: the nonzero rule fills a lone CW ring"
         );
@@ -538,7 +612,7 @@ mod tests {
         let base = ccw_square(0.0, 0.0, 10.0, 10.0);
         let cutter_a = cw(ccw_square(-1.0, -1.0, 3.0, 3.0));
         let cutter_b = cw(ccw_square(1.0, 1.0, 4.0, 2.0));
-        let regions = resolve_polygons_positive(&[base, cutter_a, cutter_b], DEFAULT_EPS);
+        let regions = resolve_polygons_positive(&[base, cutter_a, cutter_b], DEFAULT_EPS).unwrap();
         assert_eq!(regions.len(), 1);
         let region = &regions[0];
         assert!(region.holes.is_empty());
@@ -558,19 +632,19 @@ mod tests {
         ];
         let b = vec![ccw_square(5.0, -1.0, 12.0, 5.0)];
 
-        let union = boolean_oriented_regions(&a, &b, PlanarBooleanOp::Union, DEFAULT_EPS);
+        let union = boolean_oriented_regions(&a, &b, PlanarBooleanOp::Union, DEFAULT_EPS).unwrap();
         assert_eq!(union.len(), 1);
         assert_eq!(union[0].holes.len(), 1);
         assert!((signed_area2(&union[0].holes[0]) + 3.0).abs() < 1e-6);
 
         let intersection =
-            boolean_oriented_regions(&a, &b, PlanarBooleanOp::Intersection, DEFAULT_EPS);
+            boolean_oriented_regions(&a, &b, PlanarBooleanOp::Intersection, DEFAULT_EPS).unwrap();
         assert_eq!(intersection.len(), 1);
         assert!(intersection[0].holes.is_empty());
         assert!((signed_area2(&intersection[0].outer) - 24.0).abs() < 1e-6);
 
         let subtraction =
-            boolean_oriented_regions(&a, &b, PlanarBooleanOp::Subtraction, DEFAULT_EPS);
+            boolean_oriented_regions(&a, &b, PlanarBooleanOp::Subtraction, DEFAULT_EPS).unwrap();
         assert_eq!(subtraction.len(), 1);
         assert!(subtraction[0].holes.is_empty());
         assert!(
@@ -633,7 +707,8 @@ mod tests {
                     std::slice::from_ref(wall),
                     PlanarBooleanOp::Union,
                     DEFAULT_EPS,
-                );
+                )
+                .unwrap();
                 merged = regions
                     .iter()
                     .flat_map(|region| {
@@ -662,7 +737,7 @@ mod tests {
         let scale = 1.0e-4;
         let a = vec![ccw_square(0.0, 0.0, scale, scale)];
         let b = vec![ccw_square(0.5 * scale, 0.0, 1.5 * scale, scale)];
-        let result = boolean_oriented_regions(&a, &b, PlanarBooleanOp::Union, 1.0e-10);
+        let result = boolean_oriented_regions(&a, &b, PlanarBooleanOp::Union, 1.0e-10).unwrap();
         assert_eq!(result.len(), 1);
         assert!((signed_area2(&result[0].outer) - 1.5 * scale * scale).abs() < 1.0e-14);
     }
@@ -688,7 +763,7 @@ mod tests {
             PlanarBooleanOp::Subtraction,
         ]
         .map(|operation| {
-            let regions = boolean_oriented_regions(a, b, operation, DEFAULT_EPS);
+            let regions = boolean_oriented_regions(a, b, operation, DEFAULT_EPS).unwrap();
             (regions.len(), total_area(&regions))
         })
     }
@@ -732,7 +807,8 @@ mod tests {
             vec![p(1.5, 0.5), p(2.5, 0.5), p(2.0, 0.5)],
         ] {
             let regions =
-                boolean_oriented_regions(&unit, &[sliver], PlanarBooleanOp::Union, DEFAULT_EPS);
+                boolean_oriented_regions(&unit, &[sliver], PlanarBooleanOp::Union, DEFAULT_EPS)
+                    .unwrap();
             assert_eq!(regions.len(), 1);
             assert_eq!(regions[0].outer.len(), 4);
             assert!(regions[0].holes.is_empty());
@@ -744,7 +820,8 @@ mod tests {
     fn a_t_junction_splits_the_edge_it_meets() {
         let unit = vec![ccw_square(0.0, 0.0, 1.0, 1.0)];
         let stem = vec![ccw_square(0.25, 1.0, 0.75, 2.0)];
-        let regions = boolean_oriented_regions(&unit, &stem, PlanarBooleanOp::Union, DEFAULT_EPS);
+        let regions =
+            boolean_oriented_regions(&unit, &stem, PlanarBooleanOp::Union, DEFAULT_EPS).unwrap();
         assert_eq!(regions.len(), 1);
         assert_eq!(regions[0].outer.len(), 8);
         assert!((total_area(&regions) - 1.5).abs() < 1.0e-12);
@@ -769,14 +846,16 @@ mod tests {
             &[],
             PlanarBooleanOp::Union,
             DEFAULT_EPS,
-        );
+        )
+        .unwrap();
         assert!(thinner.is_empty());
         let wider = boolean_oriented_regions(
             &long(4.0 * DEFAULT_EPS),
             &[],
             PlanarBooleanOp::Union,
             DEFAULT_EPS,
-        );
+        )
+        .unwrap();
         assert_eq!(wider.len(), 1);
         assert!((total_area(&wider) - 40.0 * DEFAULT_EPS).abs() < 1.0e-12);
         let small = boolean_oriented_regions(
@@ -784,7 +863,42 @@ mod tests {
             &[],
             PlanarBooleanOp::Union,
             DEFAULT_EPS,
-        );
+        )
+        .unwrap();
         assert_eq!(small.len(), 1);
+    }
+
+    fn edges_of(ring: &[Pt2]) -> Vec<Edge2> {
+        (0..ring.len())
+            .map(|index| (ring[index], ring[(index + 1) % ring.len()]))
+            .collect()
+    }
+
+    fn inside_the_unit_square(point: Pt2) -> bool {
+        point.x > 0.0 && point.x < 1.0 && point.z > 0.0 && point.z < 1.0
+    }
+
+    #[test]
+    fn an_open_chain_of_boundary_edges_is_an_error_and_not_a_ring() {
+        let mut edges = edges_of(&ccw_square(0.0, 0.0, 1.0, 1.0));
+        edges.pop();
+        assert_eq!(
+            regions_from_edges_by(&edges, DEFAULT_EPS, inside_the_unit_square).err(),
+            Some(RegionBooleanError::OpenBoundary)
+        );
+        assert_eq!(
+            RegionBooleanError::OpenBoundary.to_string(),
+            "Boolean regions produced an open boundary"
+        );
+    }
+
+    #[test]
+    fn a_hole_that_no_region_contains_is_an_error() {
+        let edges = edges_of(&ccw_square(0.0, 0.0, 1.0, 1.0));
+        assert_eq!(
+            regions_from_edges_by(&edges, DEFAULT_EPS, |point| !inside_the_unit_square(point))
+                .err(),
+            Some(RegionBooleanError::OrphanHole)
+        );
     }
 }

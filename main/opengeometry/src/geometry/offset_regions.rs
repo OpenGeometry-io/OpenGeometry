@@ -58,6 +58,7 @@ pub fn boolean_offset_regions(
     let b_contours = contours(b)?;
     Ok(
         boolean_oriented_regions(&a_contours, &b_contours, operation, DEFAULT_EPS)
+            .map_err(|error| error.to_string())?
             .into_iter()
             .map(|region| finalize_region(&region.outer, &region.holes, base_y))
             .collect(),
@@ -234,6 +235,29 @@ mod planar_boolean_export_tests {
     }
 
     #[test]
+    fn exported_boolean_reports_a_boundary_that_cannot_be_closed() {
+        let long = vec![(
+            ring(&[(0.0, 0.0), (0.0, 1.0), (1000.0, 1.0), (1000.0, 0.0)]),
+            Vec::new(),
+        )];
+        let beside_its_end = vec![(
+            ring(&[
+                (999.9995, 1.0),
+                (999.9995, 2.0),
+                (1000.5, 2.0),
+                (1000.5, 1.0),
+            ]),
+            Vec::new(),
+        )];
+        assert_eq!(
+            boolean_offset_regions(&long, &beside_its_end, PlanarBooleanOp::Union)
+                .err()
+                .as_deref(),
+            Some("Boolean regions produced an open boundary")
+        );
+    }
+
+    #[test]
     fn exported_boolean_preserves_split_regions_and_winding() {
         let a = vec![(
             ring(&[(0.0, 0.0), (0.0, 4.0), (10.0, 4.0), (10.0, 0.0)]),
@@ -352,9 +376,9 @@ pub fn offset_polyline_regions(
     closed: bool,
     miter_limit: f64,
     eps: f64,
-) -> Vec<OffsetRegion> {
+) -> Result<Vec<OffsetRegion>, RegionBooleanError> {
     if width <= 0.0 || !width.is_finite() || centreline.len() < 2 {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let simplified = simplify_polyline(centreline, width / 2.0, closed);
     let base_y = simplified.first().map(|v| v.y).unwrap_or(0.0);
@@ -370,17 +394,17 @@ pub fn offset_polyline_regions(
     if is_closed && self_intersects2(&pts, eps) {
         let half_width = width / 2.0;
         let bands = mitered_offset_bands(&pts, true, half_width, f64::INFINITY, eps);
-        return union_polygons_nonzero(&bands, eps)
+        return Ok(union_polygons_nonzero(&bands, eps)?
             .into_iter()
             .map(|region| {
                 let outer = bevel_sharp_convex_pts(&region.outer, half_width, miter_limit, eps);
                 finalize_region(&outer, &region.holes, base_y)
             })
-            .collect();
+            .collect());
     }
 
     // Simple centrelines: the single-ring analytic offset (one region, or none if degenerate).
-    match offset_outline(&simplified, width, is_closed, miter_limit, eps) {
+    let regions = match offset_outline(&simplified, width, is_closed, miter_limit, eps) {
         Some(outline) => {
             let outer = canonical_ring(&normalize_winding(&outline.outer, Winding::Cw));
             let holes = outline
@@ -391,7 +415,8 @@ pub fn offset_polyline_regions(
             vec![(outer, holes)]
         }
         None => Vec::new(),
-    }
+    };
+    Ok(regions)
 }
 
 /// Convert a resolved 2D region (outer + holes, in Pt2) to an `OffsetRegion`:
@@ -601,8 +626,9 @@ pub fn offset_ring_variable(
     }
 
     Ok(resolve_polygons_positive(&polys, eps)
+        .map_err(|error| error.to_string())?
         .into_iter()
-        .filter(|region| signed_area2(&region.outer).abs() > eps)
+        .filter(|region| !ring_is_degenerate(&region.outer, eps))
         .map(|region| finalize_region(&region.outer, &region.holes, base_y))
         .collect())
 }
@@ -624,7 +650,7 @@ pub fn offset_polyline_group_regions(
     polylines: &[OffsetPolyline],
     miter_limit: f64,
     eps: f64,
-) -> Vec<OffsetRegion> {
+) -> Result<Vec<OffsetRegion>, RegionBooleanError> {
     let mut bands: Vec<Vec<Pt2>> = Vec::new();
     let mut base_y = 0.0;
     let mut max_half = 0.0_f64;
@@ -651,15 +677,15 @@ pub fn offset_polyline_group_regions(
         ));
     }
     if bands.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
-    union_polygons_nonzero(&bands, eps)
+    Ok(union_polygons_nonzero(&bands, eps)?
         .into_iter()
         .map(|region| {
             let outer = bevel_sharp_convex_pts(&region.outer, max_half, miter_limit, eps);
             finalize_region(&outer, &region.holes, base_y)
         })
-        .collect()
+        .collect())
 }
 
 // ── wasm boundary ────────────────────────────────────────────────────────────
@@ -726,7 +752,8 @@ pub fn offset_polyline_regions_wasm(
         DEFAULT_MITER_LIMIT
     };
 
-    let regions = offset_polyline_regions(&centreline, width, closed, limit, DEFAULT_EPS);
+    let regions = offset_polyline_regions(&centreline, width, closed, limit, DEFAULT_EPS)
+        .map_err(|error| JsValue::from_str(&error.to_string()))?;
     OGOffsetRegionsResult::from_regions(regions).map_err(|error| JsValue::from_str(&error))
 }
 
@@ -764,7 +791,8 @@ pub fn offset_polyline_group_regions_wasm(
         })
         .collect();
 
-    let regions = offset_polyline_group_regions(&polylines, DEFAULT_MITER_LIMIT, DEFAULT_EPS);
+    let regions = offset_polyline_group_regions(&polylines, DEFAULT_MITER_LIMIT, DEFAULT_EPS)
+        .map_err(|error| JsValue::from_str(&error.to_string()))?;
     OGOffsetRegionsResult::from_regions(regions).map_err(|error| JsValue::from_str(&error))
 }
 
@@ -858,13 +886,10 @@ mod tests {
     #[test]
     fn straight_offsets_by_half_width() {
         let centreline = vec![pt(0.0, 0.0), pt(2.0, 0.0)];
-        let (outer, holes) = single(offset_polyline_regions(
-            &centreline,
-            0.3,
-            false,
-            DEFAULT_MITER_LIMIT,
-            DEFAULT_EPS,
-        ));
+        let (outer, holes) = single(
+            offset_polyline_regions(&centreline, 0.3, false, DEFAULT_MITER_LIMIT, DEFAULT_EPS)
+                .unwrap(),
+        );
         assert_eq!(outer.len(), 4, "a straight stroke is a 4-point rectangle");
         assert!(holes.is_empty(), "an open stroke has no holes");
         // Centreline runs along +x at z=0; offsets should be at z = ±0.15.
@@ -889,7 +914,8 @@ mod tests {
                 closed: false,
             },
         ];
-        let regions = offset_polyline_group_regions(&polylines, DEFAULT_MITER_LIMIT, DEFAULT_EPS);
+        let regions =
+            offset_polyline_group_regions(&polylines, DEFAULT_MITER_LIMIT, DEFAULT_EPS).unwrap();
         assert_eq!(regions.len(), 1, "an X-crossing merges into one region");
         let (outer, holes) = &regions[0];
         assert!(holes.is_empty(), "a simple cross has no interior void");
@@ -914,13 +940,10 @@ mod tests {
     #[test]
     fn open_l_is_a_simple_ring() {
         let centreline = vec![pt(0.0, 0.0), pt(2.0, 0.0), pt(2.0, 2.0), pt(4.0, 2.0)];
-        let (outer, holes) = single(offset_polyline_regions(
-            &centreline,
-            0.3,
-            false,
-            DEFAULT_MITER_LIMIT,
-            DEFAULT_EPS,
-        ));
+        let (outer, holes) = single(
+            offset_polyline_regions(&centreline, 0.3, false, DEFAULT_MITER_LIMIT, DEFAULT_EPS)
+                .unwrap(),
+        );
         assert!(holes.is_empty(), "open chain has no holes");
         let ring: Vec<Pt2> = outer.iter().map(|v| Pt2::new(v.x, v.z)).collect();
         assert!(ring.len() >= 4, "ring has at least 4 points");
@@ -944,13 +967,10 @@ mod tests {
             pt(0.0, 4.0),
             pt(0.0, 0.0),
         ];
-        let (outer, holes) = single(offset_polyline_regions(
-            &centreline,
-            0.4,
-            true,
-            DEFAULT_MITER_LIMIT,
-            DEFAULT_EPS,
-        ));
+        let (outer, holes) = single(
+            offset_polyline_regions(&centreline, 0.4, true, DEFAULT_MITER_LIMIT, DEFAULT_EPS)
+                .unwrap(),
+        );
         assert!(outer.len() >= 4, "outer ring has at least 4 points");
         assert_eq!(
             holes.len(),
@@ -977,11 +997,13 @@ mod tests {
                 })
         };
         let baseline =
-            offset_polyline_regions(&centreline, 0.3, true, DEFAULT_MITER_LIMIT, DEFAULT_EPS);
+            offset_polyline_regions(&centreline, 0.3, true, DEFAULT_MITER_LIMIT, DEFAULT_EPS)
+                .unwrap();
         assert!(!baseline.is_empty(), "star offset builds");
         for _ in 0..8 {
             let again =
-                offset_polyline_regions(&centreline, 0.3, true, DEFAULT_MITER_LIMIT, DEFAULT_EPS);
+                offset_polyline_regions(&centreline, 0.3, true, DEFAULT_MITER_LIMIT, DEFAULT_EPS)
+                    .unwrap();
             assert_eq!(baseline.len(), again.len(), "region count must be stable");
             for ((o1, h1), (o2, h2)) in baseline.iter().zip(&again) {
                 assert!(same(o1, o2), "outer ring must be identical across calls");
@@ -1004,13 +1026,10 @@ mod tests {
             pt(0.0, 1.0),
             pt(0.0, 0.0),
         ];
-        let (outer, holes) = single(offset_polyline_regions(
-            &centreline,
-            1.0,
-            true,
-            DEFAULT_MITER_LIMIT,
-            DEFAULT_EPS,
-        ));
+        let (outer, holes) = single(
+            offset_polyline_regions(&centreline, 1.0, true, DEFAULT_MITER_LIMIT, DEFAULT_EPS)
+                .unwrap(),
+        );
         assert!(
             holes.is_empty(),
             "the interior void is consumed → no hole (solid)"
@@ -1038,7 +1057,8 @@ mod tests {
             pt(0.0, 3.0),
             pt(0.0, 0.0),
         ];
-        let regions = offset_polyline_regions(&bowtie, 0.3, true, DEFAULT_MITER_LIMIT, DEFAULT_EPS);
+        let regions =
+            offset_polyline_regions(&bowtie, 0.3, true, DEFAULT_MITER_LIMIT, DEFAULT_EPS).unwrap();
         assert!(!regions.is_empty(), "figure-8 builds");
         for (outer, _holes) in &regions {
             let ring: Vec<Pt2> = outer.iter().map(|v| Pt2::new(v.x, v.z)).collect();
@@ -1077,13 +1097,10 @@ mod tests {
     #[test]
     fn acute_open_corner_bevels_and_stays_bounded() {
         let centreline = vec![pt(0.0, 0.0), pt(5.0, 0.0), pt(2.0, 1.0)];
-        let (outer, holes) = single(offset_polyline_regions(
-            &centreline,
-            0.5,
-            false,
-            DEFAULT_MITER_LIMIT,
-            DEFAULT_EPS,
-        ));
+        let (outer, holes) = single(
+            offset_polyline_regions(&centreline, 0.5, false, DEFAULT_MITER_LIMIT, DEFAULT_EPS)
+                .unwrap(),
+        );
         assert!(holes.is_empty(), "open stroke has no holes");
         let ring: Vec<Pt2> = outer.iter().map(|v| Pt2::new(v.x, v.z)).collect();
         assert!(
@@ -1103,13 +1120,10 @@ mod tests {
     #[test]
     fn self_overlapping_open_path_resolves_simple() {
         let centreline = vec![pt(0.0, 0.0), pt(5.0, 0.0), pt(1.0, 0.4)];
-        let (outer, _holes) = single(offset_polyline_regions(
-            &centreline,
-            0.3,
-            false,
-            DEFAULT_MITER_LIMIT,
-            DEFAULT_EPS,
-        ));
+        let (outer, _holes) = single(
+            offset_polyline_regions(&centreline, 0.3, false, DEFAULT_MITER_LIMIT, DEFAULT_EPS)
+                .unwrap(),
+        );
         let ring: Vec<Pt2> = outer.iter().map(|v| Pt2::new(v.x, v.z)).collect();
         assert!(
             !self_intersects2(&ring, DEFAULT_EPS),

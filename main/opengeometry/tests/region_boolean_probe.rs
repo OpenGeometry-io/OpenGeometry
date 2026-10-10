@@ -26,7 +26,7 @@ fn framed(low: f64, high: f64) -> Vec<Vec<Pt2>> {
 }
 
 fn regions(a: &[Vec<Pt2>], b: &[Vec<Pt2>], operation: PlanarBooleanOp) -> Vec<RingRegion> {
-    boolean_oriented_regions(a, b, operation, DEFAULT_EPS)
+    boolean_oriented_regions(a, b, operation, DEFAULT_EPS).unwrap()
 }
 
 fn union(a: &[Vec<Pt2>], b: &[Vec<Pt2>]) -> Vec<RingRegion> {
