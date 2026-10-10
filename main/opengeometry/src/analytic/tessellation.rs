@@ -1632,6 +1632,7 @@ impl Write for HashWriter {
         Ok(())
     }
 }
+// Every field that `tessellate` reads is in the stream; a field left out must not change the result.
 fn cache_key(
     brep: &BrepEnvelope,
     deflection: f64,
@@ -1714,6 +1715,7 @@ impl TessellationCache {
             max_bytes,
         }
     }
+    // A hit can be the mesh of another body, so its `revision` is not the caller's; the caller stamps its own.
     pub fn tessellate(
         &mut self,
         brep: &BrepEnvelope,
