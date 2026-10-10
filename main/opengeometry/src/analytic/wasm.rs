@@ -1233,4 +1233,17 @@ mod tests {
         assert_eq!(long.positions(), short.positions());
         assert_eq!(long.indices(), short.indices());
     }
+
+    #[test]
+    fn equal_shapes_share_one_mesh_and_each_result_carries_its_own_revision() {
+        let first = wall_box();
+        let mut second = first.clone();
+        second.id = "rebuilt".into();
+        second.revision = 9;
+        let first_result = tessellate_cached(&first, 0.02, DEFAULT_MAX_TRIANGLES).unwrap();
+        let second_result = tessellate_cached(&second, 0.02, DEFAULT_MAX_TRIANGLES).unwrap();
+        assert!(Arc::ptr_eq(&first_result.mesh, &second_result.mesh));
+        assert_eq!(first_result.revision(), 0);
+        assert_eq!(second_result.revision(), 9);
+    }
 }

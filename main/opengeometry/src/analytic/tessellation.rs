@@ -2142,4 +2142,120 @@ mod tests {
             );
         }
     }
+    fn wall(length: f64) -> BrepEnvelope {
+        primitives::cuboid(
+            "wall".into(),
+            Frame3::IDENTITY,
+            [length, 0.2, 3.0],
+            accuracy(),
+        )
+        .unwrap()
+    }
+    fn assert_outside_the_key(change: impl Fn(&mut BrepEnvelope)) {
+        let original = wall(4.0);
+        let mut changed = original.clone();
+        change(&mut changed);
+        assert_ne!(original.to_json().unwrap(), changed.to_json().unwrap());
+        let fresh = tessellate(&original, 0.05, 1_000_000).unwrap();
+        let fresh_changed = tessellate(&changed, 0.05, 1_000_000).unwrap();
+        assert!(array_bits(&fresh) == array_bits(&fresh_changed));
+        let mut cache = TessellationCache::new(16_000_000);
+        let first = cache.tessellate(&original, 0.05, 1_000_000).unwrap();
+        let second = cache.tessellate(&changed, 0.05, 1_000_000).unwrap();
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(cache.len(), 1);
+    }
+    #[test]
+    fn cache_hits_when_only_the_body_id_differs() {
+        assert_outside_the_key(|body| body.id = "rebuilt".into());
+    }
+    #[test]
+    fn cache_hits_when_only_the_revision_differs() {
+        assert_outside_the_key(|body| body.revision = 7);
+    }
+    #[test]
+    fn cache_hits_when_only_a_face_key_differs() {
+        assert_outside_the_key(|body| body.topology.faces[0].key = "rebuilt:face".into());
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_entity_differs() {
+        assert_outside_the_key(|body| {
+            body.topology.faces[0].provenance.sources[0].entity = "rebuilt".into()
+        });
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_body_differs() {
+        assert_outside_the_key(|body| {
+            body.topology.faces[0].provenance.sources[0].body = "rebuilt".into()
+        });
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_key_differs() {
+        assert_outside_the_key(|body| {
+            body.topology.faces[0].provenance.sources[0].key = "rebuilt:face".into()
+        });
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_face_differs() {
+        assert_outside_the_key(|body| body.topology.faces[0].provenance.sources[0].face = 99);
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_role_differs() {
+        assert_outside_the_key(|body| {
+            body.topology.faces[0].provenance.role = crate::analytic::topology::FaceRole::Split
+        });
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_reversed_flag_differs() {
+        assert_outside_the_key(|body| {
+            let provenance = &mut body.topology.faces[0].provenance;
+            provenance.reversed = !provenance.reversed;
+        });
+    }
+    #[test]
+    fn cache_keeps_every_shape_of_one_body_id_under_the_byte_bound() {
+        let mut cache = TessellationCache::new(16_000_000);
+        for length in [1.0, 2.0, 3.0, 4.0, 5.0] {
+            cache.tessellate(&wall(length), 0.05, 1_000_000).unwrap();
+        }
+        assert_eq!(cache.len(), 5);
+    }
+    #[test]
+    fn cache_counts_the_bytes_of_its_meshes_exactly() {
+        let size = tessellate(&wall(1.0), 0.05, 1_000_000).unwrap().bytes();
+        for (max_bytes, kept) in [(3 * size, 3), (3 * size - 1, 2)] {
+            let mut cache = TessellationCache::new(max_bytes);
+            for length in [1.0, 2.0, 3.0] {
+                let mesh = cache.tessellate(&wall(length), 0.05, 1_000_000).unwrap();
+                assert_eq!(mesh.bytes(), size);
+            }
+            assert_eq!(cache.len(), kept);
+        }
+    }
+    #[test]
+    fn cache_evicts_the_least_recently_used_mesh_and_a_hit_refreshes_it() {
+        let size = tessellate(&wall(1.0), 0.05, 1_000_000).unwrap().bytes();
+        let mut cache = TessellationCache::new(3 * size);
+        let [first, second, third] =
+            [1.0, 2.0, 3.0].map(|length| cache.tessellate(&wall(length), 0.05, 1_000_000).unwrap());
+        let hit = cache.tessellate(&wall(1.0), 0.05, 1_000_000).unwrap();
+        assert!(Arc::ptr_eq(&first, &hit));
+        cache.tessellate(&wall(4.0), 0.05, 1_000_000).unwrap();
+        assert_eq!(cache.len(), 3);
+        let kept = cache.tessellate(&wall(3.0), 0.05, 1_000_000).unwrap();
+        assert!(Arc::ptr_eq(&third, &kept));
+        let refreshed = cache.tessellate(&wall(1.0), 0.05, 1_000_000).unwrap();
+        assert!(Arc::ptr_eq(&first, &refreshed));
+        let evicted = cache.tessellate(&wall(2.0), 0.05, 1_000_000).unwrap();
+        assert!(!Arc::ptr_eq(&second, &evicted));
+        assert_eq!(cache.len(), 3);
+    }
+    #[test]
+    fn cache_returns_but_does_not_keep_a_mesh_above_the_byte_bound() {
+        let size = tessellate(&wall(1.0), 0.05, 1_000_000).unwrap().bytes();
+        let mut cache = TessellationCache::new(size - 1);
+        let mesh = cache.tessellate(&wall(1.0), 0.05, 1_000_000).unwrap();
+        assert_eq!(mesh.bytes(), size);
+        assert!(cache.is_empty());
+    }
 }
