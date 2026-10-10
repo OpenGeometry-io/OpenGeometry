@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, before, test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { AnalyticSolid, OpenGeometry } from "../../../dist/index.js";
 
 const distFolder = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../dist");
@@ -224,4 +225,46 @@ test("the box of an arc reaches each axis extreme that its sweep passes", (conte
     if (Math.abs(geometric - (radius + depth) * 1e-8) > 1e-9 * geometric) missed.push(quarter * 90);
   }
   assert.deepEqual(missed, []);
+});
+
+function arcBodyInItsOwnProcess(startAngle, sweepAngle) {
+  const script = `
+    import { readFile } from "node:fs/promises";
+    import { AnalyticSolid, OpenGeometry } from ${JSON.stringify(pathToFileURL(path.join(distFolder, "index.js")).href)};
+    globalThis.document ??= { createElement: () => ({ style: {}, setAttribute() {}, appendChild() {} }) };
+    await OpenGeometry.create({ wasmURL: await readFile(${JSON.stringify(path.join(distFolder, "opengeometry", "pkg", "opengeometry_bg.wasm"))}) });
+    const [startAngle, sweepAngle] = process.argv.slice(-2).map(Number);
+    const at = (angle) => [2 * Math.cos(angle), 2 * Math.sin(angle)];
+    try {
+      new AnalyticSolid({
+        kind: "arcEdgedExtrusion",
+        outer: [
+          { kind: "arc", center: [0, 0], radius: 2, startAngle, sweepAngle },
+          { kind: "line", from: at(startAngle + sweepAngle), to: at(startAngle) },
+        ],
+        height: 3,
+      }).dispose();
+      console.log("made");
+    } catch (error) {
+      console.log(typeof error === "string" ? "kernel error " + error : "wrapper error " + String(error));
+    }
+  `;
+  return spawnSync(
+    process.execPath,
+    ["--max-old-space-size=256", "--input-type=module", "-e", script, String(startAngle), String(sweepAngle)],
+    { encoding: "utf8", timeout: 20000 },
+  );
+}
+
+test("an arc with a huge or infinite angle ends with a body or with the error of the kernel", (context) => {
+  const outcomes = [[1.5e16, 1], [1e17, 1], [1e300, 1], [0, -1e17], [Infinity, 1], [0, -Infinity]].map(
+    ([startAngle, sweepAngle]) => {
+      const child = arcBodyInItsOwnProcess(startAngle, sweepAngle);
+      const outcome = child.status === 0 ? child.stdout.trim() : `no result (status ${child.status}, signal ${child.signal})`;
+      context.diagnostic(`start ${startAngle}, sweep ${sweepAngle}: ${outcome.slice(0, 90)}`);
+      return outcome;
+    },
+  );
+  for (const outcome of outcomes) assert.match(outcome, /^(made|kernel error )/);
+  for (const outcome of outcomes.slice(-2)) assert.match(outcome, /^kernel error /);
 });
