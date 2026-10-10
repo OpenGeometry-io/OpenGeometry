@@ -1,48 +1,31 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { after, before, test } from "node:test";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { bootKernel, MEBIBYTE, PAGE_BYTES } from "./kernel-memory.mjs";
 
-const packageFolder = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../dist/opengeometry/pkg");
-const PAGE_BYTES = 65536;
-const MEBIBYTE = 1024 * 1024;
 const BODY_COUNT = 5000;
 const BYTES_AFTER_THE_BODIES_WITHOUT_A_RESERVE = 55508992;
 const keptBodies = [];
 const measured = { wasmBytes: undefined, afterOneBody: 0, afterAllBodies: 0, growthSteps: 0 };
 
 before(async () => {
-  measured.wasmBytes = await readFile(path.join(packageFolder, "opengeometry_bg.wasm"));
-  const glue = await import(pathToFileURL(path.join(packageFolder, "opengeometry.js")).href);
-  let memory;
-  const instantiate = globalThis.WebAssembly.instantiate;
-  globalThis.WebAssembly.instantiate = async (...parameters) => {
-    const result = await instantiate(...parameters);
-    memory = (result.instance ?? result).exports.memory;
-    return result;
-  };
-  try {
-    await glue.default({ module_or_path: measured.wasmBytes });
-  } finally {
-    globalThis.WebAssembly.instantiate = instantiate;
-  }
-  let lastBytes = memory.buffer.byteLength;
+  const kernel = await bootKernel();
+  measured.wasmBytes = kernel.wasmBytes;
+  let lastPages = kernel.pages();
   for (let index = 0; index < BODY_COUNT; index += 1) {
-    keptBodies.push(glue.OGAnalyticBrep.from_primitive(JSON.stringify({
+    keptBodies.push(kernel.glue.OGAnalyticBrep.from_primitive(JSON.stringify({
       kind: "cuboid",
       id: `body-${index}`,
       frame: { origin: [0, 0, 0], x: [1, 0, 0], y: [0, 0, -1], z: [0, 1, 0] },
       accuracy: { geometric: 1e-9, intersection: 1e-10, tessellation: 0.001, exchange: 1e-5 },
       size: [4, 3, 0.2],
     })));
-    if (memory.buffer.byteLength !== lastBytes) {
+    if (kernel.pages() !== lastPages) {
       measured.growthSteps += 1;
-      lastBytes = memory.buffer.byteLength;
+      lastPages = kernel.pages();
     }
-    if (index === 0) measured.afterOneBody = lastBytes;
+    if (index === 0) measured.afterOneBody = lastPages * PAGE_BYTES;
   }
-  measured.afterAllBodies = lastBytes;
+  measured.afterAllBodies = lastPages * PAGE_BYTES;
 });
 
 after(() => {
@@ -114,7 +97,7 @@ test("the memory grows in large steps", (context) => {
   assert.ok(measured.growthSteps <= 100, `${measured.growthSteps} growth steps`);
 });
 
-test("the reserve adds at most an eighth and one step to the memory", () => {
+test("many small kept bodies need at most an eighth and one step more memory than without a reserve", () => {
   const bound = 1.125 * BYTES_AFTER_THE_BODIES_WITHOUT_A_RESERVE + MEBIBYTE + PAGE_BYTES;
   assert.ok(measured.afterAllBodies <= bound, `${measured.afterAllBodies} bytes against a bound of ${bound}`);
 });
