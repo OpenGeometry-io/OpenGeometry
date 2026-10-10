@@ -666,4 +666,125 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert!((signed_area2(&result[0].outer) - 1.5 * scale * scale).abs() < 1.0e-14);
     }
+
+    fn total_area(regions: &[RingRegion]) -> f64 {
+        regions
+            .iter()
+            .map(|region| {
+                signed_area2(&region.outer).abs()
+                    - region
+                        .holes
+                        .iter()
+                        .map(|ring| signed_area2(ring).abs())
+                        .sum::<f64>()
+            })
+            .sum()
+    }
+
+    fn areas_of_all_operations(a: &[Vec<Pt2>], b: &[Vec<Pt2>]) -> [(usize, f64); 3] {
+        [
+            PlanarBooleanOp::Union,
+            PlanarBooleanOp::Intersection,
+            PlanarBooleanOp::Subtraction,
+        ]
+        .map(|operation| {
+            let regions = boolean_oriented_regions(a, b, operation, DEFAULT_EPS);
+            (regions.len(), total_area(&regions))
+        })
+    }
+
+    fn assert_counts_and_areas(got: [(usize, f64); 3], expected: [(usize, f64); 3]) {
+        for (index, (got, expected)) in got.into_iter().zip(expected).enumerate() {
+            assert_eq!(got.0, expected.0, "operation {index}");
+            assert!(
+                (got.1 - expected.1).abs() < 1.0e-9,
+                "operation {index}: area {}, expected {}",
+                got.1,
+                expected.1
+            );
+        }
+    }
+
+    #[test]
+    fn coincident_edges_of_two_operands_class_by_both_windings() {
+        let unit = vec![ccw_square(0.0, 0.0, 1.0, 1.0)];
+        let beside = vec![ccw_square(1.0, 0.0, 2.0, 1.0)];
+        assert_counts_and_areas(
+            areas_of_all_operations(&unit, &beside),
+            [(1, 2.0), (0, 0.0), (1, 1.0)],
+        );
+        let within = vec![ccw_square(0.0, 0.0, 0.5, 1.0)];
+        assert_counts_and_areas(
+            areas_of_all_operations(&unit, &within),
+            [(1, 1.0), (1, 0.5), (1, 0.5)],
+        );
+        assert_counts_and_areas(
+            areas_of_all_operations(&unit, &unit),
+            [(1, 1.0), (1, 1.0), (0, 0.0)],
+        );
+    }
+
+    #[test]
+    fn a_zero_area_sliver_adds_nothing_inside_or_outside_a_region() {
+        let unit = vec![ccw_square(0.0, 0.0, 1.0, 1.0)];
+        for sliver in [
+            vec![p(0.2, 0.5), p(0.8, 0.5), p(0.5, 0.5)],
+            vec![p(1.5, 0.5), p(2.5, 0.5), p(2.0, 0.5)],
+        ] {
+            let regions =
+                boolean_oriented_regions(&unit, &[sliver], PlanarBooleanOp::Union, DEFAULT_EPS);
+            assert_eq!(regions.len(), 1);
+            assert_eq!(regions[0].outer.len(), 4);
+            assert!(regions[0].holes.is_empty());
+            assert!((total_area(&regions) - 1.0).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn a_t_junction_splits_the_edge_it_meets() {
+        let unit = vec![ccw_square(0.0, 0.0, 1.0, 1.0)];
+        let stem = vec![ccw_square(0.25, 1.0, 0.75, 2.0)];
+        let regions = boolean_oriented_regions(&unit, &stem, PlanarBooleanOp::Union, DEFAULT_EPS);
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0].outer.len(), 8);
+        assert!((total_area(&regions) - 1.5).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn a_clearance_below_twice_the_tolerance_still_classes_both_edges() {
+        let gap = 1.5 * DEFAULT_EPS;
+        let unit = vec![ccw_square(0.0, 0.0, 1.0, 1.0)];
+        let beside = vec![ccw_square(1.0 + gap, 0.0, 2.0 + gap, 1.0)];
+        assert_counts_and_areas(
+            areas_of_all_operations(&unit, &beside),
+            [(2, 2.0), (0, 0.0), (1, 1.0)],
+        );
+    }
+
+    #[test]
+    fn a_ring_is_degenerate_when_it_is_thinner_than_the_tolerance() {
+        let long = |width: f64| vec![ccw_square(0.0, 0.0, 10.0, width)];
+        let thinner = boolean_oriented_regions(
+            &long(0.4 * DEFAULT_EPS),
+            &[],
+            PlanarBooleanOp::Union,
+            DEFAULT_EPS,
+        );
+        assert!(thinner.is_empty());
+        let wider = boolean_oriented_regions(
+            &long(4.0 * DEFAULT_EPS),
+            &[],
+            PlanarBooleanOp::Union,
+            DEFAULT_EPS,
+        );
+        assert_eq!(wider.len(), 1);
+        assert!((total_area(&wider) - 40.0 * DEFAULT_EPS).abs() < 1.0e-12);
+        let small = boolean_oriented_regions(
+            &[ccw_square(0.0, 0.0, 3.0e-4, 3.0e-4)],
+            &[],
+            PlanarBooleanOp::Union,
+            DEFAULT_EPS,
+        );
+        assert_eq!(small.len(), 1);
+    }
 }

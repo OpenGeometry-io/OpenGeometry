@@ -144,6 +144,95 @@ mod planar_boolean_export_tests {
             .collect()
     }
 
+    fn square_region(low: f64, high: f64, hole: Option<(f64, f64)>) -> OffsetRegion {
+        let clockwise =
+            |low: f64, high: f64| ring(&[(low, low), (low, high), (high, high), (high, low)]);
+        let holes = hole
+            .map(|(low, high)| {
+                let mut counter_clockwise = clockwise(low, high);
+                counter_clockwise.reverse();
+                counter_clockwise
+            })
+            .into_iter()
+            .collect();
+        (clockwise(low, high), holes)
+    }
+
+    fn spans(regions: &[OffsetRegion]) -> Vec<((i64, i64), Vec<(i64, i64)>)> {
+        let span = |points: &Vec<Vector3>| {
+            let low = points
+                .iter()
+                .map(|point| point.x)
+                .fold(f64::INFINITY, f64::min);
+            let high = points
+                .iter()
+                .map(|point| point.x)
+                .fold(f64::NEG_INFINITY, f64::max);
+            (
+                (low * 1000.0).round() as i64,
+                (high * 1000.0).round() as i64,
+            )
+        };
+        let mut all: Vec<_> = regions
+            .iter()
+            .map(|(outer, holes)| {
+                let mut inner: Vec<_> = holes.iter().map(span).collect();
+                inner.sort_unstable();
+                (span(outer), inner)
+            })
+            .collect();
+        all.sort();
+        all
+    }
+
+    #[test]
+    fn exported_boolean_gives_a_nested_hole_to_its_own_region_in_both_orders() {
+        let frame = square_region(0.0, 10.0, Some((1.0, 9.0)));
+        let island = square_region(3.0, 7.0, Some((4.0, 6.0)));
+        let expected = spans(&[frame.clone(), island.clone()]);
+        for (a, b) in [
+            (vec![frame.clone()], vec![island.clone()]),
+            (vec![island.clone()], vec![frame.clone()]),
+            (vec![frame.clone(), island.clone()], Vec::new()),
+        ] {
+            let united = boolean_offset_regions(&a, &b, PlanarBooleanOp::Union).unwrap();
+            assert_eq!(spans(&united), expected);
+        }
+        let levels = [
+            square_region(0.0, 20.0, Some((1.0, 19.0))),
+            square_region(3.0, 17.0, Some((4.0, 16.0))),
+            square_region(6.0, 14.0, Some((7.0, 13.0))),
+            square_region(9.0, 11.0, None),
+        ];
+        let united =
+            boolean_offset_regions(&levels[..1], &levels[1..], PlanarBooleanOp::Union).unwrap();
+        assert_eq!(spans(&united), spans(&levels));
+    }
+
+    #[test]
+    fn exported_boolean_keeps_two_regions_across_a_gap_inside_the_old_probe_reach() {
+        let left = vec![(
+            ring(&[(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0)]),
+            Vec::new(),
+        )];
+        let right = vec![(
+            ring(&[
+                (1.00005, 0.0),
+                (1.00005, 1.0),
+                (2.00005, 1.0),
+                (2.00005, 0.0),
+            ]),
+            Vec::new(),
+        )];
+        let united = boolean_offset_regions(&left, &right, PlanarBooleanOp::Union).unwrap();
+        assert_eq!(united.len(), 2);
+        for (outer, holes) in &united {
+            assert_eq!(outer.len(), 4);
+            assert!(holes.is_empty());
+            assert!((signed_area_xz(outer) + 1.0).abs() < 1.0e-9);
+        }
+    }
+
     #[test]
     fn exported_boolean_preserves_split_regions_and_winding() {
         let a = vec![(
