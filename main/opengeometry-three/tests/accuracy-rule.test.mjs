@@ -268,3 +268,30 @@ test("an arc with a huge or infinite angle ends with a body or with the error of
   for (const outcome of outcomes) assert.match(outcome, /^(made|kernel error )/);
   for (const outcome of outcomes.slice(-2)) assert.match(outcome, /^kernel error /);
 });
+
+test("a nearly straight arc body with a matrix passes the placement check of the kernel", (context) => {
+  const rejected = [];
+  for (const [chord, radius, thickness, height] of [[5, 1.6e6, 0.2, 3], [0.05, 3.2e4, 0.02, 0.05]]) {
+    const halfSweep = Math.asin(chord / 2 / radius);
+    const arcEnd = (side) => [-radius + radius * Math.cos(side * halfSweep), radius * Math.sin(side * halfSweep)];
+    const body = movedOffIdentity(keep(new AnalyticSolid({
+      kind: "arcEdgedExtrusion",
+      frame: { origin: [0, 0, 0], ...consumerAxes },
+      outer: [
+        { kind: "arc", center: [-radius, 0], radius, startAngle: -halfSweep, sweepAngle: 2 * halfSweep },
+        { kind: "line", from: arcEnd(1), to: [-thickness, arcEnd(1)[1]] },
+        { kind: "line", from: [-thickness, arcEnd(1)[1]], to: [-thickness, arcEnd(-1)[1]] },
+        { kind: "line", from: [-thickness, arcEnd(-1)[1]], to: arcEnd(-1) },
+      ],
+      height,
+    })));
+    const local = body.getBrepData().accuracy.geometric;
+    context.diagnostic(`chord ${chord} m of a circle of radius ${radius} m: geometric ${local}`);
+    try {
+      assert.equal(JSON.parse(body.getWorldBrepSerialized()).accuracy.geometric, local);
+    } catch (error) {
+      rejected.push(`chord ${chord} m: ${String(error)}`);
+    }
+  }
+  assert.deepEqual(rejected, []);
+});
