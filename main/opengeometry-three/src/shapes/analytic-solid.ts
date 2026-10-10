@@ -680,6 +680,19 @@ function pointBoxOf(options: AnalyticPrimitiveOptions): LocalBox | undefined {
   return box;
 }
 
+function reachBoxOf(options: AnalyticPrimitiveOptions, box: LocalBox): LocalBox {
+  if (options.kind !== "arcEdgedExtrusion") return box;
+  const reachBox: LocalBox = { lo: [box.lo[0], box.lo[1], box.lo[2]], hi: [box.hi[0], box.hi[1], box.hi[2]] };
+  for (const edge of options.outer) {
+    if (edge.kind === "line") continue;
+    for (const axis of [0, 1]) {
+      reachBox.lo[axis] = Math.min(reachBox.lo[axis], edge.center[axis] - edge.radius);
+      reachBox.hi[axis] = Math.max(reachBox.hi[axis], edge.center[axis] + edge.radius);
+    }
+  }
+  return reachBox;
+}
+
 function worldReachOf(frame: AnalyticFrame, box: LocalBox): number {
   const farthest = [0, 0, 0];
   for (const alongX of [box.lo[0], box.hi[0]]) {
@@ -726,7 +739,7 @@ function createPrimitiveKernel(options: AnalyticPrimitiveOptions, ogid: string):
         : options.kind === "sphere"
           ? 2 * options.radius
           : Math.max(2 * options.radius, options.height);
-    const coordinateFloor = 128 * Number.EPSILON * worldReachOf(frame, pointBox ?? { lo: [-size, -size, -size], hi: [size, size, size] });
+    const coordinateFloor = 128 * Number.EPSILON * worldReachOf(frame, pointBox ? reachBoxOf(options, pointBox) : { lo: [-size, -size, -size], hi: [size, size, size] });
     const geometric = Math.max(1e-9, size * 1e-8, coordinateFloor);
     const accuracy = options.accuracy ?? {
       geometric, intersection: geometric / 4, tessellation: 0.001, exchange: 0.00001,
