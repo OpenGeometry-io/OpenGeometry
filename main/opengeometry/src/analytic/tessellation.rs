@@ -5,7 +5,7 @@ use super::{
 };
 use crate::math::interval::Interval;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
     hash::{DefaultHasher, Hasher},
     io::Write,
     sync::Arc,
@@ -1031,7 +1031,7 @@ fn general_curved_trimmed_face(
         .collect::<Vec<_>>();
     let surface = brep.geometry.surface(face.surface)?;
     for _ in 0..128 {
-        let mut split_edges = HashSet::new();
+        let mut split_edges = BTreeSet::new();
         for triangle in &triangles {
             for [a, b] in [
                 [triangle[0], triangle[1]],
