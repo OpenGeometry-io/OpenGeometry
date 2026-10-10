@@ -976,4 +976,207 @@ mod tests {
         assert!(tessellation_limit(Some(r#"{"unknown":1}"#.into())).is_err());
         assert!(tessellation_limit(Some(r#"{"max_triangles":0}"#.into())).is_err());
     }
+
+    #[derive(Debug, PartialEq)]
+    struct MeshBits {
+        positions: Vec<u64>,
+        normals: Vec<u32>,
+        indices: Vec<u32>,
+        triangle_face_ids: Vec<u32>,
+        outline_positions: Vec<u64>,
+        outline_edge_ids: Vec<u32>,
+        achieved_deflection: u64,
+    }
+    impl MeshBits {
+        fn of_mesh(mesh: &Tessellation) -> Self {
+            Self {
+                positions: mesh.positions.iter().map(|v| v.to_bits()).collect(),
+                normals: mesh.normals.iter().map(|v| v.to_bits()).collect(),
+                indices: mesh.indices.clone(),
+                triangle_face_ids: mesh.triangle_face_ids.clone(),
+                outline_positions: mesh.outline_positions.iter().map(|v| v.to_bits()).collect(),
+                outline_edge_ids: mesh.outline_edge_ids.clone(),
+                achieved_deflection: mesh.achieved_deflection.to_bits(),
+            }
+        }
+        fn of_result(result: &OGAnalyticTessellation) -> Self {
+            Self {
+                positions: result.positions().iter().map(|v| v.to_bits()).collect(),
+                normals: result.normals().iter().map(|v| v.to_bits()).collect(),
+                indices: result.indices(),
+                triangle_face_ids: result.triangle_face_ids(),
+                outline_positions: result
+                    .outline_positions()
+                    .iter()
+                    .map(|v| v.to_bits())
+                    .collect(),
+                outline_edge_ids: result.outline_edge_ids(),
+                achieved_deflection: result.achieved_deflection().to_bits(),
+            }
+        }
+        fn fnv1a(&self) -> u64 {
+            let wide = |values: &[u64]| -> Vec<u8> {
+                let length = (values.len() as u64).to_le_bytes();
+                let bytes = values.iter().flat_map(|v| v.to_le_bytes());
+                length.into_iter().chain(bytes).collect()
+            };
+            let narrow = |values: &[u32]| -> Vec<u8> {
+                let length = (values.len() as u64).to_le_bytes();
+                let bytes = values.iter().flat_map(|v| v.to_le_bytes());
+                length.into_iter().chain(bytes).collect()
+            };
+            [
+                wide(&self.positions),
+                narrow(&self.normals),
+                narrow(&self.indices),
+                narrow(&self.triangle_face_ids),
+                wide(&self.outline_positions),
+                narrow(&self.outline_edge_ids),
+            ]
+            .concat()
+            .into_iter()
+            .fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+                (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+            })
+        }
+    }
+
+    fn pinned_bodies() -> Vec<(&'static str, BrepEnvelope)> {
+        let accuracy = Accuracy {
+            geometric: 6.3e-8,
+            intersection: 1.575e-8,
+            tessellation: 0.01,
+            exchange: 1e-5,
+        };
+        let vertical = Frame3 {
+            origin: [0.0, 0.0, 0.0],
+            x: [1.0, 0.0, 0.0],
+            y: [0.0, 0.0, -1.0],
+            z: [0.0, 1.0, 0.0],
+        };
+        let cuboid =
+            primitives::cuboid("cuboid".into(), Frame3::IDENTITY, [4.0, 0.2, 3.0], accuracy)
+                .unwrap();
+        let extrusion = primitives::linear_extrusion(
+            "extrusion".into(),
+            vertical,
+            vec![[0.0, 0.0], [5.0, 0.0], [5.0, 4.0], [2.5, 5.5], [0.0, 4.0]],
+            vec![vec![[1.0, 1.0], [2.0, 1.0], [2.0, 2.5], [1.0, 2.5]]],
+            3.0,
+            accuracy,
+        )
+        .unwrap();
+        let sector = primitives::annular_sector_extrusion(
+            "sector".into(),
+            vertical,
+            3.0,
+            0.3,
+            3.0,
+            0.8,
+            -1.6,
+            accuracy,
+        )
+        .unwrap();
+        let round = primitives::cylinder(
+            "round".into(),
+            Frame3 {
+                origin: [2.7, 1.5, 0.0],
+                x: [0.0, 0.0, -1.0],
+                y: [0.0, 1.0, 0.0],
+                z: [1.0, 0.0, 0.0],
+            },
+            0.5,
+            0.6,
+            accuracy,
+        )
+        .unwrap();
+        let sector_with_opening =
+            boolean_brep(&sector, &round, BooleanOp::Subtraction, "sector-cut".into())
+                .unwrap()
+                .brep;
+        let window = primitives::cuboid(
+            "window".into(),
+            Frame3 {
+                origin: [1.0, -0.4, 0.5],
+                ..Frame3::IDENTITY
+            },
+            [1.0, 1.0, 2.0],
+            accuracy,
+        )
+        .unwrap();
+        let subtraction = boolean_brep(&cuboid, &window, BooleanOp::Subtraction, "cut".into())
+            .unwrap()
+            .brep;
+        let placed = super::super::placement::placed(
+            &extrusion,
+            Frame3 {
+                origin: [12.5, -3.0, 40.0],
+                x: [0.0, 1.0, 0.0],
+                y: [-1.0, 0.0, 0.0],
+                z: [0.0, 0.0, 1.0],
+            },
+            1.0,
+        )
+        .unwrap();
+        let mut renamed = cuboid.clone();
+        renamed.id = "renamed".into();
+        renamed.revision = 7;
+        vec![
+            ("cuboid", cuboid),
+            ("extrusion with a hole", extrusion),
+            ("annular sector with a round opening", sector_with_opening),
+            ("subtraction", subtraction),
+            ("placed extrusion", placed),
+            ("cuboid with another id and revision", renamed),
+        ]
+    }
+
+    const PINNED_ON_AARCH64_APPLE_DARWIN: [[u64; 2]; 6] = [
+        [0xcf7d_04ab_9499_4d99, 0xcf7d_04ab_9499_4d99],
+        [0x65d3_d4da_109d_6e6c, 0x65d3_d4da_109d_6e6c],
+        [0x23c3_0c17_fefc_56d8, 0x8a4e_444f_f03e_90b7],
+        [0x8a1a_848b_210e_60f4, 0x8a1a_848b_210e_60f4],
+        [0x7dd4_efe1_e278_14f8, 0x7dd4_efe1_e278_14f8],
+        [0xcf7d_04ab_9499_4d99, 0xcf7d_04ab_9499_4d99],
+    ];
+
+    #[test]
+    fn text_and_object_tessellation_give_the_pinned_triangles() {
+        let mut hashes = Vec::new();
+        for (name, body) in pinned_bodies() {
+            let text = body.to_json().unwrap();
+            let parsed = BrepEnvelope::from_json(&text).unwrap();
+            let mut pair = [0; 2];
+            for (slot, deflection) in pair.iter_mut().zip([0.05, 0.01]) {
+                let case = format!("{name} at {deflection}");
+                let fresh = |brep: &BrepEnvelope| {
+                    MeshBits::of_mesh(
+                        &super::super::tessellation::tessellate(
+                            brep,
+                            deflection,
+                            DEFAULT_MAX_TRIANGLES,
+                        )
+                        .unwrap(),
+                    )
+                };
+                let direct = fresh(&body);
+                assert_eq!(direct, fresh(&parsed), "{case}");
+                let Ok(by_text) = tessellate_brep(&text, deflection, None) else {
+                    panic!("{case}: the text entry failed");
+                };
+                assert_eq!(direct, MeshBits::of_result(&by_text), "{case}");
+                assert_eq!(by_text.revision(), body.revision, "{case}");
+                let by_object =
+                    tessellate_cached(&body, deflection, DEFAULT_MAX_TRIANGLES).unwrap();
+                assert_eq!(direct, MeshBits::of_result(&by_object), "{case}");
+                assert_eq!(by_object.revision(), body.revision, "{case}");
+                *slot = direct.fnv1a();
+            }
+            hashes.push(pair);
+        }
+        assert_eq!(hashes[0], hashes[5]);
+        if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+            assert_eq!(hashes, PINNED_ON_AARCH64_APPLE_DARWIN, "{hashes:#018x?}");
+        }
+    }
 }
