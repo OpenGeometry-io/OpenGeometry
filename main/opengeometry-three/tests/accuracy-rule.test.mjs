@@ -121,3 +121,78 @@ test("a door cut of a far wall equals the cut at the origin after the translatio
   context.diagnostic(`largest vertex difference ${largest} m over ${near.vertices.length} vertices`);
   assert.ok(largest <= 1e-9, `largest vertex difference ${largest} m`);
 });
+
+const degrees = Math.PI / 180;
+
+function curvedWall({ start, sweep, origin = [0, 0, 0], clockwise = false }) {
+  const [inner, outer] = [80, 80.3];
+  const at = (radius, angle) => [radius * Math.cos(angle), radius * Math.sin(angle)];
+  const arc = (radius, startAngle, sweepAngle) => ({ kind: "arc", center: [0, 0], radius, startAngle, sweepAngle });
+  const ring = [
+    arc(outer, start, sweep),
+    { kind: "line", from: at(outer, start + sweep), to: at(inner, start + sweep) },
+    arc(inner, start + sweep, -sweep),
+    { kind: "line", from: at(inner, start), to: at(outer, start) },
+  ];
+  const reversed = [...ring].reverse().map((edge) => (edge.kind === "line"
+    ? { kind: "line", from: edge.to, to: edge.from }
+    : arc(edge.radius, edge.startAngle + edge.sweepAngle, -edge.sweepAngle)));
+  const body = keep(new AnalyticSolid({
+    kind: "arcEdgedExtrusion",
+    frame: { origin, ...consumerAxes },
+    outer: clockwise ? reversed : ring,
+    height: 3,
+  }));
+  return body.getBrepData().accuracy.geometric;
+}
+
+function boxRuleOf({ start, sweep, extremes }) {
+  const [inner, outer] = [80, 80.3];
+  const corners = [start, start + sweep].flatMap((angle) => [inner, outer].map(
+    (radius) => [radius * Math.cos(angle), radius * Math.sin(angle)],
+  ));
+  const points = [...corners, ...extremes.map(([alongX, alongY]) => [alongX * outer, alongY * outer])];
+  const side = (axis) => Math.max(...points.map((point) => point[axis])) - Math.min(...points.map((point) => point[axis]));
+  return Math.max(3, side(0), side(1)) * 1e-8;
+}
+
+test("a gently curved wall gets the accuracy of its own box, near and far", (context) => {
+  const wall = { start: 40 * degrees, sweep: 10 * degrees };
+  const expected = boxRuleOf({ ...wall, extremes: [] });
+  const near = curvedWall(wall);
+  const far = curvedWall({ ...wall, origin: [5000, 0, 5000] });
+  context.diagnostic(`radius 80 m, sweep 10 degrees: geometric ${near} near, ${far} at (5000, 5000)`);
+  assertRelative(near, expected, 1e-9, "curved wall at the origin");
+  assertRelative(far, expected, 1e-9, "curved wall at (5000, 5000)");
+  assert.ok(near < 1e-6);
+});
+
+test("the box of an arc holds each axis extreme that its sweep passes", (context) => {
+  const cases = [
+    { start: 80 * degrees, sweep: 20 * degrees, extremes: [[0, 1]] },
+    { start: -10 * degrees, sweep: 20 * degrees, extremes: [[1, 0]] },
+    { start: 170 * degrees, sweep: 20 * degrees, extremes: [[-1, 0]] },
+    { start: 260 * degrees, sweep: 20 * degrees, extremes: [[0, -1]] },
+  ];
+  for (const wall of cases) {
+    const geometric = curvedWall(wall);
+    context.diagnostic(`sweep from ${Math.round(wall.start / degrees)} degrees: geometric ${geometric}`);
+    assertRelative(geometric, boxRuleOf(wall), 1e-9, `sweep from ${Math.round(wall.start / degrees)} degrees`);
+  }
+});
+
+test("an arc of more than a half turn is as wide as its circle where it passes both extremes", (context) => {
+  const wall = { start: -135 * degrees, sweep: 270 * degrees, extremes: [[1, 0], [0, 1], [0, -1]] };
+  const geometric = curvedWall(wall);
+  context.diagnostic(`sweep of 270 degrees: geometric ${geometric}`);
+  assertRelative(geometric, 2 * 80.3 * 1e-8, 1e-9, "sweep of 270 degrees against the circle");
+  assertRelative(geometric, boxRuleOf(wall), 1e-9, "sweep of 270 degrees");
+});
+
+test("an arc gives the same box in both directions", () => {
+  for (const wall of [{ start: 40 * degrees, sweep: 10 * degrees, extremes: [] }, { start: 80 * degrees, sweep: 20 * degrees, extremes: [[0, 1]] }]) {
+    const expected = boxRuleOf(wall);
+    assertRelative(curvedWall(wall), expected, 1e-9, "counter-clockwise ring");
+    assertRelative(curvedWall({ ...wall, clockwise: true }), expected, 1e-9, "clockwise ring");
+  }
+});
