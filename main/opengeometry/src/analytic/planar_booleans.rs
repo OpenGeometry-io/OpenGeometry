@@ -19,7 +19,10 @@ use super::{
 };
 use crate::{
     geometry::{
-        boolean2d::{boolean_oriented_regions, regions_from_edges_by, PlanarBooleanOp, RingRegion},
+        boolean2d::{
+            boolean_oriented_regions, regions_from_edges_by, PlanarBooleanOp, RegionBooleanError,
+            RingRegion,
+        },
         poly2d::{winding_number2, Pt2},
     },
     math::interval::Interval,
@@ -98,6 +101,17 @@ fn loop_positions(brep: &BrepEnvelope, loop_id: u32) -> Result<Vec<Point3>, Geom
         }
     }
     Ok(points)
+}
+
+impl From<RegionBooleanError> for GeometryError {
+    fn from(error: RegionBooleanError) -> Self {
+        Self::InvalidTopology(match error {
+            RegionBooleanError::OpenBoundary => {
+                "layered planar Boolean has an open boundary".into()
+            }
+            RegionBooleanError::OrphanHole => error.to_string(),
+        })
+    }
 }
 
 fn slice_regions(
@@ -187,7 +201,7 @@ fn slice_regions(
         &[],
         PlanarBooleanOp::Union,
         tolerance,
-    ))
+    )?)
 }
 
 fn side_sources(
@@ -885,7 +899,7 @@ pub(super) fn subtract_layered_extrusions(
                 },
                 PlanarBooleanOp::Subtraction,
                 accuracy.intersection,
-            ))
+            )?)
         })
         .collect::<Result<Vec<_>, _>>()?;
     let mut exposed_up = Vec::new();
@@ -898,13 +912,13 @@ pub(super) fn subtract_layered_extrusions(
             &above,
             PlanarBooleanOp::Subtraction,
             accuracy.intersection,
-        ));
+        )?);
         exposed_down.push(boolean_oriented_regions(
             &above,
             &below,
             PlanarBooleanOp::Subtraction,
             accuracy.intersection,
-        ));
+        )?);
     }
     let mut vertices = Vec::new();
     for layer in &layers {
@@ -1359,7 +1373,7 @@ pub(super) fn subtract_planar_polyhedra(
                 &cut,
                 PlanarBooleanOp::Subtraction,
                 accuracy.intersection,
-            )
+            )?
         } else {
             let mut edges =
                 planar_section_segments(cutter, &cutter_faces, face.frame, accuracy.intersection)?;
@@ -1427,7 +1441,7 @@ pub(super) fn subtract_planar_polyhedra(
             if let Some(error) = failure.into_inner() {
                 return Err(error);
             }
-            regions
+            regions?
         };
         for region in regions {
             pieces.push(PlanarFacet {
@@ -1512,6 +1526,7 @@ pub(super) fn subtract_planar_polyhedra(
         if let Some(error) = failure.into_inner() {
             return Err(error);
         }
+        let regions = regions?;
         let reversed = Frame3 {
             origin: face.frame.origin,
             x: face.frame.x,

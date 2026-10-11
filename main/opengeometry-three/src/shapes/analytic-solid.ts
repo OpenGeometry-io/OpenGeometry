@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { OGAnalyticBrep, tessellate_brep } from "../../../opengeometry/pkg/opengeometry";
+import { OGAnalyticBrep } from "../../../opengeometry/pkg/opengeometry";
 import { getUUID } from "../utils/randomizer";
 import { GEOMETRY_DEFLECTION_SHARE, type AnalyticTessellationData } from "../rendering/analytic-tessellation";
 import { matrixToWorldTransform } from "../world/world-graph";
@@ -365,10 +365,7 @@ export class AnalyticSolid extends THREE.Group {
       throw new Error("STL deflection must be finite and positive");
     }
     const placed = this.worldKernel();
-    const result = tessellate_brep(
-      placed.get_brep_serialized(),
-      deflection * GEOMETRY_DEFLECTION_SHARE,
-    );
+    const result = placed.tessellate(deflection * GEOMETRY_DEFLECTION_SHARE);
     try {
       const positions = result.positions();
       const indices = result.indices();
@@ -502,8 +499,7 @@ export class AnalyticSolid extends THREE.Group {
       && (!Number.isSafeInteger(options.maxTriangles) || options.maxTriangles <= 0 || options.maxTriangles > 2_000_000)) {
       throw new Error("maxTriangles must be an integer between 1 and 2000000");
     }
-    const result = tessellate_brep(
-      this.kernel.get_brep_serialized(),
+    const result = this.kernel.tessellate(
       deflection,
       options.maxTriangles === undefined ? undefined : JSON.stringify({ max_triangles: options.maxTriangles }),
     );
@@ -631,25 +627,93 @@ export class AnalyticSolid extends THREE.Group {
   }
 }
 
+interface LocalBox {
+  lo: [number, number, number];
+  hi: [number, number, number];
+}
+
+function arcBoxPointsOf(arc: Extract<AnalyticProfileEdge, { kind: "arc" }>): [number, number][] {
+  const quarterTurn = Math.PI / 2;
+  const axisDirections = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+  const endAngle = arc.startAngle + arc.sweepAngle;
+  const points: [number, number][] = [arc.startAngle, endAngle].map((angle) => [
+    arc.center[0] + arc.radius * Math.cos(angle), arc.center[1] + arc.radius * Math.sin(angle),
+  ]);
+  const firstQuarter = Math.ceil(Math.min(arc.startAngle, endAngle) / quarterTurn);
+  const lastStep = Number.isFinite(firstQuarter)
+    ? Math.min(Math.floor(Math.max(arc.startAngle, endAngle) / quarterTurn) - firstQuarter, 3)
+    : -1;
+  for (let step = 0; step <= lastStep; step += 1) {
+    const direction = axisDirections[(((firstQuarter + step) % 4) + 4) % 4];
+    points.push([arc.center[0] + arc.radius * direction[0], arc.center[1] + arc.radius * direction[1]]);
+  }
+  return points;
+}
+
+function pointBoxOf(options: AnalyticPrimitiveOptions): LocalBox | undefined {
+  const points: [number, number, number][] = options.kind === "polygonLoft"
+    ? [...options.lower, ...options.upper]
+    : options.kind === "planarPolyhedron" ? [...options.vertices] : [];
+  const addProfilePoint = (point: [number, number], height: number): void => {
+    points.push([point[0], point[1], 0], [point[0], point[1], height]);
+  };
+  if (options.kind === "linearExtrusion") {
+    for (const loop of [options.outer, ...options.holes]) {
+      for (const point of loop) addProfilePoint(point, options.height);
+    }
+  } else if (options.kind === "arcEdgedExtrusion") {
+    for (const ring of [options.outer, ...(options.holes ?? [])]) {
+      for (const edge of ring) {
+        const corners = edge.kind === "line" ? [edge.from, edge.to] : arcBoxPointsOf(edge);
+        for (const corner of corners) addProfilePoint(corner, options.height);
+      }
+    }
+  }
+  if (points.length === 0) return undefined;
+  const box: LocalBox = { lo: [Infinity, Infinity, Infinity], hi: [-Infinity, -Infinity, -Infinity] };
+  for (const point of points) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      box.lo[axis] = Math.min(box.lo[axis], point[axis]);
+      box.hi[axis] = Math.max(box.hi[axis], point[axis]);
+    }
+  }
+  return box;
+}
+
+function reachBoxOf(options: AnalyticPrimitiveOptions, box: LocalBox): LocalBox {
+  if (options.kind !== "arcEdgedExtrusion") return box;
+  const reachBox: LocalBox = { lo: [box.lo[0], box.lo[1], box.lo[2]], hi: [box.hi[0], box.hi[1], box.hi[2]] };
+  for (const edge of options.outer) {
+    if (edge.kind === "line") continue;
+    for (const axis of [0, 1]) {
+      reachBox.lo[axis] = Math.min(reachBox.lo[axis], edge.center[axis] - edge.radius);
+      reachBox.hi[axis] = Math.max(reachBox.hi[axis], edge.center[axis] + edge.radius);
+    }
+  }
+  return reachBox;
+}
+
+function worldReachOf(frame: AnalyticFrame, box: LocalBox): number {
+  const farthest = [0, 0, 0];
+  for (const alongX of [box.lo[0], box.hi[0]]) {
+    for (const alongY of [box.lo[1], box.hi[1]]) {
+      for (const alongZ of [box.lo[2], box.hi[2]]) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          const coordinate = frame.origin[axis] + alongX * frame.x[axis] + alongY * frame.y[axis] + alongZ * frame.z[axis];
+          farthest[axis] = Math.max(farthest[axis], Math.abs(coordinate));
+        }
+      }
+    }
+  }
+  return Math.hypot(farthest[0], farthest[1], farthest[2]);
+}
+
 function createPrimitiveKernel(options: AnalyticPrimitiveOptions, ogid: string): OGAnalyticBrep {
-    const frame = options.frame ?? (options.kind === "planarPolyhedron" || options.kind === "polygonLoft"
+    const frame: AnalyticFrame = options.frame ?? (options.kind === "planarPolyhedron" || options.kind === "polygonLoft"
       ? { origin: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }
       : { origin: [0, 0, 0], x: [1, 0, 0], y: [0, 0, -1], z: [0, 1, 0] });
-    const profileExtent = options.kind === "linearExtrusion"
-      ? [options.outer, ...options.holes].reduce((extent, loop) => (
-        loop.reduce((loopExtent, point) => Math.max(loopExtent, Math.abs(point[0]), Math.abs(point[1])), extent)
-      ), 0)
-      : options.kind === "arcEdgedExtrusion"
-        ? [options.outer, ...(options.holes ?? [])].reduce((extent, ring) => ring.reduce((loopExtent, edge) => edge.kind === "line"
-          ? Math.max(loopExtent, ...edge.from.map(Math.abs), ...edge.to.map(Math.abs))
-          : Math.max(loopExtent, Math.abs(edge.center[0]) + edge.radius, Math.abs(edge.center[1]) + edge.radius), extent), 0)
-      : 0;
-    const loftExtent = options.kind === "polygonLoft"
-      ? [...options.lower, ...options.upper].reduce((extent, point) => Math.max(extent, ...point.map(Math.abs)), 0)
-      : 0;
-    const polyhedronExtent = options.kind === "planarPolyhedron"
-      ? options.vertices.reduce((extent, point) => Math.max(extent, Math.abs(point[0]), Math.abs(point[1]), Math.abs(point[2])), 0)
-      : 0;
+    const pointBox = pointBoxOf(options);
+    const pointSize = pointBox ? Math.max(...pointBox.hi.map((high, axis) => high - pointBox.lo[axis])) : 0;
     const size = options.kind === "torus"
       ? 2 * (options.majorRadius + options.minorRadius)
       : options.kind === "coaxialCircleLoft"
@@ -659,13 +723,13 @@ function createPrimitiveKernel(options: AnalyticPrimitiveOptions, ogid: string):
       : options.kind === "chamferedCuboid"
         ? Math.max(options.width, options.depth, options.height)
       : options.kind === "linearExtrusion" || options.kind === "arcEdgedExtrusion"
-        ? Math.max(options.height, profileExtent)
+        ? pointSize
       : options.kind === "polygonLoft"
-        ? loftExtent
+        ? pointSize
       : options.kind === "boxWithArchedOpening"
         ? Math.max(options.width, options.depth, options.height)
       : options.kind === "planarPolyhedron"
-        ? polyhedronExtent
+        ? pointSize
       : options.kind === "frustum"
         ? Math.max(2 * options.lowerRadius, 2 * options.upperRadius, options.height)
         : options.kind === "annularSectorExtrusion" || options.kind === "annularSectorExtrusionWithOpenings" || options.kind === "annularSectorExtrusionWithArchedOpening"
@@ -675,7 +739,7 @@ function createPrimitiveKernel(options: AnalyticPrimitiveOptions, ogid: string):
         : options.kind === "sphere"
           ? 2 * options.radius
           : Math.max(2 * options.radius, options.height);
-    const coordinateFloor = Math.max(...frame.origin.map(Math.abs)) * 64 * Number.EPSILON;
+    const coordinateFloor = 128 * Number.EPSILON * worldReachOf(frame, pointBox ? reachBoxOf(options, pointBox) : { lo: [-size, -size, -size], hi: [size, size, size] });
     const geometric = Math.max(1e-9, size * 1e-8, coordinateFloor);
     const accuracy = options.accuracy ?? {
       geometric, intersection: geometric / 4, tessellation: 0.001, exchange: 0.00001,

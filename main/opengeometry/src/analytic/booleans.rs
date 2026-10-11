@@ -1683,7 +1683,7 @@ fn boolean_planar_extrusions(
         &b_contours,
         planar_operation,
         accuracy.intersection,
-    );
+    )?;
     let mut out = BrepEnvelope::new(id, accuracy)?;
     for (region_index, region) in regions.iter().enumerate() {
         let (outer, holes) = region_profiles(region);
@@ -13461,6 +13461,115 @@ mod tests {
             )
             .unwrap(),
             super::super::query::PointClassification::Outside
+        );
+    }
+
+    fn region_prism(
+        id: &str,
+        outer: [f64; 4],
+        hole: Option<[f64; 4]>,
+        geometric: f64,
+    ) -> BrepEnvelope {
+        let ring = |b: [f64; 4]| vec![[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
+        primitives::linear_extrusion(
+            id.into(),
+            Frame3::IDENTITY,
+            ring(outer),
+            hole.map(ring).into_iter().collect(),
+            3.0,
+            Accuracy {
+                geometric,
+                intersection: geometric / 4.0,
+                tessellation: 0.01,
+                exchange: 1e-5,
+            },
+        )
+        .unwrap()
+    }
+
+    fn material_at(brep: &BrepEnvelope, points: &[Point3]) -> Vec<bool> {
+        points
+            .iter()
+            .map(|point| {
+                super::super::query::classify_point(brep, *point).unwrap()
+                    == super::super::query::PointClassification::Inside
+            })
+            .collect()
+    }
+
+    #[test]
+    fn union_of_a_frame_prism_and_an_island_prism_keeps_each_hole_in_both_orders() {
+        let frame = region_prism(
+            "frame",
+            [0.0, 0.0, 10.0, 10.0],
+            Some([1.0, 1.0, 9.0, 9.0]),
+            1e-7,
+        );
+        let island = region_prism(
+            "island",
+            [3.0, 3.0, 7.0, 7.0],
+            Some([4.0, 4.0, 6.0, 6.0]),
+            1e-7,
+        );
+        for (first, second) in [(&frame, &island), (&island, &frame)] {
+            let united = boolean_brep(first, second, BooleanOp::Union, "united".into())
+                .unwrap()
+                .brep;
+            assert_eq!(united.solids.len(), 2);
+            assert_eq!(united.topology.faces.len(), 20);
+            assert_eq!(
+                material_at(
+                    &united,
+                    &[
+                        [0.5, 0.5, 1.5],
+                        [2.0, 2.0, 1.5],
+                        [3.5, 3.5, 1.5],
+                        [5.0, 5.0, 1.5]
+                    ]
+                ),
+                [true, false, true, false]
+            );
+        }
+    }
+
+    #[test]
+    fn a_profile_hole_inside_the_old_probe_reach_of_its_edge_survives_a_planar_boolean() {
+        let host = region_prism(
+            "host",
+            [0.0, 0.0, 1.0, 1.0],
+            Some([2.0e-5, 0.2, 0.5, 0.8]),
+            1e-6,
+        );
+        let cutter = region_prism("cutter", [0.6, -0.5, 0.7, 1.5], None, 1e-6);
+        let points = [
+            [1.0e-5, 0.5, 1.5],
+            [0.25, 0.5, 1.5],
+            [0.65, 0.5, 1.5],
+            [0.9, 0.5, 1.5],
+        ];
+        let cut = boolean_brep(&host, &cutter, BooleanOp::Subtraction, "cut".into())
+            .unwrap()
+            .brep;
+        assert_eq!(cut.solids.len(), 2);
+        assert_eq!(cut.topology.faces.len(), 16);
+        assert_eq!(material_at(&cut, &points), [true, false, false, true]);
+        let united = boolean_brep(&host, &cutter, BooleanOp::Union, "united".into())
+            .unwrap()
+            .brep;
+        assert_eq!(united.solids.len(), 1);
+        assert_eq!(united.topology.faces.len(), 18);
+        assert_eq!(material_at(&united, &points), [true, false, true, true]);
+    }
+
+    #[test]
+    fn a_region_boundary_that_cannot_be_closed_is_an_invalid_topology_error() {
+        let long = region_prism("long", [0.0, 0.0, 1000.0, 1.0], None, 1e-5);
+        let beside_its_end = region_prism("beside", [999.9995, 1.0, 1000.5, 2.0], None, 1e-5);
+        let result = boolean_brep(&long, &beside_its_end, BooleanOp::Union, "united".into());
+        assert!(
+            matches!(&result, Err(GeometryError::InvalidTopology(message)) if message == "layered planar Boolean has an open boundary"),
+            "{:?}",
+            result.map(|result| result.brep.topology.faces.len())
         );
     }
 }

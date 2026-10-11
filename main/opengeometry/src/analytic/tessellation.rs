@@ -1,11 +1,11 @@
 use super::{
     geometry::{cross, dot, norm, scale, sub, Surface},
-    topology::{BrepEnvelope, EdgeGeometry, Face, Orientation},
+    topology::{BrepEnvelope, EdgeGeometry, Face, Orientation, Topology},
     Curve, CurveGeometry, GeometryError, Point3, SurfaceGeometry,
 };
 use crate::math::interval::Interval;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     hash::{DefaultHasher, Hasher},
     io::Write,
     sync::Arc,
@@ -1031,7 +1031,7 @@ fn general_curved_trimmed_face(
         .collect::<Vec<_>>();
     let surface = brep.geometry.surface(face.surface)?;
     for _ in 0..128 {
-        let mut split_edges = HashSet::new();
+        let mut split_edges = BTreeSet::new();
         for triangle in &triangles {
             for [a, b] in [
                 [triangle[0], triangle[1]],
@@ -1610,34 +1610,112 @@ pub fn tessellate(
     Ok(mesh)
 }
 
-struct HashWriter(DefaultHasher);
+type CacheKey = [u64; 2];
+
+struct HashWriter([DefaultHasher; 2]);
+impl HashWriter {
+    fn new() -> Self {
+        let mut hashers = [DefaultHasher::new(), DefaultHasher::new()];
+        hashers[0].write_u8(0);
+        hashers[1].write_u8(1);
+        Self(hashers)
+    }
+}
 impl Write for HashWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.write(buf);
+        for hasher in &mut self.0 {
+            hasher.write(buf);
+        }
         Ok(buf.len())
     }
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }
-struct CacheEntry {
-    body: u64,
-    signature: u64,
-    deflection: u64,
+// Every field that `tessellate` reads is in the stream; a field left out must not change the result.
+fn cache_key(
+    brep: &BrepEnvelope,
+    deflection: f64,
     max_triangles: usize,
+) -> Result<CacheKey, GeometryError> {
+    let BrepEnvelope {
+        schema_version,
+        id: _,
+        revision: _,
+        geometry,
+        topology,
+        solids,
+        accuracy,
+        quality,
+    } = brep;
+    let Topology {
+        vertices,
+        edges,
+        halfedges,
+        loops,
+        faces,
+        wires,
+        shells,
+    } = topology;
+    let faces = faces
+        .iter()
+        .map(
+            |Face {
+                 id,
+                 key: _,
+                 surface,
+                 sense,
+                 trim,
+                 shell_ref,
+                 provenance: _,
+             }| (id, surface, sense, trim, shell_ref),
+        )
+        .collect::<Vec<_>>();
+    let mut writer = HashWriter::new();
+    serde_json::to_writer(
+        &mut writer,
+        &(
+            schema_version,
+            geometry,
+            vertices,
+            edges,
+            halfedges,
+            loops,
+            faces,
+            wires,
+            shells,
+            solids,
+            accuracy,
+            quality,
+            deflection.to_bits(),
+            max_triangles,
+        ),
+    )
+    .map_err(|e| GeometryError::InvalidGeometry(e.to_string()))?;
+    Ok(writer.0.map(|hasher| hasher.finish()))
+}
+struct CacheEntry {
     mesh: Arc<Tessellation>,
+    stamp: u64,
 }
 pub struct TessellationCache {
-    entries: VecDeque<CacheEntry>,
+    entries: HashMap<CacheKey, CacheEntry>,
+    recency: BTreeMap<u64, CacheKey>,
+    stamp: u64,
+    bytes: usize,
     max_bytes: usize,
 }
 impl TessellationCache {
     pub fn new(max_bytes: usize) -> Self {
         Self {
-            entries: VecDeque::new(),
+            entries: HashMap::new(),
+            recency: BTreeMap::new(),
+            stamp: 0,
+            bytes: 0,
             max_bytes,
         }
     }
+    // A hit can be the mesh of another body, so its `revision` is not the caller's; the caller stamps its own.
     pub fn tessellate(
         &mut self,
         brep: &BrepEnvelope,
@@ -1645,49 +1723,35 @@ impl TessellationCache {
         max_triangles: usize,
     ) -> Result<Arc<Tessellation>, GeometryError> {
         brep.validate()?;
-        let mut writer = HashWriter(DefaultHasher::new());
-        serde_json::to_writer(&mut writer, brep)
-            .map_err(|e| GeometryError::InvalidGeometry(e.to_string()))?;
-        let signature = writer.0.finish();
-        if let Some(i) = self.entries.iter().position(|e| {
-            e.signature == signature
-                && e.deflection == deflection.to_bits()
-                && e.max_triangles == max_triangles
-        }) {
-            let entry = self
-                .entries
-                .remove(i)
-                .ok_or_else(|| GeometryError::InvalidGeometry("cache entry missing".into()))?;
-            let mesh = Arc::clone(&entry.mesh);
-            self.entries.push_back(entry);
-            return Ok(mesh);
+        let key = cache_key(brep, deflection, max_triangles)?;
+        self.stamp += 1;
+        if let Some(entry) = self.entries.get_mut(&key) {
+            self.recency.remove(&entry.stamp);
+            entry.stamp = self.stamp;
+            self.recency.insert(self.stamp, key);
+            return Ok(Arc::clone(&entry.mesh));
         }
         let mesh = Arc::new(tessellate(brep, deflection, max_triangles)?);
         if mesh.bytes() > self.max_bytes {
             return Ok(mesh);
         }
-        let mut hasher = DefaultHasher::new();
-        hasher.write(brep.id.as_bytes());
-        let body = hasher.finish();
-        while self.entries.iter().filter(|e| e.body == body).count() >= 3 {
-            if let Some(i) = self.entries.iter().position(|e| e.body == body) {
-                self.entries.remove(i);
-            } else {
+        self.bytes += mesh.bytes();
+        self.entries.insert(
+            key,
+            CacheEntry {
+                mesh: Arc::clone(&mesh),
+                stamp: self.stamp,
+            },
+        );
+        self.recency.insert(self.stamp, key);
+        while self.bytes > self.max_bytes {
+            let Some((_, oldest)) = self.recency.pop_first() else {
                 break;
+            };
+            if let Some(evicted) = self.entries.remove(&oldest) {
+                self.bytes -= evicted.mesh.bytes();
             }
         }
-        while self.entries.iter().map(|e| e.mesh.bytes()).sum::<usize>() + mesh.bytes()
-            > self.max_bytes
-        {
-            self.entries.pop_front();
-        }
-        self.entries.push_back(CacheEntry {
-            body,
-            signature,
-            deflection: deflection.to_bits(),
-            max_triangles,
-            mesh: Arc::clone(&mesh),
-        });
         Ok(mesh)
     }
     pub fn len(&self) -> usize {
@@ -1993,13 +2057,351 @@ mod tests {
         let a = cache.tessellate(&b, 0.1, 1_000_000).unwrap();
         let again = cache.tessellate(&b, 0.1, 1_000_000).unwrap();
         assert!(Arc::ptr_eq(&a, &again));
-        b.topology.faces[0].key = "changed".into();
+        b = primitives::cylinder("c".into(), Frame3::IDENTITY, 1.5, 2.0, accuracy()).unwrap();
         let changed = cache.tessellate(&b, 0.1, 1_000_000).unwrap();
         assert!(!Arc::ptr_eq(&a, &changed));
         for d in [0.08, 0.06, 0.04, 0.02] {
             cache.tessellate(&b, d, 1_000_000).unwrap();
         }
-        assert_eq!(cache.len(), 3);
+        assert_eq!(cache.len(), 6);
         assert!(tessellate(&b, 0.001, 1).is_err());
+    }
+    fn trimmed_curved_bodies() -> [BrepEnvelope; 2] {
+        let accuracy = Accuracy {
+            geometric: 6.3e-8,
+            intersection: 1.575e-8,
+            tessellation: 0.01,
+            exchange: 1e-5,
+        };
+        let sector = primitives::annular_sector_extrusion(
+            "sector".into(),
+            Frame3 {
+                origin: [0.0, 0.0, 0.0],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, -1.0],
+                z: [0.0, 1.0, 0.0],
+            },
+            3.0,
+            0.3,
+            3.0,
+            0.8,
+            -1.6,
+            accuracy,
+        )
+        .unwrap();
+        let round = primitives::cylinder(
+            "round".into(),
+            Frame3 {
+                origin: [2.7, 1.5, 0.0],
+                x: [0.0, 0.0, -1.0],
+                y: [0.0, 1.0, 0.0],
+                z: [1.0, 0.0, 0.0],
+            },
+            0.5,
+            0.6,
+            accuracy,
+        )
+        .unwrap();
+        let round_opening = crate::analytic::booleans::boolean_brep(
+            &sector,
+            &round,
+            crate::analytic::booleans::BooleanOp::Subtraction,
+            "sector with a round opening".into(),
+        )
+        .unwrap()
+        .brep;
+        let raised_cutout = primitives::annular_sector_extrusion_with_openings(
+            "sector with a raised cutout".into(),
+            Frame3::IDENTITY,
+            3.0,
+            0.3,
+            3.0,
+            0.0,
+            2.0,
+            vec![primitives::AnnularSectorOpening {
+                id: "raised_cutout".into(),
+                angle: 1.0,
+                width: 0.8,
+                bottom: 0.9,
+                height: 1.2,
+            }],
+            accuracy,
+        )
+        .unwrap();
+        [round_opening, raised_cutout]
+    }
+    fn array_bits(mesh: &Tessellation) -> (Vec<u64>, Vec<u32>, Vec<u64>, [&Vec<u32>; 3]) {
+        (
+            mesh.positions.iter().map(|v| v.to_bits()).collect(),
+            mesh.normals.iter().map(|v| v.to_bits()).collect(),
+            mesh.outline_positions.iter().map(|v| v.to_bits()).collect(),
+            [
+                &mesh.indices,
+                &mesh.triangle_face_ids,
+                &mesh.outline_edge_ids,
+            ],
+        )
+    }
+    fn triangle_set_hash(mesh: &Tessellation) -> u64 {
+        let corner = |id: u32| {
+            let at = id as usize * 3;
+            let position = mesh.positions[at..at + 3].iter().map(|v| v.to_bits());
+            let normal = mesh.normals[at..at + 3]
+                .iter()
+                .map(|v| u64::from(v.to_bits()));
+            position.chain(normal).collect::<Vec<_>>()
+        };
+        let mut triangles = mesh
+            .indices
+            .chunks_exact(3)
+            .zip(&mesh.triangle_face_ids)
+            .map(|(ids, &face)| {
+                let mut corners = [corner(ids[0]), corner(ids[1]), corner(ids[2])];
+                let first = (0..3).min_by_key(|&i| &corners[i]).unwrap_or(0);
+                corners.rotate_left(first);
+                (face, corners)
+            })
+            .collect::<Vec<_>>();
+        triangles.sort();
+        triangles
+            .iter()
+            .flat_map(|(face, corners)| {
+                std::iter::once(u64::from(*face)).chain(corners.iter().flatten().copied())
+            })
+            .flat_map(u64::to_le_bytes)
+            .fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+                (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+            })
+    }
+    #[test]
+    fn a_trimmed_curved_face_tessellates_to_the_same_arrays_each_time() {
+        let equal_runs = trimmed_curved_bodies().map(|body| {
+            [0.05, 0.01].map(|deflection| {
+                let first = tessellate(&body, deflection, 2_000_000).unwrap();
+                (0..20)
+                    .filter(|_| {
+                        let again = tessellate(&body, deflection, 2_000_000).unwrap();
+                        array_bits(&first) == array_bits(&again)
+                    })
+                    .count()
+            })
+        });
+        assert_eq!(equal_runs, [[20; 2]; 2]);
+    }
+    const TRIANGLE_SETS_ON_AARCH64_APPLE_DARWIN: [[u64; 2]; 2] = [
+        [0xf0d9_a930_15e0_d334, 0x6617_beaa_d081_2100],
+        [0xcea2_8fc6_831d_672a, 0x8b42_bcc8_7643_6dbb],
+    ];
+    #[test]
+    fn a_trimmed_curved_face_keeps_its_triangle_set() {
+        let hashes = trimmed_curved_bodies().map(|body| {
+            [0.05, 0.01].map(|deflection| {
+                triangle_set_hash(&tessellate(&body, deflection, 2_000_000).unwrap())
+            })
+        });
+        if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+            assert_eq!(
+                hashes, TRIANGLE_SETS_ON_AARCH64_APPLE_DARWIN,
+                "{hashes:#018x?}"
+            );
+        }
+    }
+    fn wall(length: f64) -> BrepEnvelope {
+        primitives::cuboid(
+            "wall".into(),
+            Frame3::IDENTITY,
+            [length, 0.2, 3.0],
+            accuracy(),
+        )
+        .unwrap()
+    }
+    fn assert_outside_the_key(change: impl Fn(&mut BrepEnvelope)) {
+        let original = wall(4.0);
+        let mut changed = original.clone();
+        change(&mut changed);
+        assert_ne!(original.to_json().unwrap(), changed.to_json().unwrap());
+        let fresh = tessellate(&original, 0.05, 1_000_000).unwrap();
+        let fresh_changed = tessellate(&changed, 0.05, 1_000_000).unwrap();
+        assert!(array_bits(&fresh) == array_bits(&fresh_changed));
+        let mut cache = TessellationCache::new(16_000_000);
+        let first = cache.tessellate(&original, 0.05, 1_000_000).unwrap();
+        let second = cache.tessellate(&changed, 0.05, 1_000_000).unwrap();
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(cache.len(), 1);
+    }
+    #[test]
+    fn cache_hits_when_only_the_body_id_differs() {
+        assert_outside_the_key(|body| body.id = "rebuilt".into());
+    }
+    #[test]
+    fn cache_hits_when_only_the_revision_differs() {
+        assert_outside_the_key(|body| body.revision = 7);
+    }
+    #[test]
+    fn cache_hits_when_only_a_face_key_differs() {
+        assert_outside_the_key(|body| body.topology.faces[0].key = "rebuilt:face".into());
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_entity_differs() {
+        assert_outside_the_key(|body| {
+            body.topology.faces[0].provenance.sources[0].entity = "rebuilt".into()
+        });
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_body_differs() {
+        assert_outside_the_key(|body| {
+            body.topology.faces[0].provenance.sources[0].body = "rebuilt".into()
+        });
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_key_differs() {
+        assert_outside_the_key(|body| {
+            body.topology.faces[0].provenance.sources[0].key = "rebuilt:face".into()
+        });
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_face_differs() {
+        assert_outside_the_key(|body| body.topology.faces[0].provenance.sources[0].face = 99);
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_role_differs() {
+        assert_outside_the_key(|body| {
+            body.topology.faces[0].provenance.role = crate::analytic::topology::FaceRole::Split
+        });
+    }
+    #[test]
+    fn cache_hits_when_only_a_provenance_reversed_flag_differs() {
+        assert_outside_the_key(|body| {
+            let provenance = &mut body.topology.faces[0].provenance;
+            provenance.reversed = !provenance.reversed;
+        });
+    }
+    fn cache_miss_changes_the_result(
+        original: &BrepEnvelope,
+        change: impl Fn(&mut BrepEnvelope),
+    ) -> bool {
+        let mut changed = original.clone();
+        change(&mut changed);
+        changed.validate().unwrap();
+        let fresh = tessellate(original, 0.05, 1_000_000).unwrap();
+        let fresh_changed = tessellate(&changed, 0.05, 1_000_000);
+        let mut cache = TessellationCache::new(16_000_000);
+        let first = cache.tessellate(original, 0.05, 1_000_000).unwrap();
+        match (fresh_changed, cache.tessellate(&changed, 0.05, 1_000_000)) {
+            (Ok(fresh_changed), Ok(second)) => {
+                assert!(!Arc::ptr_eq(&first, &second));
+                assert!(array_bits(&fresh_changed) == array_bits(&second));
+                assert_eq!(cache.len(), 2);
+                array_bits(&fresh) != array_bits(&fresh_changed)
+            }
+            (Err(_), Err(_)) => {
+                assert_eq!(cache.len(), 1);
+                true
+            }
+            _ => panic!("the cache and a fresh tessellation disagree"),
+        }
+    }
+    fn assert_inside_the_key(original: &BrepEnvelope, change: impl Fn(&mut BrepEnvelope)) {
+        assert!(cache_miss_changes_the_result(original, change));
+    }
+    fn unit_cylinder() -> BrepEnvelope {
+        primitives::cylinder("c".into(), Frame3::IDENTITY, 1.0, 2.0, accuracy()).unwrap()
+    }
+    #[test]
+    fn cache_misses_when_the_geometric_accuracy_differs() {
+        assert_inside_the_key(&wall(4.0), |body| body.accuracy.geometric = 0.03);
+    }
+    #[test]
+    fn cache_misses_when_the_intersection_accuracy_differs() {
+        cache_miss_changes_the_result(&wall(4.0), |body| body.accuracy.intersection = 5e-11);
+    }
+    #[test]
+    fn cache_misses_when_a_vertex_position_differs() {
+        assert_inside_the_key(&wall(4.0), |body| {
+            body.topology.vertices[0].position[0] += 2.5e-10
+        });
+    }
+    #[test]
+    fn cache_misses_when_a_face_sense_differs() {
+        assert_inside_the_key(&wall(4.0), |body| {
+            body.topology.faces[0].sense = Orientation::Reverse
+        });
+    }
+    #[test]
+    fn cache_misses_when_a_face_trim_differs() {
+        assert_inside_the_key(&unit_cylinder(), |body| {
+            body.topology.faces[0].trim.uv_bounds[1] = Interval { lo: -0.5, hi: 2.5 }
+        });
+    }
+    #[test]
+    fn cache_misses_when_a_curve_differs() {
+        assert_inside_the_key(&unit_cylinder(), |body| {
+            if let CurveGeometry::Circle { radius, .. } = &mut body.geometry.curves[0] {
+                *radius += 2.5e-10;
+            }
+        });
+    }
+    #[test]
+    fn cache_misses_when_a_surface_differs() {
+        let sphere = primitives::sphere("s".into(), Frame3::IDENTITY, 1.0, accuracy()).unwrap();
+        assert_inside_the_key(&sphere, |body| {
+            if let SurfaceGeometry::Sphere { radius, .. } = &mut body.geometry.surfaces[0] {
+                *radius += 2.5e-10;
+            }
+        });
+    }
+    #[test]
+    fn cache_keeps_every_shape_of_one_body_id_under_the_byte_bound() {
+        let mut cache = TessellationCache::new(16_000_000);
+        for length in [1.0, 2.0, 3.0, 4.0, 5.0] {
+            cache.tessellate(&wall(length), 0.05, 1_000_000).unwrap();
+        }
+        assert_eq!(cache.len(), 5);
+    }
+    #[test]
+    fn cache_counts_the_bytes_of_its_meshes_exactly() {
+        let size = tessellate(&wall(1.0), 0.05, 1_000_000).unwrap().bytes();
+        for (max_bytes, kept) in [(3 * size, 3), (3 * size - 1, 2)] {
+            let mut cache = TessellationCache::new(max_bytes);
+            for length in [1.0, 2.0, 3.0] {
+                let mesh = cache.tessellate(&wall(length), 0.05, 1_000_000).unwrap();
+                assert_eq!(mesh.bytes(), size);
+            }
+            assert_eq!(cache.len(), kept);
+        }
+    }
+    #[test]
+    fn cache_evicts_the_least_recently_used_mesh_and_a_hit_refreshes_it() {
+        let size = tessellate(&wall(1.0), 0.05, 1_000_000).unwrap().bytes();
+        let mut cache = TessellationCache::new(3 * size);
+        let [first, second, third] =
+            [1.0, 2.0, 3.0].map(|length| cache.tessellate(&wall(length), 0.05, 1_000_000).unwrap());
+        let hit = cache.tessellate(&wall(1.0), 0.05, 1_000_000).unwrap();
+        assert!(Arc::ptr_eq(&first, &hit));
+        cache.tessellate(&wall(4.0), 0.05, 1_000_000).unwrap();
+        assert_eq!(cache.len(), 3);
+        let kept = cache.tessellate(&wall(3.0), 0.05, 1_000_000).unwrap();
+        assert!(Arc::ptr_eq(&third, &kept));
+        let refreshed = cache.tessellate(&wall(1.0), 0.05, 1_000_000).unwrap();
+        assert!(Arc::ptr_eq(&first, &refreshed));
+        let evicted = cache.tessellate(&wall(2.0), 0.05, 1_000_000).unwrap();
+        assert!(!Arc::ptr_eq(&second, &evicted));
+        assert_eq!(cache.len(), 3);
+    }
+    #[test]
+    fn cache_returns_but_does_not_keep_a_mesh_above_the_byte_bound() {
+        let size = tessellate(&wall(1.0), 0.05, 1_000_000).unwrap().bytes();
+        let mut cache = TessellationCache::new(size - 1);
+        let mesh = cache.tessellate(&wall(1.0), 0.05, 1_000_000).unwrap();
+        assert_eq!(mesh.bytes(), size);
+        assert!(cache.is_empty());
+    }
+    #[test]
+    fn cache_key_is_two_different_hashes_of_one_shape() {
+        let key = cache_key(&wall(4.0), 0.05, 1_000_000).unwrap();
+        assert_ne!(key[0], key[1]);
+        assert_eq!(key, cache_key(&wall(4.0), 0.05, 1_000_000).unwrap());
+        assert_ne!(key, cache_key(&wall(4.0), 0.05, 999_999).unwrap());
+        assert_ne!(key, cache_key(&wall(4.0), 0.04, 1_000_000).unwrap());
     }
 }

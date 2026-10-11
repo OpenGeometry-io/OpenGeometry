@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "test": "cargo test --manifest-path main/opengeometry/Cargo.toml && cargo test --examples --manifest-path main/opengeometry/Cargo.toml",
+    "test:wrapper": "node --test main/opengeometry-three/tests/*.test.mjs",
     "lint": "eslint main/opengeometry-three/src/**/*.ts --fix",
     "lint:check": "eslint main/opengeometry-three/src/**/*.ts",
     "clean-dist": "node ./scripts/clean-dist.mjs",
