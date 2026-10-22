@@ -85,6 +85,9 @@ pub(super) fn cylinder_half_space_boolean(
         return Err(gap());
     }
     let clearance = 4.0 * accuracy.geometric;
+    // Cuts that leave a sliver thinner than this are exact but cannot be
+    // tessellated, so they are left to the other paths.
+    let sliver = clearance.max(1.0e-3 * cylinder.radius);
     let (radius, height) = (cylinder.radius, cylinder.height);
     let box_axes = [box_.frame.x, box_.frame.y, box_.frame.z];
     let local_origin = box_.frame.local(cylinder.frame.origin);
@@ -136,13 +139,14 @@ pub(super) fn cylinder_half_space_boolean(
         c = -c;
         flipped = true;
     }
-    let perpendicular = sub(normal, scale(z, c));
-    let a = norm(perpendicular);
+    // Build the chart from cross products so a plane almost perpendicular
+    // to the axis keeps an exactly orthonormal frame.
+    let a = norm(cross(z, normal));
     if a <= 1.0e-12 {
         return Err(gap());
     }
-    let x = scale(perpendicular, -1.0 / a);
-    let y = unit(cross(z, x))?;
+    let y = unit(cross(normal, z))?;
+    let x = cross(y, z);
     let frame = Frame3 { origin, x, y, z };
     frame.validate()?;
     let e = dot(normal, sub(plane_point, origin));
@@ -182,7 +186,7 @@ pub(super) fn cylinder_half_space_boolean(
     if height * c <= 0.25 * accuracy.geometric {
         // Plane parallel to the axis: two rulings bound the kept band.
         let u0 = -e / a;
-        if u0.abs() >= radius - clearance {
+        if u0.abs() >= radius - sliver {
             return Err(gap());
         }
         let t1 = (u0 / radius).acos();
@@ -233,19 +237,31 @@ pub(super) fn cylinder_half_space_boolean(
         ];
         cut_bounds = [[-pad, height + pad], [-half - pad, half + pad]];
     } else {
-        if c < 1.0e-7 {
+        // Kept side: w >= f(theta) = m + k cos(theta).
+        let k = a * radius / c;
+        let m = e / c;
+        // Ellipse points are formed from the centre `m` and the axial
+        // amplitude `k`; their rounding must stay well inside tolerance.
+        if !(k.is_finite() && m.is_finite())
+            || (m.abs() + k) * 16.0 * f64::EPSILON > 0.25 * accuracy.geometric
+        {
             return Err(GeometryError::UnresolvedIntersection(
                 "cut plane is nearly parallel to the cylinder axis".into(),
             ));
         }
-        // Kept side: w >= f(theta) = m + k cos(theta).
-        let k = a * radius / c;
-        let m = e / c;
         let (fmin, fmax) = (m - k, m + k);
-        if fmax <= clearance || fmin >= height - clearance {
+        // Distance of the cut from a rim, measured both along the axis and
+        // across the cap (radial depth of the chord segment).
+        let rim_gap = |dw: f64| dw.abs() * (radius / k).min(1.0);
+        if fmax <= 0.0
+            || fmin >= height
+            || rim_gap(fmax) <= sliver
+            || rim_gap(fmin - height) <= sliver
+        {
+            // Nothing, or only a sliver, is kept or removed at a rim.
             return Err(gap());
         }
-        if (fmax - height).abs() <= clearance || fmin.abs() <= clearance {
+        if rim_gap(fmax - height) <= sliver || rim_gap(fmin) <= sliver {
             return Err(GeometryError::UnresolvedIntersection(
                 "cut ellipse meets a cylinder rim within geometric resolution".into(),
             ));
@@ -509,7 +525,7 @@ mod tests {
         primitives,
         tessellation::tessellate,
         topology::*,
-        CurveGeometry, Frame3, Point3, SurfaceGeometry,
+        CurveGeometry, Frame3, GeometryError, Point3, SurfaceGeometry,
     };
     use std::f64::consts::PI;
 
@@ -890,5 +906,243 @@ mod tests {
             [0.0, 1.0, 0.0],
             [5, 4],
         );
+    }
+
+    /// Either an exact result that validates and tessellates at a deflection
+    /// relative to the radius, or a deliberate error; never an invalid model.
+    fn robust(
+        label: &str,
+        origin: Point3,
+        axis: Point3,
+        radius: f64,
+        height: f64,
+        point: Point3,
+        normal: Point3,
+        reference: Point3,
+    ) {
+        let reference_axis = if axis[2].abs() < 0.9 {
+            [0.0, 0.0, 1.0]
+        } else {
+            [1.0, 0.0, 0.0]
+        };
+        let frame = Frame3::from_axis(origin, axis, reference_axis).unwrap();
+        let host = primitives::cylinder("cyl".into(), frame, radius, height, accuracy()).unwrap();
+        let big = 100.0 * height.max(radius);
+        let frame = Frame3::from_axis([0.0; 3], unit(normal).unwrap(), reference).unwrap();
+        let corner = sub(
+            sub(point, scale(frame.x, big / 2.0)),
+            scale(frame.y, big / 2.0),
+        );
+        let cutter = primitives::cuboid(
+            "half".into(),
+            Frame3 {
+                origin: corner,
+                ..frame
+            },
+            [big, big, big / 2.0],
+            accuracy(),
+        )
+        .unwrap();
+        for operation in [BooleanOp::Subtraction, BooleanOp::Intersection] {
+            match boolean_brep(&host, &cutter, operation, "out".into()) {
+                Ok(result) => {
+                    result.brep.validate().unwrap();
+                    if !result.brep.topology.faces.is_empty() {
+                        tessellate(&result.brep, 2e-3 * radius, 4_000_000).unwrap_or_else(
+                            |error| {
+                                panic!(
+                                    "{label} {operation:?} {point:?} {normal:?} new={}: tessellation {error:?}",
+                                    result.brep.topology.faces.iter().any(|f| f.key.contains("half-space"))
+                                )
+                            },
+                        );
+                    }
+                }
+                Err(
+                    error @ (GeometryError::InvalidGeometry(_) | GeometryError::InvalidTopology(_)),
+                ) => {
+                    panic!("{label} {operation:?}: {error:?}")
+                }
+                Err(_) => {}
+            }
+        }
+    }
+
+    fn sloped_axis() -> (Point3, Point3) {
+        let a = 40f64.to_radians();
+        ([0.3, -0.2, 1.0], [a.cos(), 0.0, a.sin()])
+    }
+
+    #[test]
+    fn near_perpendicular_cut_keeps_an_orthonormal_chart() {
+        let c = sloped(40.0, 6.0);
+        let axis = unit(c.axis).unwrap();
+        for eps in [3e-5, 1e-5, 3e-6] {
+            let normal = unit(crate::analytic::geometry::add(
+                axis,
+                scale([0.0, 1.0, 0.0], eps),
+            ))
+            .unwrap();
+            check(
+                sloped(40.0, 6.0),
+                along_axis(&c, 3.0),
+                normal,
+                [0.0, 1.0, 0.0],
+                [3, 3],
+            );
+        }
+        for eps in [1e-1, 1e-3, 1e-4, 1e-6, 1e-7, 1e-9] {
+            let normal = unit(crate::analytic::geometry::add(
+                axis,
+                scale([0.0, 1.0, 0.0], eps),
+            ))
+            .unwrap();
+            let (o, a) = sloped_axis();
+            robust(
+                "perpendicular",
+                o,
+                a,
+                R,
+                6.0,
+                along_axis(&c, 3.0),
+                normal,
+                [0.0, 1.0, 0.0],
+            );
+        }
+    }
+
+    #[test]
+    fn near_parallel_cuts_are_exact_or_unresolved() {
+        let (origin, axis) = sloped_axis();
+        let c = sloped(40.0, 6.0);
+        let mid = along_axis(&c, 3.0);
+        for delta in [
+            1e-13, 1e-12, 5e-12, 2e-11, 5e-11, 1e-10, 1e-9, 1e-8, 9e-8, 1.1e-7, 3e-7, 1e-6, 1e-5,
+            1e-4, 1e-3, 1e-2,
+        ] {
+            let normal = unit(crate::analytic::geometry::add(
+                [0.0, 1.0, 0.0],
+                scale(axis, delta),
+            ))
+            .unwrap();
+            robust(
+                "tilt",
+                origin,
+                axis,
+                R,
+                6.0,
+                crate::analytic::geometry::add(mid, [0.0, 0.1, 0.0]),
+                normal,
+                [1.0, 0.0, 0.0],
+            );
+        }
+        for (radius, height) in [(500.0, 6000.0), (0.001, 0.01)] {
+            let mid = crate::analytic::geometry::add(origin, scale(axis, height / 2.0));
+            for delta in [1e-6, 1e-3, 0.3] {
+                let normal = unit(crate::analytic::geometry::add(
+                    [0.0, 1.0, 0.0],
+                    scale(axis, delta),
+                ))
+                .unwrap();
+                robust(
+                    "scale",
+                    origin,
+                    axis,
+                    radius,
+                    height,
+                    crate::analytic::geometry::add(mid, [0.0, 0.2 * radius, 0.0]),
+                    normal,
+                    [1.0, 0.0, 0.0],
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn slivers_at_a_side_or_rim_are_left_to_other_paths() {
+        let (origin, axis) = sloped_axis();
+        for d in [
+            0.0,
+            0.3,
+            0.499,
+            0.5 - 1e-6,
+            0.5 - 8e-9,
+            0.5 - 3e-9,
+            0.5,
+            0.5 + 3e-9,
+            0.5 + 1e-6,
+            -0.5,
+            -0.5 + 1e-7,
+        ] {
+            robust(
+                "parallel",
+                origin,
+                axis,
+                R,
+                6.0,
+                [0.0, -0.2 + d, 0.0],
+                [0.0, 1.0, 0.0],
+                [1.0, 0.0, 0.0],
+            );
+        }
+        for d in [0.0, 0.2, 0.5 - 1e-6, 0.5] {
+            robust(
+                "aligned",
+                [0.0, 0.0, 1.0],
+                [1.0, 0.0, 0.0],
+                R,
+                6.0,
+                [0.0, d, 1.0],
+                [0.0, 1.0, 0.0],
+                [1.0, 0.0, 0.0],
+            );
+        }
+        let z = unit(axis).unwrap();
+        let b = 30f64.to_radians();
+        let n0 = [b.cos(), b.sin(), 0.0];
+        let perp = unit(sub(n0, scale(z, dot(n0, z)))).unwrap();
+        let top = crate::analytic::geometry::add(origin, scale(z, 6.0));
+        for (center, sign) in [(top, -1.0), (top, 1.0), (origin, -1.0), (origin, 1.0)] {
+            let rim = crate::analytic::geometry::add(center, scale(perp, sign * R));
+            for s in [
+                0.0, 2e-9, -2e-9, 1e-8, -1e-8, 1e-6, -1e-6, 1e-4, -1e-4, 1e-3, -1e-3,
+            ] {
+                robust(
+                    "rim",
+                    origin,
+                    axis,
+                    R,
+                    6.0,
+                    crate::analytic::geometry::add(rim, scale(n0, s)),
+                    n0,
+                    [0.0, 0.0, 1.0],
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn two_crossing_cuboid_faces_are_not_a_half_space() {
+        let c = sloped(40.0, 6.0);
+        let host = cylinder(&c);
+        let mid = along_axis(&c, 3.0);
+        for (ox, oy) in [(0.0, 0.0), (0.0, -0.2), (-50.0, 0.1)] {
+            let cutter = primitives::cuboid(
+                "box".into(),
+                Frame3 {
+                    origin: crate::analytic::geometry::add(mid, [ox, oy, -10.0]),
+                    ..Frame3::IDENTITY
+                },
+                [50.0, 50.0, 50.0],
+                accuracy(),
+            )
+            .unwrap();
+            for operation in [BooleanOp::Subtraction, BooleanOp::Intersection] {
+                assert!(matches!(
+                    boolean_brep(&host, &cutter, operation, "out".into()),
+                    Err(GeometryError::CoverageGap { .. })
+                ));
+            }
+        }
     }
 }

@@ -5181,8 +5181,11 @@ fn cylinder_box_boolean(
                 id,
                 accuracy,
             ) {
-                Err(GeometryError::CoverageGap { .. }) => Err(error),
-                result => result,
+                // Keep only results and deliberate resolution limits; any
+                // other failure leaves the original error so the generic
+                // fallbacks still run.
+                result @ (Ok(_) | Err(GeometryError::UnresolvedIntersection(_))) => result,
+                Err(_) => Err(error),
             }
         }
         result => result,
