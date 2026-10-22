@@ -20,6 +20,8 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+mod cylinder_half_space;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BooleanOp {
@@ -5162,7 +5164,29 @@ fn cylinder_box_boolean(
             .exchange
             .max(box_.brep.accuracy.exchange),
     };
-    perpendicular_cylinder_box_boolean(&box_, &cylinder, cylinder_is_a, operation, id, accuracy)
+    match perpendicular_cylinder_box_boolean(
+        &box_,
+        &cylinder,
+        cylinder_is_a,
+        operation,
+        id.clone(),
+        accuracy,
+    ) {
+        Err(error @ GeometryError::CoverageGap { .. }) => {
+            match cylinder_half_space::cylinder_half_space_boolean(
+                &box_,
+                &cylinder,
+                cylinder_is_a,
+                operation,
+                id,
+                accuracy,
+            ) {
+                Err(GeometryError::CoverageGap { .. }) => Err(error),
+                result => result,
+            }
+        }
+        result => result,
+    }
 }
 
 fn cylinder_source(input: &CylinderInput<'_>, face: u32) -> FaceSource {
