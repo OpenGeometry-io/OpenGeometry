@@ -193,6 +193,73 @@ fn placements() -> Vec<Case> {
     ]
 }
 
+const ROOF_RINGS: [&[u32]; 5] = [
+    &[0, 1, 2, 3],
+    &[1, 0, 4, 5],
+    &[2, 1, 5],
+    &[3, 2, 5, 4],
+    &[0, 3, 4],
+];
+
+const L_RINGS: [&[u32]; 7] = [
+    &[0, 1, 2, 3, 4, 5],
+    &[1, 0, 6, 7],
+    &[2, 1, 7],
+    &[3, 2, 7, 6],
+    &[4, 3, 6, 8],
+    &[5, 4, 8],
+    &[0, 5, 8, 6],
+];
+
+fn rings(source: &[&[u32]]) -> Vec<Vec<u32>> {
+    source.iter().map(|ring| ring.to_vec()).collect()
+}
+
+fn ridged(ridge: [[f64; 3]; 2]) -> Vec<[f64; 3]> {
+    let eaves = [
+        [0.0, 0.0, 0.0],
+        [4.0, 0.0, 0.0],
+        [4.0, 0.0, 2.0],
+        [0.0, 0.0, 2.0],
+    ];
+    eaves.into_iter().chain(ridge).collect()
+}
+
+fn polyhedra() -> Vec<Case> {
+    vec![
+        built("polyhedron.hip", || {
+            let points = ridged([[1.0, 1.0, 1.0], [3.0, 1.0, 1.0]]);
+            primitives::polyhedron("hip".into(), &points, &rings(&ROOF_RINGS), standard())
+        }),
+        built("polyhedron.gable", || {
+            let points = ridged([[0.0, 1.0, 1.0], [4.0, 1.0, 1.0]]);
+            primitives::polyhedron("gable".into(), &points, &rings(&ROOF_RINGS), standard())
+        }),
+        built("polyhedron.l-skeleton", || {
+            let mut points = [
+                [0.0, 0.0],
+                [4.0, 0.0],
+                [4.0, 2.0],
+                [2.0, 2.0],
+                [2.0, 4.0],
+                [0.0, 4.0],
+            ]
+            .map(|[x, z]| [x, 0.0, z])
+            .to_vec();
+            points.extend([[1.0, 1.0, 1.0], [3.0, 1.0, 1.0], [1.0, 1.0, 3.0]]);
+            primitives::polyhedron("l".into(), &points, &rings(&L_RINGS), standard())
+        }),
+        built("polyhedron.open", || {
+            let points = ridged([[1.0, 1.0, 1.0], [3.0, 1.0, 1.0]]);
+            primitives::polyhedron("open".into(), &points, &rings(&ROOF_RINGS[..4]), standard())
+        }),
+        built("polyhedron.non-planar", || {
+            let points = ridged([[1.0, 1.0, 1.0], [3.0, 1.001, 1.0]]);
+            primitives::polyhedron("bent".into(), &points, &rings(&ROOF_RINGS), standard())
+        }),
+    ]
+}
+
 pub(crate) fn cases() -> Vec<Case> {
     [
         cuboids(),
@@ -201,6 +268,7 @@ pub(crate) fn cases() -> Vec<Case> {
         conics(),
         rounds(),
         placements(),
+        polyhedra(),
     ]
     .into_iter()
     .flatten()

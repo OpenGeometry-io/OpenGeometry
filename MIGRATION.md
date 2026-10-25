@@ -20,7 +20,8 @@ It is written for people and for coding assistants alike: each section says what
 - `OG_PRIMITIVE_ARC` makes a partial arc wire: `{ radius, startAngle, sweepAngle }`, angles in radians, centred on the `plane` origin.
 - `OG_OPERATION_EXTRUDE` takes a closed Profile as the profile or as a hole, so the 2.0 arc-edged extrusion is an extrude again.
 - `OG_PRIMITIVE_CYLINDER_SECTOR` makes a solid cylinder sector: `{ radius, height, startAngle, sweepAngle }`, angles in radians from the `plane` x direction. A positive angle turns counter-clockwise seen from the side the `plane` normal points to; on the default ground plane that is seen from above, from +X towards −Z. The height runs along the normal.
-- `OG_PRIMITIVE_PARAMS_PROFILE`, `OG_PRIMITIVE_PARAMS_ARC` and `OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR` type their parameters. The entry exports the types `ProfileParams`, `ProfileSegment`, `ProfileArc`, `ArcParams` and `CylinderSectorParams`.
+- `OG_PRIMITIVE_POLYHEDRON` makes a planar solid from `{ points, faces }`: `points` are `[x, y, z]` in the body's own space, Y up, in metres, and each face is a ring of point indices, counter-clockwise seen from outside. It replaces 2.0's `planarPolyhedron` analytic solid, which took `vertices`.
+- `OG_PRIMITIVE_PARAMS_PROFILE`, `OG_PRIMITIVE_PARAMS_ARC`, `OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR` and `OG_PRIMITIVE_PARAMS_POLYHEDRON` type their parameters. The entry exports the types `ProfileParams`, `ProfileSegment`, `ProfileArc`, `ArcParams`, `CylinderSectorParams` and `PolyhedronParams`.
 - `body.getWorldBrep()` reads a body's BRep placed in the world. It makes no body and changes nothing.
 - `body.faceNormalAt(faceId, point)` returns the unit normal of a face at a point, in the body's own coordinates, with the face's orientation applied.
 - `OG_OPERATION_SWEEP` takes `caps`. It is `true` when left out, so existing sweeps are unchanged. `caps: false` leaves both ends open.
@@ -44,6 +45,11 @@ const sector = new AnalyticSolid({
 });
 const arc = new Arc({ center: new Vector3(0, 0, 0), radius: 2, startAngle: 0, sweepAngle: Math.PI / 2 });
 const wedge = new AnalyticSolid({ kind: 'cylinderSector', radius: 2, height: 3, startAngle: 0, sweepAngle: Math.PI / 2 });
+const roof = new AnalyticSolid({
+  kind: 'planarPolyhedron',
+  vertices: [[0, 0, 0], [4, 0, 0], [4, 0, 2], [0, 0, 2], [1, 1, 1], [3, 1, 1]],
+  faces: [[0, 1, 2, 3], [1, 0, 4, 5], [2, 1, 5], [3, 2, 5, 4], [0, 3, 4]],
+});
 ```
 
 Unreleased:
@@ -58,6 +64,8 @@ import {
   OG_PRIMITIVE_CYLINDER_SECTOR,
   OG_PRIMITIVE_PARAMS_ARC,
   OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR,
+  OG_PRIMITIVE_PARAMS_POLYHEDRON,
+  OG_PRIMITIVE_POLYHEDRON,
   OG_PRIMITIVE_PARAMS_PROFILE,
   OG_PRIMITIVE_PROFILE,
 } from 'opengeometry';
@@ -82,9 +90,14 @@ const wedge = new Solid(
   OG_PRIMITIVE_CYLINDER_SECTOR,
   OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR({ radius: 2, height: 3, startAngle: 0, sweepAngle: Math.PI / 2 }),
 );
+
+const roof = new Solid(OG_PRIMITIVE_POLYHEDRON, OG_PRIMITIVE_PARAMS_POLYHEDRON({
+  points: [[0, 0, 0], [4, 0, 0], [4, 0, 2], [0, 0, 2], [1, 1, 1], [3, 1, 1]],
+  faces: [[0, 1, 2, 3], [1, 0, 4, 5], [2, 1, 5], [3, 2, 5, 4], [0, 3, 4]],
+}));
 ```
 
-Both make the same quarter ring sector, 3 m high, the same quarter arc and the same quarter cylinder.
+Both make the same quarter ring sector, 3 m high, the same quarter arc, the same quarter cylinder and the same hip roof.
 
 2.0:
 
@@ -162,6 +175,7 @@ Both make the same open duct, 0.7 m by 0.4 m, along an L-shaped path: eight side
 | `{ kind: 'arc', center, radius, startAngle, sweepAngle }` | `{ to: its end point, arc: { center, counterClockwise: sweepAngle > 0 } }` |
 | `frame` `{ origin, x, y, z }` | `plane` `{ origin, normal: z, xDirection: x }` |
 | `new AnalyticSolid({ kind: 'cylinderSector', radius, height, startAngle, sweepAngle, frame })` | `new Solid(OG_PRIMITIVE_CYLINDER_SECTOR, { radius, height, startAngle, sweepAngle }, { plane })` |
+| `new AnalyticSolid({ kind: 'planarPolyhedron', vertices, faces })` | `new Solid(OG_PRIMITIVE_POLYHEDRON, { points: vertices, faces })`; a 2.0 `frame` becomes `plane`, which places the body instead of mapping each vertex, so check the result |
 | `new Arc({ center, radius, startAngle, sweepAngle })` | `new Wire(OG_PRIMITIVE_ARC, { radius, startAngle, sweepAngle }, { plane: { origin: [center.x, center.y, center.z] } })` |
 | `AnalyticSolid.fromBrep(solid.getWorldBrepSerialized())`, to read a world copy | `body.getWorldBrep()`, which returns the BRep object and makes no body; for a copy you will change, `body.duplicate()` |
 | `solid.normalAtFace(faceId, new Vector3(x, y, z))` | `body.faceNormalAt(faceId, [x, y, z])`, which returns `[x, y, z]` |
@@ -183,6 +197,8 @@ Both make the same open duct, 0.7 m by 0.4 m, along an L-shaped path: eight side
 - A Sheet cannot be exported: `OpenGeometry.exportStep` with a Sheet in `nodes` rejects with `InvalidOperand`, and a Sheet inside an exported assembly is skipped and listed in the report.
 - `rebuild` keeps the body type: a Sheet rebuilt with `caps` true, or a Solid rebuilt with `caps: false`, throws `BodyTypeMismatch`.
 - Sheets get their own default ids, `sheet-1`, `sheet-2` and so on, and show their outline by default.
+- A polyhedron refuses, with `InvalidParameter`, non-finite or coincident points (closer than four times the geometric tolerance), points no face uses, bad or repeated indices in a ring, and a face whose points are off its plane by more than the geometric tolerance. It refuses, with `InvalidTopology`, an edge not used by exactly two faces in opposite directions (an open shell or a T-junction), a vertex where the faces do not form one fan, faces that form more than one shell, and inward winding. 2.0 accepted inward winding, unused points and coincident points. A shell that encloses no volume, such as a flat one that folds over itself, is also refused with `InvalidTopology`.
+- A polyhedron does not check whether faces cross each other, or whether a ring touches itself at a vertex; build such shapes from separate solids.
 
 ### Check your result
 

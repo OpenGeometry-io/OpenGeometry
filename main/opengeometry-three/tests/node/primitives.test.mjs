@@ -5,12 +5,17 @@ import {
   Solid,
   Wire,
   OG_OPERATION_EXTRUDE,
+  OG_OPERATION_SUBTRACT,
   OG_PRIMITIVE_ARC,
   OG_PRIMITIVE_CIRCLE,
+  OG_PRIMITIVE_CUBOID,
   OG_PRIMITIVE_CYLINDER_SECTOR,
   OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR,
+  OG_PRIMITIVE_PARAMS_POLYHEDRON,
+  OG_PRIMITIVE_POLYHEDRON,
   OG_PRIMITIVE_PROFILE,
   OG_PRIMITIVE_RECTANGLE,
+  OG_TRANSFORM_TRANSLATE,
 } from '../../../dist/index.js';
 import { boot, failsWith } from './support.mjs';
 
@@ -69,4 +74,38 @@ test('a full-turn cylinder sector is InvalidParameter', async () => {
   await boot();
   const params = { radius: 2, height: 3, startAngle: 0, sweepAngle: 2 * Math.PI };
   assert.throws(() => new Solid(OG_PRIMITIVE_CYLINDER_SECTOR, params, { ogId: 'full' }), failsWith('InvalidParameter'));
+});
+
+const HIP_FACES = [[0, 1, 2, 3], [1, 0, 4, 5], [2, 1, 5], [3, 2, 5, 4], [0, 3, 4]];
+
+function hipRoof(ridgeY = 1) {
+  return OG_PRIMITIVE_PARAMS_POLYHEDRON({
+    points: [[0, 0, 0], [4, 0, 0], [4, 0, 2], [0, 0, 2], [1, 1, 1], [3, ridgeY, 1]],
+    faces: HIP_FACES,
+  });
+}
+
+test('a hip roof polyhedron is a five-face Solid that exports planes to STEP', async () => {
+  await boot();
+  const roof = new Solid(OG_PRIMITIVE_POLYHEDRON, hipRoof(), { ogId: 'hip-roof' });
+  assert.equal(roof.getBrep().topology.faces.length, 5);
+  const { text } = await OpenGeometry.exportStep({ nodes: [roof] });
+  assert.equal(text.match(/\bPLANE\(/g)?.length, 5);
+});
+
+test('a non-planar face is InvalidParameter and inward rings are InvalidTopology', async () => {
+  await boot();
+  const bent = hipRoof(1.001);
+  assert.throws(() => new Solid(OG_PRIMITIVE_POLYHEDRON, bent, { ogId: 'bent' }), failsWith('InvalidParameter'));
+  const inward = { ...hipRoof(), faces: HIP_FACES.map((ring) => [...ring].reverse()) };
+  assert.throws(() => new Solid(OG_PRIMITIVE_POLYHEDRON, inward, { ogId: 'inward' }), failsWith('InvalidTopology'));
+});
+
+test('a roof minus a chimney goes through the planar polyhedra handler', async () => {
+  await boot();
+  const roof = new Solid(OG_PRIMITIVE_POLYHEDRON, hipRoof(), { ogId: 'chimney-roof' });
+  const chimney = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.5, height: 3, depth: 0.5 }, { ogId: 'chimney' });
+  chimney.transform(OG_TRANSFORM_TRANSLATE, { offset: [2, -1, 1] });
+  roof.operate(OG_OPERATION_SUBTRACT, { tools: [chimney] });
+  assert.deepEqual(roof.getReport()?.handlers, ['subtract_planar_polyhedra']);
 });

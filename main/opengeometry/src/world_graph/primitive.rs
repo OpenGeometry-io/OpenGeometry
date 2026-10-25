@@ -3,7 +3,9 @@ use super::change_log::ChangeSet;
 use super::error::{ErrorCode, ErrorContext, GraphError};
 use super::graph::WorldGraph;
 use super::node::EditScope;
-use crate::brep::{Accuracy, BodyType, BrepEnvelope, CurveGeometry, Frame3, Similarity3, GROUND};
+use crate::brep::{
+    Accuracy, BodyType, BrepEnvelope, CurveGeometry, Frame3, GeometryError, Similarity3, GROUND,
+};
 use crate::math::{norm, sub, Point3};
 use crate::primitives::{self, ProfileEdge, ProfileSegment};
 use serde::{Deserialize, Serialize};
@@ -28,6 +30,10 @@ pub enum Primitive {
         height: f64,
         start_angle: f64,
         sweep_angle: f64,
+    },
+    Polyhedron {
+        points: Vec<Point3>,
+        faces: Vec<Vec<u32>>,
     },
     Rectangle {
         width: f64,
@@ -73,9 +79,10 @@ pub struct CreateOptions {
 impl Primitive {
     fn body_type(&self) -> BodyType {
         match self {
-            Self::Cuboid { .. } | Self::Cylinder { .. } | Self::CylinderSector { .. } => {
-                BodyType::Solid
-            }
+            Self::Cuboid { .. }
+            | Self::Cylinder { .. }
+            | Self::CylinderSector { .. }
+            | Self::Polyhedron { .. } => BodyType::Solid,
             Self::Rectangle { .. }
             | Self::Circle { .. }
             | Self::Polyline { .. }
@@ -278,6 +285,9 @@ fn build_primitive(
             [start_angle, sweep_angle],
             accuracy,
         )?,
+        Primitive::Polyhedron { points, faces } => {
+            polyhedron_body(shape_id.clone(), &points, &faces, accuracy)?
+        }
         Primitive::Rectangle { width, breadth } => {
             required_size(width, accuracy.geometric, "width")?;
             required_size(breadth, accuracy.geometric, "breadth")?;
@@ -352,6 +362,27 @@ fn cuboid_body(
         primitives::cuboid(shape_id, frame, [width, depth, height], accuracy)?,
         Vec::new(),
     ))
+}
+
+fn polyhedron_body(
+    shape_id: String,
+    points: &[Point3],
+    faces: &[Vec<u32>],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    let brep =
+        primitives::polyhedron(shape_id, points, faces, accuracy).map_err(|error| match error {
+            GeometryError::InvalidGeometry(message)
+            | GeometryError::UnresolvedIntersection(message) => {
+                GraphError::code(ErrorCode::InvalidParameter, message)
+            }
+            GeometryError::Math(error) => GraphError::code(
+                ErrorCode::InvalidParameter,
+                format!("polyhedron points are out of range: {error:?}"),
+            ),
+            other => other.into(),
+        })?;
+    Ok((brep, Vec::new()))
 }
 
 fn sector_body(

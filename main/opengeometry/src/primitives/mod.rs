@@ -3,6 +3,7 @@ mod circle;
 mod cuboid;
 mod cylinder;
 mod internal;
+mod polyhedron;
 mod polyline;
 mod profile;
 mod profile_wire;
@@ -22,6 +23,7 @@ pub use internal::{
     annular_cylinder, arc_edged_extrusion, arc_edged_extrusion_with_holes, cone, cylinder_sector,
     cylinder_with_circular_hole, frustum, linear_extrusion, sphere, torus,
 };
+pub use polyhedron::polyhedron;
 pub use polyline::{polyline, polyline_with_keys};
 pub use profile::ProfileEdge;
 pub(super) use profile::{

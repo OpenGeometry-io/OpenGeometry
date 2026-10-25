@@ -6,4 +6,6 @@ export { Solid } from './src/bodies/solid';
 export { Sheet } from './src/bodies/sheet';
 export { OGError } from './src/errors';
 export * from './src/constants/index';
-export type { ArcParams, CylinderSectorParams, ProfileArc, ProfileParams, ProfileSegment } from './src/dto/primitives';
+export type {
+  ArcParams, CylinderSectorParams, PolyhedronParams, ProfileArc, ProfileParams, ProfileSegment,
+} from './src/dto/primitives';
