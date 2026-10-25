@@ -56,6 +56,24 @@ export function getBrep(owner: string, ogId: string): Brep {
   return decodeBrep(call(label, () => worldGraph().brep(ogId)), label);
 }
 
+export function getWorldBrep(owner: string, ogId: string): Brep {
+  const label = `${owner}.getWorldBrep`;
+  return decodeBrep(call(label, () => worldGraph().worldBrep(ogId)), label);
+}
+
+export function faceNormalAt(
+  owner: string, ogId: string, faceId: number, point: [number, number, number],
+): [number, number, number] {
+  const label = `${owner}.faceNormalAt`;
+  if (!Number.isInteger(faceId) || faceId < 0 || faceId > 0xffffffff) {
+    throw new OGError('InvalidParameter', label, 'faceId must be an unsigned integer');
+  }
+  const [x = Number.NaN, y = Number.NaN, z = Number.NaN] = call(
+    label, () => worldGraph().faceNormalAt(ogId, faceId, Float64Array.from(point)),
+  );
+  return [x, y, z];
+}
+
 export function getInstanceCount(owner: string, ogId: string): number {
   return call(`${owner}.getInstanceCount`, () => worldGraph().instanceCount(ogId));
 }

@@ -48,7 +48,7 @@ It is the geometry engine layer, not a full CAD application. Floorkit is a downs
 | **Assemblies** | Assemblies with parent and child placement; translate, rotate, scale and place; independent copies and shared instances. |
 | **History** | Marks with rollback and release; transactions, with a dry-run option. |
 | **Display for Three.js** | Every body is a `THREE.Group`. Level of detail that follows the camera, tessellation in a web worker or inline, picking down to face and edge, outlines, colour and opacity. |
-| **Queries** | Bounds, placements, the B-rep of a body, and the report of its last boolean. |
+| **Queries** | Bounds, placements, the B-rep of a body, that B-rep placed in the world, the normal of a face at a point, and the report of its last boolean. |
 | **Export** | STEP, in millimetres or metres, with Y or Z up, together with an export report. |
 
 Not in 2.5, though 2.0 had them: IFC and STL export; projection; offset; loft; triangulation as a public call; arcs, curves, spheres and wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
@@ -174,7 +174,7 @@ This section is a compact reference for writing OpenGeometry 2.5 code, by hand o
 | Edits | `body.rebuild(kind, params, { instances? })` with the kinds and parameters above; a wire stays a wire and a solid a solid. |
 | Copies | `body.duplicate({ ogId?, parent? })` makes an independent copy; `body.instance({ ogId?, parent? })` shares the shape. `getInstanceCount()`, `makeUnique()`. |
 | `SystemAssembly` | `new SystemAssembly({ ogId?, parent? })`. `addChild(children, { keepWorld? })`, `removeChild(child, { keepWorld? })`, `getChildren()`, `getParent()`, `getBounds()`, `transform`, `dispose()`. Bodies have the same tree methods. |
-| Queries | `getBounds()` (`[minX, minY, minZ, maxX, maxY, maxZ]`, or `null`), `getBrep()`, `solid.getReport()` (the last boolean's report, or `null`). |
+| Queries | `getBounds()` (`[minX, minY, minZ, maxX, maxY, maxZ]`, or `null`), `getBrep()`, `getWorldBrep()` (the BRep placed in the world), `faceNormalAt(faceId, [x, y, z])` (the face's unit normal in the body's own coordinates), `solid.getReport()` (the last boolean's report, or `null`). |
 | Appearance | `appearance` in the options, or `body.setAppearance({ color?, opacity?, outline?, pickOutline?, deflection? })`. |
 | Display | `OpenGeometry.settled({ deflection? })` resolves to `{ failed }`; `OpenGeometry.flush({ geometry?: 'sync' })`; `OpenGeometry.setDisplayDeflection(world?)`; `OpenGeometry.setCameraMotion(moving)`. |
 | Picking | `OpenGeometry.resolveHit(intersection)` takes a Three.js raycast hit and returns `{ ogId, shapeRevision, faceId?, edgeId? }` or `undefined`. |

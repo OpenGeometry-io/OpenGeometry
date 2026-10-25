@@ -21,8 +21,8 @@ import { derivePose, keepPose, poseMemory } from './body-placement';
 import { register, unregister } from './body-registry';
 import { DisplayClone } from './display-clone';
 import {
-  addChild, checkNode, getBounds, getBrep, getChildren, getInstanceCount, getParent, getPlacement, getWorldPlacement,
-  localBounds, removeChild,
+  addChild, checkNode, faceNormalAt, getBounds, getBrep, getChildren, getInstanceCount, getParent, getPlacement,
+  getWorldBrep, getWorldPlacement, localBounds, removeChild,
 } from './node-methods';
 import type { SystemAssembly } from './system-assembly';
 
@@ -181,6 +181,13 @@ export abstract class Body extends THREE.Group {
   }
 
   getBrep(): Brep { this.check(`${this.bodyType}.getBrep`); return getBrep(this.bodyType, this.ogId); }
+
+  getWorldBrep(): Brep { this.check(`${this.bodyType}.getWorldBrep`); return getWorldBrep(this.bodyType, this.ogId); }
+
+  faceNormalAt(faceId: number, point: [number, number, number]): [number, number, number] {
+    this.check(`${this.bodyType}.faceNormalAt`);
+    return faceNormalAt(this.bodyType, this.ogId, faceId, point);
+  }
 
   getInstanceCount(): number {
     this.check(`${this.bodyType}.getInstanceCount`);

@@ -2,6 +2,7 @@ use super::{serialise, OGWorldGraph};
 use crate::bindings::errors;
 use crate::bindings::tessellator::buffers_to_js;
 use crate::tessellation::display::{bucket_floor, static_bucket};
+use crate::world_graph::{ErrorCode, GraphError};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -17,6 +18,40 @@ impl OGWorldGraph {
             .map_err(errors::json)?
             .to_json()
             .map_err(|error| errors::json(error.into()))
+    }
+
+    #[wasm_bindgen(js_name = worldBrep)]
+    pub fn world_brep(&self, og_id: &str) -> Result<String, JsValue> {
+        self.inner
+            .placed_brep(og_id)
+            .map_err(errors::json)?
+            .to_json()
+            .map_err(|error| errors::json(error.into()))
+    }
+
+    #[wasm_bindgen(js_name = faceNormalAt)]
+    pub fn face_normal_at(
+        &self,
+        og_id: &str,
+        face_id: u32,
+        point: &[f64],
+    ) -> Result<Vec<f64>, JsValue> {
+        self.inner.node(og_id).map_err(errors::json)?;
+        let point: [f64; 3] = point
+            .try_into()
+            .ok()
+            .filter(|point: &[f64; 3]| point.iter().all(|value| value.is_finite()))
+            .ok_or_else(|| {
+                errors::json(GraphError::code(
+                    ErrorCode::InvalidParameter,
+                    "point must be three finite numbers",
+                ))
+            })?;
+        Ok(self
+            .inner
+            .face_normal_at(og_id, face_id, point)
+            .map_err(errors::json)?
+            .to_vec())
     }
 
     pub fn report(&self, og_id: &str) -> Result<String, JsValue> {

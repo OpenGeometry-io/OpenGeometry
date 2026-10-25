@@ -20,6 +20,8 @@ It is written for people and for coding assistants alike: each section says what
 - `OG_PRIMITIVE_ARC` makes a partial arc wire: `{ radius, startAngle, sweepAngle }`, angles in radians, centred on the `plane` origin.
 - `OG_OPERATION_EXTRUDE` takes a closed Profile as the profile or as a hole, so the 2.0 arc-edged extrusion is an extrude again.
 - `OG_PRIMITIVE_PARAMS_PROFILE` and `OG_PRIMITIVE_PARAMS_ARC` type their parameters. The entry exports the types `ProfileParams`, `ProfileSegment`, `ProfileArc` and `ArcParams`.
+- `body.getWorldBrep()` reads a body's BRep placed in the world. It makes no body and changes nothing.
+- `body.faceNormalAt(faceId, point)` returns the unit normal of a face at a point, in the body's own coordinates, with the face's orientation applied.
 
 ### Before and after
 
@@ -73,6 +75,37 @@ const arc = new Wire(OG_PRIMITIVE_ARC, OG_PRIMITIVE_PARAMS_ARC({ radius: 2, star
 
 Both make the same quarter ring sector, 3 m high, and the same quarter arc.
 
+2.0:
+
+```js
+import { AnalyticSolid, Vector3 } from 'opengeometry';
+const world = AnalyticSolid.fromBrep(solid.getWorldBrepSerialized());
+const normal = solid.normalAtFace(faceId, new Vector3(0, 0, 0));
+```
+
+Unreleased:
+
+```ts
+import * as THREE from 'three';
+import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, OG_TRANSFORM_ROTATE } from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const solid = new Solid(OG_PRIMITIVE_CUBOID, { width: 2, height: 2, depth: 2 });
+solid.transform(OG_TRANSFORM_ROTATE, { axis: [0, 0, 1], degrees: 30 });
+OpenGeometry.flush();
+
+const world = solid.getWorldBrep();
+const bottom = solid.getBrep().topology.faces.find((face) => face.key === 'bottom');
+if (bottom) {
+  const local = solid.faceNormalAt(bottom.id, [0, 0, 0]);
+  const worldNormal = new THREE.Vector3(...local).transformDirection(solid.matrixWorld);
+  console.log(world.topology.vertices.length, local, worldNormal.toArray());
+}
+```
+
+Both read the box's world vertices without making a body. The Unreleased normal is `[0, -1, 0]` in the box's own coordinates; `worldNormal` is that normal turned by the box's 30 degree rotation, about `[0.5, -0.866, 0]`. `OpenGeometry.flush()` brings `matrixWorld` up to date with the transform.
+
 ### Replace this with that
 
 | 2.0 | Unreleased |
@@ -82,17 +115,25 @@ Both make the same quarter ring sector, 3 m high, and the same quarter arc.
 | `{ kind: 'arc', center, radius, startAngle, sweepAngle }` | `{ to: its end point, arc: { center, counterClockwise: sweepAngle > 0 } }` |
 | `frame` `{ origin, x, y, z }` | `plane` `{ origin, normal: z, xDirection: x }` |
 | `new Arc({ center, radius, startAngle, sweepAngle })` | `new Wire(OG_PRIMITIVE_ARC, { radius, startAngle, sweepAngle }, { plane: { origin: [center.x, center.y, center.z] } })` |
+| `AnalyticSolid.fromBrep(solid.getWorldBrepSerialized())`, to read a world copy | `body.getWorldBrep()`, which returns the BRep object and makes no body; for a copy you will change, `body.duplicate()` |
+| `solid.normalAtFace(faceId, new Vector3(x, y, z))` | `body.faceNormalAt(faceId, [x, y, z])`, which returns `[x, y, z]` |
 
 ### Different behaviour
 
 - A hole that encloses the whole profile throws `OGError` `InvalidParameter`. It used to fail as `InvalidGeometry`.
 - A circular hole away from the profile centre now extrudes. 2.0 refused some of these.
 - A Profile refuses repeated points, arcs whose end is not on their circle, self-crossing segments and a closed profile that does not end at its start, with `InvalidParameter`. An Arc refuses a zero sweep and a full turn; use `OG_PRIMITIVE_CIRCLE` for a full circle.
+- `faceNormalAt` takes and returns the body's own coordinates, those of `getBrep()`. 2.0 code that read the normal from a world copy got a world normal; now turn the result into the world yourself, for example with `transformDirection(body.matrixWorld)` after `OpenGeometry.flush()`. Do not pass a point read from `getWorldBrep()`.
+- `getWorldBrep()` places the BRep by the kernel's world placement, not by a Three.js parent. Its `id` and `revision` equal those of `getBrep()`; the 2.0 copy had the revision plus one. A scaled body's tolerances and accuracy are scaled too. An unmoved body returns exactly the `getBrep()` result.
+- `getWorldBrep()` throws `LimitExceeded` for a body placed so far from the origin that its coordinates lose precision, as 2.0 did; `getBrep()` still works.
+- `faceNormalAt` throws `InvalidParameter` for a face id that is not an unsigned integer or not a face of the body, and for a point that is not three finite numbers. A point on a cylinder axis, a cone apex or a sphere centre throws `InvalidGeometry`. A point off the face is projected onto it, as in 2.0.
 
 ### Check your result
 
 1. `profile.getBrep()` has one edge per segment, and the extruded solid has one cylindrical face per arc.
 2. The `text` of `await OpenGeometry.exportStep({ nodes: [sector] })` has one `CYLINDRICAL_SURFACE` per arc.
+3. For an unmoved body, `getWorldBrep()` equals `getBrep()`; for a moved one its vertices are the `getBrep()` vertices moved by `matrixWorld`.
+4. Each `faceNormalAt` result has length 1 and points out of the body in its own coordinates.
 
 ## 2.0 to 2.5
 
