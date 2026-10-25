@@ -68,7 +68,7 @@ pub(crate) fn subtract_layered_extrusions(
     }
     let levels = layer_levels(&host_positions, host_lo, b_lo, b_hi, host_height, accuracy);
     let layers = layer_regions(host, frame, &levels, &b_contours, b_lo, b_hi, accuracy)?;
-    let boundaries = layer_boundaries(&layers, accuracy);
+    let boundaries = layer_boundaries(&layers, accuracy)?;
     let mut facets = PlanarFacets::new(id, accuracy)?;
     cap(
         &mut facets,

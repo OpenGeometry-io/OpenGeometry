@@ -85,7 +85,7 @@ pub(crate) fn boolean_planar_extrusions(
         &b_contours,
         planar_operation,
         accuracy.intersection,
-    );
+    )?;
     let out = region_solid(&a, &b, &regions, operation, id, accuracy)?;
     finish_analytic_result(out, a.brep, b.brep, true, operation, false)
 }

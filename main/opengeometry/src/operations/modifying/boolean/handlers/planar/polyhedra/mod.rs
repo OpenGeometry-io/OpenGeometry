@@ -35,7 +35,7 @@ pub(crate) fn subtract_planar_polyhedra(
         let mut base = vec![local_ring(&face.polygon, face.frame)];
         base.extend(face.holes.iter().map(|ring| local_ring(ring, face.frame)));
         let regions = if let Some(convex_faces) = &convex_cutter_faces {
-            convex_host_regions(cutter, convex_faces, face, &base, accuracy)
+            convex_host_regions(cutter, convex_faces, face, &base, accuracy)?
         } else {
             classified_host_regions(cutter, &cutter_faces, face, &base, accuracy)?
         };
@@ -116,19 +116,19 @@ fn convex_host_regions(
     face: &PlanarFace,
     base: &[Vec<Pt2>],
     accuracy: Accuracy,
-) -> Vec<RingRegion> {
+) -> Result<Vec<RingRegion>, GeometryError> {
     let section = convex_section_polygon(cutter, convex_faces, face.frame, accuracy.intersection);
     let cut = if section.is_empty() {
         Vec::new()
     } else {
         vec![section]
     };
-    boolean_oriented_regions(
+    Ok(boolean_oriented_regions(
         base,
         &cut,
         PlanarBooleanOp::Subtraction,
         accuracy.intersection,
-    )
+    )?)
 }
 
 fn classified_host_regions(
@@ -189,7 +189,7 @@ fn classified_host_regions(
     if let Some(error) = failure.into_inner() {
         return Err(error);
     }
-    Ok(regions)
+    Ok(regions?)
 }
 
 fn coplanar_rings(faces: &[PlanarFace], face: &PlanarFace, accuracy: Accuracy) -> Vec<Vec<Pt2>> {
@@ -282,7 +282,7 @@ fn cutter_face_regions(
     if let Some(error) = failure.into_inner() {
         return Err(error);
     }
-    Ok(regions)
+    Ok(regions?)
 }
 
 fn cutter_piece(

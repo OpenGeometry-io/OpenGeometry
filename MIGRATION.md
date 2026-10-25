@@ -199,6 +199,7 @@ Both make the same open duct, 0.7 m by 0.4 m, along an L-shaped path: eight side
 - Sheets get their own default ids, `sheet-1`, `sheet-2` and so on, and show their outline by default.
 - A polyhedron refuses, with `InvalidParameter`, non-finite or coincident points (closer than four times the geometric tolerance), points no face uses, bad or repeated indices in a ring, and a face whose points are off its plane by more than the geometric tolerance. It refuses, with `InvalidTopology`, an edge not used by exactly two faces in opposite directions (an open shell or a T-junction), a vertex where the faces do not form one fan, faces that form more than one shell, and inward winding. 2.0 accepted inward winding, unused points and coincident points. A shell that encloses no volume, such as a flat one that folds over itself, is also refused with `InvalidTopology`.
 - A polyhedron does not check whether faces cross each other, or whether a ring touches itself at a vertex; build such shapes from separate solids.
+- A planar Boolean whose 2D outline cannot close, or that leaves a hole outside every region, throws `OGError` `InvalidTopology`, as 2.0.18 does. 2.0.17 and earlier returned a body.
 
 ### Check your result
 

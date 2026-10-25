@@ -1,6 +1,8 @@
 mod boolean2d;
 mod curved_boolean2d;
 mod poly2d;
+#[cfg(test)]
+mod tests;
 pub(super) use boolean2d::{
     boolean_oriented_regions, regions_from_edges_by, PlanarBooleanOp, RingRegion,
 };

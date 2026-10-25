@@ -48,7 +48,7 @@ pub(super) fn layer_regions(
                 },
                 PlanarBooleanOp::Subtraction,
                 accuracy.intersection,
-            ))
+            )?)
         })
         .collect::<Result<Vec<_>, _>>()
 }
@@ -66,7 +66,7 @@ fn slice_regions(
         &[],
         PlanarBooleanOp::Union,
         tolerance,
-    ))
+    )?)
 }
 
 fn slice_segments(
@@ -171,7 +171,10 @@ fn region_contours(regions: &[RingRegion]) -> Vec<Vec<Pt2>> {
         .collect()
 }
 
-pub(super) fn layer_boundaries(layers: &[Vec<RingRegion>], accuracy: Accuracy) -> LayerBoundaries {
+pub(super) fn layer_boundaries(
+    layers: &[Vec<RingRegion>],
+    accuracy: Accuracy,
+) -> Result<LayerBoundaries, GeometryError> {
     let mut exposed_up = Vec::new();
     let mut exposed_down = Vec::new();
     for index in 1..layers.len() {
@@ -182,13 +185,13 @@ pub(super) fn layer_boundaries(layers: &[Vec<RingRegion>], accuracy: Accuracy) -
             &above,
             PlanarBooleanOp::Subtraction,
             accuracy.intersection,
-        ));
+        )?);
         exposed_down.push(boolean_oriented_regions(
             &above,
             &below,
             PlanarBooleanOp::Subtraction,
             accuracy.intersection,
-        ));
+        )?);
     }
     let mut vertices = Vec::new();
     for layer in layers {
@@ -197,11 +200,11 @@ pub(super) fn layer_boundaries(layers: &[Vec<RingRegion>], accuracy: Accuracy) -
     for regions in exposed_up.iter().chain(&exposed_down) {
         region_points(regions, &mut vertices);
     }
-    LayerBoundaries {
+    Ok(LayerBoundaries {
         exposed_up,
         exposed_down,
         vertices,
-    }
+    })
 }
 
 fn region_points(regions: &[RingRegion], out: &mut Vec<Pt2>) {
