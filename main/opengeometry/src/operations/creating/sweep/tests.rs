@@ -1,4 +1,4 @@
-use super::build;
+use super::{build, SweepPath};
 use crate::brep::{
     coarse_accuracy, BrepEnvelope, CurveGeometry, Edge, EdgeGeometry, PcurveGeometry,
     SurfaceGeometry, GROUND,
@@ -21,7 +21,10 @@ fn circular_sweep(radius: f64, path: &[Point3]) -> BrepEnvelope {
             frame: GROUND,
             radius,
         },
-        path.to_vec(),
+        SweepPath {
+            points: path.to_vec(),
+            bends: vec![None; path.len() - 1],
+        },
         true,
         coarse_accuracy(1e-6),
     )

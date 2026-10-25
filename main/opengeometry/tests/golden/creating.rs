@@ -3,15 +3,25 @@ use crate::graph_case::{
     polyline, primitive, profile, rectangle, ring_segments, segment, sweep,
 };
 use crate::graph_record::{changes, created, node_state};
-use crate::kernel::{CreatingOperation, EditScope, Point3, Primitive, Transform, WorldGraph};
+use crate::kernel::{
+    CreateOptions, CreatingOperation, EditScope, Point3, Primitive, Transform, WorldGraph,
+};
 use crate::record::{Failure, Record};
 use crate::runner::Case;
+use opengeometry::primitives::ProfileSegment;
+use std::f64::consts::{FRAC_PI_2, PI};
 
 type Profiles = fn() -> Vec<(&'static str, Primitive)>;
 
 type Extrusion = (&'static str, Profiles, &'static [&'static str], f64);
 
 type Sweep = (&'static str, fn() -> Primitive, &'static [Point3]);
+
+type Elbow = (
+    &'static str,
+    fn() -> (Primitive, CreateOptions),
+    fn() -> Primitive,
+);
 
 const L_PATH: [Point3; 3] = [[0.0, 0.0, 0.0], [0.0, 3.0, 0.0], [3.0, 3.0, 0.0]];
 
@@ -58,6 +68,98 @@ fn swept(entry: &Sweep) -> Case {
         solid(record, graph, sweep("profile", "path"))
     })
 }
+
+fn bent(entry: &Elbow) -> Case {
+    let (name, profile, path) = *entry;
+    graph_case(&format!("creating.sweep.{name}"), move |graph, record| {
+        let (shape, options) = profile();
+        primitive(record, graph, shape, options);
+        primitive(record, graph, path(), create_options("path"));
+        solid(record, graph, sweep("profile", "path"))
+    })
+}
+
+fn arc_path(radius: f64, sweep_angle: f64) -> Primitive {
+    Primitive::Arc {
+        radius,
+        start_angle: 0.0,
+        sweep_angle,
+    }
+}
+
+fn at_arc_start(radius: f64) -> CreateOptions {
+    on_plane(
+        create_options("profile"),
+        [radius, 0.0, 0.0],
+        [0.0, 0.0, -1.0],
+        [1.0, 0.0, 0.0],
+    )
+}
+
+fn duct_at_arc() -> (Primitive, CreateOptions) {
+    (rectangle(0.4, 0.25), at_arc_start(0.6))
+}
+
+fn pipe_at_arc() -> (Primitive, CreateOptions) {
+    (circle(0.1), at_arc_start(0.3))
+}
+
+fn tight_pipe() -> (Primitive, CreateOptions) {
+    (circle(0.1), at_arc_start(0.1))
+}
+
+fn trapezoid_at_arc() -> (Primitive, CreateOptions) {
+    let points = [
+        [0.4, -0.1, 0.0],
+        [0.5, 0.1, 0.0],
+        [0.7, 0.1, 0.0],
+        [0.8, -0.1, 0.0],
+    ];
+    (polyline(&points, true), create_options("profile"))
+}
+
+fn duct_at_origin() -> (Primitive, CreateOptions) {
+    let options = on_plane(
+        create_options("profile"),
+        [0.0; 3],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+    );
+    (rectangle(0.4, 0.25), options)
+}
+
+fn open_path(segments: Vec<ProfileSegment>) -> Primitive {
+    Primitive::Profile {
+        start: [0.0, 0.0],
+        segments,
+        closed: false,
+    }
+}
+
+fn line_arc_line() -> Primitive {
+    open_path(vec![
+        segment([2.0, 0.0], None),
+        segment([2.6, 0.6], Some(([2.0, 0.6], true))),
+        segment([2.6, 2.6], None),
+    ])
+}
+
+fn corner_at_arc() -> Primitive {
+    open_path(vec![
+        segment([2.0, 0.0], None),
+        segment([2.6, -0.6], Some(([2.6, 0.0], true))),
+    ])
+}
+
+const ELBOWS: [Elbow; 7] = [
+    ("duct-elbow", duct_at_arc, || arc_path(0.6, FRAC_PI_2)),
+    ("pipe-elbow-torus", pipe_at_arc, || arc_path(0.3, FRAC_PI_2)),
+    ("cone-elbow", trapezoid_at_arc, || arc_path(0.6, FRAC_PI_2)),
+    ("line-arc-line", duct_at_origin, line_arc_line),
+    ("arc-split", pipe_at_arc, || arc_path(0.3, 1.5 * PI)),
+    ("arc-corner-refused", duct_at_origin, corner_at_arc),
+    ("bend-too-tight", tight_pipe, || arc_path(0.1, FRAC_PI_2)),
+];
 
 fn rectangle_profile() -> Vec<(&'static str, Primitive)> {
     vec![("profile", rectangle(2.0, 3.0))]
@@ -452,6 +554,7 @@ pub(crate) fn cases() -> Vec<Case> {
     let mut cases = EXTRUSIONS.iter().map(extruded).collect::<Vec<_>>();
     cases.extend(SWEEPS.iter().map(swept));
     cases.extend(OPEN_SWEEPS.iter().map(open_ended));
+    cases.extend(ELBOWS.iter().map(bent));
     cases.extend([
         graph_case("creating.extrude.offset-circle-hole", offset_hole),
         graph_case("creating.extrude.far-parent", far_parent),

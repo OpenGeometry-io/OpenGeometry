@@ -9,7 +9,10 @@ fn circular_sweep_midpoints_reuse_boundary_points_for_bitwise_watertight_seams()
         frame: GROUND,
         radius: 0.5,
     };
-    let path = vec![[0.0, 0.0, 0.0], [0.0, 3.0, 0.0], [3.0, 3.0, 0.0]];
+    let path = sweep::SweepPath {
+        points: vec![[0.0, 0.0, 0.0], [0.0, 3.0, 0.0], [3.0, 3.0, 0.0]],
+        bends: vec![None; 2],
+    };
     let body = sweep::build("solid".into(), profile, path, true, coarse_accuracy(1e-6)).unwrap();
     let mesh = tessellate(&body, 0.02, 1_000_000).unwrap();
     let bits = |index: u32| -> Vec<u64> {

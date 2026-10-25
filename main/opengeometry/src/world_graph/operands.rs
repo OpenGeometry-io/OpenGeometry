@@ -1,14 +1,15 @@
 use super::error::{ErrorCode, GraphError};
 use super::graph::WorldGraph;
 use crate::brep::{BrepEnvelope, CurveGeometry, EdgeGeometry, HalfEdge, Orientation, Similarity3};
-use crate::math::Point3;
+use crate::math::scale;
+use crate::operations::creating::sweep::{Bend, SweepPath};
 use crate::operations::creating::{mapped_frame, LoopArc, LoopEdge, ProfileLoop};
 
-pub(super) fn path_points(
+pub(super) fn sweep_path(
     graph: &WorldGraph,
     path: &str,
     target: &str,
-) -> Result<Vec<Point3>, GraphError> {
+) -> Result<SweepPath, GraphError> {
     let mapping = graph.relative_placement(path, target)?;
     if mapping.scale.to_bits() != 1.0f64.to_bits() {
         return Err(GraphError::code(
@@ -28,42 +29,60 @@ pub(super) fn path_points(
             "path must be one open wire",
         ));
     }
-    let mut result = Vec::new();
+    let mut result = SweepPath {
+        points: Vec::new(),
+        bends: Vec::new(),
+    };
     let mut cursor = wire.start_halfedge;
     for _ in 0..brep.topology.halfedges.len() {
         let halfedge = &brep.topology.halfedges[cursor as usize];
-        let edge = &brep.topology.edges[halfedge.edge as usize];
-        let EdgeGeometry::Curve { curve, .. } = edge.geometry else {
-            return Err(GraphError::code(
-                ErrorCode::InvalidParameter,
-                "path has a collapsed edge",
-            ));
-        };
-        if !matches!(
-            brep.geometry.curves[curve as usize],
-            CurveGeometry::Line { .. }
-        ) {
-            return Err(GraphError::code(
-                ErrorCode::InvalidParameter,
-                "path has a curved edge",
-            ));
-        }
-        result.push(mapping.apply_point(brep.topology.vertices[halfedge.from as usize].position));
+        result.bends.push(path_bend(&brep, halfedge, mapping)?);
+        result
+            .points
+            .push(mapping.apply_point(brep.topology.vertices[halfedge.from as usize].position));
         if halfedge.next.is_none() {
-            result.push(mapping.apply_point(brep.topology.vertices[halfedge.to as usize].position));
+            result
+                .points
+                .push(mapping.apply_point(brep.topology.vertices[halfedge.to as usize].position));
             break;
         }
         cursor = halfedge.next.ok_or_else(|| {
             GraphError::code(ErrorCode::InvalidTopology, "path ends unexpectedly")
         })?;
     }
-    if result.len() < 2 {
+    if result.points.len() < 2 {
         return Err(GraphError::code(
             ErrorCode::InvalidParameter,
             "path is too short",
         ));
     }
     Ok(result)
+}
+
+fn path_bend(
+    brep: &BrepEnvelope,
+    halfedge: &HalfEdge,
+    mapping: Similarity3,
+) -> Result<Option<Bend>, GraphError> {
+    let EdgeGeometry::Curve { curve, range } = brep.topology.edges[halfedge.edge as usize].geometry
+    else {
+        return Err(invalid("path has a collapsed edge"));
+    };
+    match brep.geometry.curves[curve as usize] {
+        CurveGeometry::Line { .. } => Ok(None),
+        CurveGeometry::Circle { frame, .. } => {
+            let turn = match halfedge.geometry_use.sense {
+                Orientation::Forward => 1.0,
+                Orientation::Reverse => -1.0,
+            };
+            Ok(Some(Bend {
+                centre: mapping.apply_point(frame.origin),
+                axis: scale(mapping.apply_vector(frame.z), turn),
+                angle: range.hi - range.lo,
+            }))
+        }
+        _ => Err(invalid("path has a curved edge")),
+    }
 }
 
 pub(super) fn profile_loop(

@@ -26,6 +26,7 @@ It is written for people and for coding assistants alike: each section says what
 - `body.faceNormalAt(faceId, point)` returns the unit normal of a face at a point, in the body's own coordinates, with the face's orientation applied.
 - `OG_OPERATION_SWEEP` takes `caps`. It is `true` when left out, so existing sweeps are unchanged. `caps: false` leaves both ends open.
 - `Sheet` is a new body class beside `Wire` and `Solid`, with the body type `'Sheet'`: faces that enclose no volume. `new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false })` makes an open-ended sweep. A Sheet shows its surface, from the front only, and its outline.
+- `OG_OPERATION_SWEEP` takes a path with arcs: an `OG_PRIMITIVE_ARC` wire, or an open `OG_PRIMITIVE_PROFILE` with arc segments. Each arc sweeps into an exact bend. A circle profile gives torus faces; a polygon profile gives planes, cylinders and cones. A 2.0 elbow swept along many short straight segments becomes one arc.
 
 ### Before and after
 
@@ -166,6 +167,55 @@ console.log(duct.bodyType, duct.getBrep().topology.faces.length);
 
 Both make the same open duct, 0.7 m by 0.4 m, along an L-shaped path: eight side faces and no end faces. The Unreleased line prints `Sheet 8`.
 
+2.0:
+
+```js
+import { Sweep, Vector3 } from 'opengeometry';
+const steps = [0, 1, 2, 3, 4, 5, 6, 7, 8].map((step) => (step * Math.PI) / 16);
+const elbow = new Sweep({
+  path: steps.map((angle) => new Vector3(0.6 * Math.cos(angle), 0, -0.6 * Math.sin(angle))),
+  profile: [new Vector3(0.4, -0.125, 0), new Vector3(0.8, -0.125, 0), new Vector3(0.8, 0.125, 0), new Vector3(0.4, 0.125, 0)],
+});
+```
+
+Unreleased:
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_SWEEP,
+  OG_PRIMITIVE_ARC,
+  OG_PRIMITIVE_CIRCLE,
+  OG_PRIMITIVE_PARAMS_ARC,
+  OG_PRIMITIVE_RECTANGLE,
+} from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const ductPath = new Wire(OG_PRIMITIVE_ARC, OG_PRIMITIVE_PARAMS_ARC({ radius: 0.6, startAngle: 0, sweepAngle: Math.PI / 2 }));
+const ductProfile = new Wire(
+  OG_PRIMITIVE_RECTANGLE,
+  { width: 0.4, breadth: 0.25 },
+  { plane: { origin: [0.6, 0, 0], normal: [0, 0, -1], xDirection: [1, 0, 0] } },
+);
+const duct = new Solid(OG_OPERATION_SWEEP, { profile: ductProfile, path: ductPath });
+
+const pipePath = new Wire(OG_PRIMITIVE_ARC, OG_PRIMITIVE_PARAMS_ARC({ radius: 0.3, startAngle: 0, sweepAngle: Math.PI / 2 }));
+const pipeProfile = new Wire(
+  OG_PRIMITIVE_CIRCLE,
+  { radius: 0.1 },
+  { plane: { origin: [0.3, 0, 0], normal: [0, 0, -1], xDirection: [1, 0, 0] } },
+);
+const pipe = new Solid(OG_OPERATION_SWEEP, { profile: pipeProfile, path: pipePath });
+
+const { report } = await OpenGeometry.exportStep({ nodes: [duct, pipe] });
+console.log(duct.getBrep().topology.faces.length, pipe.getBrep().topology.faces.length, report.pcurvelessEdges);
+```
+
+Both follow a quarter turn at a bend radius of 0.6 m, one and a half times the 0.4 m duct width. 2.0 can only follow the arc with straight pieces, here eight. Unreleased makes one exact bend with two cylindrical walls and prints `6 4 0`; the pipe elbow has two torus faces.
+
 ### Replace this with that
 
 | 2.0 | Unreleased |
@@ -181,6 +231,7 @@ Both make the same open duct, 0.7 m by 0.4 m, along an L-shaped path: eight side
 | `solid.normalAtFace(faceId, new Vector3(x, y, z))` | `body.faceNormalAt(faceId, [x, y, z])`, which returns `[x, y, z]` |
 | `new Sweep({ path, profile, capStart: false, capEnd: false })` | `new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false })`, with the profile and path as wires (see the 2.0 to 2.5 sweep rows) |
 | `new Sweep({ path, profile, capStart: true, capEnd: true })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })` |
+| `new Sweep({ path: points along an arc, profile })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })` with `path` an `OG_PRIMITIVE_ARC` wire, or an open `OG_PRIMITIVE_PROFILE` whose arc segments meet its lines tangentially |
 
 ### Different behaviour
 
@@ -200,6 +251,10 @@ Both make the same open duct, 0.7 m by 0.4 m, along an L-shaped path: eight side
 - A polyhedron refuses, with `InvalidParameter`, non-finite or coincident points (closer than four times the geometric tolerance), points no face uses, bad or repeated indices in a ring, and a face whose points are off its plane by more than the geometric tolerance. It refuses, with `InvalidTopology`, an edge not used by exactly two faces in opposite directions (an open shell or a T-junction), a vertex where the faces do not form one fan, faces that form more than one shell, and inward winding. 2.0 accepted inward winding, unused points and coincident points. A shell that encloses no volume, such as a flat one that folds over itself, is also refused with `InvalidTopology`.
 - A polyhedron does not check whether faces cross each other, or whether a ring touches itself at a vertex; build such shapes from separate solids.
 - A planar Boolean whose 2D outline cannot close, or that leaves a hole outside every region, throws `OGError` `InvalidTopology`, as 2.0.18 does. 2.0.17 and earlier returned a body.
+- An arc in a sweep path must meet its neighbours tangentially, within 1e-9 radians. A corner at an arc throws `InvalidParameter`; a corner between two lines is still mitred.
+- Each bend radius must exceed the profile's reach from the path start, the largest distance from the start to the profile, by four geometric tolerances. A tighter bend throws `SweepSelfIntersection`.
+- An arc above half a turn sweeps as equal bends of at most half a turn each, and each bend has its own `seg-` face keys.
+- The overlap rule is unchanged: two path segments that are not neighbours must stay more than twice the reach apart. A tight line, bend, line path can still throw `SweepSelfIntersection` although the bend keeps its two lines apart.
 
 ### Check your result
 
@@ -208,6 +263,7 @@ Both make the same open duct, 0.7 m by 0.4 m, along an L-shaped path: eight side
 3. For an unmoved body, `getWorldBrep()` equals `getBrep()`; for a moved one its vertices are the `getBrep()` vertices moved by `matrixWorld`.
 4. Each `faceNormalAt` result has length 1 and points out of the body in its own coordinates.
 5. An open-ended sweep's `getBrep()` has no faces whose `key` starts with `cap-`, and `solids` is empty.
+6. A duct elbow along one arc has six faces, two of them `Cylinder`; a pipe elbow has two `Torus` faces. Its STEP report has `pcurvelessEdges` 0.
 
 ## 2.0 to 2.5
 

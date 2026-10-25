@@ -1,3 +1,5 @@
+use super::bend::{add_torus_bend, BendFrame, CircleBend, CircleEnds};
+use super::path::Course;
 use crate::brep::{
     boundary, plane_boundary, unit, uv_line, Accuracy, Builder, CurveGeometry, EdgeGeometry,
     Frame3, GeometryError, Orientation, PcurveGeometry, SurfaceGeometry, Use,
@@ -12,6 +14,7 @@ struct Ring {
     minor: f64,
     vertices: [u32; 2],
     edges: [u32; 2],
+    perpendicular: bool,
 }
 
 struct SweptRings {
@@ -31,42 +34,32 @@ pub(super) fn build(
     id: String,
     profile: Frame3,
     radius: f64,
-    path: Vec<Point3>,
-    directions: Vec<Point3>,
+    course: &Course,
     caps: bool,
     accuracy: Accuracy,
 ) -> Result<Builder, OperationError> {
     let mut builder = Builder::new(id, accuracy)?;
-    let first_axis = directions[0];
+    let first_axis = course.starts[0];
     let SweptRings {
         mut rings,
         cylinders,
         x,
         offset,
-    } = add_rings(
-        &mut builder,
-        profile,
-        radius,
-        &path,
-        &directions,
-        first_axis,
-    )?;
-    let last = directions.len();
-    let end_centre = add(path[last], offset);
-    rings.push(ring(
+    } = add_rings(&mut builder, profile, radius, course)?;
+    let last = course.bends.len();
+    let end_centre = add(course.points[last], offset);
+    rings.push(section(
         &mut builder,
         end_centre,
-        directions[last - 1],
-        scale(x, radius),
+        course.ends[last - 1],
         x,
         radius,
-        radius,
     )?);
-    check_miter_planes(&rings, &cylinders, &directions, radius, last, accuracy)?;
-    let seams = add_seams(&mut builder, &rings, last)?;
+    check_miter_planes(&rings, &cylinders, course, radius, accuracy)?;
+    let seams = add_seams(&mut builder, &rings, course)?;
     if caps {
         let start_frame = Frame3::from_axis(rings[0].centre, scale(first_axis, -1.0), profile.x)?;
-        let end_frame = Frame3::from_axis(rings[last].centre, directions[last - 1], x)?;
+        let end_frame = Frame3::from_axis(rings[last].centre, course.ends[last - 1], x)?;
         add_caps(
             &mut builder,
             &rings,
@@ -82,7 +75,7 @@ pub(super) fn build(
         &rings,
         &cylinders,
         &seams,
-        last,
+        course,
         radius,
         accuracy,
     )?;
@@ -93,27 +86,26 @@ fn add_rings(
     builder: &mut Builder,
     profile: Frame3,
     radius: f64,
-    path: &[Point3],
-    directions: &[Point3],
-    first_axis: Point3,
+    course: &Course,
 ) -> Result<SweptRings, OperationError> {
+    let (path, first_axis) = (&course.points, course.starts[0]);
     let mut x = profile.x;
     let mut offset = sub(profile.origin, path[0]);
     let mut rings = Vec::with_capacity(path.len());
-    rings.push(ring(
-        builder,
-        profile.origin,
-        first_axis,
-        scale(x, radius),
-        x,
-        radius,
-        radius,
-    )?);
-    let mut cylinders = Vec::with_capacity(directions.len());
+    rings.push(section(builder, profile.origin, first_axis, x, radius)?);
+    let mut cylinders = Vec::with_capacity(course.bends.len());
     cylinders.push(Frame3::from_axis(add(path[0], offset), first_axis, x)?);
     for joint in 1..path.len() - 1 {
-        let previous = directions[joint - 1];
-        let bisector = unit(add(previous, directions[joint]))
+        [offset, x] = turned(course, joint - 1, [offset, x]);
+        let next = course.starts[joint];
+        if course.bends[joint - 1].is_some() || course.bends[joint].is_some() {
+            let centre = add(path[joint], offset);
+            rings.push(section(builder, centre, next, x, radius)?);
+            cylinders.push(Frame3::from_axis(centre, next, x)?);
+            continue;
+        }
+        let previous = course.ends[joint - 1];
+        let bisector = unit(add(previous, next))
             .map_err(|_| OperationError::SweepSelfIntersection("sweep path reverses".into()))?;
         let denominator = dot(previous, bisector);
         let centre = add(
@@ -130,12 +122,9 @@ fn add_rings(
         )?);
         offset = reflection(offset, bisector);
         x = reflection(x, bisector);
-        cylinders.push(Frame3::from_axis(
-            add(path[joint], offset),
-            directions[joint],
-            x,
-        )?);
+        cylinders.push(Frame3::from_axis(add(path[joint], offset), next, x)?);
     }
+    [offset, x] = turned(course, path.len() - 2, [offset, x]);
     Ok(SweptRings {
         rings,
         cylinders,
@@ -192,7 +181,29 @@ fn ring(
         minor,
         vertices,
         edges,
+        perpendicular: false,
     })
+}
+
+fn section(
+    builder: &mut Builder,
+    centre: Point3,
+    axis: Point3,
+    x: Point3,
+    radius: f64,
+) -> Result<Ring, OperationError> {
+    let ring = ring(builder, centre, axis, scale(x, radius), x, radius, radius)?;
+    Ok(Ring {
+        perpendicular: true,
+        ..ring
+    })
+}
+
+fn turned(course: &Course, segment: usize, vectors: [Point3; 2]) -> [Point3; 2] {
+    match course.bends[segment] {
+        Some(frame) => vectors.map(|vector| frame.rotated(vector)),
+        None => vectors,
+    }
 }
 
 fn reflection(vector: Point3, normal: Point3) -> Point3 {
@@ -202,13 +213,15 @@ fn reflection(vector: Point3, normal: Point3) -> Point3 {
 fn check_miter_planes(
     rings: &[Ring],
     cylinders: &[Frame3],
-    directions: &[Point3],
+    course: &Course,
     radius: f64,
-    last: usize,
     accuracy: Accuracy,
 ) -> Result<(), OperationError> {
-    for segment in 0..last {
-        let axis = directions[segment];
+    for segment in 0..course.bends.len() {
+        if course.bends[segment].is_some() {
+            continue;
+        }
+        let axis = course.starts[segment];
         let start = &rings[segment];
         let end = &rings[segment + 1];
         let start_denominator = dot(axis, start.frame.z);
@@ -233,11 +246,15 @@ fn check_miter_planes(
 fn add_seams(
     builder: &mut Builder,
     rings: &[Ring],
-    last: usize,
-) -> Result<Vec<[u32; 2]>, OperationError> {
-    let mut seams = Vec::with_capacity(last);
-    for segment in 0..last {
-        seams.push([
+    course: &Course,
+) -> Result<Vec<Option<[u32; 2]>>, OperationError> {
+    let mut seams = Vec::with_capacity(course.bends.len());
+    for segment in 0..course.bends.len() {
+        if course.bends[segment].is_some() {
+            seams.push(None);
+            continue;
+        }
+        seams.push(Some([
             line_edge(
                 builder,
                 rings[segment].vertices[0],
@@ -248,7 +265,7 @@ fn add_seams(
                 rings[segment].vertices[1],
                 rings[segment + 1].vertices[1],
             )?,
-        ]);
+        ]));
     }
     Ok(seams)
 }
@@ -337,12 +354,24 @@ fn add_side_faces(
     builder: &mut Builder,
     rings: &[Ring],
     cylinders: &[Frame3],
-    seams: &[[u32; 2]],
-    last: usize,
+    seams: &[Option<[u32; 2]>],
+    course: &Course,
     radius: f64,
     accuracy: Accuracy,
 ) -> Result<(), OperationError> {
-    for segment in 0..last {
+    for segment in 0..course.bends.len() {
+        let seam = match (course.bends[segment], seams[segment]) {
+            (Some(frame), _) => {
+                add_torus_bend(builder, &torus_bend(rings, frame, segment, radius))?;
+                continue;
+            }
+            (None, Some(seam)) => seam,
+            (None, None) => {
+                return Err(OperationError::InvalidTopology(
+                    "circular sweep segment has no seams".into(),
+                ))
+            }
+        };
         let cylinder = cylinders[segment];
         let low = v_extent(&rings[segment], cylinder.origin, cylinder.z);
         let high = v_extent(&rings[segment + 1], cylinder.origin, cylinder.z);
@@ -352,7 +381,7 @@ fn add_side_faces(
         ];
         for half in 0..2 {
             let surface = builder.brep.geometry.surfaces.len() as u32;
-            let uses = side_uses(builder, rings, seams, segment, half, surface, cylinder)?;
+            let uses = side_uses(builder, rings, seam, segment, half, surface, cylinder)?;
             builder.face(
                 &format!("seg-{segment}:side-0-{half}"),
                 SurfaceGeometry::Cylinder {
@@ -373,6 +402,25 @@ fn add_side_faces(
     Ok(())
 }
 
+fn torus_bend(rings: &[Ring], frame: BendFrame, segment: usize, radius: f64) -> CircleBend {
+    let [start, end] = [&rings[segment], &rings[segment + 1]];
+    CircleBend {
+        frame,
+        segment,
+        centre: start.centre,
+        x: start.frame.x,
+        radius,
+        start: CircleEnds {
+            vertices: start.vertices,
+            edges: start.edges,
+        },
+        end: CircleEnds {
+            vertices: end.vertices,
+            edges: end.edges,
+        },
+    }
+}
+
 fn v_extent(ring: &Ring, base: Point3, axis: Point3) -> (f64, f64) {
     let centre = dot(sub(ring.centre, base), axis);
     let amplitude =
@@ -383,7 +431,7 @@ fn v_extent(ring: &Ring, base: Point3, axis: Point3) -> (f64, f64) {
 fn side_uses(
     builder: &Builder,
     rings: &[Ring],
-    seams: &[[u32; 2]],
+    seams: [u32; 2],
     segment: usize,
     half: usize,
     surface: u32,
@@ -406,11 +454,11 @@ fn side_uses(
             lower.vertices[half],
             lower.vertices[next],
             Orientation::Forward,
-            segment == 0,
+            lower.perpendicular,
         )?,
         seam_use(
             builder,
-            seams[segment][next],
+            seams[next],
             lower.vertices[next],
             upper.vertices[next],
             (half + 1) as f64 * std::f64::consts::PI,
@@ -428,11 +476,11 @@ fn side_uses(
             upper.vertices[next],
             upper.vertices[half],
             Orientation::Reverse,
-            segment + 2 == rings.len(),
+            upper.perpendicular,
         )?,
         seam_use(
             builder,
-            seams[segment][half],
+            seams[half],
             upper.vertices[half],
             lower.vertices[half],
             half as f64 * std::f64::consts::PI,

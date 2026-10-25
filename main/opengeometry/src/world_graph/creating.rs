@@ -3,7 +3,7 @@ use super::change_log::ChangeSet;
 use super::error::{ErrorCode, ErrorContext, GraphError};
 use super::graph::WorldGraph;
 use super::node::EditScope;
-use super::operands::{path_points, profile_loop};
+use super::operands::{profile_loop, sweep_path};
 use super::primitive::{check_body_type, check_no_plane, CreateOptions};
 use crate::brep::{BodyType, BrepEnvelope, Similarity3};
 use crate::operations::creating::{extrude, sweep};
@@ -78,7 +78,7 @@ impl WorldGraph {
                 caps,
             } => {
                 let profile = profile_loop(self, profile, target)?;
-                let path = path_points(self, path, target)?;
+                let path = sweep_path(self, path, target)?;
                 sweep::build(id, profile, path, caps.unwrap_or(true), self.accuracy)
                     .map_err(GraphError::from)
             }

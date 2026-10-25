@@ -1,6 +1,12 @@
+mod bend;
 mod circle;
+mod overlap;
+mod path;
 #[cfg(test)]
 mod tests;
+
+pub(crate) use bend::Bend;
+pub(crate) use path::SweepPath;
 
 use super::extrude;
 use super::profile::{check_lines, newell_normal, profile_frame, ProfileLoop};
@@ -10,7 +16,10 @@ use crate::brep::{
 };
 use crate::math::{add, cross, dot, norm, scale, sub, Interval, Point3};
 use crate::operations::{invalid, OperationError};
+use bend::{add_bend_arcs, add_polygon_bend, BendFrame, PolygonBend};
 use circle as sweep_circle;
+use overlap::{check_segment_overlap, profile_reach};
+use path::{checked_path, course, Course};
 
 struct SweepTopology {
     vertices: Vec<Vec<u32>>,
@@ -21,38 +30,37 @@ struct SweepTopology {
 pub(crate) fn build(
     id: String,
     profile: ProfileLoop,
-    mut path: Vec<Point3>,
+    path: SweepPath,
     caps: bool,
     accuracy: Accuracy,
 ) -> Result<BrepEnvelope, OperationError> {
-    if path.len() < 2 || path.iter().flatten().any(|value| !value.is_finite()) {
-        return Err(invalid("sweep path is invalid"));
-    }
-    remove_collinear_joints(&mut path, accuracy)?;
-    let directions = path_directions(&path, accuracy)?;
+    let path = checked_path(path, accuracy)?;
+    let reach = profile_reach(&profile, path.points[0]);
+    let course = course(path, reach, accuracy)?;
     let frame = profile_frame(&profile, accuracy.geometric)?;
     check_lines(&profile, frame, accuracy.geometric)?;
-    if dot(sub(path[0], frame.origin), frame.z).abs() > 4.0 * accuracy.geometric
-        || norm(cross(frame.z, directions[0])) > 1e-9
+    let points = &course.points;
+    if dot(sub(points[0], frame.origin), frame.z).abs() > 4.0 * accuracy.geometric
+        || norm(cross(frame.z, course.starts[0])) > 1e-9
     {
         return Err(invalid(
             "profile plane is not at the start and perpendicular to the path",
         ));
     }
-    if directions.len() == 1 && caps {
+    if course.bends == [None] && caps {
         return extrude::build(
             id,
             profile,
             Vec::new(),
-            dot(sub(path[1], path[0]), frame.z),
+            dot(sub(points[1], points[0]), frame.z),
             accuracy,
         );
     }
-    check_segment_overlap(&profile, &path, &directions, accuracy)?;
+    check_segment_overlap(reach, &course, accuracy)?;
     let points = match profile {
         ProfileLoop::Lines(points) => points,
         ProfileLoop::Circle { frame, radius } => {
-            let builder = sweep_circle::build(id, frame, radius, path, directions, caps, accuracy)?;
+            let builder = sweep_circle::build(id, frame, radius, &course, caps, accuracy)?;
             return finish_sweep(builder, caps);
         }
         ProfileLoop::Curves(_) => {
@@ -64,33 +72,18 @@ pub(crate) fn build(
     let mut polygon = points;
     let area_normal = newell_normal(&polygon, accuracy.geometric)
         .ok_or_else(|| invalid("profile is collinear"))?;
-    if dot(area_normal, directions[0]) < 0.0 {
+    if dot(area_normal, course.starts[0]) < 0.0 {
         polygon.reverse();
     }
     let count = polygon.len();
-    let rings = miter_rings(polygon, &path, &directions, count)?;
-    check_miter_spans(&rings, &directions, count, accuracy)?;
+    let rings = miter_rings(polygon, &course, count)?;
+    check_miter_spans(&rings, &course, count, accuracy)?;
     let mut builder = Builder::new(id, accuracy)?;
-    let topology = add_sweep_topology(&mut builder, &rings, &directions, count)?;
+    let topology = add_sweep_topology(&mut builder, &rings, &course, count)?;
     if caps {
-        add_caps(
-            &mut builder,
-            &topology,
-            &path,
-            &directions,
-            &rings,
-            count,
-            accuracy,
-        )?;
+        add_caps(&mut builder, &topology, &course, &rings, count, accuracy)?;
     }
-    add_side_faces(
-        &mut builder,
-        &topology,
-        &directions,
-        &rings,
-        count,
-        accuracy,
-    )?;
+    add_side_faces(&mut builder, &topology, &course, &rings, count, accuracy)?;
     finish_sweep(builder, caps)
 }
 
@@ -112,100 +105,12 @@ fn finish_sheet(mut builder: Builder) -> Result<BrepEnvelope, OperationError> {
     Ok(builder.brep)
 }
 
-fn remove_collinear_joints(
-    path: &mut Vec<Point3>,
-    accuracy: Accuracy,
-) -> Result<(), OperationError> {
-    let mut index = 1;
-    while index + 1 < path.len() {
-        let before = sub(path[index], path[index - 1]);
-        let after = sub(path[index + 1], path[index]);
-        if norm(before) <= 4.0 * accuracy.geometric || norm(after) <= 4.0 * accuracy.geometric {
-            return Err(invalid("sweep path has a short segment"));
-        }
-        let (u, v) = (unit(before)?, unit(after)?);
-        if norm(add(u, v)) <= 1e-9 {
-            return Err(OperationError::SweepSelfIntersection(
-                "sweep path reverses".into(),
-            ));
-        }
-        if norm(cross(u, v)) <= 1e-9 && dot(u, v) > 0.0 {
-            path.remove(index);
-        } else {
-            index += 1;
-        }
-    }
-    Ok(())
-}
-
-fn path_directions(path: &[Point3], accuracy: Accuracy) -> Result<Vec<Point3>, OperationError> {
-    path.windows(2)
-        .map(|pair| {
-            let delta = sub(pair[1], pair[0]);
-            if norm(delta) <= 4.0 * accuracy.geometric {
-                return Err(invalid("sweep path has a short segment"));
-            }
-            unit(delta).map_err(Into::into)
-        })
-        .collect::<Result<Vec<_>, OperationError>>()
-}
-
-fn check_segment_overlap(
-    profile: &ProfileLoop,
-    path: &[Point3],
-    directions: &[Point3],
-    accuracy: Accuracy,
-) -> Result<(), OperationError> {
-    let radius = match profile {
-        ProfileLoop::Lines(points) => points
-            .iter()
-            .map(|point| norm(sub(*point, path[0])))
-            .fold(0.0_f64, f64::max),
-        ProfileLoop::Circle { frame, radius } => norm(sub(frame.origin, path[0])) + radius,
-        ProfileLoop::Curves(edges) => edges
-            .iter()
-            .map(|edge| match edge.arc {
-                Some(arc) => norm(sub(arc.center, path[0])) + arc.radius,
-                None => norm(sub(edge.from, path[0])),
-            })
-            .fold(0.0_f64, f64::max),
-    };
-    for first in 0..directions.len() {
-        for second in first + 2..directions.len() {
-            if segment_distance(path[first], path[first + 1], path[second], path[second + 1])
-                <= 2.0 * radius + 4.0 * accuracy.geometric
-            {
-                return Err(OperationError::SweepSelfIntersection(
-                    "non-adjacent sweep segments overlap".into(),
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn segment_distance(a: Point3, b: Point3, c: Point3, d: Point3) -> f64 {
-    let u = sub(b, a);
-    let v = sub(d, c);
-    let w = sub(a, c);
-    let (aa, bb, cc, dd, ee) = (dot(u, u), dot(u, v), dot(v, v), dot(u, w), dot(v, w));
-    let denominator = aa * cc - bb * bb;
-    let mut s = if denominator.abs() <= 1e-20 {
-        0.0
-    } else {
-        ((bb * ee - cc * dd) / denominator).clamp(0.0, 1.0)
-    };
-    let t = ((bb * s + ee) / cc).clamp(0.0, 1.0);
-    s = ((bb * t - dd) / aa).clamp(0.0, 1.0);
-    norm(sub(add(a, scale(u, s)), add(c, scale(v, t))))
-}
-
 fn miter_rings(
     polygon: Vec<Point3>,
-    path: &[Point3],
-    directions: &[Point3],
+    course: &Course,
     count: usize,
 ) -> Result<Vec<Vec<Point3>>, OperationError> {
+    let path = &course.points;
     let mut offsets = polygon
         .iter()
         .map(|point| sub(*point, path[0]))
@@ -213,8 +118,9 @@ fn miter_rings(
     let mut rings = Vec::with_capacity(path.len());
     rings.push(polygon);
     for joint in 1..path.len() - 1 {
-        let previous = directions[joint - 1];
-        let bisector = unit(add(previous, directions[joint]))
+        turn_offsets(&mut offsets, course, joint - 1);
+        let previous = course.ends[joint - 1];
+        let bisector = unit(add(previous, course.starts[joint]))
             .map_err(|_| OperationError::SweepSelfIntersection("sweep path reverses".into()))?;
         let mut ring = Vec::with_capacity(count);
         for offset in &mut offsets {
@@ -224,6 +130,7 @@ fn miter_rings(
         }
         rings.push(ring);
     }
+    turn_offsets(&mut offsets, course, path.len() - 2);
     rings.push(
         offsets
             .iter()
@@ -233,17 +140,28 @@ fn miter_rings(
     Ok(rings)
 }
 
+fn turn_offsets(offsets: &mut [Point3], course: &Course, segment: usize) {
+    if let Some(frame) = course.bends[segment] {
+        for offset in offsets {
+            *offset = frame.rotated(*offset);
+        }
+    }
+}
+
 fn check_miter_spans(
     rings: &[Vec<Point3>],
-    directions: &[Point3],
+    course: &Course,
     count: usize,
     accuracy: Accuracy,
 ) -> Result<(), OperationError> {
-    for segment in 0..directions.len() {
+    for segment in 0..course.bends.len() {
+        if course.bends[segment].is_some() {
+            continue;
+        }
         for vertex in 0..count {
             let span = dot(
                 sub(rings[segment + 1][vertex], rings[segment][vertex]),
-                directions[segment],
+                course.starts[segment],
             );
             if span <= 4.0 * accuracy.geometric {
                 return Err(OperationError::SweepSelfIntersection(
@@ -258,7 +176,7 @@ fn check_miter_spans(
 fn add_sweep_topology(
     builder: &mut Builder,
     rings: &[Vec<Point3>],
-    directions: &[Point3],
+    course: &Course,
     count: usize,
 ) -> Result<SweepTopology, OperationError> {
     let vertices = rings
@@ -277,8 +195,12 @@ fn add_sweep_topology(
                 .collect::<Result<Vec<_>, _>>()?,
         );
     }
-    let mut longitudinal = Vec::with_capacity(directions.len());
-    for segment in 0..directions.len() {
+    let mut longitudinal = Vec::with_capacity(course.bends.len());
+    for segment in 0..course.bends.len() {
+        if let Some(frame) = course.bends[segment] {
+            longitudinal.push(add_bend_arcs(builder, frame, &vertices[segment])?);
+            continue;
+        }
         longitudinal.push(
             (0..count)
                 .map(|vertex| {
@@ -321,8 +243,7 @@ fn line_edge(builder: &mut Builder, from: u32, to: u32) -> Result<u32, Operation
 fn add_caps(
     builder: &mut Builder,
     topology: &SweepTopology,
-    path: &[Point3],
-    directions: &[Point3],
+    course: &Course,
     rings: &[Vec<Point3>],
     count: usize,
     accuracy: Accuracy,
@@ -333,14 +254,14 @@ fn add_caps(
         ..
     } = topology;
     let start_frame = Frame3::from_axis(
-        path[0],
-        scale(directions[0], -1.0),
+        course.points[0],
+        scale(course.starts[0], -1.0),
         sub(rings[0][1], rings[0][0]),
     )?;
-    let last = directions.len();
+    let last = course.bends.len();
     let end_frame = Frame3::from_axis(
-        path[last],
-        directions[last - 1],
+        course.points[last],
+        course.ends[last - 1],
         sub(rings[last][1], rings[last][0]),
     )?;
     let mut start_uses = Vec::new();
@@ -389,19 +310,23 @@ fn add_caps(
 fn add_side_faces(
     builder: &mut Builder,
     topology: &SweepTopology,
-    directions: &[Point3],
+    course: &Course,
     rings: &[Vec<Point3>],
     count: usize,
     accuracy: Accuracy,
 ) -> Result<(), OperationError> {
-    for segment in 0..directions.len() {
+    for segment in 0..course.bends.len() {
+        if let Some(frame) = course.bends[segment] {
+            add_polygon_bend(builder, &polygon_bend(topology, frame, segment), accuracy)?;
+            continue;
+        }
         for edge in 0..count {
             let next = (edge + 1) % count;
             let origin = rings[segment][edge];
             let along_edge = unit(sub(rings[segment][next], origin))?;
             let side_frame = Frame3::from_axis(
                 origin,
-                unit(cross(along_edge, directions[segment]))?,
+                unit(cross(along_edge, course.starts[segment]))?,
                 along_edge,
             )?;
             let uses = side_uses(builder, topology, segment, edge, next, side_frame)?;
@@ -423,6 +348,18 @@ fn add_side_faces(
         }
     }
     Ok(())
+}
+
+fn polygon_bend(topology: &SweepTopology, frame: BendFrame, segment: usize) -> PolygonBend<'_> {
+    PolygonBend {
+        frame,
+        segment,
+        start: &topology.vertices[segment],
+        end: &topology.vertices[segment + 1],
+        start_edges: &topology.ring_edges[segment],
+        end_edges: &topology.ring_edges[segment + 1],
+        arcs: &topology.longitudinal[segment],
+    }
 }
 
 fn side_uses(

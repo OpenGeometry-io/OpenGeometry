@@ -43,7 +43,7 @@ It is the geometry engine layer, not a full CAD application. Floorkit is a downs
 | Area | What 2.5 has |
 | --- | --- |
 | **Primitives** | Wires: rectangle, circle, polyline (open or closed). Solids: cuboid, cylinder. Each can be placed on any plane. |
-| **Operations** | Extrude a closed wire into a solid, with holes. Sweep a profile along a path, capped into a solid or open-ended into a sheet. Union, subtract and intersect, with one to a hundred tool solids in one call. |
+| **Operations** | Extrude a closed wire into a solid, with holes. Sweep a profile along a path of lines and arcs, each arc an exact bend, capped into a solid or open-ended into a sheet. Union, subtract and intersect, with one to a hundred tool solids in one call. |
 | **Parametric edits** | `rebuild` gives an existing body new parameters in place. |
 | **Assemblies** | Assemblies with parent and child placement; translate, rotate, scale and place; independent copies and shared instances. |
 | **History** | Marks with rollback and release; transactions, with a dry-run option. |
