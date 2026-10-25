@@ -3,8 +3,7 @@ use crate::brep::Frame3;
 use crate::math::{cross, dot, norm, sub};
 use crate::operations::{invalid, OperationError};
 use crate::primitives::{
-    arc_profile_contains, loops_touch, profile_edge_intersections, profile_point_inside,
-    ProfileEdge,
+    loop_inside, loops_touch, profile_edge_intersections, profile_point_inside, ProfileEdge,
 };
 
 struct PlanarLoop {
@@ -77,11 +76,11 @@ fn check_inside_outer(
     resolution: f64,
 ) -> Result<(), OperationError> {
     for hole in holes {
-        if !contains(outer, hole.probe, resolution) {
-            return Err(invalid("hole lies outside the profile"));
-        }
         if touch(outer, hole, resolution) {
             return Err(invalid("hole touches the profile"));
+        }
+        if !contains(outer, hole, resolution) {
+            return Err(invalid("hole lies outside the profile"));
         }
     }
     Ok(())
@@ -93,7 +92,7 @@ fn check_holes_apart(holes: &[PlanarLoop], resolution: f64) -> Result<(), Operat
             if touch(a, b, resolution) {
                 return Err(invalid("holes overlap"));
             }
-            if contains(a, b.probe, resolution) || contains(b, a.probe, resolution) {
+            if contains(a, b, resolution) || contains(b, a, resolution) {
                 return Err(invalid("holes are nested"));
             }
         }
@@ -104,14 +103,11 @@ fn check_holes_apart(holes: &[PlanarLoop], resolution: f64) -> Result<(), Operat
 fn planar_loop(profile: &ProfileLoop, frame: Frame3) -> PlanarLoop {
     let edges = edges(profile, frame);
     match profile {
-        ProfileLoop::Circle { frame: circle, .. } => {
-            let centre = frame.local(circle.origin);
-            PlanarLoop {
-                edges,
-                points: None,
-                probe: [centre[0], centre[1]],
-            }
-        }
+        ProfileLoop::Circle { .. } | ProfileLoop::Curves(_) => PlanarLoop {
+            probe: edges[0].midpoint(),
+            points: None,
+            edges,
+        },
         ProfileLoop::Lines(_) => {
             let points = edges
                 .iter()
@@ -126,10 +122,10 @@ fn planar_loop(profile: &ProfileLoop, frame: Frame3) -> PlanarLoop {
     }
 }
 
-fn contains(container: &PlanarLoop, point: [f64; 2], resolution: f64) -> bool {
+fn contains(container: &PlanarLoop, inner: &PlanarLoop, resolution: f64) -> bool {
     match &container.points {
-        Some(points) => profile_point_inside(point, points),
-        None => arc_profile_contains(&container.edges, point, resolution),
+        Some(points) => profile_point_inside(inner.probe, points),
+        None => loop_inside(&inner.edges, &container.edges, resolution),
     }
 }
 

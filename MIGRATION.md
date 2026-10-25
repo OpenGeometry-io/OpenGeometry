@@ -12,6 +12,88 @@ It is written for people and for coding assistants alike: each section says what
 4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
 5. Finish with its "Check your result" steps.
 
+## Unreleased
+
+### What changed
+
+- `OG_PRIMITIVE_PROFILE` makes a wire of line and arc segments: `{ start, segments, closed }`, with points as `[u, v]` in the body's `plane`. A segment is `{ to }` for a line, or `{ to, arc: { center, counterClockwise } }` for an arc.
+- `OG_PRIMITIVE_ARC` makes a partial arc wire: `{ radius, startAngle, sweepAngle }`, angles in radians, centred on the `plane` origin.
+- `OG_OPERATION_EXTRUDE` takes a closed Profile as the profile or as a hole, so the 2.0 arc-edged extrusion is an extrude again.
+- `OG_PRIMITIVE_PARAMS_PROFILE` and `OG_PRIMITIVE_PARAMS_ARC` type their parameters. The entry exports the types `ProfileParams`, `ProfileSegment`, `ProfileArc` and `ArcParams`.
+
+### Before and after
+
+2.0:
+
+```js
+import { AnalyticSolid, Arc, Vector3 } from 'opengeometry';
+const sector = new AnalyticSolid({
+  kind: 'arcEdgedExtrusion',
+  outer: [
+    { kind: 'line', from: [1, 0], to: [2, 0] },
+    { kind: 'arc', center: [0, 0], radius: 2, startAngle: 0, sweepAngle: Math.PI / 2 },
+    { kind: 'line', from: [0, 2], to: [0, 1] },
+    { kind: 'arc', center: [0, 0], radius: 1, startAngle: Math.PI / 2, sweepAngle: -Math.PI / 2 },
+  ],
+  height: 3,
+});
+const arc = new Arc({ center: new Vector3(0, 0, 0), radius: 2, startAngle: 0, sweepAngle: Math.PI / 2 });
+```
+
+Unreleased:
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_EXTRUDE,
+  OG_PRIMITIVE_ARC,
+  OG_PRIMITIVE_PARAMS_ARC,
+  OG_PRIMITIVE_PARAMS_PROFILE,
+  OG_PRIMITIVE_PROFILE,
+} from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const profile = new Wire(OG_PRIMITIVE_PROFILE, OG_PRIMITIVE_PARAMS_PROFILE({
+  start: [1, 0],
+  segments: [
+    { to: [2, 0] },
+    { to: [0, 2], arc: { center: [0, 0], counterClockwise: true } },
+    { to: [0, 1] },
+    { to: [1, 0], arc: { center: [0, 0], counterClockwise: false } },
+  ],
+  closed: true,
+}));
+const sector = new Solid(OG_OPERATION_EXTRUDE, { profile, distance: 3 });
+
+const arc = new Wire(OG_PRIMITIVE_ARC, OG_PRIMITIVE_PARAMS_ARC({ radius: 2, startAngle: 0, sweepAngle: Math.PI / 2 }));
+```
+
+Both make the same quarter ring sector, 3 m high, and the same quarter arc.
+
+### Replace this with that
+
+| 2.0 | Unreleased |
+| --- | --- |
+| `new AnalyticSolid({ kind: 'arcEdgedExtrusion', outer, holes, height, frame })` | one `new Wire(OG_PRIMITIVE_PROFILE, { start, segments, closed: true }, { plane })` per loop, then `new Solid(OG_OPERATION_EXTRUDE, { profile, holes, distance: height })` |
+| `{ kind: 'line', from, to }` | `{ to }`; the first `from` becomes `start` |
+| `{ kind: 'arc', center, radius, startAngle, sweepAngle }` | `{ to: its end point, arc: { center, counterClockwise: sweepAngle > 0 } }` |
+| `frame` `{ origin, x, y, z }` | `plane` `{ origin, normal: z, xDirection: x }` |
+| `new Arc({ center, radius, startAngle, sweepAngle })` | `new Wire(OG_PRIMITIVE_ARC, { radius, startAngle, sweepAngle }, { plane: { origin: [center.x, center.y, center.z] } })` |
+
+### Different behaviour
+
+- A hole that encloses the whole profile throws `OGError` `InvalidParameter`. It used to fail as `InvalidGeometry`.
+- A circular hole away from the profile centre now extrudes. 2.0 refused some of these.
+- A Profile refuses repeated points, arcs whose end is not on their circle, self-crossing segments and a closed profile that does not end at its start, with `InvalidParameter`. An Arc refuses a zero sweep and a full turn; use `OG_PRIMITIVE_CIRCLE` for a full circle.
+
+### Check your result
+
+1. `profile.getBrep()` has one edge per segment, and the extruded solid has one cylindrical face per arc.
+2. The `text` of `await OpenGeometry.exportStep({ nodes: [sector] })` has one `CYLINDRICAL_SURFACE` per arc.
+
 ## 2.0 to 2.5
 
 ### What changed

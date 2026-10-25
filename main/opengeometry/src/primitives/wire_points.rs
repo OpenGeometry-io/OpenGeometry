@@ -34,27 +34,39 @@ pub(super) fn wire_from_points(
         points.len() - 1
     } {
         let next = (index + 1) % points.len();
-        let delta = sub(points[next], points[index]);
-        let length = norm(delta);
-        if length <= 4.0 * accuracy.geometric {
-            return Err(GeometryError::InvalidGeometry(
-                "wire edge is below geometric resolution".into(),
-            ));
-        }
-        let edge = builder.edge(
-            CurveGeometry::Line {
-                origin: points[index],
-                direction: scale(delta, 1.0 / length),
-            },
-            Interval::new(0.0, length)?,
-            false,
-        );
-        uses.push(WireUse {
-            edge,
-            from: vertices[index],
-            to: vertices[next],
-            sense: Orientation::Forward,
-        });
+        let ends = [
+            (vertices[index], points[index]),
+            (vertices[next], points[next]),
+        ];
+        uses.push(line_use(&mut builder, ends, accuracy.geometric)?);
     }
     builder.finish_wire(uses, closed)
+}
+
+pub(super) fn line_use(
+    builder: &mut Builder,
+    ends: [(u32, Point3); 2],
+    geometric: f64,
+) -> Result<WireUse, GeometryError> {
+    let delta = sub(ends[1].1, ends[0].1);
+    let length = norm(delta);
+    if length <= 4.0 * geometric {
+        return Err(GeometryError::InvalidGeometry(
+            "wire edge is below geometric resolution".into(),
+        ));
+    }
+    let edge = builder.edge(
+        CurveGeometry::Line {
+            origin: ends[0].1,
+            direction: scale(delta, 1.0 / length),
+        },
+        Interval::new(0.0, length)?,
+        false,
+    );
+    Ok(WireUse {
+        edge,
+        from: ends[0].0,
+        to: ends[1].0,
+        sense: Orientation::Forward,
+    })
 }

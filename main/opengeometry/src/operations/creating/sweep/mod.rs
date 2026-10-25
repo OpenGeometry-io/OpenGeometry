@@ -53,6 +53,11 @@ pub(crate) fn build(
         ProfileLoop::Circle { frame, radius } => {
             return sweep_circle::build(id, frame, radius, path, directions, accuracy)
         }
+        ProfileLoop::Curves(_) => {
+            return Err(
+                GeometryError::UnsupportedGeometry("sweep of an arc-edged profile".into()).into(),
+            )
+        }
     };
     let mut polygon = points;
     let area_normal = newell_normal(&polygon, accuracy.geometric)
@@ -135,6 +140,13 @@ fn check_segment_overlap(
             .map(|point| norm(sub(*point, path[0])))
             .fold(0.0_f64, f64::max),
         ProfileLoop::Circle { frame, radius } => norm(sub(frame.origin, path[0])) + radius,
+        ProfileLoop::Curves(edges) => edges
+            .iter()
+            .map(|edge| match edge.arc {
+                Some(arc) => norm(sub(arc.center, path[0])) + arc.radius,
+                None => norm(sub(edge.from, path[0])),
+            })
+            .fold(0.0_f64, f64::max),
     };
     for first in 0..directions.len() {
         for second in first + 2..directions.len() {

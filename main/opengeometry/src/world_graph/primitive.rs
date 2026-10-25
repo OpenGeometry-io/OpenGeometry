@@ -5,18 +5,45 @@ use super::graph::WorldGraph;
 use super::node::EditScope;
 use crate::brep::{Accuracy, BodyType, BrepEnvelope, CurveGeometry, Frame3, Similarity3, GROUND};
 use crate::math::{norm, sub, Point3};
-use crate::primitives;
+use crate::primitives::{self, ProfileEdge, ProfileSegment};
 use serde::{Deserialize, Serialize};
+use std::f64::consts::TAU;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", deny_unknown_fields)]
 pub enum Primitive {
-    Cuboid { width: f64, height: f64, depth: f64 },
-    Cylinder { radius: f64, height: f64 },
-    Rectangle { width: f64, breadth: f64 },
-    Circle { radius: f64 },
-    Polyline { points: Vec<Point3>, closed: bool },
+    Cuboid {
+        width: f64,
+        height: f64,
+        depth: f64,
+    },
+    Cylinder {
+        radius: f64,
+        height: f64,
+    },
+    Rectangle {
+        width: f64,
+        breadth: f64,
+    },
+    Circle {
+        radius: f64,
+    },
+    Polyline {
+        points: Vec<Point3>,
+        closed: bool,
+    },
+    Profile {
+        start: [f64; 2],
+        segments: Vec<ProfileSegment>,
+        closed: bool,
+    },
+    #[serde(rename_all = "camelCase")]
+    Arc {
+        radius: f64,
+        start_angle: f64,
+        sweep_angle: f64,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
@@ -40,7 +67,11 @@ impl Primitive {
     fn body_type(&self) -> BodyType {
         match self {
             Self::Cuboid { .. } | Self::Cylinder { .. } => BodyType::Solid,
-            Self::Rectangle { .. } | Self::Circle { .. } | Self::Polyline { .. } => BodyType::Wire,
+            Self::Rectangle { .. }
+            | Self::Circle { .. }
+            | Self::Polyline { .. }
+            | Self::Profile { .. }
+            | Self::Arc { .. } => BodyType::Wire,
         }
     }
 }
@@ -253,19 +284,20 @@ fn build_primitive(
         }
         Primitive::Circle { radius } => {
             required_size(radius, accuracy.geometric, "radius")?;
-            (
-                primitives::arc_wire(
-                    shape_id.clone(),
-                    CurveGeometry::Circle {
-                        frame: GROUND,
-                        radius,
-                    },
-                    0.0,
-                    std::f64::consts::TAU,
-                    accuracy,
-                )?,
-                vec!["edge-0".into()],
-            )
+            arc_body(shape_id.clone(), radius, [0.0, TAU], accuracy)?
+        }
+        Primitive::Arc {
+            radius,
+            start_angle,
+            sweep_angle,
+        } => {
+            check_arc(radius, [start_angle, sweep_angle], accuracy)?;
+            arc_body(
+                shape_id.clone(),
+                radius,
+                [start_angle, sweep_angle],
+                accuracy,
+            )?
         }
         Primitive::Polyline { points, closed } => {
             check_polyline(&points, closed, accuracy)?;
@@ -273,8 +305,43 @@ fn build_primitive(
                 primitives::polyline_with_keys(shape_id.clone(), &points, closed, accuracy)?;
             (brep, keys)
         }
+        Primitive::Profile {
+            start,
+            segments,
+            closed,
+        } => profile_body(shape_id.clone(), start, &segments, closed, accuracy)?,
     };
     Ok(result)
+}
+
+fn profile_body(
+    shape_id: String,
+    start: [f64; 2],
+    segments: &[ProfileSegment],
+    closed: bool,
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    let edges = primitives::profile_segment_edges(start, segments, closed);
+    check_profile(start, segments, &edges, closed, accuracy.geometric)?;
+    Ok(primitives::profile_wire_with_keys(
+        shape_id, start, segments, closed, accuracy,
+    )?)
+}
+
+fn arc_body(
+    shape_id: String,
+    radius: f64,
+    [start_angle, sweep_angle]: [f64; 2],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    let curve = CurveGeometry::Circle {
+        frame: GROUND,
+        radius,
+    };
+    Ok((
+        primitives::arc_wire(shape_id, curve, start_angle, sweep_angle, accuracy)?,
+        vec!["edge-0".into()],
+    ))
 }
 
 fn required_size(value: f64, accuracy: f64, name: &str) -> Result<(), GraphError> {
@@ -314,4 +381,91 @@ fn check_polyline(points: &[Point3], closed: bool, accuracy: Accuracy) -> Result
         }
     }
     Ok(())
+}
+
+fn check_arc(radius: f64, [start, sweep]: [f64; 2], accuracy: Accuracy) -> Result<(), GraphError> {
+    required_size(radius, accuracy.geometric, "radius")?;
+    if !start.is_finite() || !sweep.is_finite() || sweep == 0.0 || sweep.abs() >= TAU {
+        return Err(parameter(
+            "arc sweep must be nonzero and less than one turn",
+        ));
+    }
+    if radius * sweep.abs() <= 4.0 * accuracy.geometric {
+        return Err(parameter(
+            "arc length must exceed four times geometric tolerance",
+        ));
+    }
+    Ok(())
+}
+
+fn check_profile(
+    start: [f64; 2],
+    segments: &[ProfileSegment],
+    edges: &[ProfileEdge],
+    closed: bool,
+    g: f64,
+) -> Result<(), GraphError> {
+    if segments.len() < if closed { 2 } else { 1 } {
+        return Err(parameter("profile has too few segments"));
+    }
+    let values = segments.iter().flat_map(|segment| {
+        segment
+            .to
+            .into_iter()
+            .chain(segment.arc.into_iter().flat_map(|arc| arc.center))
+    });
+    if !start.into_iter().chain(values).all(f64::is_finite) {
+        return Err(parameter("profile points must be finite"));
+    }
+    let last = segments[segments.len() - 1].to;
+    if closed != ((last[0] - start[0]).hypot(last[1] - start[1]) <= 4.0 * g) {
+        return Err(parameter(if closed {
+            "closed profile must end at its start"
+        } else {
+            "open profile must not end at its start"
+        }));
+    }
+    for (index, (edge, segment)) in edges.iter().zip(segments).enumerate() {
+        let to = if closed && index + 1 == segments.len() {
+            start
+        } else {
+            segment.to
+        };
+        check_profile_edge(edge, to, g)?;
+    }
+    if primitives::profile_self_intersects(edges, closed, g) {
+        return Err(parameter("profile self-intersects"));
+    }
+    if closed && primitives::profile_area_twice(edges).abs() <= 16.0 * g * g {
+        return Err(parameter("profile area is below geometric resolution"));
+    }
+    Ok(())
+}
+
+fn check_profile_edge(edge: &ProfileEdge, to: [f64; 2], g: f64) -> Result<(), GraphError> {
+    let (from, _) = edge.endpoints();
+    if (to[0] - from[0]).hypot(to[1] - from[1]) <= 4.0 * g {
+        return Err(parameter("profile has a zero-length segment"));
+    }
+    if let ProfileEdge::Arc {
+        center,
+        radius,
+        sweep_angle,
+        ..
+    } = *edge
+    {
+        if radius <= 4.0 * g
+            || ((to[0] - center[0]).hypot(to[1] - center[1]) - radius).abs() > g / 4.0
+        {
+            return Err(parameter("profile arc does not end on its circle"));
+        }
+        if sweep_angle.abs() >= TAU || radius * sweep_angle.abs() <= 4.0 * g {
+            return Err(parameter("profile arc is below geometric resolution"));
+        }
+    }
+    Ok(())
+}
+
+fn parameter(message: &str) -> GraphError {
+    GraphError::code(ErrorCode::InvalidParameter, message)
 }

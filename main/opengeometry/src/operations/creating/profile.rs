@@ -2,12 +2,28 @@ use crate::brep::{Frame3, Similarity3, GROUND};
 use crate::geom2d::{self_intersects2, Pt2};
 use crate::math::{add, cross, dot, norm, scale, sub, Point3};
 use crate::operations::{invalid, OperationError};
-use crate::primitives::ProfileEdge;
+use crate::primitives::{profile_self_intersects, ProfileEdge};
+use std::f64::consts::TAU;
 
 #[derive(Clone)]
 pub(crate) enum ProfileLoop {
     Circle { frame: Frame3, radius: f64 },
     Lines(Vec<Point3>),
+    Curves(Vec<LoopEdge>),
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct LoopEdge {
+    pub(crate) from: Point3,
+    pub(crate) arc: Option<LoopArc>,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct LoopArc {
+    pub(crate) center: Point3,
+    pub(crate) axis: Point3,
+    pub(crate) radius: f64,
+    pub(crate) counter_clockwise: bool,
 }
 
 pub(crate) fn mapped_frame(frame: Frame3, mapping: Similarity3) -> Frame3 {
@@ -26,7 +42,56 @@ pub(super) fn profile_frame(
     match profile {
         ProfileLoop::Circle { frame, radius } => Ok(circle_frame(*frame, *radius, tolerance)),
         ProfileLoop::Lines(points) => lines_frame(points, tolerance),
+        ProfileLoop::Curves(edges) => curves_frame(edges, tolerance),
     }
+}
+
+fn curves_frame(edges: &[LoopEdge], tolerance: f64) -> Result<Frame3, OperationError> {
+    let points = edges
+        .iter()
+        .enumerate()
+        .flat_map(|(index, edge)| {
+            let to = edges[(index + 1) % edges.len()].from;
+            std::iter::once(edge.from).chain(edge.arc.map(|arc| arc_midpoint(edge.from, to, arc)))
+        })
+        .collect::<Vec<_>>();
+    let frame = lines_frame(&points, tolerance)?;
+    if edges
+        .iter()
+        .filter_map(|edge| edge.arc)
+        .any(|arc| arc.radius * norm(cross(arc.axis, frame.z)) > 4.0 * tolerance)
+    {
+        return Err(invalid("profile is not planar"));
+    }
+    Ok(frame)
+}
+
+fn turn_axis(arc: LoopArc) -> Point3 {
+    if arc.counter_clockwise {
+        arc.axis
+    } else {
+        scale(arc.axis, -1.0)
+    }
+}
+
+fn arc_turn(from: Point3, to: Point3, arc: LoopArc) -> f64 {
+    let a = sub(from, arc.center);
+    let b = sub(to, arc.center);
+    dot(cross(a, b), turn_axis(arc))
+        .atan2(dot(a, b))
+        .rem_euclid(TAU)
+}
+
+fn arc_midpoint(from: Point3, to: Point3, arc: LoopArc) -> Point3 {
+    let half = arc_turn(from, to, arc) / 2.0;
+    let radial = sub(from, arc.center);
+    add(
+        arc.center,
+        add(
+            scale(radial, half.cos()),
+            scale(cross(turn_axis(arc), radial), half.sin()),
+        ),
+    )
 }
 
 fn circle_frame(frame: Frame3, radius: f64, tolerance: f64) -> Frame3 {
@@ -138,6 +203,37 @@ pub(super) fn edges(profile: &ProfileLoop, frame: Frame3) -> Vec<ProfileEdge> {
                 }
             })
             .collect(),
+        ProfileLoop::Curves(edges) => edges
+            .iter()
+            .enumerate()
+            .map(|(index, edge)| curve_edge(*edge, edges[(index + 1) % edges.len()].from, frame))
+            .collect(),
+    }
+}
+
+fn curve_edge(edge: LoopEdge, to: Point3, frame: Frame3) -> ProfileEdge {
+    let local = |point: Point3| {
+        let local = frame.local(point);
+        [local[0], local[1]]
+    };
+    let from = local(edge.from);
+    let Some(arc) = edge.arc else {
+        return ProfileEdge::Line {
+            from,
+            to: local(to),
+        };
+    };
+    let center = local(arc.center);
+    let sign = if arc.counter_clockwise == (dot(arc.axis, frame.z) > 0.0) {
+        1.0
+    } else {
+        -1.0
+    };
+    ProfileEdge::Arc {
+        center,
+        radius: arc.radius,
+        start_angle: (from[1] - center[1]).atan2(from[0] - center[0]),
+        sweep_angle: sign * arc_turn(edge.from, to, arc),
     }
 }
 
@@ -155,6 +251,11 @@ pub(super) fn check_lines(
             })
             .collect::<Vec<_>>();
         if self_intersects2(&ring, tolerance) {
+            return Err(invalid("profile self-intersects"));
+        }
+    }
+    if let ProfileLoop::Curves(_) = profile {
+        if profile_self_intersects(&edges(profile, frame), true, tolerance) {
             return Err(invalid("profile self-intersects"));
         }
     }

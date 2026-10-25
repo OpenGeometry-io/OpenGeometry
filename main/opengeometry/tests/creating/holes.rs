@@ -1,6 +1,7 @@
 use opengeometry::world_graph::{
     CreateOptions, CreatingOperation, ErrorCode, Plane, Primitive, WorldGraph,
 };
+use opengeometry_test_support::volume;
 use opengeometry_test_support::world_graph::{graph, named};
 
 fn square_profile() -> WorldGraph {
@@ -109,4 +110,33 @@ fn tilted_circle_hole_rim_off_the_plane_is_invalid_parameter() {
         )
         .unwrap();
     assert_rejected(world, &["hole"], "hole is not coplanar");
+}
+
+#[test]
+fn circular_hole_enclosing_the_profile_is_invalid_parameter() {
+    let mut world = square_profile();
+    circle_at(&mut world, "hole", 5.0, [0.0; 3]);
+    assert_rejected(world, &["hole"], "hole lies outside the profile");
+}
+
+#[test]
+fn offset_circular_hole_extrudes() {
+    let mut world = graph();
+    circle_at(&mut world, "outer", 2.0, [0.0; 3]);
+    circle_at(&mut world, "hole", 0.5, [0.8, 0.0, 0.0]);
+    world
+        .create_operation(
+            CreatingOperation::Extrude {
+                profile: "outer".into(),
+                holes: vec!["hole".into()],
+                distance: 1.5,
+            },
+            named("solid"),
+        )
+        .unwrap();
+    let body = world.brep("solid").unwrap();
+    body.validate().unwrap();
+    let measured = volume::estimate(&body, 0.001);
+    let expected = 3.75 * std::f64::consts::PI * 1.5;
+    assert!((measured.value - expected).abs() <= measured.error_bound);
 }

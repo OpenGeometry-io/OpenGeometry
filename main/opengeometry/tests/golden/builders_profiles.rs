@@ -1,5 +1,6 @@
 use crate::builder_case::{built, keyed};
 use crate::fixtures::{fine, ground, rectangle, standard, upright};
+use crate::graph_case::ring_segments;
 use crate::kernel::{primitives, CurveGeometry, Frame3};
 use crate::planar_shapes::profile_shell;
 use crate::profiles::{
@@ -35,6 +36,16 @@ fn wires() -> Vec<Case> {
         built("polyline.repeated-point", || {
             primitives::polyline("bad".into(), &[[0.0; 3], [0.0; 3]], false, standard())
         }),
+        keyed("profile-keys.ring-sector", || {
+            let segments = ring_segments(1.0, 2.0);
+            primitives::profile_wire_with_keys(
+                "ring".into(),
+                [1.0, 0.0],
+                &segments,
+                true,
+                standard(),
+            )
+        }),
     ]
 }
 
@@ -48,6 +59,10 @@ fn arcs() -> Vec<Case> {
         built("arc-wire.half", move || {
             let curve = CurveGeometry::Circle { frame, radius: 1.0 };
             primitives::arc_wire("arc".into(), curve, 0.0, PI, standard())
+        }),
+        built("arc-wire.partial", move || {
+            let curve = CurveGeometry::Circle { frame, radius: 2.0 };
+            primitives::arc_wire("arc".into(), curve, 0.5, -1.2, standard())
         }),
         built("arc-wire.ellipse", move || {
             let curve = CurveGeometry::Ellipse {

@@ -5,7 +5,7 @@ use crate::brep::{
 };
 use crate::math::{add, norm, scale, Interval, Point3};
 use crate::primitives::profile::{
-    arc_profile_contains, profile_edge_intersections, validate_arc_profile_loop, ProfileEdge,
+    loop_inside, profile_edge_intersections, validate_arc_profile_loop, ProfileEdge,
 };
 
 struct EdgeCurves {
@@ -64,7 +64,7 @@ pub fn arc_edged_extrusion_with_holes(
                 }
             }
         }
-        if !arc_profile_contains(&outer, hole[0].endpoints().0, g) {
+        if !loop_inside(hole, &outer, g) {
             return Err(GeometryError::InvalidGeometry(format!(
                 "arc-edged profile hole {index} lies outside the outer boundary"
             )));
@@ -106,8 +106,8 @@ fn check_hole_pairs(holes: &[Vec<ProfileEdge>], g: f64) -> Result<(), GeometryEr
                 holes[second]
                     .iter()
                     .any(|b| !profile_edge_intersections(a, b, g).is_empty())
-            }) || arc_profile_contains(&holes[first], holes[second][0].endpoints().0, g)
-                || arc_profile_contains(&holes[second], holes[first][0].endpoints().0, g)
+            }) || loop_inside(&holes[second], &holes[first], g)
+                || loop_inside(&holes[first], &holes[second], g)
             {
                 return Err(GeometryError::InvalidGeometry(format!(
                     "arc-edged profile holes {first} and {second} overlap or nest"

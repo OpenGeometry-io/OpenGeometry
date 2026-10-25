@@ -1,6 +1,6 @@
 use crate::graph_case::{
     child, circle, copy_options, create_options, extrude, graph_case, inspect, on_plane, operation,
-    polyline, primitive, rectangle, sweep,
+    polyline, primitive, profile, rectangle, ring_segments, segment, sweep,
 };
 use crate::graph_record::{changes, created, node_state};
 use crate::kernel::{CreatingOperation, EditScope, Point3, Primitive, Transform, WorldGraph};
@@ -116,11 +116,44 @@ fn self_crossing() -> Vec<(&'static str, Primitive)> {
     vec![("profile", polyline(&points, true))]
 }
 
+fn ring_sector() -> Vec<(&'static str, Primitive)> {
+    vec![("profile", profile([1.0, 0.0], ring_segments(1.0, 2.0)))]
+}
+
+fn rectangle_arc_side() -> Vec<(&'static str, Primitive)> {
+    let segments = vec![
+        segment([4.0, 0.0], None),
+        segment([4.0, 2.0], Some(([4.0, 1.0], true))),
+        segment([0.0, 2.0], None),
+        segment([0.0, 0.0], None),
+    ];
+    vec![("profile", profile([0.0, 0.0], segments))]
+}
+
+fn curved_wall_hole() -> Vec<(&'static str, Primitive)> {
+    let centre = 5.0 * std::f64::consts::FRAC_1_SQRT_2;
+    let corner = |du: f64, dv: f64| [centre + du, 0.0, -(centre + dv)];
+    let hole = [
+        corner(-0.3, -0.3),
+        corner(0.3, -0.3),
+        corner(0.3, 0.3),
+        corner(-0.3, 0.3),
+    ];
+    vec![
+        ("profile", profile([4.0, 0.0], ring_segments(4.0, 6.0))),
+        ("hole", polyline(&hole, true)),
+    ]
+}
+
+fn enclosing_circle_hole() -> Vec<(&'static str, Primitive)> {
+    vec![("profile", rectangle(4.0, 4.0)), ("hole", circle(5.0))]
+}
+
 fn open_polyline() -> Vec<(&'static str, Primitive)> {
     vec![("profile", polyline(&L_PATH, false))]
 }
 
-const EXTRUSIONS: [Extrusion; 12] = [
+const EXTRUSIONS: [Extrusion; 16] = [
     ("rectangle", rectangle_profile, &[], 4.0),
     ("circle", circle_profile, &[], 3.0),
     ("closed-polyline", closed_polyline, &[], 4.0),
@@ -133,6 +166,20 @@ const EXTRUSIONS: [Extrusion; 12] = [
     ("self-crossing", self_crossing, &[], 2.0),
     ("hole-is-profile", square_profile, &["profile"], 2.0),
     ("open-polyline-profile", open_polyline, &[], 2.0),
+    ("ring-sector", ring_sector, &[], 3.0),
+    ("rectangle-arc-side", rectangle_arc_side, &[], 2.0),
+    (
+        "curved-wall-rectangle-hole",
+        curved_wall_hole,
+        &["hole"],
+        2.0,
+    ),
+    (
+        "enclosing-circle-hole",
+        enclosing_circle_hole,
+        &["hole"],
+        2.0,
+    ),
 ];
 
 fn square_one() -> Primitive {

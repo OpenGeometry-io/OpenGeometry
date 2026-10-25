@@ -5,6 +5,7 @@ mod cylinder;
 mod internal;
 mod polyline;
 mod profile;
+mod profile_wire;
 mod rectangle;
 mod revolved_section;
 #[cfg(test)]
@@ -24,6 +25,9 @@ pub use internal::{
 pub use polyline::{polyline, polyline_with_keys};
 pub use profile::ProfileEdge;
 pub(super) use profile::{
-    arc_profile_contains, loops_touch, profile_edge_intersections, profile_point_inside,
+    loop_inside, loops_touch, profile_area_twice, profile_edge_intersections, profile_point_inside,
+    profile_self_intersects,
 };
+pub(super) use profile_wire::profile_segment_edges;
+pub use profile_wire::{profile_wire_with_keys, ProfileSegment, SegmentArc};
 pub use rectangle::{rectangle, rectangle_with_keys};

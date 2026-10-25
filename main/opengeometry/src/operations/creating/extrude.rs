@@ -1,7 +1,7 @@
 use super::holes::{check_annular, check_circle_hole, check_layout};
 use super::profile::{check_lines, edges, profile_frame, ProfileLoop};
 use crate::brep::{Accuracy, BrepEnvelope, Frame3};
-use crate::math::{add, dot, norm, scale, sub, Point3};
+use crate::math::{add, cross, dot, norm, scale, sub, Point3};
 use crate::operations::{invalid, OperationError};
 use crate::primitives;
 
@@ -95,6 +95,17 @@ fn check_holes(
                     if dot(sub(*point, frame.origin), frame.z).abs() > 4.0 * accuracy.geometric {
                         return Err(invalid("hole is not coplanar"));
                     }
+                }
+            }
+            ProfileLoop::Curves(edges) => {
+                let resolution = 4.0 * accuracy.geometric;
+                if edges.iter().any(|edge| {
+                    dot(sub(edge.from, frame.origin), frame.z).abs() > resolution
+                        || edge.arc.is_some_and(|arc| {
+                            arc.radius * norm(cross(arc.axis, frame.z)) > resolution
+                        })
+                }) {
+                    return Err(invalid("hole is not coplanar"));
                 }
             }
         }

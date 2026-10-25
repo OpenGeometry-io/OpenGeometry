@@ -1,8 +1,8 @@
 use super::error::{ErrorCode, GraphError};
 use super::graph::WorldGraph;
-use crate::brep::{CurveGeometry, EdgeGeometry, Similarity3};
+use crate::brep::{BrepEnvelope, CurveGeometry, EdgeGeometry, HalfEdge, Orientation, Similarity3};
 use crate::math::Point3;
-use crate::operations::creating::{mapped_frame, ProfileLoop};
+use crate::operations::creating::{mapped_frame, LoopArc, LoopEdge, ProfileLoop};
 
 pub(super) fn path_points(
     graph: &WorldGraph,
@@ -95,7 +95,10 @@ fn profile_loop_mapped(
     if !wire.is_closed || brep.topology.wires.len() != 1 {
         return Err(invalid("profile must be one closed wire"));
     }
-    let mut points = Vec::new();
+    if let Some(circle) = lone_circle(&brep, mapping) {
+        return Ok(circle);
+    }
+    let mut edges = Vec::new();
     let mut cursor = wire.start_halfedge;
     for _ in 0..brep.topology.halfedges.len() {
         let halfedge = brep
@@ -105,31 +108,7 @@ fn profile_loop_mapped(
             .ok_or_else(|| {
                 GraphError::code(ErrorCode::InvalidTopology, "wire halfedge is missing")
             })?;
-        let edge = &brep.topology.edges[halfedge.edge as usize];
-        if let EdgeGeometry::Curve { curve, range } = edge.geometry {
-            if let CurveGeometry::Circle { frame, radius } = brep.geometry.curves[curve as usize] {
-                if brep.topology.halfedges.len() == 1
-                    && (range.hi - range.lo - std::f64::consts::TAU).abs() <= 1e-12
-                {
-                    return Ok(ProfileLoop::Circle {
-                        frame: mapped_frame(frame, mapping),
-                        radius,
-                    });
-                }
-            }
-            if !matches!(
-                brep.geometry.curves[curve as usize],
-                CurveGeometry::Line { .. }
-            ) {
-                return Err(GraphError::code(
-                    ErrorCode::UnsupportedGeometry,
-                    "profile curve is not supported",
-                ));
-            }
-        } else {
-            return Err(invalid("profile contains a collapsed edge"));
-        }
-        points.push(mapping.apply_point(brep.topology.vertices[halfedge.from as usize].position));
+        edges.push(loop_edge(&brep, halfedge, mapping)?);
         cursor = halfedge
             .next
             .ok_or_else(|| GraphError::code(ErrorCode::InvalidTopology, "wire chain is open"))?;
@@ -137,10 +116,67 @@ fn profile_loop_mapped(
             break;
         }
     }
-    if points.len() < 3 {
+    if edges.iter().any(|edge| edge.arc.is_some()) {
+        return Ok(ProfileLoop::Curves(edges));
+    }
+    if edges.len() < 3 {
         return Err(invalid("profile has fewer than three vertices"));
     }
-    Ok(ProfileLoop::Lines(points))
+    Ok(ProfileLoop::Lines(
+        edges.into_iter().map(|edge| edge.from).collect(),
+    ))
+}
+
+fn lone_circle(brep: &BrepEnvelope, mapping: Similarity3) -> Option<ProfileLoop> {
+    let [halfedge] = brep.topology.halfedges.as_slice() else {
+        return None;
+    };
+    let EdgeGeometry::Curve { curve, range } =
+        brep.topology.edges.get(halfedge.edge as usize)?.geometry
+    else {
+        return None;
+    };
+    match brep.geometry.curves.get(curve as usize)? {
+        CurveGeometry::Circle { frame, radius }
+            if (range.hi - range.lo - std::f64::consts::TAU).abs() <= 1e-12 =>
+        {
+            Some(ProfileLoop::Circle {
+                frame: mapped_frame(*frame, mapping),
+                radius: *radius,
+            })
+        }
+        _ => None,
+    }
+}
+
+fn loop_edge(
+    brep: &BrepEnvelope,
+    halfedge: &HalfEdge,
+    mapping: Similarity3,
+) -> Result<LoopEdge, GraphError> {
+    let EdgeGeometry::Curve { curve, .. } = brep.topology.edges[halfedge.edge as usize].geometry
+    else {
+        return Err(invalid("profile contains a collapsed edge"));
+    };
+    let arc = match brep.geometry.curves[curve as usize] {
+        CurveGeometry::Line { .. } => None,
+        CurveGeometry::Circle { frame, radius } => Some(LoopArc {
+            center: mapping.apply_point(frame.origin),
+            axis: mapping.apply_vector(frame.z),
+            radius,
+            counter_clockwise: matches!(halfedge.geometry_use.sense, Orientation::Forward),
+        }),
+        _ => {
+            return Err(GraphError::code(
+                ErrorCode::UnsupportedGeometry,
+                "profile curve is not supported",
+            ))
+        }
+    };
+    Ok(LoopEdge {
+        from: mapping.apply_point(brep.topology.vertices[halfedge.from as usize].position),
+        arc,
+    })
 }
 
 fn invalid(message: impl Into<String>) -> GraphError {

@@ -348,3 +348,51 @@ fn linear_extrusion_rejects_invalid_profile_relationships() {
     )
     .is_err());
 }
+
+fn circle(center: [f64; 2], radius: f64) -> Vec<ProfileEdge> {
+    [0.0, std::f64::consts::PI]
+        .into_iter()
+        .map(|start_angle| ProfileEdge::Arc {
+            center,
+            radius,
+            start_angle,
+            sweep_angle: std::f64::consts::PI,
+        })
+        .collect()
+}
+
+#[test]
+fn arc_edged_extrusion_accepts_an_offset_circular_hole() {
+    let body = arc_edged_extrusion_with_holes(
+        "offset-hole".into(),
+        Frame3::IDENTITY,
+        circle([0.0, 0.0], 2.0),
+        vec![circle([0.8, 0.0], 0.5)],
+        1.5,
+        fine_accuracy(),
+    )
+    .unwrap();
+    body.validate().unwrap();
+    assert_eq!(
+        classify_point(&body, [0.8, 0.0, 0.5]).unwrap(),
+        PointClassification::Outside
+    );
+    assert_eq!(
+        classify_point(&body, [-1.0, 0.0, 0.5]).unwrap(),
+        PointClassification::Inside
+    );
+}
+
+#[test]
+fn arc_edged_extrusion_rejects_a_hole_nested_on_a_seam() {
+    let error = arc_edged_extrusion_with_holes(
+        "nested-holes".into(),
+        Frame3::IDENTITY,
+        circle([0.0, 0.0], 3.0),
+        vec![circle([0.0, 0.0], 1.0), circle([0.5, 0.0], 0.2)],
+        1.0,
+        fine_accuracy(),
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("overlap or nest"), "{error}");
+}

@@ -6,6 +6,7 @@ use crate::kernel::{
 };
 use crate::record::{Failure, Record};
 use crate::runner::Case;
+use opengeometry::primitives::{ProfileSegment, SegmentArc};
 
 pub(crate) trait Script:
     Fn(&mut WorldGraph, &mut Record) -> Result<(), Failure> + Send + Sync + 'static
@@ -84,6 +85,33 @@ pub(crate) fn polyline(points: &[Point3], closed: bool) -> Primitive {
     Primitive::Polyline {
         points: points.to_vec(),
         closed,
+    }
+}
+
+pub(crate) fn segment(to: [f64; 2], arc: Option<([f64; 2], bool)>) -> ProfileSegment {
+    ProfileSegment {
+        to,
+        arc: arc.map(|(center, counter_clockwise)| SegmentArc {
+            center,
+            counter_clockwise,
+        }),
+    }
+}
+
+pub(crate) fn ring_segments(inner: f64, outer: f64) -> Vec<ProfileSegment> {
+    vec![
+        segment([outer, 0.0], None),
+        segment([0.0, outer], Some(([0.0, 0.0], true))),
+        segment([0.0, inner], None),
+        segment([inner, 0.0], Some(([0.0, 0.0], false))),
+    ]
+}
+
+pub(crate) fn profile(start: [f64; 2], segments: Vec<ProfileSegment>) -> Primitive {
+    Primitive::Profile {
+        start,
+        segments,
+        closed: true,
     }
 }
 

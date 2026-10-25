@@ -58,6 +58,24 @@ impl ProfileEdge {
         }
     }
 
+    pub(crate) fn midpoint(&self) -> [f64; 2] {
+        match self {
+            Self::Line { from, to } => [(from[0] + to[0]) / 2.0, (from[1] + to[1]) / 2.0],
+            Self::Arc {
+                center,
+                radius,
+                start_angle,
+                sweep_angle,
+            } => {
+                let angle = start_angle + sweep_angle / 2.0;
+                [
+                    center[0] + radius * angle.cos(),
+                    center[1] + radius * angle.sin(),
+                ]
+            }
+        }
+    }
+
     fn signed_area_twice(&self) -> f64 {
         let (from, to) = self.endpoints();
         match self {
@@ -126,8 +144,12 @@ pub(crate) fn validate_arc_profile_loop(
             ));
         }
     }
-    check_self_intersections(edges, g)?;
-    let signed_area_twice: f64 = edges.iter().map(ProfileEdge::signed_area_twice).sum();
+    if profile_self_intersects(edges, true, g) {
+        return Err(GeometryError::InvalidGeometry(
+            "arc-edged profile self-intersects".into(),
+        ));
+    }
+    let signed_area_twice = profile_area_twice(edges);
     if signed_area_twice.abs() <= 16.0 * g * g {
         return Err(GeometryError::UnresolvedIntersection(
             "profile area is below resolution".into(),
@@ -136,13 +158,18 @@ pub(crate) fn validate_arc_profile_loop(
     Ok(signed_area_twice)
 }
 
-fn check_self_intersections(edges: &[ProfileEdge], g: f64) -> Result<(), GeometryError> {
+pub(crate) fn profile_area_twice(edges: &[ProfileEdge]) -> f64 {
+    edges.iter().map(ProfileEdge::signed_area_twice).sum()
+}
+
+pub(crate) fn profile_self_intersects(edges: &[ProfileEdge], closed: bool, g: f64) -> bool {
+    let wraps = |first: usize, second: usize| closed && first == 0 && second == edges.len() - 1;
     for first in 0..edges.len() {
         for second in (first + 1)..edges.len() {
-            let adjacent = second == first + 1 || first == 0 && second == edges.len() - 1;
+            let adjacent = second == first + 1 || wraps(first, second);
             let expected = if second == first + 1 {
                 Some(edges[first].endpoints().1)
-            } else if first == 0 && second == edges.len() - 1 {
+            } else if wraps(first, second) {
                 Some(edges[first].endpoints().0)
             } else {
                 None
@@ -150,19 +177,18 @@ fn check_self_intersections(edges: &[ProfileEdge], g: f64) -> Result<(), Geometr
             for point in profile_edge_intersections(&edges[first], &edges[second], g) {
                 let at_expected = expected
                     .is_some_and(|shared| (point[0] - shared[0]).hypot(point[1] - shared[1]) <= g);
-                let at_second_join = edges.len() == 2
+                let at_second_join = closed
+                    && edges.len() == 2
                     && (point[0] - edges[first].endpoints().0[0])
                         .hypot(point[1] - edges[first].endpoints().0[1])
                         <= g;
                 if !adjacent || !(at_expected || at_second_join) {
-                    return Err(GeometryError::InvalidGeometry(
-                        "arc-edged profile self-intersects".into(),
-                    ));
+                    return true;
                 }
             }
         }
     }
-    Ok(())
+    false
 }
 
 pub(crate) fn profile_edge_intersections(
@@ -314,7 +340,7 @@ fn offer_line_circle_points(
     }
 }
 
-pub(crate) fn arc_profile_contains(edges: &[ProfileEdge], point: [f64; 2], g: f64) -> bool {
+fn arc_profile_contains(edges: &[ProfileEdge], point: [f64; 2], g: f64) -> bool {
     let ring = edges
         .iter()
         .map(|edge| match edge {
@@ -336,4 +362,31 @@ pub(crate) fn arc_profile_contains(edges: &[ProfileEdge], point: [f64; 2], g: f6
         })
         .collect::<Vec<_>>();
     winding(Pt2::new(point[0], point[1]), &ring, g) != 0
+}
+
+pub(crate) fn loop_inside(inner: &[ProfileEdge], outer: &[ProfileEdge], g: f64) -> bool {
+    let levels = outer
+        .iter()
+        .flat_map(|edge| match edge {
+            ProfileEdge::Line { from, .. } => vec![from[1]],
+            ProfileEdge::Arc { center, radius, .. } => {
+                vec![
+                    edge.endpoints().0[1],
+                    center[1] - radius,
+                    center[1] + radius,
+                ]
+            }
+        })
+        .collect::<Vec<_>>();
+    let clearance = |point: &[f64; 2]| {
+        levels
+            .iter()
+            .map(|level| (point[1] - level).abs())
+            .fold(f64::INFINITY, f64::min)
+    };
+    inner
+        .iter()
+        .map(ProfileEdge::midpoint)
+        .max_by(|a, b| clearance(a).total_cmp(&clearance(b)))
+        .is_some_and(|probe| arc_profile_contains(outer, probe, g))
 }

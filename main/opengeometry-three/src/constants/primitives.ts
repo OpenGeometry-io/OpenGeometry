@@ -1,8 +1,12 @@
+import type { ArcParams, ProfileParams } from '../dto/primitives';
+
 export const OG_PRIMITIVE_RECTANGLE = 'Rectangle' as const;
 export const OG_PRIMITIVE_CIRCLE = 'Circle' as const;
 export const OG_PRIMITIVE_POLYLINE = 'Polyline' as const;
 export const OG_PRIMITIVE_CUBOID = 'Cuboid' as const;
 export const OG_PRIMITIVE_CYLINDER = 'Cylinder' as const;
+export const OG_PRIMITIVE_PROFILE = 'Profile' as const;
+export const OG_PRIMITIVE_ARC = 'Arc' as const;
 
 export const OG_PRIMITIVE_PARAMS_RECTANGLE = (
   value: { width: number; breadth: number },
@@ -17,3 +21,5 @@ export const OG_PRIMITIVE_PARAMS_CUBOID = (
 export const OG_PRIMITIVE_PARAMS_CYLINDER = (
   value: { radius: number; height: number },
 ): { radius: number; height: number } => value;
+export const OG_PRIMITIVE_PARAMS_PROFILE = (value: ProfileParams): ProfileParams => value;
+export const OG_PRIMITIVE_PARAMS_ARC = (value: ArcParams): ArcParams => value;

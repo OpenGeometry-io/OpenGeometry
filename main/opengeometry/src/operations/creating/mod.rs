@@ -3,4 +3,4 @@ mod holes;
 mod profile;
 pub(crate) mod sweep;
 
-pub(crate) use profile::{mapped_frame, ProfileLoop};
+pub(crate) use profile::{mapped_frame, LoopArc, LoopEdge, ProfileLoop};
