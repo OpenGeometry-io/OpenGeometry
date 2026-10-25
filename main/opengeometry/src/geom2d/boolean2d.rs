@@ -28,7 +28,7 @@ struct WeldedBoundary {
     vertex_count: usize,
 }
 
-struct VertexWeld {
+pub(super) struct VertexWeld {
     reach: f64,
     vertices: Vec<Pt2>,
     cells: std::collections::HashMap<(i64, i64), Vec<usize>>,
@@ -72,7 +72,7 @@ pub(crate) fn probe_reach(mid: Pt2, len: f64, most: f64, sub_edges: &[Edge2], ep
     clearance * 0.5
 }
 
-fn distance_to_segment(point: Pt2, a: Pt2, b: Pt2) -> f64 {
+pub(super) fn distance_to_segment(point: Pt2, a: Pt2, b: Pt2) -> f64 {
     let along = Pt2::new(b.x - a.x, b.z - a.z);
     let length_squared = dot2(along, along);
     let t = if length_squared > 0.0 {
@@ -241,12 +241,12 @@ fn welded_boundary(mut edges: Vec<Edge2>, eps: f64) -> WeldedBoundary {
     WeldedBoundary {
         edges,
         ends,
-        vertex_count: weld.vertices.len(),
+        vertex_count: weld.vertex_count(),
     }
 }
 
 impl VertexWeld {
-    fn new(reach: f64) -> Self {
+    pub(super) fn new(reach: f64) -> Self {
         Self {
             reach,
             vertices: Vec::new(),
@@ -254,7 +254,7 @@ impl VertexWeld {
         }
     }
 
-    fn weld(&mut self, point: Pt2) -> usize {
+    pub(super) fn weld(&mut self, point: Pt2) -> usize {
         let (cx, cz) = self.cell(point);
         let mut found: Option<usize> = None;
         for key in [-1, 0, 1]
@@ -283,6 +283,10 @@ impl VertexWeld {
                 .push(self.vertices.len() - 1);
             self.vertices.len() - 1
         })
+    }
+
+    pub(super) fn vertex_count(&self) -> usize {
+        self.vertices.len()
     }
 
     fn cell(&self, point: Pt2) -> (i64, i64) {

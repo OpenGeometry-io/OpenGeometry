@@ -1,3 +1,4 @@
+use crate::geom2d::boolean2d::distance_to_segment;
 use crate::geom2d::poly2d::Pt2;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::TAU;
@@ -164,6 +165,31 @@ impl CurveEdge2 {
                     Some(0.0)
                 } else {
                     None
+                }
+            }
+        }
+    }
+
+    pub(super) fn distance_to(&self, point: Pt2) -> f64 {
+        match self {
+            Self::Line { from, to } => distance_to_segment(point, p(*from), p(*to)),
+            Self::Arc {
+                center,
+                radius,
+                start_angle,
+                sweep_angle,
+            } => {
+                let radial = sub(point, p(*center));
+                let angle = radial.z.atan2(radial.x);
+                let travel = if *sweep_angle > 0.0 {
+                    (angle - start_angle).rem_euclid(TAU)
+                } else {
+                    (start_angle - angle).rem_euclid(TAU)
+                };
+                if travel <= sweep_angle.abs() {
+                    (radial.x.hypot(radial.z) - radius).abs()
+                } else {
+                    distance(point, self.point(0.0)).min(distance(point, self.point(1.0)))
                 }
             }
         }

@@ -1,4 +1,5 @@
 mod boolean2d;
+mod curved_boolean2d;
 mod region_probe;
 
 use super::boolean2d::{

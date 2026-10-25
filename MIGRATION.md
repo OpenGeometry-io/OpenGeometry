@@ -255,6 +255,7 @@ Both follow a quarter turn at a bend radius of 0.6 m, one and a half times the 0
 - Each bend radius must exceed the profile's reach from the path start, the largest distance from the start to the profile, by four geometric tolerances. A tighter bend throws `SweepSelfIntersection`.
 - An arc above half a turn sweeps as equal bends of at most half a turn each, and each bend has its own `seg-` face keys.
 - The overlap rule is unchanged: two path segments that are not neighbours must stay more than twice the reach apart. A tight line, bend, line path can still throw `SweepSelfIntersection` although the bend keeps its two lines apart.
+- A Boolean of solids with circular-arc sides (arc extrusions or cylinders) that leaves a hole outside every region throws `OGError` `InvalidTopology`. 2.0 dropped the hole and returned a body.
 
 ### Check your result
 
