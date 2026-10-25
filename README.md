@@ -43,7 +43,7 @@ It is the geometry engine layer, not a full CAD application. Floorkit is a downs
 | Area | What 2.5 has |
 | --- | --- |
 | **Primitives** | Wires: rectangle, circle, polyline (open or closed). Solids: cuboid, cylinder. Each can be placed on any plane. |
-| **Operations** | Extrude a closed wire into a solid, with holes. Sweep a profile along a path. Union, subtract and intersect, with one to a hundred tool solids in one call. |
+| **Operations** | Extrude a closed wire into a solid, with holes. Sweep a profile along a path, capped into a solid or open-ended into a sheet. Union, subtract and intersect, with one to a hundred tool solids in one call. |
 | **Parametric edits** | `rebuild` gives an existing body new parameters in place. |
 | **Assemblies** | Assemblies with parent and child placement; translate, rotate, scale and place; independent copies and shared instances. |
 | **History** | Marks with rollback and release; transactions, with a dry-run option. |
@@ -159,7 +159,7 @@ This section is a compact reference for writing OpenGeometry 2.5 code, by hand o
 
 **Which line is installed.** The 2.5 entry exports `OpenGeometry.create`, `Solid` and `Wire`. Code that uses `Cuboid`, `Vector3` or `setPlacement` is written for 2.0 and does not work with 2.5. The `version` in `node_modules/opengeometry/package.json` settles it.
 
-**The whole public surface.** The entry exports `OpenGeometry`, `Solid`, `Wire`, `SystemAssembly`, `OGMark`, `OGError` and the `OG_*` constants. Every point and vector is `[x, y, z]`. Model units are metres, and Y is up.
+**The whole public surface.** The entry exports `OpenGeometry`, `Solid`, `Sheet`, `Wire`, `SystemAssembly`, `OGMark`, `OGError` and the `OG_*` constants. Every point and vector is `[x, y, z]`. Model units are metres, and Y is up.
 
 | Export | Call and parameters |
 | --- | --- |
@@ -167,7 +167,8 @@ This section is a compact reference for writing OpenGeometry 2.5 code, by hand o
 | `Wire` | `new Wire(kind, params, options?)`. `OG_PRIMITIVE_RECTANGLE` `{ width, breadth }`, `OG_PRIMITIVE_CIRCLE` `{ radius }`, `OG_PRIMITIVE_POLYLINE` `{ points, closed? }`. |
 | Profile wire | `new Wire(OG_PRIMITIVE_PROFILE, { start, segments, closed }, options?)`. Points are `[u, v]` in `plane`; a segment is `{ to }` for a line or `{ to, arc: { center, counterClockwise } }` for an arc. A closed profile is an extrude profile or hole. |
 | Arc wire | `new Wire(OG_PRIMITIVE_ARC, { radius, startAngle, sweepAngle }, options?)`. Angles in radians from the `plane` x direction, centred on the `plane` origin; the sweep is nonzero and less than one turn. |
-| `Solid` | `new Solid(kind, params, options?)`. `OG_PRIMITIVE_CUBOID` `{ width, height, depth }`, `OG_PRIMITIVE_CYLINDER` `{ radius, height }`, `OG_PRIMITIVE_CYLINDER_SECTOR` `{ radius, height, startAngle, sweepAngle }` (radians from the `plane` x direction, counter-clockwise seen from the side the normal points to; sweep nonzero and less than one turn), `OG_OPERATION_EXTRUDE` `{ profile, holes?, distance }`, `OG_OPERATION_SWEEP` `{ profile, path }`; `profile`, `holes` and `path` are wires. |
+| `Solid` | `new Solid(kind, params, options?)`. `OG_PRIMITIVE_CUBOID` `{ width, height, depth }`, `OG_PRIMITIVE_CYLINDER` `{ radius, height }`, `OG_PRIMITIVE_CYLINDER_SECTOR` `{ radius, height, startAngle, sweepAngle }` (radians from the `plane` x direction, counter-clockwise seen from the side the normal points to; sweep nonzero and less than one turn), `OG_OPERATION_EXTRUDE` `{ profile, holes?, distance }`, `OG_OPERATION_SWEEP` `{ profile, path, caps? }`; `profile`, `holes` and `path` are wires. |
+| `Sheet` | `new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false })`: an open-ended sweep, faces that enclose no volume. It shows its surface, from the front only, and its outline; `OpenGeometry.exportStep` refuses it. |
 | Body options | `{ ogId?, parent?, appearance?, plane? }`. `plane` is `{ origin?, normal?, xDirection? }` and applies to primitives only; by default it is the ground plane through the origin, normal `[0, 1, 0]`, x direction `[1, 0, 0]`. |
 | Booleans | `solid.operate(kind, { tools, instances? })` with `OG_OPERATION_SUBTRACT`, `OG_OPERATION_UNION` or `OG_OPERATION_INTERSECT`; `tools` is one to a hundred solids. |
 | Transforms | `node.transform(kind, params)` on a body or an assembly: `OG_TRANSFORM_TRANSLATE` `{ offset }`, `OG_TRANSFORM_ROTATE` `{ axis, degrees, pivot? }`, `OG_TRANSFORM_SCALE` `{ factor, pivot? }`, `OG_TRANSFORM_PLACE` `{ origin?, xDirection?, normal?, scale? }`. `getPlacement()` and `getWorldPlacement()` return `{ origin, xDirection, normal, scale }`. |

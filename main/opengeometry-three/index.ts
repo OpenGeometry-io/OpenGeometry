@@ -3,6 +3,7 @@ export { OGMark } from './src/marks/og-mark';
 export { SystemAssembly } from './src/bodies/system-assembly';
 export { Wire } from './src/bodies/wire';
 export { Solid } from './src/bodies/solid';
+export { Sheet } from './src/bodies/sheet';
 export { OGError } from './src/errors';
 export * from './src/constants/index';
 export type { ArcParams, CylinderSectorParams, ProfileArc, ProfileParams, ProfileSegment } from './src/dto/primitives';

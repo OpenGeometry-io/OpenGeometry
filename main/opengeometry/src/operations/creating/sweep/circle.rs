@@ -1,6 +1,6 @@
 use crate::brep::{
-    boundary, plane_boundary, unit, uv_line, Accuracy, BrepEnvelope, Builder, CurveGeometry,
-    EdgeGeometry, Frame3, GeometryError, Orientation, PcurveGeometry, SurfaceGeometry, Use,
+    boundary, plane_boundary, unit, uv_line, Accuracy, Builder, CurveGeometry, EdgeGeometry,
+    Frame3, GeometryError, Orientation, PcurveGeometry, SurfaceGeometry, Use,
 };
 use crate::math::{add, cross, dot, norm, scale, sub, Interval, Point3};
 use crate::operations::OperationError;
@@ -33,8 +33,9 @@ pub(super) fn build(
     radius: f64,
     path: Vec<Point3>,
     directions: Vec<Point3>,
+    caps: bool,
     accuracy: Accuracy,
-) -> Result<BrepEnvelope, OperationError> {
+) -> Result<Builder, OperationError> {
     let mut builder = Builder::new(id, accuracy)?;
     let first_axis = directions[0];
     let SweptRings {
@@ -63,17 +64,19 @@ pub(super) fn build(
     )?);
     check_miter_planes(&rings, &cylinders, &directions, radius, last, accuracy)?;
     let seams = add_seams(&mut builder, &rings, last)?;
-    let start_frame = Frame3::from_axis(rings[0].centre, scale(first_axis, -1.0), profile.x)?;
-    let end_frame = Frame3::from_axis(rings[last].centre, directions[last - 1], x)?;
-    add_caps(
-        &mut builder,
-        &rings,
-        last,
-        start_frame,
-        end_frame,
-        radius,
-        accuracy,
-    )?;
+    if caps {
+        let start_frame = Frame3::from_axis(rings[0].centre, scale(first_axis, -1.0), profile.x)?;
+        let end_frame = Frame3::from_axis(rings[last].centre, directions[last - 1], x)?;
+        add_caps(
+            &mut builder,
+            &rings,
+            last,
+            start_frame,
+            end_frame,
+            radius,
+            accuracy,
+        )?;
+    }
     add_side_faces(
         &mut builder,
         &rings,
@@ -83,7 +86,7 @@ pub(super) fn build(
         radius,
         accuracy,
     )?;
-    Ok(builder.finish_solid()?)
+    Ok(builder)
 }
 
 fn add_rings(

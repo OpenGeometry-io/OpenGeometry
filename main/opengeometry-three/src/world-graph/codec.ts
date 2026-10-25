@@ -33,7 +33,8 @@ export function operationParams(kind: string, params: Record<string, unknown>, c
     return { kind, profile: ogIdOf(params['profile'], call, 'profile'), holes: holeIds, distance: params['distance'] };
   }
   if (kind === 'Sweep') {
-    return { kind, profile: ogIdOf(params['profile'], call, 'profile'), path: ogIdOf(params['path'], call, 'path') };
+    const profile = ogIdOf(params['profile'], call, 'profile');
+    return { kind, profile, path: ogIdOf(params['path'], call, 'path'), caps: params['caps'] };
   }
   return { kind, ...params };
 }

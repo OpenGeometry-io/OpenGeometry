@@ -127,6 +127,7 @@ pub(crate) fn sweep(profile: &str, path: &str) -> CreatingOperation {
     CreatingOperation::Sweep {
         profile: profile.into(),
         path: path.into(),
+        caps: None,
     }
 }
 

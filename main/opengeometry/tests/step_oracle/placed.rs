@@ -298,6 +298,7 @@ fn sweep_rail_exports_projected_edges_without_pcurves() {
             CreatingOperation::Sweep {
                 profile: "profile".into(),
                 path: "path".into(),
+                caps: None,
             },
             named("rail"),
         )

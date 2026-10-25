@@ -8,7 +8,7 @@ export function existingParams(ogId: string): Record<string, unknown> {
 }
 
 export function createBody(
-  kind: string, params: Record<string, unknown>, options: BodyOptions, bodyType: 'Wire' | 'Solid',
+  kind: string, params: Record<string, unknown>, options: BodyOptions, bodyType: 'Wire' | 'Sheet' | 'Solid',
 ): string {
   const existing = existingNodeId(params);
   if (existing !== undefined) return existing;

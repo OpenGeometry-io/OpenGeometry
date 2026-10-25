@@ -6,7 +6,7 @@ use super::extrude;
 use super::profile::{check_lines, newell_normal, profile_frame, ProfileLoop};
 use crate::brep::{
     padded_uv_bounds, plane_boundary, unit, Accuracy, BrepEnvelope, Builder, CurveGeometry, Frame3,
-    GeometryError, Orientation, SurfaceGeometry, Use,
+    GeometryError, Orientation, Shell, SurfaceGeometry, Use,
 };
 use crate::math::{add, cross, dot, norm, scale, sub, Interval, Point3};
 use crate::operations::{invalid, OperationError};
@@ -22,6 +22,7 @@ pub(crate) fn build(
     id: String,
     profile: ProfileLoop,
     mut path: Vec<Point3>,
+    caps: bool,
     accuracy: Accuracy,
 ) -> Result<BrepEnvelope, OperationError> {
     if path.len() < 2 || path.iter().flatten().any(|value| !value.is_finite()) {
@@ -38,7 +39,7 @@ pub(crate) fn build(
             "profile plane is not at the start and perpendicular to the path",
         ));
     }
-    if directions.len() == 1 {
+    if directions.len() == 1 && caps {
         return extrude::build(
             id,
             profile,
@@ -51,7 +52,8 @@ pub(crate) fn build(
     let points = match profile {
         ProfileLoop::Lines(points) => points,
         ProfileLoop::Circle { frame, radius } => {
-            return sweep_circle::build(id, frame, radius, path, directions, accuracy)
+            let builder = sweep_circle::build(id, frame, radius, path, directions, caps, accuracy)?;
+            return finish_sweep(builder, caps);
         }
         ProfileLoop::Curves(_) => {
             return Err(
@@ -70,15 +72,17 @@ pub(crate) fn build(
     check_miter_spans(&rings, &directions, count, accuracy)?;
     let mut builder = Builder::new(id, accuracy)?;
     let topology = add_sweep_topology(&mut builder, &rings, &directions, count)?;
-    add_caps(
-        &mut builder,
-        &topology,
-        &path,
-        &directions,
-        &rings,
-        count,
-        accuracy,
-    )?;
+    if caps {
+        add_caps(
+            &mut builder,
+            &topology,
+            &path,
+            &directions,
+            &rings,
+            count,
+            accuracy,
+        )?;
+    }
     add_side_faces(
         &mut builder,
         &topology,
@@ -87,7 +91,25 @@ pub(crate) fn build(
         count,
         accuracy,
     )?;
-    Ok(builder.finish_solid()?)
+    finish_sweep(builder, caps)
+}
+
+fn finish_sweep(builder: Builder, caps: bool) -> Result<BrepEnvelope, OperationError> {
+    if caps {
+        return Ok(builder.finish_solid()?);
+    }
+    finish_sheet(builder)
+}
+
+fn finish_sheet(mut builder: Builder) -> Result<BrepEnvelope, OperationError> {
+    let faces = (0..builder.brep.topology.faces.len() as u32).collect();
+    builder.brep.topology.shells.push(Shell {
+        id: 0,
+        faces,
+        is_closed: false,
+    });
+    builder.brep.validate()?;
+    Ok(builder.brep)
 }
 
 fn remove_collinear_joints(

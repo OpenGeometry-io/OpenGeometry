@@ -23,6 +23,8 @@ It is written for people and for coding assistants alike: each section says what
 - `OG_PRIMITIVE_PARAMS_PROFILE`, `OG_PRIMITIVE_PARAMS_ARC` and `OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR` type their parameters. The entry exports the types `ProfileParams`, `ProfileSegment`, `ProfileArc`, `ArcParams` and `CylinderSectorParams`.
 - `body.getWorldBrep()` reads a body's BRep placed in the world. It makes no body and changes nothing.
 - `body.faceNormalAt(faceId, point)` returns the unit normal of a face at a point, in the body's own coordinates, with the face's orientation applied.
+- `OG_OPERATION_SWEEP` takes `caps`. It is `true` when left out, so existing sweeps are unchanged. `caps: false` leaves both ends open.
+- `Sheet` is a new body class beside `Wire` and `Solid`, with the body type `'Sheet'`: faces that enclose no volume. `new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false })` makes an open-ended sweep. A Sheet shows its surface, from the front only, and its outline.
 
 ### Before and after
 
@@ -115,6 +117,42 @@ if (bottom) {
 
 Both read the box's world vertices without making a body. The Unreleased normal is `[0, -1, 0]` in the box's own coordinates; `worldNormal` is that normal turned by the box's 30 degree rotation, about `[0.5, -0.866, 0]`. `OpenGeometry.flush()` brings `matrixWorld` up to date with the transform.
 
+2.0:
+
+```js
+import { Sweep, Vector3 } from 'opengeometry';
+const duct = new Sweep({
+  path: [new Vector3(0, 0, 0), new Vector3(0, 3, 0), new Vector3(3, 3, 0)],
+  profile: [new Vector3(-0.35, 0, -0.2), new Vector3(0.35, 0, -0.2), new Vector3(0.35, 0, 0.2), new Vector3(-0.35, 0, 0.2)],
+  color: 0x2a9d8f,
+  capStart: false,
+  capEnd: false,
+});
+```
+
+Unreleased:
+
+```ts
+import {
+  OpenGeometry,
+  Sheet,
+  Wire,
+  OG_OPERATION_PARAMS_SWEEP,
+  OG_OPERATION_SWEEP,
+  OG_PRIMITIVE_POLYLINE,
+  OG_PRIMITIVE_RECTANGLE,
+} from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const profile = new Wire(OG_PRIMITIVE_RECTANGLE, { width: 0.7, breadth: 0.4 });
+const path = new Wire(OG_PRIMITIVE_POLYLINE, { points: [[0, 0, 0], [0, 3, 0], [3, 3, 0]] });
+const duct = new Sheet(OG_OPERATION_SWEEP, OG_OPERATION_PARAMS_SWEEP({ profile, path, caps: false }));
+console.log(duct.bodyType, duct.getBrep().topology.faces.length);
+```
+
+Both make the same open duct, 0.7 m by 0.4 m, along an L-shaped path: eight side faces and no end faces. The Unreleased line prints `Sheet 8`.
+
 ### Replace this with that
 
 | 2.0 | Unreleased |
@@ -127,6 +165,8 @@ Both read the box's world vertices without making a body. The Unreleased normal 
 | `new Arc({ center, radius, startAngle, sweepAngle })` | `new Wire(OG_PRIMITIVE_ARC, { radius, startAngle, sweepAngle }, { plane: { origin: [center.x, center.y, center.z] } })` |
 | `AnalyticSolid.fromBrep(solid.getWorldBrepSerialized())`, to read a world copy | `body.getWorldBrep()`, which returns the BRep object and makes no body; for a copy you will change, `body.duplicate()` |
 | `solid.normalAtFace(faceId, new Vector3(x, y, z))` | `body.faceNormalAt(faceId, [x, y, z])`, which returns `[x, y, z]` |
+| `new Sweep({ path, profile, capStart: false, capEnd: false })` | `new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false })`, with the profile and path as wires (see the 2.0 to 2.5 sweep rows) |
+| `new Sweep({ path, profile, capStart: true, capEnd: true })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })` |
 
 ### Different behaviour
 
@@ -138,6 +178,11 @@ Both read the box's world vertices without making a body. The Unreleased normal 
 - `getWorldBrep()` throws `LimitExceeded` for a body placed so far from the origin that its coordinates lose precision, as 2.0 did; `getBrep()` still works.
 - `faceNormalAt` throws `InvalidParameter` for a face id that is not an unsigned integer or not a face of the body, and for a point that is not three finite numbers. A point on a cylinder axis, a cone apex or a sphere centre throws `InvalidGeometry`. A point off the face is projected onto it, as in 2.0.
 - A cylinder sector refuses a zero, non-finite or full-turn sweep with `InvalidParameter`; 2.0 turned a full turn into a cylinder. Use `OG_PRIMITIVE_CYLINDER` for that.
+- `caps` opens both ends or neither. A 2.0 sweep with one cap, such as `capStart: true, capEnd: false`, has no form here.
+- `new Solid(OG_OPERATION_SWEEP, { ..., caps: false })` throws `BodyTypeMismatch` and makes no body; use `Sheet`. `new Sheet` with a primitive or a capped sweep throws `BodyTypeMismatch` too.
+- A Sheet cannot be exported: `OpenGeometry.exportStep` with a Sheet in `nodes` rejects with `InvalidOperand`, and a Sheet inside an exported assembly is skipped and listed in the report.
+- `rebuild` keeps the body type: a Sheet rebuilt with `caps` true, or a Solid rebuilt with `caps: false`, throws `BodyTypeMismatch`.
+- Sheets get their own default ids, `sheet-1`, `sheet-2` and so on, and show their outline by default.
 
 ### Check your result
 
@@ -145,6 +190,7 @@ Both read the box's world vertices without making a body. The Unreleased normal 
 2. The `text` of `await OpenGeometry.exportStep({ nodes: [sector] })` has one `CYLINDRICAL_SURFACE` per arc.
 3. For an unmoved body, `getWorldBrep()` equals `getBrep()`; for a moved one its vertices are the `getBrep()` vertices moved by `matrixWorld`.
 4. Each `faceNormalAt` result has length 1 and points out of the body in its own coordinates.
+5. An open-ended sweep's `getBrep()` has no faces whose `key` starts with `cap-`, and `solids` is empty.
 
 ## 2.0 to 2.5
 

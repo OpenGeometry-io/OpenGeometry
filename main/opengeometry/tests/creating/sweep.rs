@@ -1,6 +1,8 @@
 use super::support::extrude;
+use opengeometry::brep::BodyType;
 use opengeometry::world_graph::{
-    CreateOptions, CreatingOperation, EditScope, ErrorCode, Plane, Primitive, Transform,
+    CreateOptions, CreatingOperation, EditScope, ErrorCode, Plane, Primitive, StepOptions,
+    Transform, WorldGraph,
 };
 use opengeometry_test_support::volume;
 use opengeometry_test_support::world_graph::{graph, named};
@@ -31,6 +33,7 @@ fn l_path_sweep_has_centroid_path_volume() {
             CreatingOperation::Sweep {
                 profile: "profile".into(),
                 path: "path".into(),
+                caps: None,
             },
             named("solid"),
         )
@@ -74,6 +77,7 @@ fn noncoplanar_path_sweep_is_valid_and_repeatable() {
     let operation = CreatingOperation::Sweep {
         profile: "profile".into(),
         path: "path".into(),
+        caps: None,
     };
     world
         .create_operation(operation.clone(), named("solid"))
@@ -107,6 +111,7 @@ fn circular_l_path_sweep_is_watertight() {
             CreatingOperation::Sweep {
                 profile: "profile".into(),
                 path: "path".into(),
+                caps: None,
             },
             named("solid"),
         )
@@ -165,6 +170,7 @@ fn circular_noncoplanar_sweep_is_valid() {
             CreatingOperation::Sweep {
                 profile: "profile".into(),
                 path: "path".into(),
+                caps: None,
             },
             named("solid"),
         )
@@ -200,6 +206,7 @@ fn circular_sweep_keeps_profile_offset_from_path() {
             CreatingOperation::Sweep {
                 profile: "profile".into(),
                 path: "path".into(),
+                caps: None,
             },
             named("solid"),
         )
@@ -236,6 +243,7 @@ fn invalid_sweep_and_extrude_leave_graph_unchanged() {
             CreatingOperation::Sweep {
                 profile: "profile".into(),
                 path: "path".into(),
+                caps: None,
             },
             named("bad"),
         )
@@ -281,6 +289,7 @@ fn sweep_rejects_miter_and_separated_segment_collisions() {
                 CreatingOperation::Sweep {
                     profile: "profile".into(),
                     path: "path".into(),
+                    caps: None,
                 },
                 named("solid"),
             )
@@ -325,6 +334,7 @@ fn sweep_profile_tilted_1e_6_rad_gives_invalid_parameter() {
             CreatingOperation::Sweep {
                 profile: "tilted".into(),
                 path: "rise".into(),
+                caps: None,
             },
             named("tilted-sweep"),
         )
@@ -366,6 +376,7 @@ fn collinear_diagonal_path_merges() {
             CreatingOperation::Sweep {
                 profile: "square".into(),
                 path: "diagonal".into(),
+                caps: None,
             },
             named("prism"),
         )
@@ -379,4 +390,156 @@ fn collinear_diagonal_path_merges() {
         "{} vs {expected}",
         measured.value
     );
+}
+
+fn open_sweep_graph(profile: Primitive, points: Vec<[f64; 3]>) -> WorldGraph {
+    let mut world = graph();
+    world.create_primitive(profile, named("profile")).unwrap();
+    world
+        .create_primitive(
+            Primitive::Polyline {
+                points,
+                closed: false,
+            },
+            named("path"),
+        )
+        .unwrap();
+    world
+}
+
+fn sweep_with_caps(caps: Option<bool>) -> CreatingOperation {
+    CreatingOperation::Sweep {
+        profile: "profile".into(),
+        path: "path".into(),
+        caps,
+    }
+}
+
+fn square() -> Primitive {
+    Primitive::Rectangle {
+        width: 1.0,
+        breadth: 1.0,
+    }
+}
+
+fn l_path() -> Vec<[f64; 3]> {
+    vec![[0.0, 0.0, 0.0], [0.0, 3.0, 0.0], [3.0, 3.0, 0.0]]
+}
+
+fn face_keys(world: &WorldGraph, id: &str) -> Vec<String> {
+    let value: serde_json::Value =
+        serde_json::from_str(&world.brep(id).unwrap().to_json().unwrap()).unwrap();
+    value["topology"]["faces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|face| face["key"].as_str().unwrap().to_string())
+        .collect()
+}
+
+fn open_shell(world: &WorldGraph, id: &str) {
+    let brep = world.brep(id).unwrap();
+    assert_eq!(brep.body_type().unwrap(), BodyType::Sheet);
+    let value: serde_json::Value = serde_json::from_str(&brep.to_json().unwrap()).unwrap();
+    assert_eq!(value["topology"]["shells"][0]["is_closed"], false);
+    assert_eq!(value["solids"].as_array().unwrap().len(), 0);
+    assert!(face_keys(world, id)
+        .iter()
+        .all(|key| !key.starts_with("cap-")));
+}
+
+#[test]
+fn open_ended_l_path_sweep_is_a_sheet_with_an_open_shell_and_copies_as_a_sheet() {
+    let mut world = open_sweep_graph(square(), l_path());
+    let (id, _) = world
+        .create_operation(sweep_with_caps(Some(false)), CreateOptions::default())
+        .unwrap();
+    assert!(id.starts_with("sheet-"), "{id}");
+    open_shell(&world, &id);
+    assert_eq!(world.brep(&id).unwrap().topology.faces.len(), 8);
+    let (copy, _) = world.duplicate(&id, Default::default()).unwrap();
+    assert!(copy.starts_with("sheet-"), "{copy}");
+}
+
+#[test]
+fn open_ended_single_segment_sweep_builds_through_the_sweep() {
+    let mut world = open_sweep_graph(square(), vec![[0.0; 3], [0.0, 2.0, 0.0]]);
+    world
+        .create_operation(sweep_with_caps(Some(false)), named("sheet"))
+        .unwrap();
+    open_shell(&world, "sheet");
+    let keys = face_keys(&world, "sheet");
+    assert_eq!(keys.len(), 4);
+    assert!(keys.iter().all(|key| key.starts_with("seg-0:")), "{keys:?}");
+}
+
+#[test]
+fn open_ended_circle_sweeps_have_no_cap_faces() {
+    for points in [vec![[0.0; 3], [0.0, 2.0, 0.0]], l_path()] {
+        let segments = points.len() - 1;
+        let mut world = open_sweep_graph(Primitive::Circle { radius: 0.5 }, points);
+        world
+            .create_operation(sweep_with_caps(Some(false)), named("sheet"))
+            .unwrap();
+        open_shell(&world, "sheet");
+        assert_eq!(face_keys(&world, "sheet").len(), 2 * segments);
+    }
+}
+
+#[test]
+fn open_ended_sweep_asked_for_as_a_solid_is_body_type_mismatch_and_adds_no_node() {
+    let mut world = open_sweep_graph(square(), l_path());
+    let before = world.node_count();
+    let options = CreateOptions {
+        body_type: Some(BodyType::Solid),
+        ..named("solid")
+    };
+    let error = world
+        .create_operation(sweep_with_caps(Some(false)), options)
+        .unwrap_err();
+    assert_eq!(error.error_code(), ErrorCode::BodyTypeMismatch);
+    assert_eq!(world.node_count(), before);
+}
+
+#[test]
+fn capped_sweep_is_the_same_with_caps_true_or_absent() {
+    let mut world = open_sweep_graph(square(), l_path());
+    world
+        .create_operation(sweep_with_caps(None), named("absent"))
+        .unwrap();
+    world
+        .create_operation(sweep_with_caps(Some(true)), named("capped"))
+        .unwrap();
+    let parsed: CreatingOperation =
+        serde_json::from_str(r#"{"kind":"Sweep","profile":"profile","path":"path"}"#).unwrap();
+    world.create_operation(parsed, named("parsed")).unwrap();
+    let absent = world.brep("absent").unwrap();
+    assert_eq!(absent.body_type().unwrap(), BodyType::Solid);
+    for id in ["capped", "parsed"] {
+        let other = world.brep(id).unwrap();
+        assert_eq!(
+            absent.to_json().unwrap().replace(&absent.id, ""),
+            other.to_json().unwrap().replace(&other.id, "")
+        );
+    }
+}
+
+#[test]
+fn sheet_is_refused_by_step_export_and_by_a_capped_rebuild() {
+    let mut world = open_sweep_graph(square(), l_path());
+    world
+        .create_operation(sweep_with_caps(Some(false)), named("sheet"))
+        .unwrap();
+    let error = world
+        .export_step(&["sheet".into()], &StepOptions::default())
+        .unwrap_err();
+    assert_eq!(error.error_code(), ErrorCode::InvalidOperand);
+    let error = world
+        .rebuild_operation("sheet", sweep_with_caps(Some(true)), EditScope::Node)
+        .unwrap_err();
+    assert_eq!(error.error_code(), ErrorCode::BodyTypeMismatch);
+    world
+        .rebuild_operation("sheet", sweep_with_caps(Some(false)), EditScope::Node)
+        .unwrap();
+    open_shell(&world, "sheet");
 }

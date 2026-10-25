@@ -8,6 +8,7 @@ use std::sync::Arc;
 #[derive(Clone, Copy)]
 pub(super) struct IdCounters {
     solid: u64,
+    sheet: u64,
     wire: u64,
     assembly: u64,
 }
@@ -15,6 +16,7 @@ pub(super) struct IdCounters {
 #[derive(Clone, Copy)]
 pub(super) enum IdKind {
     Solid,
+    Sheet,
     Wire,
     Assembly,
 }
@@ -155,11 +157,8 @@ impl IdKind {
     pub(super) fn of_body(body_type: BodyType) -> Result<Self, GraphError> {
         match body_type {
             BodyType::Solid => Ok(Self::Solid),
+            BodyType::Sheet => Ok(Self::Sheet),
             BodyType::Wire => Ok(Self::Wire),
-            BodyType::Sheet => Err(GraphError::code(
-                ErrorCode::InvalidTopology,
-                "graph bodies are never sheets",
-            )),
         }
     }
 
@@ -176,6 +175,7 @@ impl IdKind {
     fn prefix(self) -> &'static str {
         match self {
             Self::Solid => "solid",
+            Self::Sheet => "sheet",
             Self::Wire => "wire",
             Self::Assembly => "assembly",
         }
@@ -185,6 +185,7 @@ impl IdKind {
 impl IdCounters {
     pub(super) const FIRST: Self = Self {
         solid: 1,
+        sheet: 1,
         wire: 1,
         assembly: 1,
     };
@@ -192,6 +193,7 @@ impl IdCounters {
     fn slot(&mut self, kind: IdKind) -> &mut u64 {
         match kind {
             IdKind::Solid => &mut self.solid,
+            IdKind::Sheet => &mut self.sheet,
             IdKind::Wire => &mut self.wire,
             IdKind::Assembly => &mut self.assembly,
         }

@@ -92,7 +92,11 @@ fn build_rail(graph: &mut WorldGraph) -> String {
     let (profile, _) = graph
         .create_primitive(Primitive::Circle { radius: 0.05 }, disc)
         .unwrap();
-    let sweep = CreatingOperation::Sweep { profile, path };
+    let sweep = CreatingOperation::Sweep {
+        profile,
+        path,
+        caps: None,
+    };
     graph.create_operation(sweep, named("rail-1")).unwrap().0
 }
 

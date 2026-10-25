@@ -22,6 +22,7 @@ fn circular_sweep(radius: f64, path: &[Point3]) -> BrepEnvelope {
             radius,
         },
         path.to_vec(),
+        true,
         coarse_accuracy(1e-6),
     )
     .unwrap()

@@ -244,6 +244,21 @@ const SWEEPS: [Sweep; 11] = [
     ),
 ];
 
+const OPEN_SWEEPS: [Sweep; 4] = [
+    ("open-l-path-sheet", square_two, &L_PATH),
+    ("open-circle-l-path-sheet", disc_half, &L_PATH),
+    (
+        "open-straight-path-sheet",
+        slot,
+        &[[0.0; 3], [0.0, 3.0, 0.0]],
+    ),
+    (
+        "open-circle-straight-path-sheet",
+        disc_half,
+        &[[0.0; 3], [0.0, 3.0, 0.0]],
+    ),
+];
+
 fn offset_hole(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Failure> {
     primitive(record, graph, circle(2.0), create_options("profile"));
     primitive(record, graph, circle(0.5), create_options("hole"));
@@ -296,6 +311,23 @@ fn noncoplanar_hole(graph: &mut WorldGraph, record: &mut Record) -> Result<(), F
 
 fn unknown_profile(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Failure> {
     solid(record, graph, extrude("missing", &[], 1.0))
+}
+
+fn open_ended(entry: &Sweep) -> Case {
+    let (name, profile, path) = *entry;
+    graph_case(&format!("creating.sweep.{name}"), move |graph, record| {
+        primitive(record, graph, profile(), create_options("profile"));
+        primitive(record, graph, polyline(path, false), create_options("path"));
+        let open = CreatingOperation::Sweep {
+            profile: "profile".into(),
+            path: "path".into(),
+            caps: Some(false),
+        };
+        if operation(record, graph, open, create_options("sheet")).is_some() {
+            inspect(record, graph, "sheet")?;
+        }
+        Ok(())
+    })
 }
 
 fn offset_profile(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Failure> {
@@ -419,6 +451,7 @@ fn rebuild_sweep(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Fail
 pub(crate) fn cases() -> Vec<Case> {
     let mut cases = EXTRUSIONS.iter().map(extruded).collect::<Vec<_>>();
     cases.extend(SWEEPS.iter().map(swept));
+    cases.extend(OPEN_SWEEPS.iter().map(open_ended));
     cases.extend([
         graph_case("creating.extrude.offset-circle-hole", offset_hole),
         graph_case("creating.extrude.far-parent", far_parent),

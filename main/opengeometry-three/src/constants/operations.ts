@@ -8,5 +8,5 @@ export const OG_OPERATION_PARAMS_EXTRUDE = (
   value: { profile: { ogId: string }; holes?: { ogId: string }[]; distance: number },
 ): { profile: { ogId: string }; holes?: { ogId: string }[]; distance: number } => value;
 export const OG_OPERATION_PARAMS_SWEEP = (
-  value: { profile: { ogId: string }; path: { ogId: string } },
-): { profile: { ogId: string }; path: { ogId: string } } => value;
+  value: { profile: { ogId: string }; path: { ogId: string }; caps?: boolean },
+): { profile: { ogId: string }; path: { ogId: string }; caps?: boolean } => value;

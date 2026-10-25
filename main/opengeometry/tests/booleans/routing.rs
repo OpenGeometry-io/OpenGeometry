@@ -31,6 +31,7 @@ fn sweep_result_boolean_routing_is_pinned() {
             CreatingOperation::Sweep {
                 profile: "profile".into(),
                 path: "path".into(),
+                caps: None,
             },
             named("sweep"),
         )

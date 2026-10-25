@@ -21,6 +21,8 @@ pub enum CreatingOperation {
     Sweep {
         profile: String,
         path: String,
+        #[serde(default)]
+        caps: Option<bool>,
     },
 }
 
@@ -29,6 +31,15 @@ impl CreatingOperation {
         match self {
             Self::Extrude { profile, .. } => profile,
             Self::Sweep { path, .. } => path,
+        }
+    }
+
+    fn body_type(&self) -> BodyType {
+        match self {
+            Self::Sweep {
+                caps: Some(false), ..
+            } => BodyType::Sheet,
+            _ => BodyType::Solid,
         }
     }
 }
@@ -61,10 +72,15 @@ impl WorldGraph {
                     .collect::<Result<Vec<_>, _>>()?;
                 extrude::build(id, outer, holes, *distance, self.accuracy).map_err(GraphError::from)
             }
-            CreatingOperation::Sweep { profile, path } => {
+            CreatingOperation::Sweep {
+                profile,
+                path,
+                caps,
+            } => {
                 let profile = profile_loop(self, profile, target)?;
                 let path = path_points(self, path, target)?;
-                sweep::build(id, profile, path, self.accuracy).map_err(GraphError::from)
+                sweep::build(id, profile, path, caps.unwrap_or(true), self.accuracy)
+                    .map_err(GraphError::from)
             }
         }
     }
@@ -83,7 +99,7 @@ impl WorldGraph {
         operation: CreatingOperation,
         options: CreateOptions,
     ) -> Result<(String, ChangeSet), GraphError> {
-        check_body_type(options.body_type, BodyType::Solid)?;
+        check_body_type(options.body_type, operation.body_type())?;
         check_no_plane(options.plane)?;
         let anchor = operation.anchor();
         let anchor_node = self.node(anchor)?;
@@ -105,15 +121,10 @@ impl WorldGraph {
         let reserved = self.reserve(1, &[])?;
         let shape_id = reserved.shape_ids[0].clone();
         let brep = self.build_operation(shape_id.clone(), &operation, anchor)?;
-        if brep.body_type()? != BodyType::Solid {
-            return Err(GraphError::code(
-                ErrorCode::BodyTypeMismatch,
-                "operation did not produce a solid",
-            ));
-        }
+        let kind = IdKind::of_body(brep.body_type()?)?;
         let mut created = None;
         let changes = self.mutate(|draft| {
-            let id = draft.new_og_id(options.og_id.as_deref(), IdKind::Solid)?;
+            let id = draft.new_og_id(options.og_id.as_deref(), kind)?;
             let allocated = draft.new_shape_id()?;
             if allocated != shape_id {
                 return Err(GraphError::code(
@@ -150,7 +161,8 @@ impl WorldGraph {
         scope: EditScope,
     ) -> Result<ChangeSet, GraphError> {
         let previous = self.ensure_editable(og_id, scope)?;
-        if previous.brep.body_type()? != BodyType::Solid {
+        let body_type = previous.brep.body_type()?;
+        if body_type == BodyType::Wire {
             return Err(GraphError::code(
                 ErrorCode::BodyTypeMismatch,
                 "body is not a solid",
@@ -163,7 +175,7 @@ impl WorldGraph {
             .ok_or_else(|| GraphError::code(ErrorCode::InvalidOperand, "node is not a body"))?;
         let revision = self.reserve(0, std::slice::from_ref(&shape_id))?.revisions[0].1;
         let mut brep = self.build_operation(shape_id.clone(), &operation, og_id)?;
-        if brep.body_type()? != BodyType::Solid {
+        if brep.body_type()? != body_type {
             return Err(GraphError::code(
                 ErrorCode::BodyTypeMismatch,
                 "rebuild changed body type",

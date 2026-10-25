@@ -336,6 +336,7 @@ fn multi_segment_sweep_of_a_curved_profile_is_unsupported() {
             CreatingOperation::Sweep {
                 profile: "profile".into(),
                 path: "path".into(),
+                caps: None,
             },
             named("solid"),
         )

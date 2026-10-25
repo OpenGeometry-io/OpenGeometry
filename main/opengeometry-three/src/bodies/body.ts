@@ -31,7 +31,7 @@ function singleMaterial(material: THREE.Material | THREE.Material[], label: stri
   return material;
 }
 
-function lineStyle(bodyType: 'Wire' | 'Solid', appearance: Appearance): MaterialAppearance {
+function lineStyle(bodyType: 'Wire' | 'Sheet' | 'Solid', appearance: Appearance): MaterialAppearance {
   return { color: bodyType === 'Wire' ? appearance.color : 0x243040, opacity: appearance.opacity };
 }
 
@@ -41,7 +41,7 @@ export abstract class Body extends THREE.Group {
   readonly generation: number;
   readonly surface: THREE.Mesh;
   readonly outline: THREE.LineSegments;
-  readonly bodyType: 'Wire' | 'Solid';
+  readonly bodyType: 'Wire' | 'Sheet' | 'Solid';
   appearance: Appearance;
   lastInfo: NodeInfo;
   record?: GeometryRecord;
@@ -51,7 +51,7 @@ export abstract class Body extends THREE.Group {
   private readonly epoch = runtime().epoch;
   private readonly pose = poseMemory();
 
-  protected constructor(ogId: string, bodyType: 'Wire' | 'Solid', options: BodyOptions) {
+  protected constructor(ogId: string, bodyType: 'Wire' | 'Sheet' | 'Solid', options: BodyOptions) {
     super();
     this.ogId = ogId;
     this.lastInfo = node(ogId, `${bodyType}.constructor`);
@@ -59,7 +59,7 @@ export abstract class Body extends THREE.Group {
     this.generation = this.lastInfo.generation;
     this.bodyType = bodyType;
     this.appearance = {
-      color: bodyType === 'Wire' ? 0x2563eb : 0x6699dd, opacity: 1, outline: bodyType === 'Wire',
+      color: bodyType === 'Wire' ? 0x2563eb : 0x6699dd, opacity: 1, outline: bodyType !== 'Solid',
       pickOutline: bodyType === 'Wire', ...options.appearance,
     };
     this.matrixAutoUpdate = false;
@@ -71,7 +71,7 @@ export abstract class Body extends THREE.Group {
     const surfaceStyle = surfaceMaterial(this.appearance);
     this.surfaceKey = surfaceStyle.key;
     this.surface = new THREE.Mesh(placeholder ?? new THREE.BufferGeometry(), surfaceStyle.material);
-    this.surface.visible = Boolean(placeholder) && bodyType === 'Solid';
+    this.surface.visible = Boolean(placeholder) && bodyType !== 'Wire';
     const outlineStyle = lineMaterial(lineStyle(bodyType, this.appearance));
     this.lineKey = outlineStyle.key;
     this.outline = new THREE.LineSegments(placeholder ?? new THREE.BufferGeometry(), outlineStyle.material);
@@ -118,7 +118,7 @@ export abstract class Body extends THREE.Group {
     this.outline.geometry = record.outline;
     this.surface.position.copy(record.origin);
     this.outline.position.copy(record.origin);
-    this.surface.visible = this.bodyType === 'Solid';
+    this.surface.visible = this.bodyType !== 'Wire';
     this.outline.visible = this.appearance.outline;
   }
 
