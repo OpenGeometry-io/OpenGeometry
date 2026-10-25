@@ -4,7 +4,8 @@ import { bootKernel, MEBIBYTE, PAGE_BYTES, readKernelBytes } from './kernel-memo
 import { boot, cuboid } from './support.mjs';
 
 const BODY_COUNT = 5000;
-const RECORDED = { growthSteps: 737, pagesAfterAllBodies: 982, pagesAfterOneBody: 19 };
+const RECORDED = { growthSteps: 22, pagesAfterAllBodies: 1033, pagesAfterOneBody: 36 };
+const MOST_GROWTH_STEPS = 100;
 const STEP_MARGIN = 0.1;
 const PAGE_MARGIN = 0.05;
 const COMPARED = process.env.CI !== 'true';
@@ -56,8 +57,10 @@ function reader(bytes) {
 
 function addImportedMemories(read, importedMemories) {
   for (let count = read.unsigned(); count > 0; count -= 1) {
-    read.position += read.unsigned();
-    read.position += read.unsigned();
+    for (let name = 0; name < 2; name += 1) {
+      const length = read.unsigned();
+      read.position += length;
+    }
     const kind = read.byte();
     if (kind === 0) read.unsigned();
     if (kind === 1) {
@@ -107,11 +110,21 @@ test('the kernel has one memory of its own, not shared and without a maximum', (
   assert.equal(memories[0].maximum, undefined);
 });
 
-test('keeping 5,000 cuboids grows the memory the recorded number of times', () => {
+test('the section reader finds the imported and exported memories the engine finds', () => {
+  const bytes = readKernelBytes();
+  const module = new WebAssembly.Module(bytes);
+  const { memories, importedMemories } = sectionsOf(bytes);
+  const memoryCount = (entries) => entries.filter((entry) => entry.kind === 'memory').length;
+  assert.equal(importedMemories.length, memoryCount(WebAssembly.Module.imports(module)));
+  assert.equal(memories.length, memoryCount(WebAssembly.Module.exports(module)));
+});
+
+test('keeping 5,000 cuboids grows the memory at most 100 times, the recorded number of times', () => {
   const { growthSteps, startPages, afterAllBodies } = MEASURED;
   report(`${BODY_COUNT} kept cuboids: ${growthSteps} growth steps`);
   report(`${startPages} to ${afterAllBodies} pages (${mebibytes(afterAllBodies)} MiB)`);
   assert(MEASURED.growthSteps <= MEASURED.afterAllBodies - MEASURED.startPages);
+  assert(MEASURED.growthSteps <= MOST_GROWTH_STEPS, `${MEASURED.growthSteps} growth steps`);
   if (COMPARED) assertNear(MEASURED.growthSteps, RECORDED.growthSteps, STEP_MARGIN, 'growth steps');
 });
 

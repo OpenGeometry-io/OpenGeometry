@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import init from '../../../dist/opengeometry/pkg/opengeometry.js';
 
 export const PAGE_BYTES = 65536;
 export const MEBIBYTE = 1024 * 1024;
@@ -22,4 +23,10 @@ export async function bootKernel(start) {
     globalThis.WebAssembly.instantiate = instantiate;
   }
   return { pages: () => captured.memory.buffer.byteLength / PAGE_BYTES };
+}
+
+export async function rawKernel() {
+  const kernel = await init({ module_or_path: readKernelBytes() });
+  const pages = () => kernel.memory.buffer.byteLength / PAGE_BYTES;
+  return { pages, allocate: (bytes) => kernel.__wbindgen_malloc(bytes, 8) >>> 0 };
 }

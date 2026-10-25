@@ -29,6 +29,11 @@ declare module 'node:child_process' {
 
 declare module 'node:test' {
   export function test(name: string, body: () => void | Promise<void>): Promise<void>;
+  export function test(
+    name: string,
+    options: { skip?: boolean | string },
+    body: () => void | Promise<void>,
+  ): Promise<void>;
 }
 
 declare module 'node:fs/promises' {

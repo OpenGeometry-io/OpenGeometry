@@ -37,3 +37,10 @@ pub mod exchange;
 pub mod world_graph;
 
 pub mod bindings;
+
+#[cfg(any(all(target_arch = "wasm32", target_os = "unknown"), test))]
+mod memory;
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+#[global_allocator]
+static ALLOCATOR: memory::GrowAhead = memory::GrowAhead;

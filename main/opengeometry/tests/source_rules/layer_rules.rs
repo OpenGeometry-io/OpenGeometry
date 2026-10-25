@@ -5,8 +5,9 @@ use crate::source_tree::SourceTree;
 use crate::{kernel_sources, rule_list};
 use std::collections::{BTreeMap, BTreeSet};
 
-const LAYERS: [(&str, usize); 11] = [
+const LAYERS: [(&str, usize); 12] = [
     ("math", 0),
+    ("memory", 0),
     ("brep", 1),
     ("geom2d", 2),
     ("query", 3),
