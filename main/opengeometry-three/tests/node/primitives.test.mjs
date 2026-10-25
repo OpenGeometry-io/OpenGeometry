@@ -7,6 +7,8 @@ import {
   OG_OPERATION_EXTRUDE,
   OG_PRIMITIVE_ARC,
   OG_PRIMITIVE_CIRCLE,
+  OG_PRIMITIVE_CYLINDER_SECTOR,
+  OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR,
   OG_PRIMITIVE_PROFILE,
   OG_PRIMITIVE_RECTANGLE,
 } from '../../../dist/index.js';
@@ -52,4 +54,19 @@ test('a hole that encloses the profile is InvalidParameter', async () => {
     () => new Solid(OG_OPERATION_EXTRUDE, { profile, holes: [hole], distance: 1 }, { ogId: 'enclosed' }),
     failsWith('InvalidParameter'),
   );
+});
+
+test('a cylinder sector is a Solid that exports one cylindrical STEP face', async () => {
+  await boot();
+  const params = OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR({ radius: 2, height: 3, startAngle: 0, sweepAngle: Math.PI / 2 });
+  const sector = new Solid(OG_PRIMITIVE_CYLINDER_SECTOR, params, { ogId: 'cylinder-sector' });
+  assert.equal(sector.lastInfo.bodyType, 'Solid');
+  const { text } = await OpenGeometry.exportStep({ nodes: [sector] });
+  assert.equal(text.match(/CYLINDRICAL_SURFACE/g)?.length, 1);
+});
+
+test('a full-turn cylinder sector is InvalidParameter', async () => {
+  await boot();
+  const params = { radius: 2, height: 3, startAngle: 0, sweepAngle: 2 * Math.PI };
+  assert.throws(() => new Solid(OG_PRIMITIVE_CYLINDER_SECTOR, params, { ogId: 'full' }), failsWith('InvalidParameter'));
 });

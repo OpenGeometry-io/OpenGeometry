@@ -55,6 +55,12 @@ fn cylinders() -> Vec<Case> {
         built("cylinder-sector.ground", || {
             primitives::cylinder_sector("sector".into(), ground(), 2.0, 1.0, 0.3, 4.0, standard())
         }),
+        built("cylinder-sector.negative-sweep", || {
+            primitives::cylinder_sector("sector".into(), ground(), 2.0, 3.0, 0.3, -1.2, standard())
+        }),
+        built("cylinder-sector.reflex", || {
+            primitives::cylinder_sector("sector".into(), ground(), 2.0, 3.0, 0.0, 5.0, standard())
+        }),
         built("cylinder-sector.full-turn", || {
             let frame = Frame3::IDENTITY;
             primitives::cylinder_sector("sector".into(), frame, 1.0, 1.0, 0.0, TAU, standard())

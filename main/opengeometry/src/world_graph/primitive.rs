@@ -22,6 +22,13 @@ pub enum Primitive {
         radius: f64,
         height: f64,
     },
+    #[serde(rename_all = "camelCase")]
+    CylinderSector {
+        radius: f64,
+        height: f64,
+        start_angle: f64,
+        sweep_angle: f64,
+    },
     Rectangle {
         width: f64,
         breadth: f64,
@@ -66,7 +73,9 @@ pub struct CreateOptions {
 impl Primitive {
     fn body_type(&self) -> BodyType {
         match self {
-            Self::Cuboid { .. } | Self::Cylinder { .. } => BodyType::Solid,
+            Self::Cuboid { .. } | Self::Cylinder { .. } | Self::CylinderSector { .. } => {
+                BodyType::Solid
+            }
             Self::Rectangle { .. }
             | Self::Circle { .. }
             | Self::Polyline { .. }
@@ -249,19 +258,7 @@ fn build_primitive(
             width,
             height,
             depth,
-        } => {
-            for (name, value) in [("width", width), ("height", height), ("depth", depth)] {
-                required_size(value, accuracy.geometric, name)?;
-            }
-            let frame = Frame3 {
-                origin: [-width / 2.0, 0.0, depth / 2.0],
-                ..GROUND
-            };
-            (
-                primitives::cuboid(shape_id.clone(), frame, [width, depth, height], accuracy)?,
-                Vec::new(),
-            )
-        }
+        } => cuboid_body(shape_id.clone(), [width, height, depth], accuracy)?,
         Primitive::Cylinder { radius, height } => {
             required_size(radius, accuracy.geometric, "radius")?;
             required_size(height, accuracy.geometric, "height")?;
@@ -270,6 +267,17 @@ fn build_primitive(
                 Vec::new(),
             )
         }
+        Primitive::CylinderSector {
+            radius,
+            height,
+            start_angle,
+            sweep_angle,
+        } => sector_body(
+            shape_id.clone(),
+            [radius, height],
+            [start_angle, sweep_angle],
+            accuracy,
+        )?,
         Primitive::Rectangle { width, breadth } => {
             required_size(width, accuracy.geometric, "width")?;
             required_size(breadth, accuracy.geometric, "breadth")?;
@@ -291,7 +299,7 @@ fn build_primitive(
             start_angle,
             sweep_angle,
         } => {
-            check_arc(radius, [start_angle, sweep_angle], accuracy)?;
+            check_arc("arc", radius, [start_angle, sweep_angle], accuracy)?;
             arc_body(
                 shape_id.clone(),
                 radius,
@@ -326,6 +334,47 @@ fn profile_body(
     Ok(primitives::profile_wire_with_keys(
         shape_id, start, segments, closed, accuracy,
     )?)
+}
+
+fn cuboid_body(
+    shape_id: String,
+    [width, height, depth]: [f64; 3],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    for (name, value) in [("width", width), ("height", height), ("depth", depth)] {
+        required_size(value, accuracy.geometric, name)?;
+    }
+    let frame = Frame3 {
+        origin: [-width / 2.0, 0.0, depth / 2.0],
+        ..GROUND
+    };
+    Ok((
+        primitives::cuboid(shape_id, frame, [width, depth, height], accuracy)?,
+        Vec::new(),
+    ))
+}
+
+fn sector_body(
+    shape_id: String,
+    [radius, height]: [f64; 2],
+    angles: [f64; 2],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    check_arc("sector", radius, angles, accuracy)?;
+    required_size(height, accuracy.geometric, "height")?;
+    let [start_angle, sweep_angle] = angles;
+    Ok((
+        primitives::cylinder_sector(
+            shape_id,
+            GROUND,
+            radius,
+            height,
+            start_angle,
+            sweep_angle,
+            accuracy,
+        )?,
+        Vec::new(),
+    ))
 }
 
 fn arc_body(
@@ -383,17 +432,22 @@ fn check_polyline(points: &[Point3], closed: bool, accuracy: Accuracy) -> Result
     Ok(())
 }
 
-fn check_arc(radius: f64, [start, sweep]: [f64; 2], accuracy: Accuracy) -> Result<(), GraphError> {
+fn check_arc(
+    kind: &str,
+    radius: f64,
+    [start, sweep]: [f64; 2],
+    accuracy: Accuracy,
+) -> Result<(), GraphError> {
     required_size(radius, accuracy.geometric, "radius")?;
     if !start.is_finite() || !sweep.is_finite() || sweep == 0.0 || sweep.abs() >= TAU {
-        return Err(parameter(
-            "arc sweep must be nonzero and less than one turn",
-        ));
+        return Err(parameter(&format!(
+            "{kind} sweep must be nonzero and less than one turn"
+        )));
     }
     if radius * sweep.abs() <= 4.0 * accuracy.geometric {
-        return Err(parameter(
-            "arc length must exceed four times geometric tolerance",
-        ));
+        return Err(parameter(&format!(
+            "{kind} length must exceed four times geometric tolerance"
+        )));
     }
     Ok(())
 }

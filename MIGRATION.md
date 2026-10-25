@@ -19,7 +19,8 @@ It is written for people and for coding assistants alike: each section says what
 - `OG_PRIMITIVE_PROFILE` makes a wire of line and arc segments: `{ start, segments, closed }`, with points as `[u, v]` in the body's `plane`. A segment is `{ to }` for a line, or `{ to, arc: { center, counterClockwise } }` for an arc.
 - `OG_PRIMITIVE_ARC` makes a partial arc wire: `{ radius, startAngle, sweepAngle }`, angles in radians, centred on the `plane` origin.
 - `OG_OPERATION_EXTRUDE` takes a closed Profile as the profile or as a hole, so the 2.0 arc-edged extrusion is an extrude again.
-- `OG_PRIMITIVE_PARAMS_PROFILE` and `OG_PRIMITIVE_PARAMS_ARC` type their parameters. The entry exports the types `ProfileParams`, `ProfileSegment`, `ProfileArc` and `ArcParams`.
+- `OG_PRIMITIVE_CYLINDER_SECTOR` makes a solid cylinder sector: `{ radius, height, startAngle, sweepAngle }`, angles in radians from the `plane` x direction. A positive angle turns counter-clockwise seen from the side the `plane` normal points to; on the default ground plane that is seen from above, from +X towards −Z. The height runs along the normal.
+- `OG_PRIMITIVE_PARAMS_PROFILE`, `OG_PRIMITIVE_PARAMS_ARC` and `OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR` type their parameters. The entry exports the types `ProfileParams`, `ProfileSegment`, `ProfileArc`, `ArcParams` and `CylinderSectorParams`.
 - `body.getWorldBrep()` reads a body's BRep placed in the world. It makes no body and changes nothing.
 - `body.faceNormalAt(faceId, point)` returns the unit normal of a face at a point, in the body's own coordinates, with the face's orientation applied.
 
@@ -40,6 +41,7 @@ const sector = new AnalyticSolid({
   height: 3,
 });
 const arc = new Arc({ center: new Vector3(0, 0, 0), radius: 2, startAngle: 0, sweepAngle: Math.PI / 2 });
+const wedge = new AnalyticSolid({ kind: 'cylinderSector', radius: 2, height: 3, startAngle: 0, sweepAngle: Math.PI / 2 });
 ```
 
 Unreleased:
@@ -51,7 +53,9 @@ import {
   Wire,
   OG_OPERATION_EXTRUDE,
   OG_PRIMITIVE_ARC,
+  OG_PRIMITIVE_CYLINDER_SECTOR,
   OG_PRIMITIVE_PARAMS_ARC,
+  OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR,
   OG_PRIMITIVE_PARAMS_PROFILE,
   OG_PRIMITIVE_PROFILE,
 } from 'opengeometry';
@@ -71,9 +75,14 @@ const profile = new Wire(OG_PRIMITIVE_PROFILE, OG_PRIMITIVE_PARAMS_PROFILE({
 const sector = new Solid(OG_OPERATION_EXTRUDE, { profile, distance: 3 });
 
 const arc = new Wire(OG_PRIMITIVE_ARC, OG_PRIMITIVE_PARAMS_ARC({ radius: 2, startAngle: 0, sweepAngle: Math.PI / 2 }));
+
+const wedge = new Solid(
+  OG_PRIMITIVE_CYLINDER_SECTOR,
+  OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR({ radius: 2, height: 3, startAngle: 0, sweepAngle: Math.PI / 2 }),
+);
 ```
 
-Both make the same quarter ring sector, 3 m high, and the same quarter arc.
+Both make the same quarter ring sector, 3 m high, the same quarter arc and the same quarter cylinder.
 
 2.0:
 
@@ -114,6 +123,7 @@ Both read the box's world vertices without making a body. The Unreleased normal 
 | `{ kind: 'line', from, to }` | `{ to }`; the first `from` becomes `start` |
 | `{ kind: 'arc', center, radius, startAngle, sweepAngle }` | `{ to: its end point, arc: { center, counterClockwise: sweepAngle > 0 } }` |
 | `frame` `{ origin, x, y, z }` | `plane` `{ origin, normal: z, xDirection: x }` |
+| `new AnalyticSolid({ kind: 'cylinderSector', radius, height, startAngle, sweepAngle, frame })` | `new Solid(OG_PRIMITIVE_CYLINDER_SECTOR, { radius, height, startAngle, sweepAngle }, { plane })` |
 | `new Arc({ center, radius, startAngle, sweepAngle })` | `new Wire(OG_PRIMITIVE_ARC, { radius, startAngle, sweepAngle }, { plane: { origin: [center.x, center.y, center.z] } })` |
 | `AnalyticSolid.fromBrep(solid.getWorldBrepSerialized())`, to read a world copy | `body.getWorldBrep()`, which returns the BRep object and makes no body; for a copy you will change, `body.duplicate()` |
 | `solid.normalAtFace(faceId, new Vector3(x, y, z))` | `body.faceNormalAt(faceId, [x, y, z])`, which returns `[x, y, z]` |
@@ -127,6 +137,7 @@ Both read the box's world vertices without making a body. The Unreleased normal 
 - `getWorldBrep()` places the BRep by the kernel's world placement, not by a Three.js parent. Its `id` and `revision` equal those of `getBrep()`; the 2.0 copy had the revision plus one. A scaled body's tolerances and accuracy are scaled too. An unmoved body returns exactly the `getBrep()` result.
 - `getWorldBrep()` throws `LimitExceeded` for a body placed so far from the origin that its coordinates lose precision, as 2.0 did; `getBrep()` still works.
 - `faceNormalAt` throws `InvalidParameter` for a face id that is not an unsigned integer or not a face of the body, and for a point that is not three finite numbers. A point on a cylinder axis, a cone apex or a sphere centre throws `InvalidGeometry`. A point off the face is projected onto it, as in 2.0.
+- A cylinder sector refuses a zero, non-finite or full-turn sweep with `InvalidParameter`; 2.0 turned a full turn into a cylinder. Use `OG_PRIMITIVE_CYLINDER` for that.
 
 ### Check your result
 

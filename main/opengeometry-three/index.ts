@@ -5,4 +5,4 @@ export { Wire } from './src/bodies/wire';
 export { Solid } from './src/bodies/solid';
 export { OGError } from './src/errors';
 export * from './src/constants/index';
-export type { ArcParams, ProfileArc, ProfileParams, ProfileSegment } from './src/dto/primitives';
+export type { ArcParams, CylinderSectorParams, ProfileArc, ProfileParams, ProfileSegment } from './src/dto/primitives';
