@@ -133,20 +133,7 @@ impl WorldGraph {
                 "STEP selection has no solids",
             ));
         }
-        let conversion = if options.up_axis == "Z" {
-            Similarity3 {
-                frame: Frame3 {
-                    origin: [0.0; 3],
-                    x: [1.0, 0.0, 0.0],
-                    y: [0.0, 0.0, 1.0],
-                    z: [0.0, -1.0, 0.0],
-                },
-                scale: 1.0,
-            }
-        } else {
-            Similarity3::IDENTITY
-        };
-        let owned = self.placed_bodies(selected, conversion)?;
+        let owned = self.placed_bodies(selected, up_conversion(&options.up_axis))?;
         let inputs = owned
             .iter()
             .map(|(og_id, shape_id, revision, brep)| StepBodyInput {
@@ -189,7 +176,7 @@ impl WorldGraph {
         Ok((selected, skipped))
     }
 
-    fn placed_bodies(
+    pub(super) fn placed_bodies(
         &self,
         selected: Vec<String>,
         conversion: Similarity3,
@@ -225,6 +212,22 @@ impl WorldGraph {
             owned.push((og_id, shape_id.clone(), shape.revision, brep));
         }
         Ok(owned)
+    }
+}
+
+pub(super) fn up_conversion(up_axis: &str) -> Similarity3 {
+    if up_axis == "Z" {
+        Similarity3 {
+            frame: Frame3 {
+                origin: [0.0; 3],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 0.0, 1.0],
+                z: [0.0, -1.0, 0.0],
+            },
+            scale: 1.0,
+        }
+    } else {
+        Similarity3::IDENTITY
     }
 }
 

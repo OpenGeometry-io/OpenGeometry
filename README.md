@@ -49,9 +49,9 @@ It is the geometry engine layer, not a full CAD application. Floorkit is a downs
 | **History** | Marks with rollback and release; transactions, with a dry-run option. |
 | **Display for Three.js** | Every body is a `THREE.Group`. Level of detail that follows the camera, tessellation in a web worker or inline, picking down to face and edge, outlines, colour and opacity. |
 | **Queries** | Bounds, placements, the B-rep of a body, that B-rep placed in the world, the normal of a face at a point, and the report of its last boolean. |
-| **Export** | STEP, in millimetres or metres, with Y or Z up, together with an export report. |
+| **Export** | STEP, in millimetres or metres, with Y or Z up, together with an export report. The IFC exchange body of a solid, in world metres with Z up, for an IFC writer. |
 
-Not in 2.5, though 2.0 had them: IFC and STL export; projection; offset; loft; triangulation as a public call; arcs, curves, spheres and wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
+Not in 2.5, though 2.0 had them: IFC file text and STL export; projection; offset; loft; triangulation as a public call; arcs, curves, spheres and wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
 
 ## Installation
 
@@ -182,6 +182,7 @@ This section is a compact reference for writing OpenGeometry 2.5 code, by hand o
 | `OGMark` | `const mark = OpenGeometry.mark()`, then `mark.rollback()` and `mark.release()`. `OpenGeometry.markStats()` returns `{ liveMarks, retainedRevisions }`. `OpenGeometry.transaction(fn, { dryRun? })` runs a synchronous `fn` and rolls back if it throws. |
 | Events | `OpenGeometry.on(event, handler)` with `'geometry'`, `'warning'`, `'error'` or `'fatal'`; it returns a function that unsubscribes. |
 | STEP | `await OpenGeometry.exportStep({ nodes, unit?, upAxis?, name?, timestamp? })` returns `{ text, report }`. `nodes`: bodies, assemblies or `ogId` strings. `unit`: `'millimetre'` (default) or `'metre'`; `upAxis`: `'Z'` (default) or `'Y'`. |
+| IFC body | `OpenGeometry.exportIfcBody(solid)` returns the IFC exchange body (type `AnalyticExchangeBodyV2`): `schema_version` 2, world metres, Z up, `representation_type` `'AdvancedBrep'` or `'CSG'` for a solid with a cavity, `entities`, `solids` and `faces`. It refuses a Sheet, a Wire or an assembly. |
 | `OGError` | Failures throw an `OGError` with `code` (for example `InvalidParameter`, `SharedShape`, `Disposed`), `call`, `message` and `details`. |
 | Reset | `OpenGeometry.reset()` frees every body and leaves an empty document. |
 | Typed parameters | `OG_PRIMITIVE_PARAMS_<KIND>(params)`, `OG_OPERATION_PARAMS_EXTRUDE(params)` and `OG_OPERATION_PARAMS_SWEEP(params)` return their argument unchanged; they only give the object a type. |

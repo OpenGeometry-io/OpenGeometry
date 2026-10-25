@@ -2,10 +2,12 @@ import type * as THREE from 'three';
 import type { Body } from './bodies/body';
 import type { SystemAssembly } from './bodies/system-assembly';
 import type { Events, Listener } from './dto/events';
+import type { AnalyticExchangeBodyV2 } from './dto/ifc-body';
 import type { MarkStats } from './dto/mark-stats';
 import type { StepExport } from './dto/step-export';
 import { OGError } from './errors';
 import { exportStep } from './export/export-step';
+import { exportIfcBody } from './export/ifc-body';
 import { createMark, markStats, type OGMark } from './marks/og-mark';
 import { transaction } from './marks/transaction';
 import { resolveHit } from './picking/resolve-hit';
@@ -59,6 +61,8 @@ export class OpenGeometry {
     name?: string;
     timestamp?: string;
   }): Promise<StepExport> { return exportStep(options); }
+
+  static exportIfcBody(node: Body | SystemAssembly): AnalyticExchangeBodyV2 { return exportIfcBody(node); }
 
   static mark(): OGMark { return createMark(); }
   static markStats(): MarkStats { return markStats(); }

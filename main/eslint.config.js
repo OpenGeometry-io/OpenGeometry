@@ -248,7 +248,7 @@ const NAMING = [
     format: null,
   },
 ];
-const KERNEL_KEY_FILES = [`${SDK}/dto/brep.ts`, `${SDK}/dto/boolean-report.ts`];
+const KERNEL_KEY_FILES = [`${SDK}/dto/brep.ts`, `${SDK}/dto/boolean-report.ts`, `${SDK}/dto/ifc-body.ts`];
 const KERNEL_KEY_NAMING = [
   ...NAMING,
   { selector: 'typeProperty', filter: { regex: '_', match: true }, format: ['snake_case'] },

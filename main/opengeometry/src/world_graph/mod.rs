@@ -6,6 +6,7 @@ mod commit;
 mod creating;
 mod error;
 mod export;
+mod export_ifc;
 mod graph;
 mod hierarchy;
 mod instancing;

@@ -3,6 +3,7 @@ import type { Bounds } from '../dto/bounds';
 import type { Brep } from '../dto/brep';
 import type { ChangeSet } from '../dto/change-set';
 import type { Creation } from '../dto/creation';
+import type { AnalyticExchangeBodyV2 } from '../dto/ifc-body';
 import type { MarkStats } from '../dto/mark-stats';
 import type { NodeInfo } from '../dto/node-info';
 import type { Placement } from '../dto/placement';
@@ -73,6 +74,10 @@ export function decodeParent(text: string, call: string): string | null {
 
 export function decodeBounds(text: string, call: string): Bounds | null {
   return decode(text, call, 'bounds', (value): value is Bounds | null => value === null || isNumbers(value, 6));
+}
+
+export function decodeIfcBody(text: string, call: string): AnalyticExchangeBodyV2 {
+  return decode(text, call, 'IFC body', isIfcBody);
 }
 
 export function decodeBrep(text: string, call: string): Brep {
@@ -197,4 +202,11 @@ function isStepGlue(value: unknown): value is StepGlue {
 function isStepReport(value: unknown): value is StepExportReport {
   return isFields(value) && STEP_COUNTS.every((key) => isNumber(value[key]))
     && Array.isArray(value['bodies']) && Array.isArray(value['skipped']);
+}
+
+function isIfcBody(value: unknown): value is AnalyticExchangeBodyV2 {
+  return isFields(value) && value['schema_version'] === 2 && value['length_unit'] === 'metre'
+    && value['up_axis'] === 'Z' && value['coordinate_space'] === 'world'
+    && (value['representation_type'] === 'AdvancedBrep' || value['representation_type'] === 'CSG')
+    && Array.isArray(value['entities']) && Array.isArray(value['solids']) && Array.isArray(value['faces']);
 }
