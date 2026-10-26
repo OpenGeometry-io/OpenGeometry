@@ -8,6 +8,7 @@ use crate::brep::geometry::store::GeometryStore;
 use crate::brep::geometry::surface::{Surface, SurfaceGeometry};
 use crate::math::{add, cross, dot, finite, norm, scale, solve, sub, Interval, Point3};
 
+#[derive(Clone, Copy)]
 struct TracePredictor<'a> {
     a: &'a SurfaceGeometry,
     b: &'a SurfaceGeometry,
@@ -16,6 +17,7 @@ struct TracePredictor<'a> {
     velocity: Point3,
     gauge: Point3,
     uv: [f64; 4],
+    chord: f64,
 }
 
 impl IntersectionDefinition {
@@ -97,15 +99,36 @@ impl IntersectionDefinition {
         self.shape()?;
         budget.validate()?;
         finite(t)?;
+        let predictor = self.trace_predictor(t, store)?;
+        match self.corrected(predictor, predictor.tube, budget) {
+            Err(GeometryError::UnresolvedIntersection(_)) => {
+                let point = self.corrected(predictor, widened_tube(predictor.tube)?, budget)?;
+                if norm(sub(point.point, predictor.guide)) > predictor.chord {
+                    return Err(GeometryError::UnresolvedIntersection(
+                        "retried correction leaves its anchor segment".into(),
+                    ));
+                }
+                Ok(point)
+            }
+            result => result,
+        }
+    }
+
+    fn corrected(
+        &self,
+        predictor: TracePredictor<'_>,
+        bounds: [Interval; 4],
+        budget: SsiBudget,
+    ) -> Result<IntersectionPoint, GeometryError> {
         let TracePredictor {
             a,
             b,
-            tube,
             guide,
             velocity,
             gauge,
             mut uv,
-        } = self.trace_predictor(t, store)?;
+            ..
+        } = predictor;
         for _ in 0..budget.max_newton_iterations {
             let ja = a.derivatives([uv[0], uv[1]])?;
             let jb = b.derivatives([uv[2], uv[3]])?;
@@ -130,7 +153,7 @@ impl IntersectionDefinition {
             let mut fraction = 1.0;
             for _ in 0..12 {
                 let candidate = std::array::from_fn(|i| uv[i] + fraction * step[i]);
-                if (0..4).all(|i| tube[i].contains(candidate[i]))
+                if (0..4).all(|i| bounds[i].contains(candidate[i]))
                     && a.parameter_in_domain([candidate[0], candidate[1]])
                     && b.parameter_in_domain([candidate[2], candidate[3]])
                 {
@@ -214,6 +237,7 @@ impl IntersectionDefinition {
             velocity,
             gauge,
             uv,
+            chord: norm(sub(right.point, left.point)),
         })
     }
 
@@ -335,4 +359,14 @@ fn traced_point(
         tangent: scale(direction, dot(velocity, gauge) / projection),
         support_error: norm(diff),
     })
+}
+
+fn widened_tube(tube: [Interval; 4]) -> Result<[Interval; 4], GeometryError> {
+    let [u0, v0, u1, v1] = tube.map(|interval| {
+        Interval::new(
+            interval.lo - interval.width(),
+            interval.hi + interval.width(),
+        )
+    });
+    Ok([u0?, v0?, u1?, v1?])
 }

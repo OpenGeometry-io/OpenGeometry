@@ -96,3 +96,56 @@ fn budget_failure_and_invalid_anchor_are_explicit() {
     store.intersections[0].anchors[3].point[2] = 0.1;
     assert!(store.intersections[0].validate(&store).is_err());
 }
+
+#[test]
+fn evaluation_converges_where_the_axial_tube_is_thinner_than_the_peak_between_anchors() {
+    let mut store = GeometryStore::new();
+    store.surfaces.push(SurfaceGeometry::Cylinder {
+        frame: Frame3::IDENTITY,
+        radius: 3.0,
+    });
+    let axis = [0.7648421872844885, 0.644217687237691, 0.0];
+    store.surfaces.push(SurfaceGeometry::Cylinder {
+        frame: Frame3 {
+            origin: [1.9503475775754455, 1.642755102456112, 2.2],
+            x: [-0.644217687237691, 0.7648421872844885, 0.0],
+            y: [0.0, -0.0, 1.0],
+            z: axis,
+        },
+        radius: 0.45,
+    });
+    let anchors = vec![
+        TraceAnchor {
+            parameter: 0.7128960125719093,
+            point: [2.319031360088156, 1.903179852491002, 2.6483647006160944],
+            uv_a: [0.6872233929727672, 2.648364700617094],
+            uv_b: [-4.627110592037641, 0.4497551408002707],
+        },
+        TraceAnchor {
+            parameter: 0.7865256619134415,
+            point: [2.2716265395193083, 1.9595185288615027, 2.6486132842284404],
+            uv_a: [0.7117670855789375, 2.6486132842255756],
+            uv_b: [-4.790915085586551, 0.4497923059420013],
+        },
+    ];
+    let uv_tubes = vec![[
+        Interval::new(0.6859962083424562, 0.7129942702092485).unwrap(),
+        Interval::new(2.6226562499999906, 2.6742187500000094).unwrap(),
+        Interval::new(-5.118524072684371, -4.299501604939821).unwrap(),
+        Interval::new(0.4496808105168094, 0.4498666362254626).unwrap(),
+    ]];
+    store.intersections.push(IntersectionDefinition {
+        surfaces: [0, 1],
+        anchors,
+        uv_tubes,
+        residual_tolerance: 1e-9,
+    });
+    let point = store.intersections[0]
+        .evaluate(0.7313034249072923, &store)
+        .unwrap();
+    assert!(point.point[2] > 2.6, "{:?}", point.point);
+    assert!((point.point[0].hypot(point.point[1]) - 3.0).abs() <= 1e-9);
+    let offset = sub(point.point, [1.9503475775754455, 1.642755102456112, 2.2]);
+    let radial = sub(offset, scale(axis, dot(offset, axis)));
+    assert!((norm(radial) - 0.45).abs() <= 1e-9);
+}

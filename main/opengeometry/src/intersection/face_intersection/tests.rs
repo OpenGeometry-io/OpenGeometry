@@ -1,7 +1,11 @@
+use super::clip::piece_box;
 use super::face_view::FaceView;
 use super::{intersect_breps, intersect_faces};
-use crate::brep::{coarse_accuracy, Accuracy, Curve, CurveGeometry, Frame3, Surface};
-use crate::math::{norm, sub};
+use crate::brep::{
+    coarse_accuracy, Accuracy, Curve, CurveGeometry, Frame3, GeometryStore, IntersectionDefinition,
+    IntersectionSide, PcurveGeometry, Surface, SurfaceGeometry, TraceAnchor,
+};
+use crate::math::{norm, sub, Interval};
 use crate::primitives;
 
 #[test]
@@ -180,4 +184,123 @@ fn body_graph_uses_patch_bounds_before_face_pair_ssi() {
     assert_eq!(graph.pairs.len(), 1);
     assert_eq!(graph.pairs[0].faces, [0, 0]);
     assert_eq!(graph.pairs[0].graph.branches.len(), 2);
+}
+
+#[test]
+fn arch_side_crossing_a_ring_face_is_clipped_where_the_shared_tube_spans_its_spring() {
+    let accuracy = Accuracy {
+        geometric: 1e-8,
+        intersection: 1e-9,
+        tessellation: 0.01,
+        exchange: 1e-5,
+    };
+    let ring =
+        primitives::annular_cylinder("ring".into(), Frame3::IDENTITY, 2.7, 3.0, 3.0, accuracy)
+            .unwrap();
+    let (sin, cos) = 0.7_f64.sin_cos();
+    let frame = Frame3::from_axis(
+        [2.55 * cos, 2.55 * sin, 0.0],
+        [cos, sin, 0.0],
+        [-sin, cos, 0.0],
+    )
+    .unwrap();
+    let corners = [[-0.45, 0.2], [0.45, 0.2], [0.45, 2.2], [-0.45, 2.2]];
+    let mut profile = corners
+        .windows(2)
+        .map(|pair| primitives::ProfileEdge::Line {
+            from: pair[0],
+            to: pair[1],
+        })
+        .collect::<Vec<_>>();
+    profile[2] = primitives::ProfileEdge::Arc {
+        center: [0.0, 2.2],
+        radius: 0.45,
+        start_angle: 0.0,
+        sweep_angle: std::f64::consts::PI,
+    };
+    profile.push(primitives::ProfileEdge::Line {
+        from: corners[3],
+        to: corners[0],
+    });
+    let arch =
+        primitives::arc_edged_extrusion("arch".into(), frame, profile, 0.6, accuracy).unwrap();
+    let graph = intersect_faces(
+        FaceView {
+            brep: &ring,
+            face: 0,
+        },
+        FaceView {
+            brep: &arch,
+            face: 4,
+        },
+    )
+    .unwrap();
+    assert_eq!(graph.branches.len(), 1);
+    for point in graph.branches[0].endpoints {
+        let height = point[2];
+        assert!((height - 2.2).abs() <= 1e-6, "{point:?}");
+    }
+}
+
+#[test]
+fn piece_box_encloses_an_axial_peak_between_its_end_samples() {
+    let mut store = GeometryStore::new();
+    store.surfaces.push(SurfaceGeometry::Cylinder {
+        frame: Frame3::IDENTITY,
+        radius: 3.0,
+    });
+    store.surfaces.push(SurfaceGeometry::Cylinder {
+        frame: Frame3 {
+            origin: [1.9503475775754455, 1.642755102456112, 2.2],
+            x: [-0.644217687237691, 0.7648421872844885, 0.0],
+            y: [0.0, -0.0, 1.0],
+            z: [0.7648421872844885, 0.644217687237691, 0.0],
+        },
+        radius: 0.45,
+    });
+    let ends = [
+        (
+            0.7128960125719093,
+            [2.319031360088156, 1.903179852491002, 2.6483647006160944],
+            [0.6872233929727672, 2.648364700617094],
+            [-4.627110592037641, 0.4497551408002707],
+        ),
+        (
+            0.7865256619134415,
+            [2.2716265395193083, 1.9595185288615027, 2.6486132842284404],
+            [0.7117670855789375, 2.6486132842255756],
+            [-4.790915085586551, 0.4497923059420013],
+        ),
+    ];
+    let anchors = ends
+        .iter()
+        .map(|&(parameter, point, uv_a, uv_b)| TraceAnchor {
+            parameter,
+            point,
+            uv_a,
+            uv_b,
+        })
+        .collect();
+    store.intersections.push(IntersectionDefinition {
+        surfaces: [0, 1],
+        anchors,
+        uv_tubes: vec![[
+            Interval::new(0.6859962083424562, 0.7129942702092485).unwrap(),
+            Interval::new(2.6226562499999906, 2.6742187500000094).unwrap(),
+            Interval::new(-5.118524072684371, -4.299501604939821).unwrap(),
+            Interval::new(0.4496808105168094, 0.4498666362254626).unwrap(),
+        ]],
+        residual_tolerance: 1e-9,
+    });
+    store.pcurves.push(PcurveGeometry::IntersectionSide {
+        definition: 0,
+        side: IntersectionSide::B,
+    });
+    let peak = store.pcurve_at(0, 0.7313034249072923).unwrap();
+    assert!(peak[1] > 0.4498666362254626);
+    let piece = piece_box(&store, 0, ends[0].0, ends[1].0, 1e-9).unwrap();
+    assert!(
+        piece[0].contains(peak[0]) && piece[1].contains(peak[1]),
+        "{piece:?} misses {peak:?}"
+    );
 }

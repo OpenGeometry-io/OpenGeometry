@@ -155,7 +155,7 @@ fn transverse_parallel_cylinders_build_two_arc_caps_and_shared_edges() {
     .unwrap();
     let shifted_union = boolean_brep(&a, &shifted, BooleanOp::Union, "gap".into());
     assert!(
-        matches!(shifted_union, Err(GeometryError::UnresolvedIntersection(_))),
+        matches!(shifted_union, Err(GeometryError::CoverageGap { .. })),
         "unexpected shifted-cylinder result: {:?}",
         shifted_union.err()
     );

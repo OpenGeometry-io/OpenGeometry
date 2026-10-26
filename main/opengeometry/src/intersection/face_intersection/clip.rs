@@ -101,6 +101,7 @@ fn clipped_span(
             geometry.curves[branch.curve as usize],
             CurveGeometry::Intersection { .. }
         ) && tube_may_enter_boxes(geometry, branch, segment, bounds)?
+            && !span_clears_boxes(membership, bounds, lo, hi)?
         {
             return Err(GeometryError::UnresolvedIntersection(
                 "bounded SSI branch may cross a trim box between certified anchors".into(),
@@ -171,8 +172,86 @@ fn tube_may_enter_boxes(
     let tube = definition.uv_tubes.get(segment).ok_or_else(|| {
         GeometryError::InvalidGeometry("intersection branch tube is missing".into())
     })?;
-    for side in 0..2 {
-        let definition_side = match geometry.pcurves[branch.pcurves[side] as usize] {
+    let sides = definition_sides(geometry, branch);
+    let periods = side_periods(geometry, definition.surfaces, sides)?;
+    Ok((0..2).all(|side| {
+        let first = 2 * sides[side];
+        box_may_overlap(periods[side], [tube[first], tube[first + 1]], bounds[side])
+    }))
+}
+
+fn span_clears_boxes(
+    membership: &BranchMembership,
+    bounds: [UVBox; 2],
+    lo: f64,
+    hi: f64,
+) -> Result<bool, GeometryError> {
+    let BranchMembership {
+        geometry,
+        branch,
+        faces,
+        boxes_only,
+        tolerance,
+    } = *membership;
+    let CurveGeometry::Intersection { definition } = geometry.curves[branch.curve as usize] else {
+        return Ok(false);
+    };
+    let surfaces = geometry.intersections[definition as usize].surfaces;
+    let periods = side_periods(geometry, surfaces, definition_sides(geometry, branch))?;
+    let mut spans = vec![(lo, hi, 8)];
+    while let Some((lo, hi, depth)) = spans.pop() {
+        let mut clear = false;
+        for side in 0..2 {
+            let piece = piece_box(geometry, branch.pcurves[side], lo, hi, tolerance)?;
+            clear |= !box_may_overlap(periods[side], piece, bounds[side]);
+        }
+        if clear {
+            continue;
+        }
+        let middle = 0.5 * (lo + hi);
+        if depth == 0
+            || branch_inside_faces(geometry, branch, faces, boxes_only, tolerance, middle)?
+        {
+            return Ok(false);
+        }
+        spans.push((lo, middle, depth - 1));
+        spans.push((middle, hi, depth - 1));
+    }
+    Ok(true)
+}
+
+pub(super) fn piece_box(
+    geometry: &GeometryStore,
+    pcurve: u32,
+    lo: f64,
+    hi: f64,
+    tolerance: f64,
+) -> Result<[Interval; 2], GeometryError> {
+    let [first, middle, last] = [lo, 0.5 * (lo + hi), hi].map(|t| geometry.pcurve_at(pcurve, t));
+    let samples = [first?, middle?, last?];
+    let low = [0, 1].map(|axis| {
+        samples
+            .iter()
+            .map(|uv| uv[axis])
+            .fold(f64::INFINITY, f64::min)
+    });
+    let high = [0, 1].map(|axis| {
+        samples
+            .iter()
+            .map(|uv| uv[axis])
+            .fold(f64::NEG_INFINITY, f64::max)
+    });
+    let padding = 2.0
+        * (0..2)
+            .map(|axis| high[axis] - low[axis])
+            .fold(tolerance, f64::max);
+    let [u, v] = [0, 1].map(|axis| Interval::new(low[axis] - padding, high[axis] + padding));
+    Ok([u?, v?])
+}
+
+fn definition_sides(geometry: &GeometryStore, branch: &SsiCurve) -> [usize; 2] {
+    [0, 1].map(
+        |side| match geometry.pcurves[branch.pcurves[side] as usize] {
             PcurveGeometry::IntersectionSide {
                 side: IntersectionSide::A,
                 ..
@@ -182,30 +261,36 @@ fn tube_may_enter_boxes(
                 ..
             } => 1,
             _ => side,
-        };
-        let periods = geometry
-            .surface(definition.surfaces[definition_side])?
-            .charts()[0]
-            .periods;
-        for axis in 0..2 {
-            let interval = tube[2 * definition_side + axis];
-            let face_bounds = bounds[side][axis];
-            let overlaps = periods[axis].map_or_else(
-                || interval.lo <= face_bounds.hi && interval.hi >= face_bounds.lo,
-                |period| {
-                    (-2..=2).any(|turn| {
-                        let shift = f64::from(turn) * period;
-                        interval.lo + shift <= face_bounds.hi
-                            && interval.hi + shift >= face_bounds.lo
-                    })
-                },
-            );
-            if !overlaps {
-                return Ok(false);
-            }
-        }
+        },
+    )
+}
+
+fn side_periods(
+    geometry: &GeometryStore,
+    surfaces: [u32; 2],
+    sides: [usize; 2],
+) -> Result<[[Option<f64>; 2]; 2], GeometryError> {
+    let mut periods = [[None; 2]; 2];
+    for side in 0..2 {
+        periods[side] = geometry.surface(surfaces[sides[side]])?.charts()[0].periods;
     }
-    Ok(true)
+    Ok(periods)
+}
+
+fn box_may_overlap(periods: [Option<f64>; 2], tube: [Interval; 2], face_bounds: UVBox) -> bool {
+    (0..2).all(|axis| {
+        let interval = tube[axis];
+        let face = face_bounds[axis];
+        periods[axis].map_or_else(
+            || interval.lo <= face.hi && interval.hi >= face.lo,
+            |period| {
+                (-2..=2).any(|turn| {
+                    let shift = f64::from(turn) * period;
+                    interval.lo + shift <= face.hi && interval.hi + shift >= face.lo
+                })
+            },
+        )
+    })
 }
 
 fn transition_parameter(
