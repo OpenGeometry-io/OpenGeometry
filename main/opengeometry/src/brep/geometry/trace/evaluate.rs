@@ -102,7 +102,7 @@ impl IntersectionDefinition {
         let predictor = self.trace_predictor(t, store)?;
         match self.corrected(predictor, predictor.tube, budget) {
             Err(GeometryError::UnresolvedIntersection(_)) => {
-                let point = self.corrected(predictor, widened_tube(predictor.tube)?, budget)?;
+                let point = self.corrected(predictor, widened_tube(&predictor)?, budget)?;
                 if norm(sub(point.point, predictor.guide)) > predictor.chord {
                     return Err(GeometryError::UnresolvedIntersection(
                         "retried correction leaves its anchor segment".into(),
@@ -361,12 +361,19 @@ fn traced_point(
     })
 }
 
-fn widened_tube(tube: [Interval; 4]) -> Result<[Interval; 4], GeometryError> {
-    let [u0, v0, u1, v1] = tube.map(|interval| {
-        Interval::new(
-            interval.lo - interval.width(),
-            interval.hi + interval.width(),
-        )
-    });
-    Ok([u0?, v0?, u1?, v1?])
+fn widened_tube(predictor: &TracePredictor<'_>) -> Result<[Interval; 4], GeometryError> {
+    let uv = predictor.uv;
+    let ja = predictor.a.derivatives([uv[0], uv[1]])?;
+    let jb = predictor.b.derivatives([uv[2], uv[3]])?;
+    let metrics = [norm(ja.du), norm(ja.dv), norm(jb.du), norm(jb.dv)];
+    let mut widened = predictor.tube;
+    for (interval, metric) in widened.iter_mut().zip(metrics) {
+        let reach = if metric > 0.0 {
+            interval.width().max(2.0 * predictor.chord / metric)
+        } else {
+            interval.width()
+        };
+        *interval = Interval::new(interval.lo - reach, interval.hi + reach)?;
+    }
+    Ok(widened)
 }

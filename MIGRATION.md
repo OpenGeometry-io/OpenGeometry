@@ -30,6 +30,7 @@ It is written for people and for coding assistants alike: each section says what
 - `OpenGeometry.exportIfcBody(body)` returns a solid's IFC exchange body: the same version 2 object as 2.0.18's `prepareIfcExchange()`, in world metres with Z up, read-only. The entry exports its types `AnalyticExchangeBodyV2` and `IfcPreparedValue`.
 - `OG_OPERATION_SWEEP` takes a closed path: a closed `OG_PRIMITIVE_POLYLINE`, a closed `OG_PRIMITIVE_PROFILE` or an `OG_PRIMITIVE_CIRCLE`. The sweep closes into a ring-shaped `Solid` with no end faces; its last joint is mitred like the others, and a full circle path sweeps as two bends.
 - The 2D region booleans are back as `OpenGeometry.booleanRegions2D(a, b, operation)` and `OpenGeometry.booleanCurvedRegions2D(a, b, operation)`, with `operation` one of `'union'`, `'intersection'` or `'subtraction'`. They take and return the 2.0 shapes, now exported as types: `OffsetRegion`, an `outer` ring and `holes` of `{ x, y, z }` points all at one height, outer rings clockwise in the XZ plane and holes counter-clockwise; and `CurvedRegion2D`, rings of `CurvedRegionEdge`, `{ kind: 'line', from, to }` or `{ kind: 'arc', center, radius, start_angle, sweep_angle }` with angles in radians. Results come back at the input height, wound the same way, each planar ring starting at its smallest x. The tolerance is fixed at `OG_REGION_TOLERANCE`, 1e-6 m, as in 2.0.
+- An arched opening is one cutter: extrude a closed `OG_PRIMITIVE_PROFILE` (jambs, sill and an arch) across a curved or straight wall and subtract it with `wall.operate(OG_OPERATION_SUBTRACT, { tools: [arch] })`. 2.0 needed a box and a half-cylinder for it, and a curved wall then failed.
 
 ### Before and after
 
@@ -287,6 +288,7 @@ Both cut one unit square by another moved half a metre along x. The Unreleased l
 
 ### Different behaviour
 
+- Some curved subtractions that threw `UnresolvedIntersection` now give a body, for example a round or arched opening through a curved wall; others now throw `CoverageGap` or a STEP export error instead.
 - A hole that encloses the whole profile throws `OGError` `InvalidParameter`. It used to fail as `InvalidGeometry`.
 - A circular hole away from the profile centre now extrudes. 2.0 refused some of these.
 - A Profile refuses repeated points, arcs whose end is not on their circle, self-crossing segments and a closed profile that does not end at its start, with `InvalidParameter`. An Arc refuses a zero sweep and a full turn; use `OG_PRIMITIVE_CIRCLE` for a full circle.

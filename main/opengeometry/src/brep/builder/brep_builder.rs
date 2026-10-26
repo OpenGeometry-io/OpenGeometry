@@ -58,7 +58,7 @@ impl Builder {
         });
         id
     }
-    fn face_loop(
+    pub(crate) fn face_loop(
         &mut self,
         face: u32,
         is_hole: bool,

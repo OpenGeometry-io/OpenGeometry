@@ -4,7 +4,7 @@ mod poly2d;
 #[cfg(test)]
 mod tests;
 pub(super) use boolean2d::{
-    boolean_oriented_regions, regions_from_edges_by, PlanarBooleanOp, RingRegion,
+    boolean_oriented_regions, probe_reach, regions_from_edges_by, PlanarBooleanOp, RingRegion,
 };
 pub(super) use curved_boolean2d::{
     boolean_curved_regions, intersections, reversed_ring, winding, CurveEdge2, CurveRegion2,

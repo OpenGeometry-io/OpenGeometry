@@ -1,8 +1,8 @@
 use crate::boolean_case::{boolean, operands, stage, Operands};
 use crate::fine_solids::cuboid_at;
-use crate::fixtures::{at, fine, rectangle};
+use crate::fixtures::{at, fine, rectangle, standard};
 use crate::kernel::{primitives, BooleanOp, BrepEnvelope, Frame3, GeometryError};
-use crate::profiles::{quarter_annulus, sector, split_quarter_annulus};
+use crate::profiles::{arc_at, line, quarter_annulus, sector, split_quarter_annulus};
 use crate::record::Failure;
 use crate::runner::Case;
 use std::f64::consts::FRAC_PI_2;
@@ -222,6 +222,74 @@ fn split_caps() -> Vec<Case> {
     ]
 }
 
+fn radial(angle: f64, height: f64) -> Result<Frame3, GeometryError> {
+    let (sin, cos) = angle.sin_cos();
+    Frame3::from_axis(
+        [2.55 * cos, 2.55 * sin, height],
+        [cos, sin, 0.0],
+        [-sin, cos, 0.0],
+    )
+}
+
+fn arch(angle: f64) -> Result<BrepEnvelope, GeometryError> {
+    let profile = vec![
+        line([-0.45, 0.2], [0.45, 0.2]),
+        line([0.45, 0.2], [0.45, 2.2]),
+        arc_at([0.0, 2.2], 0.45, 0.0, std::f64::consts::PI),
+        line([-0.45, 2.2], [-0.45, 0.2]),
+    ];
+    primitives::arc_edged_extrusion("arch".into(), radial(angle, 0.0)?, profile, 0.6, standard())
+}
+
+fn arched_openings() -> Vec<Case> {
+    let ring =
+        || primitives::annular_cylinder("ring".into(), Frame3::IDENTITY, 2.7, 3.0, 3.0, standard());
+    let after_rect = operands(move || {
+        let rectangle = primitives::linear_extrusion(
+            "rectangle".into(),
+            radial(0.0, 0.0)?,
+            vec![[-0.45, 0.0], [0.45, 0.0], [0.45, 2.1], [-0.45, 2.1]],
+            Vec::new(),
+            0.6,
+            standard(),
+        )?;
+        let cut = stage(&ring()?, &rectangle, BooleanOp::Subtraction, "rect-cut")?;
+        Ok((cut, arch(0.7)?))
+    });
+    let wall = operands(|| {
+        let wall = primitives::cuboid(
+            "wall".into(),
+            at([2.7, -2.0, 0.0]),
+            [0.3, 4.0, 3.0],
+            standard(),
+        )?;
+        Ok((wall, arch(0.0)?))
+    });
+    let round = operands(move || {
+        let round = primitives::cylinder("round".into(), radial(0.7, 1.5)?, 0.3, 0.6, standard())?;
+        Ok((ring()?, round))
+    });
+    vec![
+        curved_subtraction(
+            "ring-arched-opening",
+            "arched-cut",
+            operands(move || Ok((ring()?, arch(0.7)?))),
+        ),
+        curved_subtraction(
+            "ring-arched-seam",
+            "arched-seam",
+            operands(move || Ok((ring()?, arch(0.0)?))),
+        ),
+        curved_subtraction(
+            "ring-arched-after-rectangle",
+            "arched-after-rect",
+            after_rect,
+        ),
+        curved_subtraction("wall-arched-opening", "arched-wall", wall),
+        curved_subtraction("ring-round-window", "round-window", round),
+    ]
+}
+
 pub(crate) fn cases() -> Vec<Case> {
     [
         ring_sectors(),
@@ -231,5 +299,6 @@ pub(crate) fn cases() -> Vec<Case> {
     ]
     .into_iter()
     .flatten()
+    .chain(arched_openings())
     .collect()
 }

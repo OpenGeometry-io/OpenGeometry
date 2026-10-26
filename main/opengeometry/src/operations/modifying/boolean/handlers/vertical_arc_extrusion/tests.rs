@@ -1,5 +1,6 @@
 use super::cap_provenance::cap_regions_overlap;
-use crate::geom2d::{reversed_ring, CurveEdge2, CurveRegion2};
+use super::section::ring_samples;
+use crate::geom2d::{reversed_ring, winding, CurveEdge2, CurveRegion2};
 
 fn rectangle(x0: f64, z0: f64, x1: f64, z1: f64) -> CurveRegion2 {
     let points = [[x0, z0], [x0, z1], [x1, z1], [x1, z0]];
@@ -53,5 +54,27 @@ fn cap_overlap_excludes_a_cutter_inside_a_hole() {
         &host,
         &rectangle(0.8, 1.2, 1.2, 1.8),
         1e-7
+    ));
+}
+
+#[test]
+fn ring_sample_lands_inside_a_neck_narrower_than_the_old_reach() {
+    let strip = rectangle(0.0, 0.0, 5e-5, 1.0).outer;
+    let samples = ring_samples(std::slice::from_ref(&strip), 1e-9).unwrap();
+    assert_eq!(samples.len(), 1);
+    assert_ne!(winding(samples[0], &strip, 1e-9), 0);
+}
+
+#[test]
+fn cap_overlap_probe_stays_inside_a_wall_thinner_than_the_old_reach() {
+    let wall = 5e-7;
+    let mut frame = rectangle(0.0, 0.0, 1.0, 1.0);
+    frame.holes.push(reversed_ring(
+        &rectangle(wall, wall, 1.0 - wall, 1.0 - wall).outer,
+    ));
+    assert!(cap_regions_overlap(
+        &frame,
+        &rectangle(-1.0, -1.0, 2.0, 2.0),
+        1e-9
     ));
 }

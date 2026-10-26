@@ -1,3 +1,5 @@
+use super::band_chain::recognized_chain;
+use super::band_chain_faces::build_chain_cut;
 use crate::brep::{
     Accuracy, BrepEnvelope, CurveGeometry, Face, FaceProvenance, FaceRole, GeometryError,
     Orientation, TrimRegion,
@@ -38,7 +40,18 @@ pub(crate) fn generic_two_sided_cutter_band_subtraction(
         || body_graph.pairs[0].faces[1] != body_graph.pairs[1].faces[1]
         || body_graph.pairs[0].faces[0] == body_graph.pairs[1].faces[0]
     {
-        return Ok(None);
+        let pairs = body_graph
+            .pairs
+            .iter()
+            .map(|pair| (pair.faces, &pair.graph))
+            .collect::<Vec<_>>();
+        let Ok(Some((pairs, chain))) = recognized_chain(host, cutter, &pairs) else {
+            return Ok(None);
+        };
+        return match build_chain_cut(host, cutter, &pairs, &chain, operation, id) {
+            Err(GeometryError::InvalidTopology(_) | GeometryError::InvalidGeometry(_)) => Ok(None),
+            result => result,
+        };
     }
     let mut closed_branches = Vec::with_capacity(2);
     for pair in &body_graph.pairs {

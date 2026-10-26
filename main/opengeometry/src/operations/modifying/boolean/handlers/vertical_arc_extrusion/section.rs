@@ -2,7 +2,7 @@ use crate::brep::{
     coverage_gap, BrepEnvelope, CurveGeometry, EdgeGeometry, Face, Frame3, GeometryError, HalfEdge,
     Orientation, SurfaceGeometry,
 };
-use crate::geom2d::{reversed_ring, winding, CurveEdge2, CurveRegion2, Pt2};
+use crate::geom2d::{probe_reach, reversed_ring, winding, CurveEdge2, CurveRegion2, Pt2};
 use crate::math::{dot, Point3};
 
 struct FaceBoundary {
@@ -386,7 +386,10 @@ fn section_rings(
     Ok(rings)
 }
 
-fn ring_samples(rings: &[Vec<CurveEdge2>], tolerance: f64) -> Result<Vec<Pt2>, GeometryError> {
+pub(super) fn ring_samples(
+    rings: &[Vec<CurveEdge2>],
+    tolerance: f64,
+) -> Result<Vec<Pt2>, GeometryError> {
     let mut samples = Vec::new();
     for ring in rings {
         let edge = &ring[0];
@@ -398,7 +401,9 @@ fn ring_samples(rings: &[Vec<CurveEdge2>], tolerance: f64) -> Result<Vec<Pt2>, G
         if length <= tolerance {
             return Err(coverage());
         }
-        let offset = (length * 0.1).min(1.0e-4).max(tolerance * 16.0);
+        let nearby = nearest_points(ring, middle);
+        let offset = probe_reach(middle, length * 0.1 * 4.0, 1.0e-4, &nearby, tolerance)
+            .max(tolerance * 16.0);
         let normal = Pt2::new(-tangent.z * offset / length, tangent.x * offset / length);
         let left = Pt2::new(middle.x + normal.x, middle.z + normal.z);
         let right = Pt2::new(middle.x - normal.x, middle.z - normal.z);
@@ -412,6 +417,43 @@ fn ring_samples(rings: &[Vec<CurveEdge2>], tolerance: f64) -> Result<Vec<Pt2>, G
         samples.push(sample);
     }
     Ok(samples)
+}
+
+pub(super) fn nearest_points<'a>(
+    edges: impl IntoIterator<Item = &'a CurveEdge2>,
+    point: Pt2,
+) -> Vec<(Pt2, Pt2)> {
+    edges
+        .into_iter()
+        .map(|edge| match *edge {
+            CurveEdge2::Line { from, to } => (Pt2::new(from[0], from[1]), Pt2::new(to[0], to[1])),
+            CurveEdge2::Arc {
+                center,
+                radius,
+                start_angle,
+                sweep_angle,
+            } => {
+                let angle = (point.z - center[1]).atan2(point.x - center[0]);
+                let travel = (sweep_angle.signum() * (angle - start_angle))
+                    .rem_euclid(std::f64::consts::TAU);
+                let nearest = if travel <= sweep_angle.abs() {
+                    Pt2::new(
+                        center[0] + radius * angle.cos(),
+                        center[1] + radius * angle.sin(),
+                    )
+                } else {
+                    let (a, b) = (edge.point(0.0), edge.point(1.0));
+                    if (a.x - point.x).hypot(a.z - point.z) <= (b.x - point.x).hypot(b.z - point.z)
+                    {
+                        a
+                    } else {
+                        b
+                    }
+                };
+                (nearest, nearest)
+            }
+        })
+        .collect()
 }
 
 fn nested_regions(

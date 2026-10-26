@@ -1,3 +1,4 @@
+mod arched_band;
 mod atomicity;
 mod batch;
 mod coverage_gap;

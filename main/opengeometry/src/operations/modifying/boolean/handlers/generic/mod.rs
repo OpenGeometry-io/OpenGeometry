@@ -1,6 +1,11 @@
+mod band_chain;
+mod band_chain_faces;
+mod band_chain_seam;
 mod multiple_closed_loops;
 mod non_intersecting;
 mod single_closed_loop;
+#[cfg(test)]
+mod tests;
 mod two_sided_cutter_band;
 
 pub(crate) use multiple_closed_loops::generic_multiple_closed_loops_boolean;

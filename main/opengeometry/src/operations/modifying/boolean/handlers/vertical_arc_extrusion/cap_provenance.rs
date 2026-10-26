@@ -1,10 +1,10 @@
 use super::facets::Facets;
-use super::section::{area, coverage, face_region};
+use super::section::{area, coverage, face_region, nearest_points};
 use crate::brep::{
     BrepEnvelope, FaceProvenance, FaceRole, FaceSource, Frame3, GeometryError, GeometryQuality,
     Shell, SolidRegion, Surface, SurfaceGeometry,
 };
-use crate::geom2d::{intersections, winding, CurveRegion2, Pt2};
+use crate::geom2d::{intersections, probe_reach, winding, CurveRegion2, Pt2};
 use crate::math::{dot, Point3};
 use crate::operations::modifying::boolean::assembly::{
     analytic_face_mappings, assign_shell_faces, enclosing_solid,
@@ -132,7 +132,20 @@ pub(super) fn cap_regions_overlap(a: &CurveRegion2, b: &CurveRegion2, tolerance:
                     if tangent_length <= tolerance {
                         continue;
                     }
-                    let mut offset = (interval_length * 0.1).min(1.0e-4);
+                    let nearby = nearest_points(
+                        [region, other]
+                            .into_iter()
+                            .flat_map(|side| std::iter::once(&side.outer).chain(&side.holes))
+                            .flatten(),
+                        point,
+                    );
+                    let mut offset = probe_reach(
+                        point,
+                        interval_length * 0.1 * 4.0,
+                        1.0e-4,
+                        &nearby,
+                        tolerance,
+                    );
                     for _ in 0..8 {
                         if offset <= tolerance * 2.0 {
                             break;
