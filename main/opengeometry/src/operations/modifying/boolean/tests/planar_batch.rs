@@ -1,8 +1,10 @@
 use super::support::{extrusion, extrusion_span, volume, volume_at_deflection};
-use crate::brep::{FaceRole, Frame3, GeometryError, SurfaceGeometry};
+use crate::brep::{Accuracy, BrepEnvelope, FaceRole, Frame3, GeometryError, SurfaceGeometry};
 use crate::exchange::export_step;
+use crate::operations::modifying::boolean::assembly::append_analytic_input;
 use crate::operations::modifying::boolean::batch::subtract_planar_cutters;
 use crate::operations::modifying::boolean::dispatch::boolean_brep;
+use crate::operations::modifying::boolean::handlers::boolean_rectilinear;
 use crate::operations::modifying::boolean::types::BooleanOp;
 use crate::primitives;
 use crate::query::{classify_point, face_contains_uv, PointClassification};
@@ -468,4 +470,49 @@ fn ten_flush_planar_cutters_use_one_rectilinear_arrangement() {
         .face_mappings
         .iter()
         .any(|mapping| mapping.source.entity == "opening-9"));
+}
+
+fn wall_part(name: &str, span: [f64; 2]) -> BrepEnvelope {
+    primitives::linear_extrusion(
+        name.into(),
+        Frame3 {
+            origin: [0.0, 0.0, 0.0],
+            x: [1.0, 0.0, 0.0],
+            y: [0.0, 0.0, -1.0],
+            z: [0.0, 1.0, 0.0],
+        },
+        vec![
+            [span[0], -0.1],
+            [span[1], -0.1],
+            [span[1], 0.1],
+            [span[0], 0.1],
+        ],
+        Vec::new(),
+        3.0,
+        Accuracy::STANDARD,
+    )
+    .unwrap()
+}
+
+#[test]
+fn host_of_two_flush_solids_minus_one_cutter_keeps_both_solids_and_the_volume() {
+    let mut host = BrepEnvelope::new("flush-host".into(), Accuracy::STANDARD).unwrap();
+    for (name, span) in [("left", [0.0, 3.0]), ("right", [3.0, 6.0])] {
+        append_analytic_input(&mut host, &wall_part(name, span)).unwrap();
+    }
+    host.validate().unwrap();
+    for span in [[2.4, 2.9], [2.5, 3.5]] {
+        let cutter = wall_part("cutter", span);
+        let result = boolean_rectilinear(&host, &cutter, BooleanOp::Subtraction, "cut".into())
+            .unwrap_or_else(|error| panic!("{span:?}: {error}"));
+        result.brep.validate().unwrap();
+        assert_eq!(result.brep.solids.len(), 2, "{span:?}");
+        export_step(&result.brep, "metre").unwrap();
+        let expected = 6.0 * 0.2 * 3.0 - (span[1] - span[0]) * 0.2 * 3.0;
+        let measured = volume_at_deflection(&result.brep, 0.01);
+        assert!(
+            (measured - expected).abs() <= 1e-9,
+            "{span:?}: {measured} versus {expected}"
+        );
+    }
 }

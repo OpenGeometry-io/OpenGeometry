@@ -4,6 +4,7 @@ mod batch;
 mod coverage_gap;
 mod curved_openings;
 mod face_normals;
+mod flush_openings;
 mod multi_tool;
 mod point_classification;
 mod routing;

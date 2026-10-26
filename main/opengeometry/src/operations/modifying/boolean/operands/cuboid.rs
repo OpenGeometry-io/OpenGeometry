@@ -5,7 +5,7 @@ use crate::brep::{
 };
 use crate::math::{dot, norm, scale, sub, Point3};
 use crate::primitives::cuboid;
-use crate::query::{classify_point_validated, face_contains_uv, PointClassification};
+use crate::query::face_contains_uv;
 
 pub(crate) struct BoxInput<'a> {
     pub(crate) brep: &'a BrepEnvelope,
@@ -95,16 +95,6 @@ pub(crate) fn rectilinear_input<'a>(
 
 pub(crate) fn coverage() -> GeometryError {
     coverage_gap("canonical aligned cuboid", "canonical aligned cuboid")
-}
-
-pub(crate) fn classified_inside(brep: &BrepEnvelope, point: Point3) -> Result<bool, GeometryError> {
-    match classify_point_validated(brep, point)? {
-        PointClassification::Inside => Ok(true),
-        PointClassification::Outside => Ok(false),
-        _ => Err(GeometryError::UnresolvedIntersection(
-            "rectilinear arrangement cell classification is unresolved".into(),
-        )),
-    }
 }
 
 pub(crate) fn containing_faces(

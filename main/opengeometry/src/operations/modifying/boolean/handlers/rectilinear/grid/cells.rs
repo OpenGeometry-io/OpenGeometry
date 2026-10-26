@@ -1,7 +1,8 @@
-use crate::brep::{Accuracy, GeometryError};
+use crate::brep::{Accuracy, BrepEnvelope, GeometryError};
 use crate::math::Point3;
-use crate::operations::modifying::boolean::operands::{classified_inside, BoxInput, GridPoint};
+use crate::operations::modifying::boolean::operands::{BoxInput, GridPoint};
 use crate::operations::modifying::boolean::types::BooleanOp;
+use crate::query::{classify_point_in_shell, PointClassification};
 use std::collections::VecDeque;
 
 pub(super) struct GridArrangement<'a> {
@@ -36,6 +37,11 @@ pub(super) fn material_cells(
         ..
     } = arrangement;
     let mut material = vec![false; count];
+    let solids = if canonical_boxes {
+        [Vec::new(), Vec::new()]
+    } else {
+        [solid_shells(a.brep), solid_shells(b.brep)]
+    };
     for x in 0..n[0] {
         for y in 0..n[1] {
             for z in 0..n[2] {
@@ -46,12 +52,12 @@ pub(super) fn material_cells(
                 let ia = if canonical_boxes {
                     inside(center, alo, ahi)
                 } else {
-                    classified_inside(a.brep, a.frame.point(center))?
+                    inside_solids(a.brep, &solids[0], a.frame.point(center))?
                 };
                 let ib = if canonical_boxes {
                     inside(center, blo, bhi)
                 } else {
-                    classified_inside(b.brep, a.frame.point(center))?
+                    inside_solids(b.brep, &solids[1], a.frame.point(center))?
                 };
                 material[flat_index(p, n)] = match operation {
                     BooleanOp::Union => ia || ib,
@@ -62,6 +68,66 @@ pub(super) fn material_cells(
         }
     }
     Ok(material)
+}
+
+struct SolidShells {
+    shells: Vec<Vec<u32>>,
+    lo: Point3,
+    hi: Point3,
+}
+
+fn solid_shells(brep: &BrepEnvelope) -> Vec<SolidShells> {
+    let pad = brep.accuracy.geometric;
+    brep.solids
+        .iter()
+        .map(|solid| {
+            let shells = std::iter::once(solid.outer_shell)
+                .chain(solid.cavity_shells.iter().copied())
+                .map(|shell| brep.topology.shells[shell as usize].faces.clone())
+                .collect::<Vec<_>>();
+            let (mut lo, mut hi) = ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]);
+            for halfedge in &brep.topology.halfedges {
+                if halfedge.face.is_some_and(|face| shells[0].contains(&face)) {
+                    let point = brep.topology.vertices[halfedge.from as usize].position;
+                    for axis in 0..3 {
+                        lo[axis] = lo[axis].min(point[axis] - pad);
+                        hi[axis] = hi[axis].max(point[axis] + pad);
+                    }
+                }
+            }
+            SolidShells { shells, lo, hi }
+        })
+        .collect()
+}
+
+fn inside_solids(
+    brep: &BrepEnvelope,
+    solids: &[SolidShells],
+    point: Point3,
+) -> Result<bool, GeometryError> {
+    for solid in solids {
+        if (0..3).any(|axis| point[axis] < solid.lo[axis] || point[axis] > solid.hi[axis]) {
+            continue;
+        }
+        let mut inside = inside_shell(brep, &solid.shells[0], point)?;
+        for cavity in &solid.shells[1..] {
+            inside = inside && !inside_shell(brep, cavity, point)?;
+        }
+        if inside {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn inside_shell(brep: &BrepEnvelope, faces: &[u32], point: Point3) -> Result<bool, GeometryError> {
+    match classify_point_in_shell(brep, faces, point)? {
+        PointClassification::Inside => Ok(true),
+        PointClassification::Outside => Ok(false),
+        _ => Err(GeometryError::UnresolvedIntersection(
+            "rectilinear arrangement cell classification is unresolved".into(),
+        )),
+    }
 }
 
 fn inside(point: Point3, lo: Point3, hi: Point3) -> bool {
