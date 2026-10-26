@@ -4,12 +4,14 @@ import type { SystemAssembly } from './bodies/system-assembly';
 import type { Events, Listener } from './dto/events';
 import type { AnalyticExchangeBodyV2 } from './dto/ifc-body';
 import type { MarkStats } from './dto/mark-stats';
+import type { CurvedRegion2D, OffsetRegion, RegionOperation } from './dto/regions';
 import type { StepExport } from './dto/step-export';
 import { OGError } from './errors';
 import { exportStep } from './export/export-step';
 import { exportIfcBody } from './export/ifc-body';
 import { createMark, markStats, type OGMark } from './marks/og-mark';
 import { transaction } from './marks/transaction';
+import { booleanCurvedRegions2D, booleanRegions2D } from './operations/regions';
 import { resolveHit } from './picking/resolve-hit';
 import { flush } from './rendering/geometry/geometry-scheduler';
 import { settled } from './rendering/geometry/settle';
@@ -63,6 +65,18 @@ export class OpenGeometry {
   }): Promise<StepExport> { return exportStep(options); }
 
   static exportIfcBody(node: Body | SystemAssembly): AnalyticExchangeBodyV2 { return exportIfcBody(node); }
+
+  static booleanRegions2D(
+    a: readonly OffsetRegion[],
+    b: readonly OffsetRegion[],
+    operation: RegionOperation,
+  ): OffsetRegion[] { return booleanRegions2D(a, b, operation); }
+
+  static booleanCurvedRegions2D(
+    a: readonly CurvedRegion2D[],
+    b: readonly CurvedRegion2D[],
+    operation: RegionOperation,
+  ): CurvedRegion2D[] { return booleanCurvedRegions2D(a, b, operation); }
 
   static mark(): OGMark { return createMark(); }
   static markStats(): MarkStats { return markStats(); }

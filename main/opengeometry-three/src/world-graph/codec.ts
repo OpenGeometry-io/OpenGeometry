@@ -7,6 +7,7 @@ import type { AnalyticExchangeBodyV2 } from '../dto/ifc-body';
 import type { MarkStats } from '../dto/mark-stats';
 import type { NodeInfo } from '../dto/node-info';
 import type { Placement } from '../dto/placement';
+import type { CurvedRegion2D, OffsetRegion, RegionOperation } from '../dto/regions';
 import type { StepExport, StepExportReport } from '../dto/step-export';
 import { OGError } from '../errors';
 
@@ -17,6 +18,7 @@ type StepGlue = { text: string; reportJson: string };
 
 const BREP_TOPOLOGY = ['vertices', 'edges', 'halfedges', 'loops', 'faces', 'wires', 'shells'] as const;
 const STEP_COUNTS = ['products', 'solids', 'faces', 'edges', 'pcurvelessEdges', 'entities', 'bytes'] as const;
+const REGION_OPERATIONS = ['union', 'intersection', 'subtraction'] as const;
 
 export function encode(value: unknown): string {
   return JSON.stringify(value);
@@ -46,6 +48,34 @@ export function polylinePoints(params: Record<string, unknown>, call: string): F
     throw new OGError('InvalidParameter', call, 'points must be a list of [x, y, z] points');
   }
   return new Float64Array(points.flat());
+}
+
+export function regionsJson(regions: unknown, call: string): string {
+  if (!Array.isArray(regions) || !regions.every(isOffsetRegion)) {
+    throw new OGError('InvalidParameter', call, 'regions must be a list of { outer, holes } of { x, y, z } rings');
+  }
+  const ring = (points: OffsetRegion['outer']): number[][] => points.map((point) => [point.x, point.y, point.z]);
+  return encode(regions.map((region) => ({ outer: ring(region.outer), holes: region.holes.map(ring) })));
+}
+
+export function regionOperation(value: unknown, call: string): RegionOperation {
+  if (!isRegionOperation(value)) {
+    throw new OGError('InvalidParameter', call, "operation must be 'union', 'intersection' or 'subtraction'");
+  }
+  return value;
+}
+
+export function curvedRegionsJson(regions: unknown, call: string): string {
+  if (!Array.isArray(regions)) throw new OGError('InvalidParameter', call, 'curved regions must be a list');
+  return encode(regions);
+}
+
+export function decodeRegions(text: string, call: string): OffsetRegion[] {
+  return decode(text, call, 'regions', (value): value is OffsetRegion[] => isList(value, isOffsetRegion));
+}
+
+export function decodeCurvedRegions(text: string, call: string): CurvedRegion2D[] {
+  return decode(text, call, 'curved regions', (value): value is CurvedRegion2D[] => isList(value, isCurvedRegion));
 }
 
 function decode<T>(text: string, call: string, payload: string, check: Check<T>): T {
@@ -202,6 +232,31 @@ function isStepGlue(value: unknown): value is StepGlue {
 function isStepReport(value: unknown): value is StepExportReport {
   return isFields(value) && STEP_COUNTS.every((key) => isNumber(value[key]))
     && Array.isArray(value['bodies']) && Array.isArray(value['skipped']);
+}
+
+function isList(value: unknown, check: (item: unknown) => boolean): boolean {
+  return Array.isArray(value) && value.every(check);
+}
+
+function isRegionOperation(value: unknown): value is RegionOperation {
+  return REGION_OPERATIONS.some((operation) => operation === value);
+}
+
+function hasOnly(value: Fields, keys: string[]): boolean {
+  return Object.keys(value).every((key) => keys.includes(key));
+}
+
+function isOffsetRegion(value: unknown): value is OffsetRegion {
+  const isRing = (ring: unknown): boolean => isList(ring, (point) => isFields(point) && hasOnly(point, ['x', 'y', 'z'])
+    && isNumber(point['x']) && isNumber(point['y']) && isNumber(point['z']));
+  return isFields(value) && hasOnly(value, ['outer', 'holes']) && isRing(value['outer'])
+    && isList(value['holes'], isRing);
+}
+
+function isCurvedRegion(value: unknown): value is CurvedRegion2D {
+  const isEdges = (ring: unknown): boolean => isList(ring, (edge) => isFields(edge)
+    && (edge['kind'] === 'line' || edge['kind'] === 'arc'));
+  return isFields(value) && isEdges(value['outer']) && isList(value['holes'], isEdges);
 }
 
 function isIfcBody(value: unknown): value is AnalyticExchangeBodyV2 {

@@ -1,4 +1,5 @@
 mod errors;
+mod geom2d;
 mod panic;
 mod params;
 mod tessellator;

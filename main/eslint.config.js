@@ -31,8 +31,8 @@ const LAYERS = [
   { name: 'bodies', files: [`${SDK}/bodies/**/*.ts`], imports: ['(^|/)bodies/'] },
   {
     name: 'picking-export',
-    files: [`${SDK}/picking/**/*.ts`, `${SDK}/export/**/*.ts`],
-    imports: ['(^|/)picking/', '(^|/)export/'],
+    files: [`${SDK}/picking/**/*.ts`, `${SDK}/export/**/*.ts`, `${SDK}/operations/**/*.ts`],
+    imports: ['(^|/)picking/', '(^|/)export/', '(^|/)operations/'],
   },
   {
     name: 'runtime',
@@ -242,6 +242,11 @@ const NAMING = [
     leadingUnderscore: 'allowDouble',
   },
   { selector: 'objectLiteralProperty', filter: { regex: '^module_or_path$', match: true }, format: null },
+  {
+    selector: ['objectLiteralProperty', 'typeProperty'],
+    filter: { regex: '^(start|sweep)_angle$', match: true },
+    format: null,
+  },
   {
     selector: ['objectLiteralProperty', 'typeProperty', 'objectLiteralMethod'],
     modifiers: ['requiresQuotes'],

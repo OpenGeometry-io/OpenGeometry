@@ -10,3 +10,4 @@ export * from './src/constants/index';
 export type {
   ArcParams, CylinderSectorParams, PolyhedronParams, ProfileArc, ProfileParams, ProfileSegment,
 } from './src/dto/primitives';
+export type { CurvedRegion2D, CurvedRegionEdge, OffsetRegion } from './src/dto/regions';

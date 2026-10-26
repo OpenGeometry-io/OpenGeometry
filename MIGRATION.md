@@ -29,6 +29,7 @@ It is written for people and for coding assistants alike: each section says what
 - `OG_OPERATION_SWEEP` takes a path with arcs: an `OG_PRIMITIVE_ARC` wire, or an open `OG_PRIMITIVE_PROFILE` with arc segments. Each arc sweeps into an exact bend. A circle profile gives torus faces; a polygon profile gives planes, cylinders and cones. A 2.0 elbow swept along many short straight segments becomes one arc.
 - `OpenGeometry.exportIfcBody(body)` returns a solid's IFC exchange body: the same version 2 object as 2.0.18's `prepareIfcExchange()`, in world metres with Z up, read-only. The entry exports its types `AnalyticExchangeBodyV2` and `IfcPreparedValue`.
 - `OG_OPERATION_SWEEP` takes a closed path: a closed `OG_PRIMITIVE_POLYLINE`, a closed `OG_PRIMITIVE_PROFILE` or an `OG_PRIMITIVE_CIRCLE`. The sweep closes into a ring-shaped `Solid` with no end faces; its last joint is mitred like the others, and a full circle path sweeps as two bends.
+- The 2D region booleans are back as `OpenGeometry.booleanRegions2D(a, b, operation)` and `OpenGeometry.booleanCurvedRegions2D(a, b, operation)`, with `operation` one of `'union'`, `'intersection'` or `'subtraction'`. They take and return the 2.0 shapes, now exported as types: `OffsetRegion`, an `outer` ring and `holes` of `{ x, y, z }` points all at one height, outer rings clockwise in the XZ plane and holes counter-clockwise; and `CurvedRegion2D`, rings of `CurvedRegionEdge`, `{ kind: 'line', from, to }` or `{ kind: 'arc', center, radius, start_angle, sweep_angle }` with angles in radians. Results come back at the input height, wound the same way, each planar ring starting at its smallest x. The tolerance is fixed at `OG_REGION_TOLERANCE`, 1e-6 m, as in 2.0.
 
 ### Before and after
 
@@ -239,6 +240,29 @@ console.log(body.representation_type, body.up_axis, body.solids.length, body.fac
 
 Both give the solid's exchange body in world metres with Z up. The Unreleased line prints `AdvancedBrep Z 1 6`.
 
+2.0:
+
+```js
+const left = booleanRegions2D([square(0)], [square(0.5)], 'subtraction');
+```
+
+Unreleased:
+
+```ts
+import { OpenGeometry, OG_REGION_TOLERANCE, type OffsetRegion } from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const square = (x: number): OffsetRegion => ({
+  outer: [{ x, y: 0, z: 0 }, { x, y: 0, z: 1 }, { x: x + 1, y: 0, z: 1 }, { x: x + 1, y: 0, z: 0 }],
+  holes: [],
+});
+const left: OffsetRegion[] = OpenGeometry.booleanRegions2D([square(0)], [square(0.5)], 'subtraction');
+console.log(left.length, left[0]?.outer.length, OG_REGION_TOLERANCE);
+```
+
+Both cut one unit square by another moved half a metre along x. The Unreleased line prints `1 4 0.000001`.
+
 ### Replace this with that
 
 | 2.0 | Unreleased |
@@ -257,6 +281,9 @@ Both give the solid's exchange body in world metres with Z up. The Unreleased li
 | `new Sweep({ path: points along an arc, profile })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })` with `path` an `OG_PRIMITIVE_ARC` wire, or an open `OG_PRIMITIVE_PROFILE` whose arc segments meet its lines tangentially |
 | `solid.prepareIfcExchange()` | `OpenGeometry.exportIfcBody(solid)` |
 | `import type { AnalyticExchangeBodyV2, IfcPreparedValue } from 'opengeometry'` | unchanged |
+| `booleanRegions2D(a, b, operation)` | `OpenGeometry.booleanRegions2D(a, b, operation)` |
+| `booleanCurvedRegions2D(a, b, operation)` | `OpenGeometry.booleanCurvedRegions2D(a, b, operation)` |
+| `import type { OffsetRegion, CurvedRegion2D, CurvedRegionEdge } from 'opengeometry'` | unchanged |
 
 ### Different behaviour
 
@@ -286,6 +313,8 @@ Both give the solid's exchange body in world metres with Z up. The Unreleased li
 - A closed path has no ends, so `caps: false` with a closed path throws `InvalidParameter`.
 - The overlap rule is unchanged: two path segments that are not neighbours must stay more than twice the reach apart. A tight line, bend, line path can still throw `SweepSelfIntersection` although the bend keeps its two lines apart.
 - A Boolean of solids with circular-arc sides (arc extrusions or cylinders) that leaves a hole outside every region throws `OGError` `InvalidTopology`. 2.0 dropped the hole and returned a body.
+- The 2D region booleans throw an `OGError` instead of a string; `String(error)` still contains the 2.0 text. In both, an unknown operation or an operand that is not a list throws `InvalidParameter`. In `booleanRegions2D`, bad input, such as a ring with fewer than three points, points at two heights, wrong winding or an unknown field on a region or a point, throws `InvalidParameter`; 2.0 dropped unknown fields. In `booleanCurvedRegions2D`, an unknown field throws `InvalidParameter`, and input that fails its checks, such as wrong winding, a ring that does not close or an invalid arc, throws `UnresolvedIntersection`. A result with an open boundary or a hole outside every region throws `InvalidTopology`, also from `booleanCurvedRegions2D`, which in 2.0 dropped such a hole.
+- A 2D region boolean with more than 100,000 points or edges across both operands throws `LimitExceeded`. 2.0 had no limit.
 
 ### Check your result
 
@@ -297,6 +326,7 @@ Both give the solid's exchange body in world metres with Z up. The Unreleased li
 6. A duct elbow along one arc has six faces, two of them `Cylinder`; a pipe elbow has two `Torus` faces. Its STEP report has `pcurvelessEdges` 0.
 7. `OpenGeometry.exportIfcBody(solid)` has `schema_version` 2, `length_unit` `'metre'`, `up_axis` `'Z'` and `coordinate_space` `'world'`, and a solid with a cavity has `representation_type` `'CSG'`.
 8. A sweep along a closed path has no faces whose `key` starts with `cap-`, and its `bodyType` is `'Solid'`.
+9. Each ring that `OpenGeometry.booleanRegions2D` returns has its points at the input height, a negative XZ area for an outer ring and a positive one for a hole.
 
 ## 2.0 to 2.5
 
