@@ -14,6 +14,12 @@ pub(super) struct Step {
     pub(super) pcurve: PcurveGeometry,
 }
 
+pub(super) struct Directed {
+    pub(super) from: u32,
+    pub(super) to: u32,
+    pub(super) steps: Vec<Step>,
+}
+
 pub(super) fn clear_band_seam(
     brep: &mut BrepEnvelope,
     face: u32,
@@ -215,15 +221,32 @@ fn rotate_seam(
 }
 
 fn relift_holes(brep: &mut BrepEnvelope, face: u32) -> Result<(), GeometryError> {
-    let record = &brep.topology.faces[face as usize];
-    let (holes, bounds) = (record.trim.holes.clone(), record.trim.uv_bounds[0]);
-    let tau = std::f64::consts::TAU;
-    for index in 0..brep.topology.halfedges.len() {
-        let halfedge = &brep.topology.halfedges[index];
-        let (true, Some(pcurve), EdgeGeometry::Curve { range, .. }) = (
+    let holes = &brep.topology.faces[face as usize].trim.holes;
+    let members = brep
+        .topology
+        .halfedges
+        .iter()
+        .filter(|halfedge| {
             halfedge
                 .loop_ref
-                .is_some_and(|loop_id| holes.contains(&loop_id)),
+                .is_some_and(|loop_id| holes.contains(&loop_id))
+        })
+        .map(|halfedge| halfedge.id)
+        .collect::<Vec<_>>();
+    relift(brep, face, &members)
+}
+
+pub(super) fn relift(
+    brep: &mut BrepEnvelope,
+    face: u32,
+    members: &[u32],
+) -> Result<(), GeometryError> {
+    let bounds = brep.topology.faces[face as usize].trim.uv_bounds[0];
+    let tau = std::f64::consts::TAU;
+    for &index in members {
+        let index = index as usize;
+        let halfedge = &brep.topology.halfedges[index];
+        let (Some(pcurve), EdgeGeometry::Curve { range, .. }) = (
             halfedge.geometry_use.pcurve,
             &brep.topology.edges[halfedge.edge as usize].geometry,
         ) else {

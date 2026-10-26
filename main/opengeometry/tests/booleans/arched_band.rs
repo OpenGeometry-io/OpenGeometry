@@ -8,12 +8,12 @@ use opengeometry_test_support::part21::Document;
 use opengeometry_test_support::volume;
 use opengeometry_test_support::world_graph::{graph, named};
 
-fn arched_profile() -> Primitive {
+fn arched_profile(sill: f64) -> Primitive {
     let edge = |to: [f64; 2]| ProfileSegment { to, arc: None };
     Primitive::Profile {
-        start: [-0.45, 0.2],
+        start: [-0.45, sill],
         segments: vec![
-            edge([0.45, 0.2]),
+            edge([0.45, sill]),
             edge([0.45, 2.2]),
             ProfileSegment {
                 to: [-0.45, 2.2],
@@ -22,13 +22,17 @@ fn arched_profile() -> Primitive {
                     counter_clockwise: true,
                 }),
             },
-            edge([-0.45, 0.2]),
+            edge([-0.45, sill]),
         ],
         closed: true,
     }
 }
 
 fn add_arch(world: &mut WorldGraph, angle: f64) {
+    add_arched_cutter(world, angle, 0.2);
+}
+
+fn add_arched_cutter(world: &mut WorldGraph, angle: f64, sill: f64) {
     let (sin, cos) = angle.sin_cos();
     let plane = Plane {
         origin: Some([2.55 * cos, 0.0, 2.55 * sin]),
@@ -39,7 +43,9 @@ fn add_arch(world: &mut WorldGraph, angle: f64) {
         plane: Some(plane),
         ..named("arch-profile")
     };
-    world.create_primitive(arched_profile(), options).unwrap();
+    world
+        .create_primitive(arched_profile(sill), options)
+        .unwrap();
     world
         .create_operation(
             CreatingOperation::Extrude {
@@ -152,4 +158,22 @@ fn curved_wall_minus_an_arched_profile_extrusion_over_the_seam_keeps_the_off_sea
         volumes[0].value,
         volumes[1].value
     );
+}
+
+#[test]
+fn curved_wall_minus_an_arched_door_from_the_floor_is_a_valid_body() {
+    let mut world = graph();
+    add_ring(&mut world);
+    add_arched_cutter(&mut world, 0.7, -0.1);
+    cut_arch(&mut world);
+    let body = world.brep("wall").unwrap();
+    body.validate().unwrap();
+    let (sin, cos) = 0.7_f64.sin_cos();
+    for height in [0.05, 1.2] {
+        assert_eq!(
+            classify_point(&body, [2.85 * cos, height, 2.85 * sin]).unwrap(),
+            PointClassification::Outside,
+            "height {height}"
+        );
+    }
 }

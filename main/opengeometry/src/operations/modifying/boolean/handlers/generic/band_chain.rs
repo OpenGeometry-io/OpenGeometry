@@ -1,3 +1,4 @@
+use super::band_rim::{rim_edge, touching_faces};
 use crate::brep::{
     Accuracy, BrepEnvelope, Curve, CurveGeometry, Edge, EdgeGeometry, GeometryError, Surface,
     SurfaceGeometry,
@@ -5,7 +6,7 @@ use crate::brep::{
 use crate::intersection::{IntersectionBranch, IntersectionGraph};
 use crate::math::{add, cross, dot, norm, scale, sub, Interval, Point3};
 use crate::query::{classify_point, PointClassification};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) type Pair<'a> = ([u32; 2], &'a IntersectionGraph, Vec<Piece>);
 
@@ -36,10 +37,27 @@ pub(super) struct Corner {
     pub(super) parameter: f64,
 }
 
+pub(super) struct Notch {
+    pub(super) cap: u32,
+    pub(super) rims: [u32; 2],
+    pub(super) bridges: Vec<(u32, usize)>,
+}
+
 pub(super) struct Chain {
     pub(super) band: [u32; 2],
     pub(super) sides: Vec<ChainSide>,
     pub(super) corners: BTreeMap<u32, [Corner; 2]>,
+    pub(super) notch: Option<Notch>,
+}
+
+impl Chain {
+    pub(super) fn bridge_side(&self, edge: u32) -> Option<usize> {
+        let notch = self.notch.as_ref()?;
+        notch
+            .bridges
+            .iter()
+            .find_map(|(bridge, side)| (*bridge == edge).then_some(*side))
+    }
 }
 
 pub(super) fn recognized_chain<'a>(
@@ -48,14 +66,23 @@ pub(super) fn recognized_chain<'a>(
     graphs: &[([u32; 2], &'a IntersectionGraph)],
 ) -> Result<Option<(Vec<Pair<'a>>, Chain)>, GeometryError> {
     let accuracy = Accuracy::combined(host.accuracy, cutter.accuracy);
+    let touching = touching_faces(host, cutter, 4.0 * accuracy.geometric);
+    let graphs = graphs
+        .iter()
+        .filter(|(faces, _)| !touching.contains(&faces[1]))
+        .collect::<Vec<_>>();
+    let cap = cap_face(&graphs);
     let mut pairs = Vec::with_capacity(graphs.len());
     for (faces, graph) in graphs {
+        if Some(faces[0]) == cap {
+            continue;
+        }
         let Some(pieces) = piece_path(graph, 16.0 * accuracy.geometric) else {
             return Ok(None);
         };
         pairs.push((*faces, *graph, pieces));
     }
-    let Some(chain) = chain(host, cutter, &pairs, accuracy)? else {
+    let Some(chain) = chain(host, cutter, &pairs, accuracy, (&touching, cap))? else {
         return Ok(None);
     };
     Ok(Some((pairs, chain)))
@@ -142,11 +169,30 @@ pub(super) fn path_ends(pieces: &[Piece]) -> Option<[Point3; 2]> {
     Some([pieces.first()?.ends()[0], pieces.last()?.ends()[1]])
 }
 
+fn cap_face(graphs: &[&([u32; 2], &IntersectionGraph)]) -> Option<u32> {
+    let mut faces = BTreeMap::<u32, BTreeSet<u32>>::new();
+    for (pair, _) in graphs {
+        faces.entry(pair[0]).or_default().insert(pair[1]);
+    }
+    if faces.len() != 3 {
+        return None;
+    }
+    faces
+        .iter()
+        .find(|(face, cutters)| {
+            faces.iter().all(|(other, set)| {
+                other == *face || (cutters.is_subset(set) && cutters.len() < set.len())
+            })
+        })
+        .map(|(face, _)| *face)
+}
+
 fn chain(
     host: &BrepEnvelope,
     cutter: &BrepEnvelope,
     pairs: &[Pair<'_>],
     accuracy: Accuracy,
+    (touching, cap): (&[u32], Option<u32>),
 ) -> Result<Option<Chain>, GeometryError> {
     let Some(band) = band_faces(pairs) else {
         return Ok(None);
@@ -160,22 +206,59 @@ fn chain(
             SurfaceGeometry::Plane { .. }
         )
     });
+    let Some(bridges) = prism_bridges(cutter, &sides) else {
+        return Ok(None);
+    };
     if sides.len() < 2
         || !curved
-        || !is_prism(cutter, &sides)
-        || !caps_outside(host, cutter, &sides)?
-        || band_edges_inside(host, cutter, band)?
+        || !caps_outside(host, cutter, &sides, touching)?
+        || touching.iter().any(|face| {
+            bridges
+                .iter()
+                .any(|bridge| bridge_face(cutter, &sides, *bridge) != Some(*face))
+        })
     {
         return Ok(None);
     }
-    let Some(corners) = corners(host, cutter, pairs, band, &sides, accuracy)? else {
+    let Some(mut corners) = corners(host, cutter, pairs, band, &sides, accuracy)? else {
         return Ok(None);
     };
+    let notch = match bridges.len() {
+        0 if cap.is_none() && touching.is_empty() => None,
+        2 => {
+            let place = (pairs, band, sides.as_slice());
+            let Some(notch) = rim_corners(host, cutter, place, bridges, accuracy, &mut corners)?
+            else {
+                return Ok(None);
+            };
+            if cap.is_some_and(|face| face != notch.cap) {
+                return Ok(None);
+            }
+            Some(notch)
+        }
+        _ => return Ok(None),
+    };
+    if band_edges_inside(host, cutter, band, notch.as_ref().map(|notch| notch.cap))? {
+        return Ok(None);
+    }
     Ok(Some(Chain {
         band,
         sides,
         corners,
+        notch,
     }))
+}
+
+fn bridge_face(
+    cutter: &BrepEnvelope,
+    sides: &[ChainSide],
+    (edge, side): (u32, usize),
+) -> Option<u32> {
+    let halfedge = sides[side]
+        .loop_halfedges
+        .iter()
+        .find(|halfedge| cutter.topology.halfedges[**halfedge as usize].edge == edge)?;
+    twin_face(cutter, *halfedge)
 }
 
 fn band_faces(pairs: &[Pair<'_>]) -> Option<[u32; 2]> {
@@ -243,31 +326,37 @@ pub(super) fn edge_line(cutter: &BrepEnvelope, edge: u32) -> Option<(Point3, Poi
     }
 }
 
-fn is_prism(cutter: &BrepEnvelope, sides: &[ChainSide]) -> bool {
-    let mut direction = None;
-    for side in sides {
+fn prism_bridges(cutter: &BrepEnvelope, sides: &[ChainSide]) -> Option<Vec<(u32, usize)>> {
+    let line = |halfedge: u32| edge_line(cutter, cutter.topology.halfedges[halfedge as usize].edge);
+    let reference = sides
+        .iter()
+        .flat_map(|side| side.loop_halfedges.iter())
+        .find(|halfedge| shared_edge(cutter, sides, **halfedge))
+        .and_then(|halfedge| line(*halfedge))?
+        .1;
+    let mut bridges = Vec::new();
+    for (index, side) in sides.iter().enumerate() {
         let shared = side
             .loop_halfedges
             .iter()
             .filter(|halfedge| shared_edge(cutter, sides, **halfedge))
+            .count();
+        let laterals = side
+            .loop_halfedges
+            .iter()
+            .filter(|halfedge| {
+                line(**halfedge).is_some_and(|(_, along)| norm(cross(reference, along)) <= 1e-10)
+            })
             .collect::<Vec<_>>();
-        if side.loop_halfedges.len() != 4 || shared.len() != 2 {
-            return false;
+        let open = laterals
+            .iter()
+            .filter(|halfedge| !shared_edge(cutter, sides, ***halfedge))
+            .map(|halfedge| cutter.topology.halfedges[**halfedge as usize].edge)
+            .collect::<Vec<_>>();
+        if side.loop_halfedges.len() != 4 || laterals.len() != 2 || shared + open.len() != 2 {
+            return None;
         }
-        for &&halfedge in &shared {
-            let Some((_, along)) =
-                edge_line(cutter, cutter.topology.halfedges[halfedge as usize].edge)
-            else {
-                return false;
-            };
-            let reference = *direction.get_or_insert(along);
-            if norm(cross(reference, along)) > 1e-10 {
-                return false;
-            }
-        }
-        let Some(reference) = direction else {
-            return false;
-        };
+        bridges.extend(open.into_iter().map(|edge| (edge, index)));
         let surface =
             &cutter.geometry.surfaces[cutter.topology.faces[side.face as usize].surface as usize];
         let parallel = match surface {
@@ -276,19 +365,20 @@ fn is_prism(cutter: &BrepEnvelope, sides: &[ChainSide]) -> bool {
             _ => false,
         };
         if !parallel {
-            return false;
+            return None;
         }
     }
-    true
+    Some(bridges)
 }
 
 fn caps_outside(
     host: &BrepEnvelope,
     cutter: &BrepEnvelope,
     sides: &[ChainSide],
+    touching: &[u32],
 ) -> Result<bool, GeometryError> {
     for face in &cutter.topology.faces {
-        if sides.iter().any(|side| side.face == face.id) {
+        if sides.iter().any(|side| side.face == face.id) || touching.contains(&face.id) {
             continue;
         }
         let start = cutter.topology.loops[face.trim.outer as usize].start_halfedge;
@@ -347,8 +437,7 @@ fn corners(
                     .surface(host.topology.faces[host_face as usize].surface)?;
                 let Some(parameter) = surface_corner(
                     surface,
-                    origin,
-                    direction,
+                    &CurveGeometry::Line { origin, direction },
                     dot(sub(nearest, origin), direction),
                 )?
                 else {
@@ -369,6 +458,71 @@ fn corners(
     Ok(Some(corners))
 }
 
+fn rim_corners(
+    host: &BrepEnvelope,
+    cutter: &BrepEnvelope,
+    (pairs, band, sides): (&[Pair<'_>], [u32; 2], &[ChainSide]),
+    bridges: Vec<(u32, usize)>,
+    accuracy: Accuracy,
+    corners: &mut BTreeMap<u32, [Corner; 2]>,
+) -> Result<Option<Notch>, GeometryError> {
+    let (mut rims, mut cap) = ([None; 2], None);
+    for &(edge, side) in &bridges {
+        let Some((origin, direction)) = edge_line(cutter, edge) else {
+            return Ok(None);
+        };
+        let face = &cutter.topology.faces[sides[side].face as usize];
+        let surface = cutter.geometry.surface(face.surface)?;
+        let mut found = Vec::with_capacity(2);
+        for (index, host_face) in band.into_iter().enumerate() {
+            let Some([first, last]) = path_ends(&pairs[sides[side].pairs[index]].2) else {
+                return Ok(None);
+            };
+            let end = if line_distance(first, origin, direction)
+                <= line_distance(last, origin, direction)
+            {
+                first
+            } else {
+                last
+            };
+            let Some((rim, curve, start, twin)) =
+                rim_edge(host, host_face, end, 16.0 * accuracy.geometric)?
+            else {
+                return Ok(None);
+            };
+            let Some(parameter) = surface_corner(surface, curve, start)? else {
+                return Ok(None);
+            };
+            let point = curve.elementary_point(parameter)?;
+            if norm(sub(point, end)) > 8.0 * accuracy.geometric
+                || *rims[index].get_or_insert(rim) != rim
+                || *cap.get_or_insert(twin) != twin
+            {
+                return Ok(None);
+            }
+            found.push(Corner { point, parameter });
+        }
+        let Ok(pair) = <[Corner; 2]>::try_from(found) else {
+            return Ok(None);
+        };
+        corners.insert(edge, pair);
+    }
+    let (Some(cap), [Some(first), Some(second)]) = (cap, rims) else {
+        return Ok(None);
+    };
+    if !matches!(
+        host.geometry.surfaces[host.topology.faces[cap as usize].surface as usize],
+        SurfaceGeometry::Plane { .. }
+    ) {
+        return Ok(None);
+    }
+    Ok(Some(Notch {
+        cap,
+        rims: [first, second],
+        bridges,
+    }))
+}
+
 pub(super) fn line_distance(point: Point3, origin: Point3, direction: Point3) -> f64 {
     let offset = sub(point, origin);
     norm(sub(offset, scale(direction, dot(offset, direction))))
@@ -376,18 +530,17 @@ pub(super) fn line_distance(point: Point3, origin: Point3, direction: Point3) ->
 
 pub(super) fn surface_corner(
     surface: &SurfaceGeometry,
-    origin: Point3,
-    direction: Point3,
+    curve: &CurveGeometry,
     start: f64,
 ) -> Result<Option<f64>, GeometryError> {
     let mut parameter = start;
     let mut hint = None;
     for _ in 0..8 {
-        let point = add(origin, scale(direction, parameter));
+        let point = curve.elementary_point(parameter)?;
         let uv = surface.project(point, hint)?;
         hint = Some(uv);
         let normal = surface.normal_at(uv)?;
-        let along = dot(direction, normal);
+        let along = dot(curve.elementary_tangent(parameter)?, normal);
         if along.abs() <= 1e-6 {
             return Ok(None);
         }
@@ -401,13 +554,19 @@ pub(super) fn band_edges_inside(
     host: &BrepEnvelope,
     cutter: &BrepEnvelope,
     band: [u32; 2],
+    cap: Option<u32>,
 ) -> Result<bool, GeometryError> {
     for halfedge in &host.topology.halfedges {
         let Some(face) = halfedge.face.filter(|face| band.contains(face)) else {
             continue;
         };
         let edge = &host.topology.edges[halfedge.edge as usize];
-        if edge.chart_seam && seam_twin_face(host, edge) == Some(face) {
+        let twin = halfedge
+            .twin
+            .and_then(|twin| host.topology.halfedges[twin as usize].face);
+        if (edge.chart_seam && seam_twin_face(host, edge) == Some(face))
+            || (cap.is_some() && twin == cap)
+        {
             continue;
         }
         let EdgeGeometry::Curve { curve, range } = edge.geometry else {

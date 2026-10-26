@@ -1,6 +1,8 @@
 mod band_chain;
 mod band_chain_faces;
 mod band_chain_seam;
+mod band_notch;
+mod band_rim;
 mod multiple_closed_loops;
 mod non_intersecting;
 mod single_closed_loop;

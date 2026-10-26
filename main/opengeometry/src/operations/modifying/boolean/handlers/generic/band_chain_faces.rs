@@ -1,15 +1,17 @@
-use super::band_chain::{edge_line, path_ends, shared_edge, Chain, Pair, Piece};
-use super::band_chain_seam::{clear_band_seam, set_periodic_lifts, Step};
+use super::band_chain::{edge_line, path_ends, shared_edge, Chain, Corner, Pair, Piece};
+use super::band_chain_seam::{clear_band_seam, set_periodic_lifts, Directed, Step};
+use super::band_notch::cut_notch;
+use super::band_rim::trimmed_definition;
 use crate::brep::{
-    boundary, Accuracy, BrepEnvelope, Builder, Curve, CurveGeometry, EdgeGeometry, Face,
-    FaceProvenance, FaceRole, GeometryError, GeometryStore, IntersectionDefinition, Orientation,
-    PcurveGeometry, TraceAnchor, TrimRegion, Use,
+    boundary, unit, uv_line, Accuracy, BrepEnvelope, Builder, Curve, CurveGeometry, EdgeGeometry,
+    Face, FaceProvenance, FaceRole, GeometryError, Orientation, PcurveGeometry, Surface,
+    TrimRegion, Use,
 };
 use crate::intersection::IntersectionGraph;
 use crate::math::{add, dot, norm, scale, sub, Interval, Point3};
 use crate::operations::modifying::boolean::assembly::{
     append_analytic_input, append_closed_branch_geometry, finish_analytic_result,
-    retained_definition, reverse_face,
+    retained_definition, reverse_face, widen_trim_bounds,
 };
 use crate::operations::modifying::boolean::operands::brep_face_source;
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
@@ -29,6 +31,7 @@ struct BranchPath {
 struct CornerEdge {
     edge: u32,
     ends: [u32; 2],
+    bridge: Option<[PcurveGeometry; 2]>,
 }
 
 struct ChainBuild<'a> {
@@ -76,39 +79,30 @@ pub(super) fn build_chain_cut(
         paths: Vec::new(),
         corner_edges: BTreeMap::new(),
     };
-    for (side_index, surface) in side_surfaces.iter().enumerate() {
-        let mut side_paths = Vec::with_capacity(2);
-        for band in 0..2 {
-            let place = PathPlace {
-                pairs,
-                side: side_index,
-                band,
-                side_surface: *surface,
-            };
-            let Some(path) = add_branch_path(&mut builder, &build, &place)? else {
-                return Ok(None);
-            };
-            side_paths.push(path);
-        }
-        let Ok(side_paths) = <[BranchPath; 2]>::try_from(side_paths) else {
-            return Ok(None);
-        };
-        build.paths.push(side_paths);
-    }
-    if !add_corner_edges(&mut builder, &mut build) {
+    if !add_side_paths(&mut builder, &mut build, pairs, &side_surfaces)?
+        || !add_corner_edges(&mut builder, &mut build)?
+    {
         return Ok(None);
     }
     let mut cut_faces = Vec::with_capacity(chain.sides.len());
     let mut directions = Vec::with_capacity(chain.sides.len());
+    let mut bridges = Vec::new();
     for (index, surface) in side_surfaces.iter().enumerate() {
         let mut steps = [None, None];
-        let Some(face) = add_cut_face(&mut builder, &build, index, *surface, &mut steps)? else {
+        let place = (index, *surface);
+        let Some(face) = add_cut_face(&mut builder, &build, place, &mut steps, &mut bridges)?
+        else {
             return Ok(None);
         };
         cut_faces.push(face);
         directions.push(steps);
     }
-    for band in 0..2 {
+    if let Some(notch) = &chain.notch {
+        if !cut_notch(&mut builder, chain.band, notch, &directions, bridges)? {
+            return Ok(None);
+        }
+    }
+    for band in (0..2).filter(|_| chain.notch.is_none()) {
         if !add_band_cut(&mut builder, &build, band, &directions)? {
             return Ok(None);
         }
@@ -120,6 +114,34 @@ pub(super) fn build_chain_cut(
     finish_analytic_result(out, host, cutter, true, operation, false).map(Some)
 }
 
+fn add_side_paths(
+    builder: &mut Builder,
+    build: &mut ChainBuild<'_>,
+    pairs: &[Pair<'_>],
+    side_surfaces: &[u32],
+) -> Result<bool, GeometryError> {
+    for (side_index, surface) in side_surfaces.iter().enumerate() {
+        let mut side_paths = Vec::with_capacity(2);
+        for band in 0..2 {
+            let place = PathPlace {
+                pairs,
+                side: side_index,
+                band,
+                side_surface: *surface,
+            };
+            let Some(path) = add_branch_path(builder, build, &place)? else {
+                return Ok(false);
+            };
+            side_paths.push(path);
+        }
+        let Ok(side_paths) = <[BranchPath; 2]>::try_from(side_paths) else {
+            return Ok(false);
+        };
+        build.paths.push(side_paths);
+    }
+    Ok(true)
+}
+
 fn chain_accuracy(host: &BrepEnvelope, cutter: &BrepEnvelope) -> Accuracy {
     Accuracy::combined(host.accuracy, cutter.accuracy)
 }
@@ -129,8 +151,17 @@ fn side_corner_edges(build: &ChainBuild<'_>, side: usize) -> Vec<u32> {
     build.chain.sides[side]
         .loop_halfedges
         .iter()
-        .filter(|halfedge| shared_edge(cutter, &build.chain.sides, **halfedge))
-        .map(|halfedge| cutter.topology.halfedges[*halfedge as usize].edge)
+        .map(|halfedge| {
+            (
+                *halfedge,
+                cutter.topology.halfedges[*halfedge as usize].edge,
+            )
+        })
+        .filter(|(halfedge, edge)| {
+            shared_edge(cutter, &build.chain.sides, *halfedge)
+                || build.chain.bridge_side(*edge).is_some()
+        })
+        .map(|(_, edge)| edge)
         .collect()
 }
 
@@ -139,12 +170,6 @@ struct PathPlace<'a, 'b> {
     side: usize,
     band: usize,
     side_surface: u32,
-}
-
-struct Directed {
-    from: u32,
-    to: u32,
-    steps: Vec<Step>,
 }
 
 fn add_branch_path(
@@ -242,43 +267,6 @@ fn add_piece_edge(
     }))
 }
 
-fn trimmed_definition(
-    store: &GeometryStore,
-    definition: u32,
-    lo: f64,
-    hi: f64,
-) -> Result<Option<IntersectionDefinition>, GeometryError> {
-    let source = &store.intersections[definition as usize];
-    let anchor = |parameter: f64| -> Result<TraceAnchor, GeometryError> {
-        let point = source.evaluate(parameter, store)?;
-        Ok(TraceAnchor {
-            parameter,
-            point: point.point,
-            uv_a: point.uv_a,
-            uv_b: point.uv_b,
-        })
-    };
-    let first = source
-        .anchors
-        .partition_point(|candidate| candidate.parameter <= lo)
-        .saturating_sub(1);
-    let last = source
-        .anchors
-        .partition_point(|candidate| candidate.parameter < hi);
-    if last <= first || last >= source.anchors.len() {
-        return Ok(None);
-    }
-    let mut anchors = vec![anchor(lo)?];
-    anchors.extend(source.anchors[first + 1..last].iter().cloned());
-    anchors.push(anchor(hi)?);
-    Ok(Some(IntersectionDefinition {
-        surfaces: source.surfaces,
-        anchors,
-        uv_tubes: source.uv_tubes[first..last].to_vec(),
-        residual_tolerance: source.residual_tolerance,
-    }))
-}
-
 fn curve_parameter(
     brep: &BrepEnvelope,
     curve: u32,
@@ -299,10 +287,27 @@ fn curve_parameter(
     Ok(reached.then_some(parameter))
 }
 
-fn add_corner_edges(builder: &mut Builder, build: &mut ChainBuild<'_>) -> bool {
+fn add_corner_edges(
+    builder: &mut Builder,
+    build: &mut ChainBuild<'_>,
+) -> Result<bool, GeometryError> {
     for (edge, corners) in &build.chain.corners {
+        let ends = [build.vertices[&(*edge, 0)], build.vertices[&(*edge, 1)]];
+        if let Some(side) = build.chain.bridge_side(*edge) {
+            let Some((id, pcurves)) = add_bridge_edge(builder, build, corners, side)? else {
+                return Ok(false);
+            };
+            let bridge = Some(pcurves);
+            let corner = CornerEdge {
+                edge: id,
+                ends,
+                bridge,
+            };
+            build.corner_edges.insert(*edge, corner);
+            continue;
+        }
         let Some((origin, direction)) = edge_line(build.cutter, *edge) else {
-            return false;
+            return Ok(false);
         };
         let (lo, hi) = if corners[0].parameter <= corners[1].parameter {
             (0, 1)
@@ -310,18 +315,67 @@ fn add_corner_edges(builder: &mut Builder, build: &mut ChainBuild<'_>) -> bool {
             (1, 0)
         };
         let Ok(range) = Interval::new(corners[lo].parameter, corners[hi].parameter) else {
-            return false;
+            return Ok(false);
         };
         let id = builder.edge(CurveGeometry::Line { origin, direction }, range, false);
         build.corner_edges.insert(
             *edge,
             CornerEdge {
                 edge: id,
-                ends: [build.vertices[&(*edge, lo)], build.vertices[&(*edge, hi)]],
+                ends: [ends[lo], ends[hi]],
+                bridge: None,
             },
         );
     }
-    true
+    Ok(true)
+}
+
+fn add_bridge_edge(
+    builder: &mut Builder,
+    build: &ChainBuild<'_>,
+    corners: &[Corner; 2],
+    side: usize,
+) -> Result<Option<(u32, [PcurveGeometry; 2])>, GeometryError> {
+    let [start, end] = [corners[0].point, corners[1].point];
+    let (Ok(direction), Ok(range)) = (
+        unit(sub(end, start)),
+        Interval::new(0.0, norm(sub(end, start))),
+    ) else {
+        return Ok(None);
+    };
+    let cutter = build.cutter;
+    let Some(notch) = &build.chain.notch else {
+        return Ok(None);
+    };
+    let surfaces = [
+        builder.brep.topology.faces[notch.cap as usize].surface,
+        cutter.topology.faces[build.chain.sides[side].face as usize].surface,
+    ];
+    let mut pcurves = Vec::with_capacity(2);
+    for (index, surface) in surfaces.into_iter().enumerate() {
+        let geometry = if index == 0 {
+            builder.brep.geometry.surface(surface)?
+        } else {
+            cutter.geometry.surface(surface)?
+        };
+        let [a, b] = [geometry.project(start, None)?, geometry.project(end, None)?];
+        pcurves.push(uv_line(
+            a,
+            [0, 1].map(|axis| (b[axis] - a[axis]) / range.hi),
+        ));
+    }
+    let Ok(pcurves) = <[PcurveGeometry; 2]>::try_from(pcurves) else {
+        return Ok(None);
+    };
+    let id = builder.edge(
+        CurveGeometry::Line {
+            origin: start,
+            direction,
+        },
+        range,
+        false,
+    );
+    Ok(Some((id, pcurves)))
 }
 
 fn nearest_band(build: &ChainBuild<'_>, edge: u32, point: Point3) -> usize {
@@ -332,13 +386,13 @@ fn nearest_band(build: &ChainBuild<'_>, edge: u32, point: Point3) -> usize {
 fn add_cut_face(
     builder: &mut Builder,
     build: &ChainBuild<'_>,
-    side_index: usize,
-    surface: u32,
+    (side_index, surface): (usize, u32),
     directions: &mut [Option<Directed>; 2],
+    bridges: &mut Vec<Use>,
 ) -> Result<Option<u32>, GeometryError> {
     let cutter = build.cutter;
     let side = &build.chain.sides[side_index];
-    let Some(uses) = cut_face_uses(build, side_index, directions) else {
+    let Some(uses) = cut_face_uses(build, side_index, directions, bridges) else {
         return Ok(None);
     };
     let source = &cutter.topology.faces[side.face as usize];
@@ -363,6 +417,26 @@ fn add_cut_face(
         },
     });
     builder.brep.topology.shells[0].faces.push(face);
+    for halfedge in &side.loop_halfedges {
+        let edge = cutter.topology.halfedges[*halfedge as usize].edge;
+        let Some(CornerEdge {
+            edge: id,
+            bridge: Some([_, PcurveGeometry::Line2 { origin, direction }]),
+            ..
+        }) = build.corner_edges.get(&edge)
+        else {
+            continue;
+        };
+        let EdgeGeometry::Curve { range, .. } = builder.brep.topology.edges[*id as usize].geometry
+        else {
+            continue;
+        };
+        let [u, v] = [0, 1].map(|axis| {
+            let end = origin[axis] + direction[axis] * range.hi;
+            Interval::new(origin[axis].min(end), origin[axis].max(end))
+        });
+        widen_trim_bounds(&mut builder.brep, face, [u?, v?])?;
+    }
     set_periodic_lifts(&mut builder.brep, outer, false)?;
     Ok(Some(face))
 }
@@ -371,6 +445,7 @@ fn cut_face_uses(
     build: &ChainBuild<'_>,
     side_index: usize,
     directions: &mut [Option<Directed>; 2],
+    bridges: &mut Vec<Use>,
 ) -> Option<Vec<Use>> {
     let cutter = build.cutter;
     let halfedges = &build.chain.sides[side_index].loop_halfedges;
@@ -386,8 +461,14 @@ fn cut_face_uses(
             } else {
                 Orientation::Reverse
             };
-            let pcurve = cutter.geometry.pcurves[record.geometry_use.pcurve? as usize].clone();
             let to = build.vertices[&(record.edge, 1 - band)];
+            let pcurve = match &corner.bridge {
+                Some([cap, side]) => {
+                    bridges.push(boundary(corner.edge, from, to, sense, cap.clone()));
+                    side.clone()
+                }
+                None => cutter.geometry.pcurves[record.geometry_use.pcurve? as usize].clone(),
+            };
             uses.push(boundary(corner.edge, from, to, sense, pcurve));
             continue;
         }

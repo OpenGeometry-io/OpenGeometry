@@ -69,6 +69,6 @@ fn an_existing_window_inside_the_cutter_counts_as_a_band_edge_inside_it() {
         accuracy,
     )
     .unwrap();
-    assert!(band_edges_inside(&pierced, &arch, [0, 1]).unwrap());
-    assert!(!band_edges_inside(&ring, &arch, [0, 1]).unwrap());
+    assert!(band_edges_inside(&pierced, &arch, [0, 1], None).unwrap());
+    assert!(!band_edges_inside(&ring, &arch, [0, 1], None).unwrap());
 }

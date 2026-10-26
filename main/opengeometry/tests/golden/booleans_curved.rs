@@ -241,6 +241,51 @@ fn arch(angle: f64) -> Result<BrepEnvelope, GeometryError> {
     primitives::arc_edged_extrusion("arch".into(), radial(angle, 0.0)?, profile, 0.6, standard())
 }
 
+fn door(angle: f64, sill: f64) -> Result<BrepEnvelope, GeometryError> {
+    let profile = vec![
+        line([-0.45, sill], [0.45, sill]),
+        line([0.45, sill], [0.45, 2.2]),
+        arc_at([0.0, 2.2], 0.45, 0.0, std::f64::consts::PI),
+        line([-0.45, 2.2], [-0.45, sill]),
+    ];
+    primitives::arc_edged_extrusion("door".into(), radial(angle, 0.0)?, profile, 0.6, standard())
+}
+
+fn arched_doors() -> Vec<Case> {
+    let ring =
+        || primitives::annular_cylinder("ring".into(), Frame3::IDENTITY, 2.7, 3.0, 3.0, standard());
+    let wall = || {
+        primitives::cuboid(
+            "wall".into(),
+            at([2.7, -2.0, 0.0]),
+            [0.3, 4.0, 3.0],
+            standard(),
+        )
+    };
+    vec![
+        curved_subtraction(
+            "ring-arched-door",
+            "arched-door",
+            operands(move || Ok((ring()?, door(0.7, -0.1)?))),
+        ),
+        curved_subtraction(
+            "ring-arched-door-seam",
+            "arched-door-seam",
+            operands(move || Ok((ring()?, door(0.0, -0.1)?))),
+        ),
+        curved_subtraction(
+            "ring-arched-door-touching",
+            "arched-door-touching",
+            operands(move || Ok((ring()?, door(0.7, 0.0)?))),
+        ),
+        curved_subtraction(
+            "wall-arched-door",
+            "arched-wall-door",
+            operands(move || Ok((wall()?, door(0.0, -0.1)?))),
+        ),
+    ]
+}
+
 fn arched_openings() -> Vec<Case> {
     let ring =
         || primitives::annular_cylinder("ring".into(), Frame3::IDENTITY, 2.7, 3.0, 3.0, standard());
@@ -300,5 +345,6 @@ pub(crate) fn cases() -> Vec<Case> {
     .into_iter()
     .flatten()
     .chain(arched_openings())
+    .chain(arched_doors())
     .collect()
 }

@@ -1,5 +1,7 @@
 use super::support::volume_at_deflection;
-use crate::brep::{coarse_accuracy, Accuracy, BrepEnvelope, FaceRole, Frame3, GeometryError};
+use crate::brep::{
+    coarse_accuracy, Accuracy, BrepEnvelope, Face, FaceRole, Frame3, GeometryError, SurfaceGeometry,
+};
 use crate::exchange::export_step;
 use crate::operations::modifying::boolean::dispatch::boolean_brep_outcome_with_handlers;
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
@@ -77,14 +79,14 @@ fn through_arch(angle: f64) -> BrepEnvelope {
     arched_cutter(angle, 2.55, 0.6, SPRING)
 }
 
-fn cut_volume() -> f64 {
+fn cut_volume(sill: f64) -> f64 {
     let steps = 20_000;
     let width = 2.0 * HALF_WIDTH / steps as f64;
     (0..steps)
         .map(|step| {
             let u = -HALF_WIDTH + (step as f64 + 0.5) * width;
             let depth = (OUTER * OUTER - u * u).sqrt() - (INNER * INNER - u * u).sqrt();
-            let height = SPRING - SILL + (HALF_WIDTH * HALF_WIDTH - u * u).sqrt();
+            let height = SPRING - sill + (HALF_WIDTH * HALF_WIDTH - u * u).sqrt();
             depth * height * width
         })
         .sum()
@@ -141,7 +143,7 @@ fn ring_minus_one_arched_cutter_on_the_seam_is_a_valid_analytic_body() {
         .iter()
         .filter(|face| face.provenance.role == FaceRole::Split)
         .all(|face| face.trim.holes.len() == 1));
-    let expected = measured(&ring()) - cut_volume();
+    let expected = measured(&ring()) - cut_volume(SILL);
     let measured = measured(&result.brep);
     assert!(
         (measured - expected).abs() <= 1e-3 * expected,
@@ -154,7 +156,7 @@ fn ring_minus_one_arched_cutter_on_the_seam_is_a_valid_analytic_body() {
 fn ring_minus_one_arched_cutter_off_the_seam_is_valid() {
     let result = subtracted(&ring(), &through_arch(0.7), "arched-off-seam");
     assert_opening_at(&result.brep, 0.7);
-    let expected = measured(&ring()) - cut_volume();
+    let expected = measured(&ring()) - cut_volume(SILL);
     let measured = measured(&result.brep);
     assert!(
         (measured - expected).abs() <= 1e-3 * expected,
@@ -216,7 +218,7 @@ fn arched_cutter_after_a_round_cut_is_valid() {
     let first = first.unwrap().brep;
     let result = subtracted(&first, &through_arch(0.0), "arched-after-round");
     assert_opening_at(&result.brep, 0.0);
-    let expected = measured(&first) - cut_volume();
+    let expected = measured(&first) - cut_volume(SILL);
     let measured = measured(&result.brep);
     assert!(
         (measured - expected).abs() <= 1e-3 * expected,
@@ -302,19 +304,207 @@ fn arched_cutter_around_an_existing_window_is_refused() {
     assert!(result.is_err());
 }
 
-#[test]
-fn arched_sill_at_or_below_the_bottom_cap_is_a_coverage_gap() {
-    for sill in [0.0, -0.1] {
-        let cutter = primitives::arc_edged_extrusion(
-            "door".into(),
-            radial_frame(0.7, 2.55, 0.0),
-            arched_profile(sill, SPRING),
-            0.6,
-            accuracy(),
-        )
-        .unwrap();
-        assert!(coverage_gap(&ring(), &cutter), "sill {sill}");
+fn door(angle: f64, sill: f64) -> BrepEnvelope {
+    primitives::arc_edged_extrusion(
+        "door".into(),
+        radial_frame(angle, 2.55, 0.0),
+        arched_profile(sill, SPRING),
+        0.6,
+        accuracy(),
+    )
+    .unwrap()
+}
+
+fn assert_notch_at(brep: &BrepEnvelope, angle: f64) {
+    let mid = (OUTER + INNER) / 2.0;
+    for height in [0.05, 1.2] {
+        assert_eq!(
+            classify_point(brep, point_at(angle, mid, height)).unwrap(),
+            PointClassification::Outside,
+            "height {height}"
+        );
     }
+    assert_eq!(
+        classify_point(brep, point_at(angle + 0.3, mid, 0.05)).unwrap(),
+        PointClassification::Inside
+    );
+}
+
+fn assert_notch_volume(brep: &BrepEnvelope) {
+    let expected = measured(&ring()) - cut_volume(0.0);
+    let measured = measured(brep);
+    assert!(
+        (measured - expected).abs() <= 1e-3 * expected,
+        "{measured} versus {expected}"
+    );
+}
+
+fn split_faces(brep: &BrepEnvelope) -> Vec<&Face> {
+    brep.topology
+        .faces
+        .iter()
+        .filter(|face| face.provenance.role == FaceRole::Split)
+        .collect()
+}
+
+fn assert_notch_shape(brep: &BrepEnvelope) {
+    let split = split_faces(brep);
+    assert_eq!(split.len(), 3);
+    assert!(split.iter().all(|face| face.trim.holes.is_empty()));
+}
+
+#[test]
+fn door_with_its_sill_below_the_floor_cuts_a_notch() {
+    let result = subtracted(&ring(), &door(0.7, -0.1), "door-notch");
+    let faces = &result.brep.topology.faces;
+    assert_notch_shape(&result.brep);
+    assert_eq!(
+        faces
+            .iter()
+            .filter(|face| face.provenance.role == FaceRole::Cut)
+            .count(),
+        3
+    );
+    assert_notch_at(&result.brep, 0.7);
+    assert_notch_volume(&result.brep);
+}
+
+#[test]
+fn door_with_its_sill_within_four_geometric_of_the_floor_cuts_the_same_notch() {
+    let reach = 4.0 * accuracy().geometric;
+    for fraction in [0.0, 0.5, -0.5, 0.95, -0.95] {
+        let result = subtracted(&ring(), &door(0.7, fraction * reach), "door-touching");
+        assert_notch_shape(&result.brep);
+        assert_notch_at(&result.brep, 0.7);
+        assert_notch_volume(&result.brep);
+    }
+}
+
+#[test]
+fn door_with_its_sill_beyond_four_geometric_above_the_floor_cuts_a_hole() {
+    let sill = 1.5 * 4.0 * accuracy().geometric;
+    let result = subtracted(&ring(), &door(0.7, sill), "door-sliver");
+    let split = split_faces(&result.brep);
+    assert_eq!(split.len(), 2);
+    assert!(split.iter().all(|face| face.trim.holes.len() == 1));
+}
+
+#[test]
+fn door_with_its_sill_above_the_floor_still_cuts_a_hole() {
+    let result = subtracted(&ring(), &door(0.7, SILL), "door-hole");
+    assert!(result
+        .brep
+        .topology
+        .faces
+        .iter()
+        .filter(|face| face.provenance.role == FaceRole::Split)
+        .all(|face| face.trim.holes.len() == 1));
+    let mid = (OUTER + INNER) / 2.0;
+    assert_eq!(
+        classify_point(&result.brep, point_at(0.7, mid, 0.05)).unwrap(),
+        PointClassification::Inside
+    );
+}
+
+#[test]
+fn door_on_the_seam_keeps_the_off_seam_notch_volume() {
+    let volumes = [0.0, 0.7].map(|angle| {
+        let result = subtracted(&ring(), &door(angle, -0.1), "door-seam");
+        assert_notch_at(&result.brep, angle);
+        measured(&result.brep)
+    });
+    assert!(
+        (volumes[0] - volumes[1]).abs() <= 1e-3 * volumes[1],
+        "{} versus {}",
+        volumes[0],
+        volumes[1]
+    );
+}
+
+fn straight_wall() -> BrepEnvelope {
+    primitives::cuboid(
+        "wall".into(),
+        Frame3 {
+            origin: [2.7, -2.0, 0.0],
+            ..Frame3::IDENTITY
+        },
+        [0.3, 4.0, 3.0],
+        accuracy(),
+    )
+    .unwrap()
+}
+
+fn wall_door(offset: f64) -> BrepEnvelope {
+    primitives::arc_edged_extrusion(
+        "door".into(),
+        Frame3::from_axis([2.55, offset, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]).unwrap(),
+        arched_profile(-0.1, SPRING),
+        0.6,
+        accuracy(),
+    )
+    .unwrap()
+}
+
+fn door_area() -> f64 {
+    2.0 * HALF_WIDTH * SPRING + std::f64::consts::FRAC_PI_2 * HALF_WIDTH * HALF_WIDTH
+}
+
+#[test]
+fn straight_wall_minus_a_door_from_the_floor_splits_the_floor_face() {
+    let result = subtracted(&straight_wall(), &door(0.0, -0.1), "straight-door");
+    assert_eq!(result.brep.topology.faces.len(), 10);
+    let expected = 0.3 * 4.0 * 3.0 - 0.3 * door_area();
+    let measured = measured(&result.brep);
+    assert!(
+        (measured - expected).abs() <= 1e-3 * expected,
+        "{measured} versus {expected}"
+    );
+    for (point, side) in [
+        ([2.85, 0.0, 0.05], PointClassification::Outside),
+        ([2.85, 1.0, 0.05], PointClassification::Inside),
+    ] {
+        assert_eq!(classify_point(&result.brep, point).unwrap(), side);
+    }
+}
+
+#[test]
+fn straight_wall_minus_doors_from_the_floor_on_both_sides_of_a_door_is_valid() {
+    let mut wall = straight_wall();
+    for (index, offset) in [0.0, 1.3, -1.3].into_iter().enumerate() {
+        wall = subtracted(&wall, &wall_door(offset), &format!("doors-{index}")).brep;
+        let floor = wall
+            .topology
+            .faces
+            .iter()
+            .filter(|face| {
+                face.provenance.role == FaceRole::Split
+                    && matches!(
+                        wall.geometry.surfaces[face.surface as usize],
+                        SurfaceGeometry::Plane { frame } if frame.z[2].abs() > 0.5
+                    )
+            })
+            .count();
+        assert_eq!(floor, 2, "door {index}");
+    }
+    let expected = 0.3 * 4.0 * 3.0 - 3.0 * 0.3 * door_area();
+    let measured = measured(&wall);
+    assert!(
+        (measured - expected).abs() <= 1e-3 * expected,
+        "{measured} versus {expected}"
+    );
+}
+
+#[test]
+fn door_through_the_floor_and_the_roof_is_a_coverage_gap() {
+    let cutter = primitives::arc_edged_extrusion(
+        "tall-door".into(),
+        radial_frame(0.7, 2.55, 0.0),
+        arched_profile(-0.1, 2.8),
+        0.6,
+        accuracy(),
+    )
+    .unwrap();
+    assert!(coverage_gap(&ring(), &cutter));
 }
 
 #[test]
