@@ -1,3 +1,4 @@
+mod polyline;
 mod ring;
 
 use crate::geom2d::boolean2d::distance_to_segment;

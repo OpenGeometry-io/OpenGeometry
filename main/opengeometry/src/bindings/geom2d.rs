@@ -1,7 +1,8 @@
 use crate::bindings::{errors, OGWorldGraph};
 use crate::geom2d::{
-    boolean_curved_regions, boolean_oriented_regions, offset_ring_variable, signed_area2,
-    CurveRegion2, OffsetError, OffsetHole, PlanarBooleanOp, Pt2, RingRegion,
+    boolean_curved_regions, boolean_oriented_regions, offset_path, offset_polyline_regions,
+    offset_ring_variable, signed_area2, CurveEdge2, CurveRegion2, OffsetError, OffsetHole,
+    OffsetOptions, PlanarBooleanOp, Pt2, RingRegion,
 };
 use crate::world_graph::{ErrorCode, GraphError};
 use serde::de::DeserializeOwned;
@@ -11,6 +12,8 @@ use wasm_bindgen::JsValue;
 
 const REGION_TOLERANCE: f64 = 1.0e-6;
 const POINT_LIMIT: usize = 100_000;
+const MITER_LIMIT: f64 = 4.0;
+const PATH_TOLERANCE: f64 = 1.0e-9;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,6 +27,13 @@ struct RegionJson {
 struct OffsetHoleJson {
     ring: Vec<f64>,
     distances: Vec<f64>,
+}
+
+#[derive(Serialize)]
+struct OffsetPathJson {
+    edges: Vec<CurveEdge2>,
+    bevelled: Vec<usize>,
+    closed: bool,
 }
 
 #[derive(Serialize)]
@@ -73,6 +83,96 @@ impl OGWorldGraph {
         let regions = offset_ring(&ring, &distances, holes_json).map_err(errors::json)?;
         serde_json::to_string(&regions).map_err(errors::serialization)
     }
+
+    #[wasm_bindgen(js_name = offsetPolylineRegions)]
+    pub fn offset_polyline_regions(
+        &self,
+        path: Vec<f64>,
+        width: f64,
+        closed: bool,
+        miter_limit: f64,
+    ) -> Result<String, JsValue> {
+        let regions = stroke(&path, width, closed, miter_limit).map_err(errors::json)?;
+        serde_json::to_string(&regions).map_err(errors::serialization)
+    }
+
+    #[wasm_bindgen(js_name = offsetPolyline)]
+    pub fn offset_polyline(
+        &self,
+        path: Vec<f64>,
+        distance: f64,
+        closed: Option<bool>,
+        bevel: bool,
+        acute_threshold_degrees: f64,
+    ) -> Result<String, JsValue> {
+        let options = OffsetOptions {
+            bevel,
+            acute_threshold_degrees,
+        };
+        let offset = side_offset(&path, distance, closed, options).map_err(errors::json)?;
+        serde_json::to_string(&offset).map_err(errors::serialization)
+    }
+}
+
+fn stroke(
+    path: &[f64],
+    width: f64,
+    closed: bool,
+    miter_limit: f64,
+) -> Result<Vec<CurveRegion2>, GraphError> {
+    check_size(path.len() / 3, "offset points")?;
+    let limit = if miter_limit.is_finite() && miter_limit > 0.0 {
+        miter_limit
+    } else {
+        MITER_LIMIT
+    };
+    offset_polyline_regions(
+        &flat_ring(path, "path")?,
+        width,
+        closed,
+        limit,
+        REGION_TOLERANCE,
+    )
+    .map_err(offset_error)
+}
+
+fn side_offset(
+    path: &[f64],
+    distance: f64,
+    closed: Option<bool>,
+    options: OffsetOptions,
+) -> Result<OffsetPathJson, GraphError> {
+    check_size(path.len() / 3, "offset points")?;
+    if !distance.is_finite() || !options.acute_threshold_degrees.is_finite() {
+        return Err(GraphError::code(
+            ErrorCode::InvalidParameter,
+            "offset distance and acute threshold must be finite",
+        ));
+    }
+    let offset = offset_path(
+        &flat_ring(path, "path")?,
+        distance,
+        closed,
+        options,
+        PATH_TOLERANCE,
+    );
+    Ok(OffsetPathJson {
+        edges: offset.edges,
+        bevelled: offset.bevelled,
+        closed: offset.closed,
+    })
+}
+
+fn offset_error(error: OffsetError) -> GraphError {
+    match error {
+        OffsetError::InvalidParameter(message) => {
+            GraphError::code(ErrorCode::InvalidParameter, message)
+        }
+        OffsetError::InvalidTopology(message) => {
+            GraphError::code(ErrorCode::InvalidTopology, message)
+        }
+        OffsetError::Clip(error) => GraphError::from(error),
+    }
 }
 
 fn offset_ring(
@@ -103,15 +203,7 @@ fn offset_ring(
         &holes,
         REGION_TOLERANCE,
     )
-    .map_err(|error| match error {
-        OffsetError::InvalidParameter(message) => {
-            GraphError::code(ErrorCode::InvalidParameter, message)
-        }
-        OffsetError::InvalidTopology(message) => {
-            GraphError::code(ErrorCode::InvalidTopology, message)
-        }
-        OffsetError::Clip(error) => GraphError::from(error),
-    })
+    .map_err(offset_error)
 }
 
 fn flat_ring(flat: &[f64], label: &str) -> Result<Vec<Pt2>, GraphError> {

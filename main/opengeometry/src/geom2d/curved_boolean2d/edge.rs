@@ -195,6 +195,24 @@ impl CurveEdge2 {
         }
     }
 
+    pub(super) fn bounds(&self, margin: f64) -> [f64; 4] {
+        let (a, b) = (self.point(0.0), self.point(1.0));
+        match self {
+            Self::Line { .. } => [
+                a.x.min(b.x) - margin,
+                a.z.min(b.z) - margin,
+                a.x.max(b.x) + margin,
+                a.z.max(b.z) + margin,
+            ],
+            Self::Arc { center, radius, .. } => [
+                center[0] - radius - margin,
+                center[1] - radius - margin,
+                center[0] + radius + margin,
+                center[1] + radius + margin,
+            ],
+        }
+    }
+
     pub(crate) fn twice_area(&self) -> f64 {
         let a = self.point(0.0);
         let b = self.point(1.0);
@@ -207,6 +225,45 @@ impl CurveEdge2 {
                 ..
             } => radius * radius * sweep_angle + center[0] * (b.z - a.z) - center[1] * (b.x - a.x),
         }
+    }
+}
+
+pub(super) struct Boxes {
+    boxes: Vec<[f64; 4]>,
+    order: Vec<usize>,
+    widest: f64,
+}
+
+impl Boxes {
+    pub(super) fn new(boxes: Vec<[f64; 4]>) -> Self {
+        let mut order: Vec<usize> = (0..boxes.len()).collect();
+        order.sort_by(|a, b| boxes[*a][0].total_cmp(&boxes[*b][0]));
+        let widest = boxes.iter().map(|b| b[2] - b[0]).fold(0.0, f64::max);
+        Self {
+            boxes,
+            order,
+            widest,
+        }
+    }
+
+    pub(super) fn of(&self, index: usize) -> [f64; 4] {
+        self.boxes[index]
+    }
+
+    pub(super) fn touching(&self, query: [f64; 4]) -> impl Iterator<Item = usize> + '_ {
+        let low = self
+            .order
+            .partition_point(|&index| self.boxes[index][0] < query[0] - 2.0 * self.widest);
+        let high = self
+            .order
+            .partition_point(|&index| self.boxes[index][0] <= query[2]);
+        self.order[low..high.max(low)]
+            .iter()
+            .copied()
+            .filter(move |&index| {
+                let bounds = self.boxes[index];
+                bounds[2] >= query[0] && bounds[1] <= query[3] && bounds[3] >= query[1]
+            })
     }
 }
 

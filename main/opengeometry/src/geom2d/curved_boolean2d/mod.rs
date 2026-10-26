@@ -5,7 +5,7 @@ pub(crate) use edge::{intersections, reversed_ring, CurveEdge2, CurveRegion2};
 use super::boolean2d::{PlanarBooleanOp, VertexWeld};
 use super::poly2d::Pt2;
 use crate::brep::GeometryError;
-use edge::{add, canonicalize_ring, compare_points, cross, distance, dot, p, scale};
+use edge::{add, canonicalize_ring, compare_points, cross, distance, dot, p, scale, Boxes};
 use std::collections::HashMap;
 use std::f64::consts::TAU;
 
@@ -38,9 +38,11 @@ pub(crate) fn boolean_curved_regions(
     if edges.is_empty() {
         return Ok(Vec::new());
     }
+    let a_bounds = region_bounds(a, eps);
+    let b_bounds = region_bounds(b, eps);
     let filled = |point: Pt2| {
-        let left = inside(point, a, eps);
-        let right = inside(point, b, eps);
+        let left = inside(point, a, &a_bounds, eps);
+        let right = inside(point, b, &b_bounds, eps);
         match operation {
             PlanarBooleanOp::Union => left || right,
             PlanarBooleanOp::Intersection => left && right,
@@ -124,14 +126,53 @@ fn ring_area(ring: &[CurveEdge2]) -> f64 {
     ring.iter().map(CurveEdge2::twice_area).sum::<f64>() * 0.5
 }
 
-fn inside(point: Pt2, regions: &[CurveRegion2], eps: f64) -> bool {
-    regions.iter().any(|region| {
-        winding(point, &region.outer, eps) != 0
-            && !region
-                .holes
-                .iter()
-                .any(|hole| winding(point, hole, eps) != 0)
-    })
+fn region_bounds(regions: &[CurveRegion2], eps: f64) -> Boxes {
+    Boxes::new(
+        regions
+            .iter()
+            .map(|region| {
+                region.outer.iter().fold(
+                    [
+                        f64::INFINITY,
+                        f64::INFINITY,
+                        f64::NEG_INFINITY,
+                        f64::NEG_INFINITY,
+                    ],
+                    |total, edge| {
+                        let bounds = edge.bounds(eps);
+                        [
+                            total[0].min(bounds[0]),
+                            total[1].min(bounds[1]),
+                            total[2].max(bounds[2]),
+                            total[3].max(bounds[3]),
+                        ]
+                    },
+                )
+            })
+            .collect(),
+    )
+}
+
+fn around(point: Pt2, reach: f64) -> [f64; 4] {
+    [
+        point.x - reach,
+        point.z - reach,
+        point.x + reach,
+        point.z + reach,
+    ]
+}
+
+fn inside(point: Pt2, regions: &[CurveRegion2], bounds: &Boxes, eps: f64) -> bool {
+    bounds
+        .touching([point.x, point.z, f64::INFINITY, point.z])
+        .any(|index| {
+            let region = &regions[index];
+            winding(point, &region.outer, eps) != 0
+                && !region
+                    .holes
+                    .iter()
+                    .any(|hole| winding(point, hole, eps) != 0)
+        })
 }
 
 pub(crate) fn winding(point: Pt2, ring: &[CurveEdge2], eps: f64) -> i32 {
@@ -235,9 +276,11 @@ fn arc_winding(point: Pt2, arc: &CurveEdge2, eps: f64) -> i32 {
 
 fn subdivided_edges(edges: &[CurveEdge2], eps: f64) -> Vec<CurveEdge2> {
     let mut split = Vec::new();
+    let bounds = Boxes::new(edges.iter().map(|edge| edge.bounds(2.0 * eps)).collect());
     for (index, edge) in edges.iter().enumerate() {
         let mut ts = vec![0.0, 1.0];
-        for (other_index, other) in edges.iter().enumerate() {
+        for other_index in bounds.touching(bounds.of(index)) {
+            let other = &edges[other_index];
             if index == other_index {
                 continue;
             }
@@ -278,8 +321,9 @@ fn boundary_edges(split: Vec<CurveEdge2>, eps: f64, filled: impl Fn(Pt2) -> bool
     let mut edges = Vec::new();
     let mut ends = Vec::new();
     let mut seen: HashMap<(usize, usize), Vec<Pt2>> = HashMap::new();
+    let bounds = Boxes::new(split.iter().map(|edge| edge.bounds(eps)).collect());
     for (index, edge) in split.iter().enumerate() {
-        let (at, reach) = probe_site(edge, index, &split, eps);
+        let (at, reach) = probe_site(edge, index, &split, &bounds, eps);
         let left = filled(probe(edge, at, 1.0, reach));
         let right = filled(probe(edge, at, -1.0, reach));
         if left == right {
@@ -305,26 +349,38 @@ fn boundary_edges(split: Vec<CurveEdge2>, eps: f64, filled: impl Fn(Pt2) -> bool
     }
 }
 
-fn probe_site(edge: &CurveEdge2, index: usize, others: &[CurveEdge2], eps: f64) -> (f64, f64) {
+fn probe_site(
+    edge: &CurveEdge2,
+    index: usize,
+    others: &[CurveEdge2],
+    bounds: &Boxes,
+    eps: f64,
+) -> (f64, f64) {
     for at in [0.5, 0.25, 0.75, 0.125, 0.875] {
-        let (reach, crowded) = probe_reach(edge.point(at), edge, Some(index), others, eps);
+        let (reach, crowded) =
+            probe_reach(edge.point(at), edge, Some(index), (others, bounds), eps);
         if !crowded {
             return (at, reach);
         }
     }
-    (0.5, probe_reach(edge.point(0.5), edge, None, others, eps).0)
+    (
+        0.5,
+        probe_reach(edge.point(0.5), edge, None, (others, bounds), eps).0,
+    )
 }
 
 fn probe_reach(
     mid: Pt2,
     edge: &CurveEdge2,
     own: Option<usize>,
-    others: &[CurveEdge2],
+    (others, bounds): (&[CurveEdge2], &Boxes),
     eps: f64,
 ) -> (f64, bool) {
     let mut clearance = 2.0 * (edge.length() * 0.1).min(1.0e-4).max(eps * 2.0);
+    let reach = clearance;
     let mut crowded = false;
-    for (index, other) in others.iter().enumerate() {
+    for index in bounds.touching(around(mid, reach)) {
+        let other = &others[index];
         let distance = other.distance_to(mid);
         if distance > eps && distance < clearance {
             clearance = distance;
@@ -424,6 +480,7 @@ pub(super) fn nested_regions(
         })
         .collect();
     let edges = loops.concat();
+    let bounds = Boxes::new(edges.iter().map(|edge| edge.bounds(eps)).collect());
     let mut first = 0;
     for ring in loops {
         first += ring.len();
@@ -431,7 +488,7 @@ pub(super) fn nested_regions(
             continue;
         }
         let hole = ring;
-        let (at, reach) = probe_site(&hole[0], first - hole.len(), &edges, eps);
+        let (at, reach) = probe_site(&hole[0], first - hole.len(), &edges, &bounds, eps);
         let sample = probe(&hole[0], at, -1.0, reach);
         let index = result
             .iter()

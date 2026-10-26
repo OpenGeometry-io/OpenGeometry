@@ -378,6 +378,21 @@ fn two_rectangles_closer_than_the_old_probe_reach_stay_two_regions() {
     }
 }
 
+#[test]
+fn two_rectangles_less_than_a_tolerance_apart_weld_into_one_region() {
+    for gap in [0.25e-6, 0.5e-6, 0.9e-6] {
+        let united = boolean_curved_regions(
+            &[curve_rectangle(0.0, 0.0, 1.0, 1.0)],
+            &[curve_rectangle(1.0 + gap, -1.0, 2.0, 2.0)],
+            PlanarBooleanOp::Union,
+            1e-6,
+        )
+        .unwrap_or_else(|error| panic!("gap {gap}: {error:?}"));
+        assert_eq!(united.len(), 1, "gap {gap}");
+        assert!((area(&united) - 4.0).abs() < 1e-5, "gap {gap}");
+    }
+}
+
 fn circle(seam: f64, sweep: f64) -> [CurveEdge2; 2] {
     [
         CurveEdge2::Arc {
