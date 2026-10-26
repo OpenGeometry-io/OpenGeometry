@@ -133,3 +133,85 @@ fn a_ray_on_the_chord_of_a_half_disk_crosses_neither_end_from_outside() {
         );
     }
 }
+
+fn cap(center: [f64; 2], radius: f64, start_angle: f64) -> CurveEdge2 {
+    CurveEdge2::Arc {
+        center,
+        radius,
+        start_angle,
+        sweep_angle: -PI,
+    }
+}
+
+#[test]
+fn a_point_left_of_a_cap_that_starts_just_past_its_lowest_point_winds_zero() {
+    let below = [
+        line(
+            [10.642873849197489, -0.9999999999999715],
+            [9.882668591292425, -1.000000181329147],
+        ),
+        cap(
+            [9.882668352765826, -1.8132917549579485e-7],
+            1.0,
+            -1.5707960882682965,
+        ),
+        line(
+            [9.882668114239227, 0.999999818670796],
+            [10.64287337214429, 0.9999999999999715],
+        ),
+        cap([10.64287361067089, 0.0], 1.0, 1.5707965653214966),
+    ];
+    let above = [
+        line(
+            [33.207977552709366, -1.999999999999936],
+            [31.363089938974053, -2.000000466271054],
+        ),
+        cap(
+            [31.363089433500317, -4.662711180100238e-7],
+            2.0,
+            -1.5707960740580282,
+        ),
+        line(
+            [31.36308892802658, 1.9999995337288181],
+            [33.207976541761894, 1.999999999999936],
+        ),
+        cap([33.20797704723563, 0.0], 2.0, 1.5707965795317649),
+    ];
+    assert_eq!(
+        winding(
+            Pt2::new(2.2806157737151906, -1.0000002853260437),
+            &below,
+            EPS
+        ),
+        0
+    );
+    assert_eq!(
+        winding(
+            Pt2::new(23.983538978559064, -2.000000450086466),
+            &above,
+            EPS
+        ),
+        0
+    );
+}
+
+#[test]
+fn a_point_just_below_an_arc_end_near_its_lowest_point_and_outside_the_ring_winds_zero() {
+    let turn = 0.45e-6_f64.sqrt();
+    let arc = CurveEdge2::Arc {
+        center: [0.0, 0.0],
+        radius: 1.0,
+        start_angle: -FRAC_PI_2 + turn,
+        sweep_angle: PI - turn,
+    };
+    let start = arc.point(0.0);
+    let end = arc.point(1.0);
+    let ring = [arc, line([end.x, end.z], [start.x, start.z])];
+    for x in [3.0e-4, 4.5e-4, 6.0e-4] {
+        assert_eq!(
+            winding(Pt2::new(x, start.z - 0.2 * EPS), &ring, EPS),
+            0,
+            "{x}"
+        );
+    }
+}

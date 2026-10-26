@@ -1,7 +1,6 @@
 use super::{
     arcs, assert_clearance, assert_exact, corners, has_corner, single, variable, with_hole,
 };
-use crate::brep::GeometryError;
 use crate::geom2d::boolean2d::distance_to_segment;
 use crate::geom2d::curved_boolean2d::winding;
 use crate::geom2d::offset::OffsetError;
@@ -527,7 +526,7 @@ fn a_zigzag_whose_tangent_points_are_about_one_tolerance_apart_insets_exactly() 
 }
 
 #[test]
-fn a_noisy_near_flat_ring_with_micrometre_noise_is_still_unresolved() {
+fn a_noisy_near_flat_ring_with_micrometre_noise_insets_exactly() {
     let ring = vec![
         p(0.0, 0.0),
         p(0.7602052579050635, 1.5892193772219576e-7),
@@ -558,8 +557,8 @@ fn a_noisy_near_flat_ring_with_micrometre_noise_is_still_unresolved() {
         p(0.0, 10.0),
     ];
     let distances = vec![1.0; ring.len()];
-    assert!(matches!(
-        variable(&ring, &distances),
-        Err(OffsetError::Clip(GeometryError::UnresolvedIntersection(_)))
-    ));
+    let regions = variable(&ring, &distances).unwrap();
+    assert_eq!(regions.len(), 1);
+    assert_exact(&regions, &[(&ring, &distances)]);
+    assert_clearance(&regions, &[(&ring, &distances)]);
 }

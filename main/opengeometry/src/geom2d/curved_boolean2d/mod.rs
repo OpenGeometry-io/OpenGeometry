@@ -7,7 +7,7 @@ use super::poly2d::Pt2;
 use crate::brep::GeometryError;
 use edge::{add, canonicalize_ring, compare_points, cross, distance, dot, p, scale, Boxes};
 use std::collections::HashMap;
-use std::f64::consts::TAU;
+use std::f64::consts::{FRAC_PI_2, TAU};
 
 struct CurveBoundary {
     edges: Vec<CurveEdge2>,
@@ -126,7 +126,7 @@ fn ring_area(ring: &[CurveEdge2]) -> f64 {
     ring.iter().map(CurveEdge2::twice_area).sum::<f64>() * 0.5
 }
 
-fn region_bounds(regions: &[CurveRegion2], eps: f64) -> Boxes {
+pub(super) fn region_bounds(regions: &[CurveRegion2], eps: f64) -> Boxes {
     Boxes::new(
         regions
             .iter()
@@ -162,7 +162,7 @@ fn around(point: Pt2, reach: f64) -> [f64; 4] {
     ]
 }
 
-fn inside(point: Pt2, regions: &[CurveRegion2], bounds: &Boxes, eps: f64) -> bool {
+pub(super) fn inside(point: Pt2, regions: &[CurveRegion2], bounds: &Boxes, eps: f64) -> bool {
     bounds
         .touching([point.x, point.z, f64::INFINITY, point.z])
         .any(|index| {
@@ -215,60 +215,40 @@ fn arc_winding(point: Pt2, arc: &CurveEdge2, eps: f64) -> i32 {
     else {
         return 0;
     };
-    let start = arc.point(0.0).z;
-    let end = arc.point(1.0).z;
-    let at_start = (start - point.z).abs() <= eps * 0.25;
-    let at_end = (end - point.z).abs() <= eps * 0.25;
-    let level = if at_start {
-        start
-    } else if at_end {
-        end
-    } else {
-        point.z
-    };
-    let sine = (level - center[1]) / radius;
-    if sine.abs() >= 1.0 && !at_start && !at_end {
-        return 0;
-    }
-    let sine = sine.clamp(-1.0, 1.0);
-    let delta = eps / radius;
     let sweep = sweep_angle.abs();
-    let first = sine.asin();
-    let mut total = 0;
-    let angles = if sine.abs() >= 1.0 {
-        vec![first]
-    } else {
-        vec![first, std::f64::consts::PI - first]
-    };
-    for angle in angles {
-        if center[0] + radius * angle.cos() <= point.x + eps * 0.01 {
-            continue;
-        }
+    let mut cuts = vec![0.0, 1.0];
+    for extreme in [FRAC_PI_2, -FRAC_PI_2] {
         let travel = if *sweep_angle > 0.0 {
-            (angle - start_angle).rem_euclid(TAU)
+            (extreme - start_angle).rem_euclid(TAU)
         } else {
-            (start_angle - angle).rem_euclid(TAU)
+            (start_angle - extreme).rem_euclid(TAU)
         };
-        let dz = radius * sweep_angle * angle.cos();
-        let flat = dz.abs() <= eps * radius;
-        let below = i32::from(center[1] > level);
-        if flat && at_start && (travel <= delta || travel >= TAU - delta) {
-            total += below;
+        if travel > 0.0 && travel < sweep {
+            cuts.push(travel / sweep);
+        }
+    }
+    cuts.sort_by(f64::total_cmp);
+    let above = |z: f64, end: bool| z > point.z && !(end && z - point.z <= eps * 0.25);
+    let mut total = 0;
+    for window in cuts.windows(2) {
+        let (a, b) = (arc.point(window[0]), arc.point(window[1]));
+        let rising = above(b.z, window[1] == 1.0);
+        if above(a.z, window[0] == 0.0) == rising {
             continue;
         }
-        if flat && at_end && (travel - sweep).abs() <= delta {
-            total -= below;
-            continue;
-        }
-        let crossed = if at_start && (travel <= delta || travel >= TAU - delta) {
-            dz > 0.0
-        } else if at_end && (travel - sweep).abs() <= delta {
-            dz < 0.0
+        let x = if point.z <= a.z.min(b.z) || point.z >= a.z.max(b.z) {
+            if (a.z - point.z).abs() < (b.z - point.z).abs() {
+                a.x
+            } else {
+                b.x
+            }
         } else {
-            travel <= sweep
+            let side = arc.point((window[0] + window[1]) * 0.5).x - center[0];
+            let rise = point.z - center[1];
+            center[0] + side.signum() * (radius * radius - rise * rise).max(0.0).sqrt()
         };
-        if crossed && dz.abs() > eps * radius {
-            total += if dz > 0.0 { 1 } else { -1 };
+        if x > point.x + eps * 0.01 {
+            total += if rising { 1 } else { -1 };
         }
     }
     total

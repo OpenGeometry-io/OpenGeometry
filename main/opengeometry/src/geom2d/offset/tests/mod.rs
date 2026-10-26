@@ -1,3 +1,4 @@
+mod noisy;
 mod polyline;
 mod ring;
 

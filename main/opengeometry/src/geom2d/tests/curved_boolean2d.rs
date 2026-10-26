@@ -2,7 +2,8 @@ use super::{curve_area as area, curve_ring_area as ring_area, edges_of, hole};
 use crate::brep::GeometryError;
 use crate::geom2d::boolean2d::PlanarBooleanOp;
 use crate::geom2d::curved_boolean2d::{
-    boolean_curved_regions, nested_regions, winding, CurveEdge2, CurveRegion2,
+    boolean_curved_regions, inside, nested_regions, region_bounds, winding, CurveEdge2,
+    CurveRegion2,
 };
 use crate::geom2d::poly2d::Pt2;
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI};
@@ -391,6 +392,31 @@ fn two_rectangles_less_than_a_tolerance_apart_weld_into_one_region() {
         assert_eq!(united.len(), 1, "gap {gap}");
         assert!((area(&united) - 4.0).abs() < 1e-5, "gap {gap}");
     }
+}
+
+#[test]
+fn a_point_a_fifth_of_a_tolerance_below_a_square_is_inside_where_its_winding_says() {
+    let eps = 1e-6;
+    let square = [curve_rectangle(0.0, 0.0, 1.0, 1.0)];
+    for x in [0.25, 0.5, 0.75] {
+        let point = Pt2::new(x, -0.2 * eps);
+        assert_ne!(winding(point, &square[0].outer, eps), 0, "{x}");
+        assert!(
+            inside(point, &square, &region_bounds(&square, eps), eps),
+            "{x}"
+        );
+    }
+}
+
+#[test]
+fn a_row_of_squares_on_one_long_bar_unites_into_one_region() {
+    let bar = [curve_rectangle(0.0, -1.0, 100.0, 0.0)];
+    let squares: Vec<CurveRegion2> = (0..20)
+        .map(|index| curve_rectangle(index as f64 * 2.0, 0.0, index as f64 * 2.0 + 1.0, 1.0))
+        .collect();
+    let united = boolean_curved_regions(&bar, &squares, PlanarBooleanOp::Union, 1e-6).unwrap();
+    assert_eq!(united.len(), 1);
+    assert!((area(&united) - 120.0).abs() < 1e-9);
 }
 
 fn circle(seam: f64, sweep: f64) -> [CurveEdge2; 2] {

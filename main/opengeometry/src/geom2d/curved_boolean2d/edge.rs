@@ -228,20 +228,31 @@ impl CurveEdge2 {
     }
 }
 
-pub(super) struct Boxes {
+pub(crate) struct Boxes {
     boxes: Vec<[f64; 4]>,
     order: Vec<usize>,
+    wide: Vec<usize>,
     widest: f64,
 }
 
 impl Boxes {
     pub(super) fn new(boxes: Vec<[f64; 4]>) -> Self {
-        let mut order: Vec<usize> = (0..boxes.len()).collect();
+        let mut widths: Vec<f64> = boxes.iter().map(|b| b[2] - b[0]).collect();
+        widths.sort_by(f64::total_cmp);
+        let limit = widths
+            .get(widths.len() * 3 / 4)
+            .map_or(0.0, |width| 4.0 * width);
+        let (mut order, wide): (Vec<usize>, Vec<usize>) =
+            (0..boxes.len()).partition(|&index| boxes[index][2] - boxes[index][0] <= limit);
         order.sort_by(|a, b| boxes[*a][0].total_cmp(&boxes[*b][0]));
-        let widest = boxes.iter().map(|b| b[2] - b[0]).fold(0.0, f64::max);
+        let widest = order
+            .iter()
+            .map(|&index| boxes[index][2] - boxes[index][0])
+            .fold(0.0, f64::max);
         Self {
             boxes,
             order,
+            wide,
             widest,
         }
     }
@@ -257,13 +268,21 @@ impl Boxes {
         let high = self
             .order
             .partition_point(|&index| self.boxes[index][0] <= query[2]);
+        let meets = move |&index: &usize| {
+            let bounds = self.boxes[index];
+            bounds[2] >= query[0] && bounds[1] <= query[3] && bounds[3] >= query[1]
+        };
         self.order[low..high.max(low)]
             .iter()
             .copied()
-            .filter(move |&index| {
-                let bounds = self.boxes[index];
-                bounds[2] >= query[0] && bounds[1] <= query[3] && bounds[3] >= query[1]
-            })
+            .filter(meets)
+            .chain(
+                self.wide
+                    .iter()
+                    .copied()
+                    .filter(move |&index| self.boxes[index][0] <= query[2])
+                    .filter(meets),
+            )
     }
 }
 
