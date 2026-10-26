@@ -51,7 +51,7 @@ It is the geometry engine layer, not a full CAD application. Floorkit is a downs
 | **Queries** | Bounds, placements, the B-rep of a body, that B-rep placed in the world, the normal of a face at a point, and the report of its last boolean. |
 | **Export** | STEP, in millimetres or metres, with Y or Z up, together with an export report. The IFC exchange body of a solid, in world metres with Z up, for an IFC writer. |
 
-Not in 2.5, though 2.0 had them: IFC file text and STL export; projection; offset; loft; triangulation as a public call; arcs, curves, spheres and wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
+Not in 2.5, though 2.0 had them: IFC file text and STL export; projection; loft; triangulation as a public call; curves, spheres and wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
 
 ## Installation
 
@@ -184,6 +184,7 @@ This section is a compact reference for writing OpenGeometry 2.5 code, by hand o
 | STEP | `await OpenGeometry.exportStep({ nodes, unit?, upAxis?, name?, timestamp? })` returns `{ text, report }`. `nodes`: bodies, assemblies or `ogId` strings. `unit`: `'millimetre'` (default) or `'metre'`; `upAxis`: `'Z'` (default) or `'Y'`. |
 | IFC body | `OpenGeometry.exportIfcBody(solid)` returns the IFC exchange body (type `AnalyticExchangeBodyV2`): `schema_version` 2, world metres, Z up, `representation_type` `'AdvancedBrep'` or `'CSG'` for a solid with a cavity, `entities`, `solids` and `faces`. It refuses a Sheet, a Wire or an assembly. |
 | 2D regions | `OpenGeometry.booleanRegions2D(a, b, operation)` and `OpenGeometry.booleanCurvedRegions2D(a, b, operation)` with `'union'`, `'intersection'` or `'subtraction'`. Regions are rings of `{ x, y, z }` points at one height (type `OffsetRegion`) or of line and arc edges (type `CurvedRegion2D`), outer rings clockwise in XZ and holes counter-clockwise; the tolerance is `OG_REGION_TOLERANCE`. |
+| 2D offsets | `OpenGeometry.offsetRingVariable(ring, distances, holes?)` insets a closed ring by one distance per edge, each hole `{ ring, distances }` grown by its own; `OpenGeometry.offsetPolylineRegions(path, width, closed, miterLimit?)` strokes a path. Both return `CurvedRegion2D[]` with exact arcs. `OpenGeometry.offsetPolyline(path, distance, { acuteThresholdDegrees?, bevel?, closed? })` offsets a path to one side and returns `{ edges, bevelled, closed }` (type `OffsetPath2D`). Rings and paths are flat `[x, y, z, ...]` lists; `y` is ignored. |
 | `OGError` | Failures throw an `OGError` with `code` (for example `InvalidParameter`, `SharedShape`, `Disposed`), `call`, `message` and `details`. |
 | Reset | `OpenGeometry.reset()` frees every body and leaves an empty document. |
 | Typed parameters | `OG_PRIMITIVE_PARAMS_<KIND>(params)`, `OG_OPERATION_PARAMS_EXTRUDE(params)` and `OG_OPERATION_PARAMS_SWEEP(params)` return their argument unchanged; they only give the object a type. |

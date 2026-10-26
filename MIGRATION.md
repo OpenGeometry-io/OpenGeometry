@@ -32,6 +32,7 @@ It is written for people and for coding assistants alike: each section says what
 - The 2D region booleans are back as `OpenGeometry.booleanRegions2D(a, b, operation)` and `OpenGeometry.booleanCurvedRegions2D(a, b, operation)`, with `operation` one of `'union'`, `'intersection'` or `'subtraction'`. They take and return the 2.0 shapes, now exported as types: `OffsetRegion`, an `outer` ring and `holes` of `{ x, y, z }` points all at one height, outer rings clockwise in the XZ plane and holes counter-clockwise; and `CurvedRegion2D`, rings of `CurvedRegionEdge`, `{ kind: 'line', from, to }` or `{ kind: 'arc', center, radius, start_angle, sweep_angle }` with angles in radians. Results come back at the input height, wound the same way, each planar ring starting at its smallest x. The tolerance is fixed at `OG_REGION_TOLERANCE`, 1e-6 m, as in 2.0.
 - An arched opening is one cutter: extrude a closed `OG_PRIMITIVE_PROFILE` (jambs, sill and an arch) across a curved or straight wall and subtract it with `wall.operate(OG_OPERATION_SUBTRACT, { tools: [arch] })`. 2.0 needed a box and a half-cylinder for it, and a curved wall then failed.
 - An arched door from the floor is one cutter too: when its sill is at or below the wall's bottom face, the subtraction cuts a notch out of the wall instead of a hole. A cutter through both the floor and the top of the wall still throws `CoverageGap`.
+- The 2D offsets are back as statics. `OpenGeometry.offsetRingVariable(ring, distances, holes?)` insets a closed ring by one distance per edge, each hole grown by its own distances. `OpenGeometry.offsetPolylineRegions(path, width, closed, miterLimit?)` strokes a path, with mitres up to `miterLimit` (default 4) and bevels past it. Both take 2.0's flat `[x, y, z, ...]` lists or a `Float64Array` and return `CurvedRegion2D[]`, exact line and arc edges in XZ. `OpenGeometry.offsetPolyline(path, distance, options?)` replaces 2.0's `polyline.getOffset(distance, acuteThresholdDegrees, bevel)`. It returns `OffsetPath2D`, `{ edges, bevelled, closed }`, and its options are `{ acuteThresholdDegrees?, bevel?, closed? }`, with defaults 35 and `true`. When `closed` is left out, a path whose ends meet is closed. The entry exports the types `OffsetHole`, `OffsetPath2D` and `OffsetPolylineOptions`.
 
 ### Before and after
 
@@ -265,6 +266,32 @@ console.log(left.length, left[0]?.outer.length, OG_REGION_TOLERANCE);
 
 Both cut one unit square by another moved half a metre along x. The Unreleased line prints `1 4 0.000001`.
 
+2.0:
+
+```js
+const inset = offsetRingVariable(lot, [2, 2, 2, 2, 2, 2]);
+const points = inset[0].outer.map((point) => [point.x, point.z]);
+const offset = polyline.getOffset(1, 35, true);
+```
+
+Unreleased:
+
+```ts
+import { OpenGeometry, type CurvedRegion2D, type OffsetPath2D } from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const flat = (points: [number, number][]): number[] => points.flatMap(([x, z]) => [x, 0, z]);
+const lot = flat([[0, 0], [10, 0], [10, 5], [5, 5], [5, 10], [0, 10]]);
+const inset: CurvedRegion2D[] = OpenGeometry.offsetRingVariable(lot, [2, 2, 2, 2, 2, 2]);
+const corner = inset[0]?.outer.find((edge) => edge.kind === 'arc');
+const duct: CurvedRegion2D[] = OpenGeometry.offsetPolylineRegions(flat([[0, 0], [4, 0], [4, 3]]), 0.3, false);
+const side: OffsetPath2D = OpenGeometry.offsetPolyline(flat([[0, 0], [5, 0]]), 1);
+console.log(inset.length, corner?.kind === 'arc' ? corner.radius : 0, duct.length, side.edges.length);
+```
+
+Both inset an L-shaped lot by 2 m. 2.0 draws the inside corner as short segments outside the circle; the Unreleased line prints `1 2 1 1`: one region whose inside corner is one arc of radius 2, one duct region and one offset edge.
+
 ### Replace this with that
 
 | 2.0 | Unreleased |
@@ -286,6 +313,16 @@ Both cut one unit square by another moved half a metre along x. The Unreleased l
 | `booleanRegions2D(a, b, operation)` | `OpenGeometry.booleanRegions2D(a, b, operation)` |
 | `booleanCurvedRegions2D(a, b, operation)` | `OpenGeometry.booleanCurvedRegions2D(a, b, operation)` |
 | `import type { OffsetRegion, CurvedRegion2D, CurvedRegionEdge } from 'opengeometry'` | unchanged |
+| `offsetRingVariable(ring, distances, holes)` | `OpenGeometry.offsetRingVariable(ring, distances, holes)`; read the result as line and arc edges, not `{ x, y, z }` points |
+| `offsetPolylineRegions(centreline, width, closed, miterLimit)` | `OpenGeometry.offsetPolylineRegions(path, width, closed, miterLimit)` |
+| `polyline.getOffset(distance, acuteThresholdDegrees, bevel)` | `OpenGeometry.offsetPolyline(path, distance, { acuteThresholdDegrees, bevel })`; `points` become the ends of `edges`, `beveledVertexIndices` becomes `bevelled` and `isClosed` becomes `closed` |
+| `booleanRegions2D(inset, zones, operation)` on an inset | `OpenGeometry.booleanCurvedRegions2D(inset, zones, operation)`, with the zones as `CurvedRegion2D` |
+| `offsetPolylineGroupRegions(polylines)` | stroke each polyline with `OpenGeometry.offsetPolylineRegions` and unite them with `OpenGeometry.booleanCurvedRegions2D(a, b, 'union')` |
+| `line.getOffset(distance, acuteThresholdDegrees, bevel)` | `OpenGeometry.offsetPolyline([start.x, start.y, start.z, end.x, end.y, end.z], distance, { acuteThresholdDegrees, bevel })` |
+| `rectangle.getOffset(distance, acuteThresholdDegrees, bevel)` | `OpenGeometry.offsetPolyline(corners, distance, { acuteThresholdDegrees, bevel, closed: true })`, with `corners` the four corners in the order 2.0 drew them, from `(-width / 2, -breadth / 2)` round to `(-width / 2, breadth / 2)` about the centre |
+| `import type { OffsetPolyline } from 'opengeometry'` | gone with `offsetPolylineGroupRegions`; a polyline's `centreline`, `width` and `closed` are the arguments of `OpenGeometry.offsetPolylineRegions` |
+| `import type { OffsetRegionPoint } from 'opengeometry'` | gone; the offset calls return `CurvedRegion2D` edges, and an `OffsetRegion` point is `{ x, y, z }` |
+| `import type { OffsetHole } from 'opengeometry'` | unchanged |
 
 ### Different behaviour
 
@@ -318,6 +355,12 @@ Both cut one unit square by another moved half a metre along x. The Unreleased l
 - A Boolean of solids with circular-arc sides (arc extrusions or cylinders) that leaves a hole outside every region throws `OGError` `InvalidTopology`. 2.0 dropped the hole and returned a body.
 - The 2D region booleans throw an `OGError` instead of a string; `String(error)` still contains the 2.0 text. In both, an unknown operation or an operand that is not a list throws `InvalidParameter`. In `booleanRegions2D`, bad input, such as a ring with fewer than three points, points at two heights, wrong winding or an unknown field on a region or a point, throws `InvalidParameter`; 2.0 dropped unknown fields. In `booleanCurvedRegions2D`, an unknown field throws `InvalidParameter`, and input that fails its checks, such as wrong winding, a ring that does not close or an invalid arc, throws `UnresolvedIntersection`. A result with an open boundary or a hole outside every region throws `InvalidTopology`, also from `booleanCurvedRegions2D`, which in 2.0 dropped such a hole.
 - A 2D region boolean with more than 100,000 points or edges across both operands throws `LimitExceeded`. 2.0 had no limit.
+- Offset corners are exact. An inset's inside corner, and each corner of a grown hole, is one arc of the setback round the corner. 2.0 drew those corners as segments outside the circle, up to 0.86 % deeper than the setback.
+- The offset region calls return `CurvedRegion2D` edges in XZ. 2.0 returned `OffsetRegion` points that kept the input `y`; the `y` of the input is now ignored.
+- `offsetRingVariable` throws `InvalidTopology` for an outer ring that crosses itself, such as a bowtie; 2.0 returned an empty list. It throws `InvalidTopology` for a degenerate hole, and `InvalidParameter` for a distance count that does not match the edges or a negative or non-finite distance; 2.0 threw a string for these. A collapsed inset is still an empty list.
+- `offsetPolylineRegions` throws `InvalidParameter` for a width that is not finite; 2.0 returned an empty list. A width of 4e-6 m or less, or a path of one point, still gives an empty list, and a miter limit that is not finite and positive still means 4.
+- Some strokes now have their true area where 2.0 was wrong. A closed loop wider than its sides is solid: a 1 m square loop at width 1.2 covers 4.84 m², where 2.0 left a 0.2 m hole (4.8 m²). A U whose legs are shorter than its width covers 33 m² for a 10 m by 1 m U at width 2; 2.0 returned a ring that crosses itself (42 m²). An open path that crosses itself covers each place once, with a hole where it encloses space; 2.0 dropped or added pieces, and the mirrored path gave a different answer.
+- The offset calls throw `InvalidParameter` before the kernel for input of the wrong shape: a ring, path or distance list that is not a list of numbers, holes that are not a list of `{ ring, distances }`, an unknown hole or option field, a width, miter limit, distance or threshold that is not a number, or a `closed` or `bevel` that is not `true` or `false`. More than 100,000 points throws `LimitExceeded`; 2.0 had no limit.
 
 ### Check your result
 
@@ -330,6 +373,7 @@ Both cut one unit square by another moved half a metre along x. The Unreleased l
 7. `OpenGeometry.exportIfcBody(solid)` has `schema_version` 2, `length_unit` `'metre'`, `up_axis` `'Z'` and `coordinate_space` `'world'`, and a solid with a cavity has `representation_type` `'CSG'`.
 8. A sweep along a closed path has no faces whose `key` starts with `cap-`, and its `bodyType` is `'Solid'`.
 9. Each ring that `OpenGeometry.booleanRegions2D` returns has its points at the input height, a negative XZ area for an outer ring and a positive one for a hole.
+10. Each arc that `OpenGeometry.offsetRingVariable` returns has a radius equal to one of the distances and its centre on a corner of the ring or of a hole.
 
 ## 2.0 to 2.5
 

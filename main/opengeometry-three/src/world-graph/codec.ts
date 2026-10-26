@@ -7,7 +7,7 @@ import type { AnalyticExchangeBodyV2 } from '../dto/ifc-body';
 import type { MarkStats } from '../dto/mark-stats';
 import type { NodeInfo } from '../dto/node-info';
 import type { Placement } from '../dto/placement';
-import type { CurvedRegion2D, OffsetRegion, RegionOperation } from '../dto/regions';
+import type { CurvedRegion2D, OffsetPath2D, OffsetRegion, RegionOperation } from '../dto/regions';
 import type { StepExport, StepExportReport } from '../dto/step-export';
 import { OGError } from '../errors';
 
@@ -68,6 +68,24 @@ export function regionOperation(value: unknown, call: string): RegionOperation {
 export function curvedRegionsJson(regions: unknown, call: string): string {
   if (!Array.isArray(regions)) throw new OGError('InvalidParameter', call, 'curved regions must be a list');
   return encode(regions);
+}
+
+export function numberList(value: unknown, call: string, label: string): Float64Array {
+  if (!isNumberList(value)) throw new OGError('InvalidParameter', call, `${label} must be a list of numbers`);
+  return value instanceof Float64Array ? value : new Float64Array(value);
+}
+
+export function offsetHolesJson(holes: unknown, call: string): string {
+  if (!Array.isArray(holes) || !holes.every(isOffsetHole)) {
+    throw new OGError('InvalidParameter', call, 'holes must be a list of { ring, distances }');
+  }
+  return encode(holes.map((hole) => ({ ring: Array.from(hole.ring), distances: Array.from(hole.distances) })));
+}
+
+export function decodeOffsetPath(text: string, call: string): OffsetPath2D {
+  return decode(text, call, 'offset path', (value): value is OffsetPath2D => isFields(value)
+    && isList(value['edges'], isCurvedEdge) && isList(value['bevelled'], isNumber)
+    && typeof value['closed'] === 'boolean');
 }
 
 export function decodeRegions(text: string, call: string): OffsetRegion[] {
@@ -253,9 +271,21 @@ function isOffsetRegion(value: unknown): value is OffsetRegion {
     && isList(value['holes'], isRing);
 }
 
+function isNumberList(value: unknown): value is ArrayLike<number> {
+  return value instanceof Float64Array || isList(value, isNumber);
+}
+
+function isOffsetHole(value: unknown): value is { ring: ArrayLike<number>; distances: ArrayLike<number> } {
+  return isFields(value) && hasOnly(value, ['ring', 'distances'])
+    && isNumberList(value['ring']) && isNumberList(value['distances']);
+}
+
+function isCurvedEdge(edge: unknown): boolean {
+  return isFields(edge) && (edge['kind'] === 'line' || edge['kind'] === 'arc');
+}
+
 function isCurvedRegion(value: unknown): value is CurvedRegion2D {
-  const isEdges = (ring: unknown): boolean => isList(ring, (edge) => isFields(edge)
-    && (edge['kind'] === 'line' || edge['kind'] === 'arc'));
+  const isEdges = (ring: unknown): boolean => isList(ring, isCurvedEdge);
   return isFields(value) && isEdges(value['outer']) && isList(value['holes'], isEdges);
 }
 
