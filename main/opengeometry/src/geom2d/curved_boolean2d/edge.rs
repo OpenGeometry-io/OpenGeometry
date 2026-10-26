@@ -265,10 +265,6 @@ pub(crate) fn intersections(a: &CurveEdge2, b: &CurveEdge2, eps: f64) -> Vec<Pt2
                     p(*from),
                     scale(d, cross(sub(p(*bf), p(*from)), e) / denom),
                 ));
-            } else {
-                for endpoint in [*from, *to, *bf, *bt] {
-                    offer(p(endpoint));
-                }
             }
         }
         (CurveEdge2::Line { from, to }, CurveEdge2::Arc { center, radius, .. })
@@ -303,11 +299,7 @@ pub(crate) fn intersections(a: &CurveEdge2, b: &CurveEdge2, eps: f64) -> Vec<Pt2
         ) => {
             let centre_delta = sub(p(*cb), p(*ca));
             let d = centre_delta.x.hypot(centre_delta.z);
-            if d <= eps && (ra - rb).abs() <= eps {
-                for endpoint in [a.point(0.0), a.point(1.0), b.point(0.0), b.point(1.0)] {
-                    offer(endpoint);
-                }
-            } else if d > eps && d <= ra + rb + eps && d + ra.min(*rb) + eps >= ra.max(*rb) {
+            if d > eps && d <= ra + rb + eps && d + ra.min(*rb) + eps >= ra.max(*rb) {
                 let along = (ra * ra - rb * rb + d * d) / (2.0 * d);
                 let height2 = ra * ra - along * along;
                 if height2 >= -eps * eps {
@@ -320,6 +312,9 @@ pub(crate) fn intersections(a: &CurveEdge2, b: &CurveEdge2, eps: f64) -> Vec<Pt2
                 }
             }
         }
+    }
+    for endpoint in [a.point(0.0), a.point(1.0), b.point(0.0), b.point(1.0)] {
+        offer(endpoint);
     }
     candidates
 }

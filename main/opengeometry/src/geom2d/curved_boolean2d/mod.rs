@@ -6,7 +6,7 @@ use super::boolean2d::{PlanarBooleanOp, VertexWeld};
 use super::poly2d::Pt2;
 use crate::brep::GeometryError;
 use edge::{add, canonicalize_ring, compare_points, cross, distance, dot, p, scale};
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::f64::consts::TAU;
 
 struct CurveBoundary {
@@ -174,17 +174,32 @@ fn arc_winding(point: Pt2, arc: &CurveEdge2, eps: f64) -> i32 {
     else {
         return 0;
     };
-    let sine = (point.z - center[1]) / radius;
-    if sine.abs() >= 1.0 {
+    let start = arc.point(0.0).z;
+    let end = arc.point(1.0).z;
+    let at_start = (start - point.z).abs() <= eps * 0.25;
+    let at_end = (end - point.z).abs() <= eps * 0.25;
+    let level = if at_start {
+        start
+    } else if at_end {
+        end
+    } else {
+        point.z
+    };
+    let sine = (level - center[1]) / radius;
+    if sine.abs() >= 1.0 && !at_start && !at_end {
         return 0;
     }
+    let sine = sine.clamp(-1.0, 1.0);
     let delta = eps / radius;
     let sweep = sweep_angle.abs();
-    let at_start = (arc.point(0.0).z - point.z).abs() <= eps * 0.25;
-    let at_end = (arc.point(1.0).z - point.z).abs() <= eps * 0.25;
     let first = sine.asin();
     let mut total = 0;
-    for angle in [first, std::f64::consts::PI - first] {
+    let angles = if sine.abs() >= 1.0 {
+        vec![first]
+    } else {
+        vec![first, std::f64::consts::PI - first]
+    };
+    for angle in angles {
         if center[0] + radius * angle.cos() <= point.x + eps * 0.01 {
             continue;
         }
@@ -194,6 +209,16 @@ fn arc_winding(point: Pt2, arc: &CurveEdge2, eps: f64) -> i32 {
             (start_angle - angle).rem_euclid(TAU)
         };
         let dz = radius * sweep_angle * angle.cos();
+        let flat = dz.abs() <= eps * radius;
+        let below = i32::from(center[1] > level);
+        if flat && at_start && (travel <= delta || travel >= TAU - delta) {
+            total += below;
+            continue;
+        }
+        if flat && at_end && (travel - sweep).abs() <= delta {
+            total -= below;
+            continue;
+        }
         let crossed = if at_start && (travel <= delta || travel >= TAU - delta) {
             dz > 0.0
         } else if at_end && (travel - sweep).abs() <= delta {
@@ -252,22 +277,24 @@ fn boundary_edges(split: Vec<CurveEdge2>, eps: f64, filled: impl Fn(Pt2) -> bool
     let mut weld = VertexWeld::new(eps);
     let mut edges = Vec::new();
     let mut ends = Vec::new();
-    let mut seen = HashSet::new();
-    for edge in &split {
-        let reach = probe_reach(edge, &split, eps);
-        let left = filled(probe(edge, 1.0, reach));
-        let right = filled(probe(edge, -1.0, reach));
+    let mut seen: HashMap<(usize, usize), Vec<Pt2>> = HashMap::new();
+    for (index, edge) in split.iter().enumerate() {
+        let (at, reach) = probe_site(edge, index, &split, eps);
+        let left = filled(probe(edge, at, 1.0, reach));
+        let right = filled(probe(edge, at, -1.0, reach));
         if left == right {
             continue;
         }
         let oriented = if left { edge.clone() } else { edge.reversed() };
         let key = (
             weld.weld(oriented.point(0.0)),
-            weld.weld(oriented.point(0.5)),
             weld.weld(oriented.point(1.0)),
         );
-        if key.0 != key.2 && seen.insert(key) {
-            ends.push((key.0, key.2));
+        let middle = oriented.point(0.5);
+        let middles = seen.entry(key).or_default();
+        if key.0 != key.1 && middles.iter().all(|other| distance(*other, middle) > eps) {
+            middles.push(middle);
+            ends.push(key);
             edges.push(oriented);
         }
     }
@@ -278,21 +305,38 @@ fn boundary_edges(split: Vec<CurveEdge2>, eps: f64, filled: impl Fn(Pt2) -> bool
     }
 }
 
-fn probe_reach(edge: &CurveEdge2, others: &[CurveEdge2], eps: f64) -> f64 {
-    let mid = edge.point(0.5);
+fn probe_site(edge: &CurveEdge2, index: usize, others: &[CurveEdge2], eps: f64) -> (f64, f64) {
+    for at in [0.5, 0.25, 0.75, 0.125, 0.875] {
+        let (reach, crowded) = probe_reach(edge.point(at), edge, Some(index), others, eps);
+        if !crowded {
+            return (at, reach);
+        }
+    }
+    (0.5, probe_reach(edge.point(0.5), edge, None, others, eps).0)
+}
+
+fn probe_reach(
+    mid: Pt2,
+    edge: &CurveEdge2,
+    own: Option<usize>,
+    others: &[CurveEdge2],
+    eps: f64,
+) -> (f64, bool) {
     let mut clearance = 2.0 * (edge.length() * 0.1).min(1.0e-4).max(eps * 2.0);
-    for other in others {
+    let mut crowded = false;
+    for (index, other) in others.iter().enumerate() {
         let distance = other.distance_to(mid);
         if distance > eps && distance < clearance {
             clearance = distance;
         }
+        crowded |= distance <= eps && own.is_some_and(|own| own != index);
     }
-    clearance * 0.5
+    (clearance * 0.5, crowded)
 }
 
-fn probe(edge: &CurveEdge2, side: f64, distance: f64) -> Pt2 {
-    let mid = edge.point(0.5);
-    let tangent = edge.tangent(0.5);
+fn probe(edge: &CurveEdge2, at: f64, side: f64, distance: f64) -> Pt2 {
+    let mid = edge.point(at);
+    let tangent = edge.tangent(at);
     let length = tangent.x.hypot(tangent.z);
     add(
         mid,
@@ -380,8 +424,15 @@ pub(super) fn nested_regions(
         })
         .collect();
     let edges = loops.concat();
-    for hole in loops.iter().filter(|ring| ring_area(ring) < 0.0) {
-        let sample = probe(&hole[0], -1.0, probe_reach(&hole[0], &edges, eps));
+    let mut first = 0;
+    for ring in loops {
+        first += ring.len();
+        if ring_area(ring) >= 0.0 {
+            continue;
+        }
+        let hole = ring;
+        let (at, reach) = probe_site(&hole[0], first - hole.len(), &edges, eps);
+        let sample = probe(&hole[0], at, -1.0, reach);
         let index = result
             .iter()
             .enumerate()

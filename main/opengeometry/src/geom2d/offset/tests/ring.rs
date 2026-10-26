@@ -465,17 +465,15 @@ fn a_tongue_tip_facing_a_wall_keeps_its_clearance_across_the_gap() {
 }
 
 #[test]
-fn a_near_flat_zigzag_finer_than_its_setback_is_still_unresolved() {
+fn a_near_flat_zigzag_finer_than_its_setback_insets_exactly() {
     for amplitude in [3e-4, 1e-4, 3e-5, 1e-5, 3e-6] {
         let ring = zigzag(amplitude, 0.5, 40);
         let distances = vec![1.0; ring.len()];
-        assert!(
-            matches!(
-                variable(&ring, &distances),
-                Err(OffsetError::Clip(GeometryError::UnresolvedIntersection(_)))
-            ),
-            "amplitude {amplitude}"
-        );
+        let regions =
+            variable(&ring, &distances).unwrap_or_else(|error| panic!("{amplitude}: {error:?}"));
+        assert_eq!(regions.len(), 1, "amplitude {amplitude}");
+        assert_exact(&regions, &[(&ring, &distances)]);
+        assert_clearance(&regions, &[(&ring, &distances)]);
     }
 }
 
@@ -502,4 +500,66 @@ fn an_edge_shorter_than_the_tolerance_clears_by_a_disk_and_leaves_its_neighbour_
     assert!(regions
         .iter()
         .all(|region| winding(p(16.0, 8.0), &region.outer, DEFAULT_EPS) == 0));
+}
+
+fn assert_single_exact_inset(ring: &[Pt2], distance: f64) -> f64 {
+    let distances = vec![distance; ring.len()];
+    let regions = variable(ring, &distances).unwrap_or_else(|error| panic!("{error:?}"));
+    assert_eq!(regions.len(), 1);
+    assert_exact(&regions, &[(ring, &distances)]);
+    assert_clearance(&regions, &[(ring, &distances)]);
+    curve_area(&regions)
+}
+
+#[test]
+fn a_near_flat_zigzag_between_half_and_one_tolerance_of_turn_insets_exactly() {
+    assert_single_exact_inset(&zigzag(4e-4, 0.5, 40), 1.0);
+    assert_single_exact_inset(&zigzag(3e-4, 0.37, 50), 1.0);
+}
+
+#[test]
+fn a_zigzag_whose_tangent_points_are_about_one_tolerance_apart_insets_exactly() {
+    let area = assert_single_exact_inset(&zigzag(1e-6, 1.7, 20), 2.0);
+    assert!((area - 180.0).abs() < 1e-4, "area {area}");
+    let theta: f64 = 5.32e-7;
+    let area = assert_single_exact_inset(&zigzag(theta * 1.7, 1.7, 20), 2.0);
+    assert!((area - 180.0).abs() < 1e-4, "area {area}");
+}
+
+#[test]
+fn a_noisy_near_flat_ring_with_micrometre_noise_is_still_unresolved() {
+    let ring = vec![
+        p(0.0, 0.0),
+        p(0.7602052579050635, 1.5892193772219576e-7),
+        p(1.520410515810127, 0.0),
+        p(2.2806157737151906, -8.335971389935487e-7),
+        p(3.040821031620254, 0.0),
+        p(3.8010262895253177, -7.634802427735399e-8),
+        p(4.561231547430381, 0.0),
+        p(5.321436805335445, 1.506108105148871e-7),
+        p(6.081642063240508, 0.0),
+        p(6.841847321145572, 1.0278760134429032e-7),
+        p(7.6020525790506355, 0.0),
+        p(8.362257836955699, -4.772987971853007e-7),
+        p(9.122463094860763, 0.0),
+        p(9.882668352765826, -1.8132917549579485e-7),
+        p(10.64287361067089, 0.0),
+        p(11.403078868575953, 1.4784008090445777e-8),
+        p(12.163284126481017, 0.0),
+        p(12.92348938438608, -2.755551512133567e-7),
+        p(13.683694642291144, 0.0),
+        p(14.443899900196207, 8.836036112438148e-7),
+        p(15.204105158101271, 0.0),
+        p(15.964310416006334, 1.1149338053524182e-7),
+        p(16.724515673911398, 0.0),
+        p(17.48472093181646, -5.02350056402294e-7),
+        p(18.244926189721525, 0.0),
+        p(18.244926189721525, 10.0),
+        p(0.0, 10.0),
+    ];
+    let distances = vec![1.0; ring.len()];
+    assert!(matches!(
+        variable(&ring, &distances),
+        Err(OffsetError::Clip(GeometryError::UnresolvedIntersection(_)))
+    ));
 }
