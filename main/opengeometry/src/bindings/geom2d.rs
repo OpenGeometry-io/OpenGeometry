@@ -1,7 +1,7 @@
 use crate::bindings::{errors, OGWorldGraph};
 use crate::geom2d::{
-    boolean_curved_regions, boolean_oriented_regions, signed_area2, CurveRegion2, PlanarBooleanOp,
-    Pt2, RingRegion,
+    boolean_curved_regions, boolean_oriented_regions, offset_ring_variable, signed_area2,
+    CurveRegion2, OffsetError, OffsetHole, PlanarBooleanOp, Pt2, RingRegion,
 };
 use crate::world_graph::{ErrorCode, GraphError};
 use serde::de::DeserializeOwned;
@@ -17,6 +17,13 @@ const POINT_LIMIT: usize = 100_000;
 struct RegionJson {
     outer: Vec<[f64; 3]>,
     holes: Vec<Vec<[f64; 3]>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OffsetHoleJson {
+    ring: Vec<f64>,
+    distances: Vec<f64>,
 }
 
 #[derive(Serialize)]
@@ -55,6 +62,69 @@ impl OGWorldGraph {
         let regions = curved_regions(a_json, b_json, operation).map_err(errors::json)?;
         serde_json::to_string(&regions).map_err(errors::serialization)
     }
+
+    #[wasm_bindgen(js_name = offsetRingVariable)]
+    pub fn offset_ring_variable(
+        &self,
+        ring: Vec<f64>,
+        distances: Vec<f64>,
+        holes_json: &str,
+    ) -> Result<String, JsValue> {
+        let regions = offset_ring(&ring, &distances, holes_json).map_err(errors::json)?;
+        serde_json::to_string(&regions).map_err(errors::serialization)
+    }
+}
+
+fn offset_ring(
+    ring: &[f64],
+    distances: &[f64],
+    holes_json: &str,
+) -> Result<Vec<CurveRegion2>, GraphError> {
+    let parsed: Vec<OffsetHoleJson> = serde_json::from_str(holes_json).map_err(|error| {
+        GraphError::code(
+            ErrorCode::InvalidParameter,
+            format!("Invalid offset holes JSON: {error}"),
+        )
+    })?;
+    check_size(
+        (ring.len() + parsed.iter().map(|hole| hole.ring.len()).sum::<usize>()) / 3,
+        "offset points",
+    )?;
+    let mut holes = Vec::with_capacity(parsed.len());
+    for (index, hole) in parsed.into_iter().enumerate() {
+        holes.push(OffsetHole {
+            ring: flat_ring(&hole.ring, &format!("holes[{index}].ring"))?,
+            distances: hole.distances,
+        });
+    }
+    offset_ring_variable(
+        &flat_ring(ring, "ring")?,
+        distances,
+        &holes,
+        REGION_TOLERANCE,
+    )
+    .map_err(|error| match error {
+        OffsetError::InvalidParameter(message) => {
+            GraphError::code(ErrorCode::InvalidParameter, message)
+        }
+        OffsetError::InvalidTopology(message) => {
+            GraphError::code(ErrorCode::InvalidTopology, message)
+        }
+        OffsetError::Clip(error) => GraphError::from(error),
+    })
+}
+
+fn flat_ring(flat: &[f64], label: &str) -> Result<Vec<Pt2>, GraphError> {
+    if flat.len() % 3 != 0 || !flat.iter().all(|value| value.is_finite()) {
+        return Err(GraphError::code(
+            ErrorCode::InvalidParameter,
+            format!("{label} must be a flat [x, y, z, ...] list of finite numbers"),
+        ));
+    }
+    Ok(flat
+        .chunks_exact(3)
+        .map(|point| Pt2::new(point[0], point[2]))
+        .collect())
 }
 
 fn regions(a_json: &str, b_json: &str, operation: &str) -> Result<Vec<RegionOutJson>, GraphError> {
@@ -66,7 +136,7 @@ fn regions(a_json: &str, b_json: &str, operation: &str) -> Result<Vec<RegionOutJ
             .chain(&b)
             .map(|region| region.outer.len() + region.holes.iter().map(Vec::len).sum::<usize>())
             .sum(),
-        "points",
+        "Boolean region points",
     )?;
     let base_y = a
         .iter()
@@ -99,7 +169,7 @@ fn curved_regions(
             .chain(&b)
             .map(|region| region.outer.len() + region.holes.iter().map(Vec::len).sum::<usize>())
             .sum(),
-        "edges",
+        "Boolean region edges",
     )?;
     boolean_curved_regions(&a, &b, operation, REGION_TOLERANCE).map_err(GraphError::from)
 }
@@ -129,7 +199,7 @@ fn check_size(count: usize, items: &str) -> Result<(), GraphError> {
     if count > POINT_LIMIT {
         return Err(GraphError::code(
             ErrorCode::LimitExceeded,
-            format!("2D Boolean regions have {count} {items}, more than {POINT_LIMIT}"),
+            format!("2D {items}, {count} in all, more than {POINT_LIMIT}"),
         ));
     }
     Ok(())

@@ -1,4 +1,4 @@
-use super::{edges_of, hole};
+use super::{curve_area as area, curve_ring_area as ring_area, edges_of, hole};
 use crate::brep::GeometryError;
 use crate::geom2d::boolean2d::PlanarBooleanOp;
 use crate::geom2d::curved_boolean2d::{
@@ -68,19 +68,6 @@ fn disk(center: [f64; 2], radius: f64, angle: f64) -> CurveRegion2 {
         ],
         holes: Vec::new(),
     }
-}
-
-fn ring_area(ring: &[CurveEdge2]) -> f64 {
-    ring.iter().map(CurveEdge2::twice_area).sum::<f64>() * 0.5
-}
-
-fn area(regions: &[CurveRegion2]) -> f64 {
-    regions
-        .iter()
-        .map(|region| {
-            -ring_area(&region.outer) - region.holes.iter().map(|hole| ring_area(hole)).sum::<f64>()
-        })
-        .sum()
 }
 
 fn has_arc(ring: &[CurveEdge2]) -> bool {

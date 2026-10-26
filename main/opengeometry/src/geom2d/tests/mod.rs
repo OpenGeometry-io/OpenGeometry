@@ -5,6 +5,7 @@ mod region_probe;
 use super::boolean2d::{
     boolean_oriented_regions, regions_from_edges_by, PlanarBooleanOp, RingRegion,
 };
+use super::curved_boolean2d::{CurveEdge2, CurveRegion2};
 use super::poly2d::{signed_area2, winding_number2, Edge2, Pt2};
 
 pub(super) const DEFAULT_EPS: f64 = 1.0e-6;
@@ -64,4 +65,22 @@ pub(super) fn region_area(region: &RingRegion) -> f64 {
 
 pub(super) fn area(regions: &[RingRegion]) -> f64 {
     regions.iter().map(region_area).sum()
+}
+
+pub(super) fn curve_ring_area(ring: &[CurveEdge2]) -> f64 {
+    ring.iter().map(CurveEdge2::twice_area).sum::<f64>() * 0.5
+}
+
+pub(super) fn curve_area(regions: &[CurveRegion2]) -> f64 {
+    regions
+        .iter()
+        .map(|region| {
+            -curve_ring_area(&region.outer)
+                - region
+                    .holes
+                    .iter()
+                    .map(|hole| curve_ring_area(hole))
+                    .sum::<f64>()
+        })
+        .sum()
 }
