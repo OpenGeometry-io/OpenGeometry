@@ -151,7 +151,14 @@ fn corner_at_arc() -> Primitive {
     ])
 }
 
-const ELBOWS: [Elbow; 7] = [
+const CLOSED_RECTANGLE: [Point3; 4] = [
+    [0.0; 3],
+    [4.0, 0.0, 0.0],
+    [4.0, 0.0, -3.0],
+    [0.0, 0.0, -3.0],
+];
+
+const ELBOWS: [Elbow; 9] = [
     ("duct-elbow", duct_at_arc, || arc_path(0.6, FRAC_PI_2)),
     ("pipe-elbow-torus", pipe_at_arc, || arc_path(0.3, FRAC_PI_2)),
     ("cone-elbow", trapezoid_at_arc, || arc_path(0.6, FRAC_PI_2)),
@@ -159,6 +166,10 @@ const ELBOWS: [Elbow; 7] = [
     ("arc-split", pipe_at_arc, || arc_path(0.3, 1.5 * PI)),
     ("arc-corner-refused", duct_at_origin, corner_at_arc),
     ("bend-too-tight", tight_pipe, || arc_path(0.1, FRAC_PI_2)),
+    ("closed-rectangle", duct_at_origin, || {
+        polyline(&CLOSED_RECTANGLE, true)
+    }),
+    ("torus-ring", pipe_at_arc, || circle(0.3)),
 ];
 
 fn rectangle_profile() -> Vec<(&'static str, Primitive)> {

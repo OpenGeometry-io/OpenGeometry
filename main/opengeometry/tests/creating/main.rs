@@ -7,3 +7,4 @@ mod sectors;
 mod support;
 mod sweep;
 mod sweep_bends;
+mod sweep_closed;

@@ -35,6 +35,9 @@ pub(super) fn check_segment_overlap(
         .collect::<Vec<_>>();
     for first in 0..count {
         for second in first + 2..count {
+            if course.closed && first == 0 && second + 1 == count {
+                continue;
+            }
             if centre_line_distance(&pieces[first], &pieces[second])
                 <= 2.0 * reach + 4.0 * accuracy.geometric
             {

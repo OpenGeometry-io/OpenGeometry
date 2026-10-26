@@ -28,6 +28,7 @@ It is written for people and for coding assistants alike: each section says what
 - `Sheet` is a new body class beside `Wire` and `Solid`, with the body type `'Sheet'`: faces that enclose no volume. `new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false })` makes an open-ended sweep. A Sheet shows its surface, from the front only, and its outline.
 - `OG_OPERATION_SWEEP` takes a path with arcs: an `OG_PRIMITIVE_ARC` wire, or an open `OG_PRIMITIVE_PROFILE` with arc segments. Each arc sweeps into an exact bend. A circle profile gives torus faces; a polygon profile gives planes, cylinders and cones. A 2.0 elbow swept along many short straight segments becomes one arc.
 - `OpenGeometry.exportIfcBody(body)` returns a solid's IFC exchange body: the same version 2 object as 2.0.18's `prepareIfcExchange()`, in world metres with Z up, read-only. The entry exports its types `AnalyticExchangeBodyV2` and `IfcPreparedValue`.
+- `OG_OPERATION_SWEEP` takes a closed path: a closed `OG_PRIMITIVE_POLYLINE`, a closed `OG_PRIMITIVE_PROFILE` or an `OG_PRIMITIVE_CIRCLE`. The sweep closes into a ring-shaped `Solid` with no end faces; its last joint is mitred like the others, and a full circle path sweeps as two bends.
 
 ### Before and after
 
@@ -177,7 +178,6 @@ const elbow = new Sweep({
   path: steps.map((angle) => new Vector3(0.6 * Math.cos(angle), 0, -0.6 * Math.sin(angle))),
   profile: [new Vector3(0.4, -0.125, 0), new Vector3(0.8, -0.125, 0), new Vector3(0.8, 0.125, 0), new Vector3(0.4, 0.125, 0)],
 });
-const body = solid.prepareIfcExchange();
 ```
 
 Unreleased:
@@ -217,6 +217,16 @@ console.log(duct.getBrep().topology.faces.length, pipe.getBrep().topology.faces.
 ```
 
 Both follow a quarter turn at a bend radius of 0.6 m, one and a half times the 0.4 m duct width. 2.0 can only follow the arc with straight pieces, here eight. Unreleased makes one exact bend with two cylindrical walls and prints `6 4 0`; the pipe elbow has two torus faces.
+
+2.0:
+
+```js
+const body = solid.prepareIfcExchange();
+```
+
+Unreleased:
+
+```ts
 import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, OG_TRANSFORM_TRANSLATE, type AnalyticExchangeBodyV2 } from 'opengeometry';
 
 await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
@@ -272,6 +282,8 @@ Both give the solid's exchange body in world metres with Z up. The Unreleased li
 - An arc in a sweep path must meet its neighbours tangentially, within 1e-9 radians. A corner at an arc throws `InvalidParameter`; a corner between two lines is still mitred.
 - Each bend radius must exceed the profile's reach from the path start, the largest distance from the start to the profile, by four geometric tolerances. A tighter bend throws `SweepSelfIntersection`.
 - An arc above half a turn sweeps as equal bends of at most half a turn each, and each bend has its own `seg-` face keys.
+- A closed path must bring the profile back to where it started. A path that does not lie in one plane can turn the profile on the way round; it throws `InvalidParameter`.
+- A closed path has no ends, so `caps: false` with a closed path throws `InvalidParameter`.
 - The overlap rule is unchanged: two path segments that are not neighbours must stay more than twice the reach apart. A tight line, bend, line path can still throw `SweepSelfIntersection` although the bend keeps its two lines apart.
 - A Boolean of solids with circular-arc sides (arc extrusions or cylinders) that leaves a hole outside every region throws `OGError` `InvalidTopology`. 2.0 dropped the hole and returned a body.
 
@@ -283,7 +295,8 @@ Both give the solid's exchange body in world metres with Z up. The Unreleased li
 4. Each `faceNormalAt` result has length 1 and points out of the body in its own coordinates.
 5. An open-ended sweep's `getBrep()` has no faces whose `key` starts with `cap-`, and `solids` is empty.
 6. A duct elbow along one arc has six faces, two of them `Cylinder`; a pipe elbow has two `Torus` faces. Its STEP report has `pcurvelessEdges` 0.
-6. `OpenGeometry.exportIfcBody(solid)` has `schema_version` 2, `length_unit` `'metre'`, `up_axis` `'Z'` and `coordinate_space` `'world'`, and a solid with a cavity has `representation_type` `'CSG'`.
+7. `OpenGeometry.exportIfcBody(solid)` has `schema_version` 2, `length_unit` `'metre'`, `up_axis` `'Z'` and `coordinate_space` `'world'`, and a solid with a cavity has `representation_type` `'CSG'`.
+8. A sweep along a closed path has no faces whose `key` starts with `cap-`, and its `bodyType` is `'Solid'`.
 
 ## 2.0 to 2.5
 

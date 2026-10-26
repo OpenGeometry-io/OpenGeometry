@@ -1,5 +1,6 @@
 mod bend;
 mod circle;
+mod circle_ring;
 mod overlap;
 mod path;
 #[cfg(test)]
@@ -37,6 +38,9 @@ pub(crate) fn build(
     let path = checked_path(path, accuracy)?;
     let reach = profile_reach(&profile, path.points[0]);
     let course = course(path, reach, accuracy)?;
+    if course.closed && !caps {
+        return Err(invalid("a closed path has no ends to leave open"));
+    }
     let frame = profile_frame(&profile, accuracy.geometric)?;
     check_lines(&profile, frame, accuracy.geometric)?;
     let points = &course.points;
@@ -76,11 +80,11 @@ pub(crate) fn build(
         polygon.reverse();
     }
     let count = polygon.len();
-    let rings = miter_rings(polygon, &course, count)?;
+    let rings = miter_rings(polygon, &course, count, accuracy)?;
     check_miter_spans(&rings, &course, count, accuracy)?;
     let mut builder = Builder::new(id, accuracy)?;
     let topology = add_sweep_topology(&mut builder, &rings, &course, count)?;
-    if caps {
+    if caps && !course.closed {
         add_caps(&mut builder, &topology, &course, &rings, count, accuracy)?;
     }
     add_side_faces(&mut builder, &topology, &course, &rings, count, accuracy)?;
@@ -109,14 +113,20 @@ fn miter_rings(
     polygon: Vec<Point3>,
     course: &Course,
     count: usize,
+    accuracy: Accuracy,
 ) -> Result<Vec<Vec<Point3>>, OperationError> {
     let path = &course.points;
     let mut offsets = polygon
         .iter()
         .map(|point| sub(*point, path[0]))
         .collect::<Vec<_>>();
+    let starts = offsets.clone();
     let mut rings = Vec::with_capacity(path.len());
-    rings.push(polygon);
+    rings.push(if course.closed {
+        closing_ring(&polygon, &offsets, course)?
+    } else {
+        polygon
+    });
     for joint in 1..path.len() - 1 {
         turn_offsets(&mut offsets, course, joint - 1);
         let previous = course.ends[joint - 1];
@@ -131,6 +141,11 @@ fn miter_rings(
         rings.push(ring);
     }
     turn_offsets(&mut offsets, course, path.len() - 2);
+    if course.closed {
+        check_return(&offsets, &starts, course, accuracy)?;
+        rings.push(rings[0].clone());
+        return Ok(rings);
+    }
     rings.push(
         offsets
             .iter()
@@ -138,6 +153,45 @@ fn miter_rings(
             .collect(),
     );
     Ok(rings)
+}
+
+fn closing_ring(
+    polygon: &[Point3],
+    offsets: &[Point3],
+    course: &Course,
+) -> Result<Vec<Point3>, OperationError> {
+    let Some(bisector) = course.closing_bisector()? else {
+        return Ok(polygon.to_vec());
+    };
+    let start = course.starts[0];
+    Ok(offsets
+        .iter()
+        .map(|offset| {
+            let along = -dot(*offset, bisector) / dot(start, bisector);
+            add(course.points[0], add(*offset, scale(start, along)))
+        })
+        .collect())
+}
+
+fn check_return(
+    offsets: &[Point3],
+    starts: &[Point3],
+    course: &Course,
+    accuracy: Accuracy,
+) -> Result<(), OperationError> {
+    let bisector = course.closing_bisector()?;
+    for (offset, start) in offsets.iter().zip(starts) {
+        let returned = match bisector {
+            Some(bisector) => sub(*offset, scale(bisector, 2.0 * dot(*offset, bisector))),
+            None => *offset,
+        };
+        if norm(sub(returned, *start)) > 4.0 * accuracy.geometric {
+            return Err(invalid(
+                "closed path does not return the profile to its start",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn turn_offsets(offsets: &mut [Point3], course: &Course, segment: usize) {
@@ -179,7 +233,8 @@ fn add_sweep_topology(
     course: &Course,
     count: usize,
 ) -> Result<SweepTopology, OperationError> {
-    let vertices = rings
+    let own = rings.len() - usize::from(course.closed);
+    let mut vertices = rings[..own]
         .iter()
         .map(|ring| {
             ring.iter()
@@ -194,6 +249,10 @@ fn add_sweep_topology(
                 .map(|edge| line_edge(builder, ring[edge], ring[(edge + 1) % count]))
                 .collect::<Result<Vec<_>, _>>()?,
         );
+    }
+    if course.closed {
+        vertices.push(vertices[0].clone());
+        ring_edges.push(ring_edges[0].clone());
     }
     let mut longitudinal = Vec::with_capacity(course.bends.len());
     for segment in 0..course.bends.len() {

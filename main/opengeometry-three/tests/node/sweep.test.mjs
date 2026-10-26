@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  OpenGeometry, Solid, Wire, OG_OPERATION_SWEEP, OG_PRIMITIVE_ARC, OG_PRIMITIVE_CIRCLE, OG_PRIMITIVE_RECTANGLE,
+  OpenGeometry, Solid, Wire, OG_OPERATION_SWEEP, OG_PRIMITIVE_ARC, OG_PRIMITIVE_CIRCLE, OG_PRIMITIVE_POLYLINE,
+  OG_PRIMITIVE_RECTANGLE,
 } from '../../../dist/index.js';
 import { boot } from './support.mjs';
 
@@ -36,4 +37,20 @@ test('a round pipe elbow gives torus faces', async () => {
   const { text, report } = await OpenGeometry.exportStep({ nodes: [pipe], unit: 'metre' });
   assert.equal(report.pcurvelessEdges, 0);
   assert.equal(surfaces(text, 'TOROIDAL_SURFACE('), 2);
+});
+
+test('a closed rectangular path sweeps into a ring with no caps', async () => {
+  await boot();
+  const profile = new Wire(
+    OG_PRIMITIVE_RECTANGLE,
+    { width: 0.2, breadth: 0.2 },
+    { plane: { origin: [0, 0, 0], normal: [1, 0, 0], xDirection: [0, 1, 0] } },
+  );
+  const path = new Wire(OG_PRIMITIVE_POLYLINE, { points: [[0, 0, 0], [4, 0, 0], [4, 3, 0], [0, 3, 0]], closed: true });
+  const ring = new Solid(OG_OPERATION_SWEEP, { profile, path }, { ogId: 'closed-ring' });
+  const faces = ring.getBrep().topology.faces;
+  assert.equal(faces.length, 16);
+  assert(faces.every((face) => !face.key.startsWith('cap-')));
+  const { report } = await OpenGeometry.exportStep({ nodes: [ring], unit: 'metre' });
+  assert.equal(report.solids, 1);
 });

@@ -7,9 +7,11 @@ use crate::operations::{invalid, OperationError};
 pub(crate) struct SweepPath {
     pub(crate) points: Vec<Point3>,
     pub(crate) bends: Vec<Option<Bend>>,
+    pub(crate) closed: bool,
 }
 
 pub(super) struct Course {
+    pub(super) closed: bool,
     pub(super) points: Vec<Point3>,
     pub(super) starts: Vec<Point3>,
     pub(super) ends: Vec<Point3>,
@@ -26,7 +28,17 @@ pub(super) fn checked_path(
             && bend.angle <= std::f64::consts::TAU
             && bend.axis.iter().all(|v| v.is_finite())
     });
-    if path.points.len() < 2 || !finite || !arcs || path.bends.len() + 1 != path.points.len() {
+    let arcless = path.bends.iter().all(Option::is_none);
+    let least = match (path.closed, arcless) {
+        (false, _) => 2,
+        (true, false) => 1,
+        (true, true) => 3,
+    };
+    if path.points.len() < least
+        || !finite
+        || !arcs
+        || path.bends.len() + usize::from(!path.closed) != path.points.len()
+    {
         return Err(invalid("sweep path is invalid"));
     }
     split_long_bends(&mut path)?;
@@ -61,31 +73,44 @@ fn split_long_bends(path: &mut SweepPath) -> Result<(), OperationError> {
 
 fn remove_collinear_joints(path: &mut SweepPath, accuracy: Accuracy) -> Result<(), OperationError> {
     let mut index = 1;
-    while index + 1 < path.points.len() {
+    while index < path.bends.len() {
         if path.bends[index - 1].is_some() || path.bends[index].is_some() {
             index += 1;
             continue;
         }
-        let points = &path.points;
-        let before = sub(points[index], points[index - 1]);
-        let after = sub(points[index + 1], points[index]);
-        if norm(before) <= 4.0 * accuracy.geometric || norm(after) <= 4.0 * accuracy.geometric {
-            return Err(invalid("sweep path has a short segment"));
-        }
-        let (u, v) = (unit(before)?, unit(after)?);
-        if norm(add(u, v)) <= 1e-9 {
-            return Err(OperationError::SweepSelfIntersection(
-                "sweep path reverses".into(),
-            ));
-        }
-        if norm(cross(u, v)) <= 1e-9 && dot(u, v) > 0.0 {
+        let next = path.points[(index + 1) % path.points.len()];
+        let [before, at] = [path.points[index - 1], path.points[index]];
+        if line_joint_is_straight(before, at, next, accuracy)? {
             path.points.remove(index);
             path.bends.remove(index);
         } else {
             index += 1;
         }
     }
+    let last = path.bends.len() - 1;
+    if path.closed && path.bends[last].is_none() && path.bends[0].is_none() {
+        line_joint_is_straight(path.points[last], path.points[0], path.points[1], accuracy)?;
+    }
     Ok(())
+}
+
+fn line_joint_is_straight(
+    before: Point3,
+    at: Point3,
+    next: Point3,
+    accuracy: Accuracy,
+) -> Result<bool, OperationError> {
+    let (incoming, outgoing) = (sub(at, before), sub(next, at));
+    if norm(incoming) <= 4.0 * accuracy.geometric || norm(outgoing) <= 4.0 * accuracy.geometric {
+        return Err(invalid("sweep path has a short segment"));
+    }
+    let (u, v) = (unit(incoming)?, unit(outgoing)?);
+    if norm(add(u, v)) <= 1e-9 {
+        return Err(OperationError::SweepSelfIntersection(
+            "sweep path reverses".into(),
+        ));
+    }
+    Ok(norm(cross(u, v)) <= 1e-9 && dot(u, v) > 0.0)
 }
 
 pub(super) fn course(
@@ -94,11 +119,16 @@ pub(super) fn course(
     accuracy: Accuracy,
 ) -> Result<Course, OperationError> {
     let count = path.bends.len();
+    let mut points = path.points;
+    if path.closed {
+        points.push(points[0]);
+    }
     let mut course = Course {
+        closed: path.closed,
         starts: Vec::with_capacity(count),
         ends: Vec::with_capacity(count),
         bends: Vec::with_capacity(count),
-        points: path.points,
+        points,
     };
     for (segment, bend) in path.bends.into_iter().enumerate() {
         let [from, to] = [course.points[segment], course.points[segment + 1]];
@@ -126,12 +156,31 @@ pub(super) fn course(
     Ok(course)
 }
 
+impl Course {
+    pub(super) fn closing_bisector(&self) -> Result<Option<Point3>, OperationError> {
+        let last = self.bends.len() - 1;
+        let (incoming, outgoing) = (self.ends[last], self.starts[0]);
+        if !self.closed
+            || self.bends[last].is_some()
+            || self.bends[0].is_some()
+            || norm(cross(incoming, outgoing)) <= 1e-9
+        {
+            return Ok(None);
+        }
+        unit(add(incoming, outgoing))
+            .map(Some)
+            .map_err(|_| OperationError::SweepSelfIntersection("sweep path reverses".into()))
+    }
+}
+
 fn check_arc_joints(course: &Course) -> Result<(), OperationError> {
-    for joint in 1..course.bends.len() {
-        if course.bends[joint - 1].is_none() && course.bends[joint].is_none() {
+    let count = course.bends.len();
+    for joint in (1..count).chain(course.closed.then_some(0)) {
+        let previous = (joint + count - 1) % count;
+        if course.bends[previous].is_none() && course.bends[joint].is_none() {
             continue;
         }
-        let (incoming, outgoing) = (course.ends[joint - 1], course.starts[joint]);
+        let (incoming, outgoing) = (course.ends[previous], course.starts[joint]);
         if norm(cross(incoming, outgoing)) > 1e-9 || dot(incoming, outgoing) <= 0.0 {
             return Err(invalid("path has a corner at an arc"));
         }

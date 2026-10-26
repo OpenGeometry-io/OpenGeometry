@@ -1,21 +1,12 @@
 use super::bend::{add_torus_bend, BendFrame, CircleBend, CircleEnds};
+use super::circle_ring::{mitre_ring, reflection, section, turned, Ring};
 use super::path::Course;
 use crate::brep::{
     boundary, plane_boundary, unit, uv_line, Accuracy, Builder, CurveGeometry, EdgeGeometry,
     Frame3, GeometryError, Orientation, PcurveGeometry, SurfaceGeometry, Use,
 };
-use crate::math::{add, cross, dot, norm, scale, sub, Interval, Point3};
+use crate::math::{add, dot, norm, scale, sub, Interval, Point3};
 use crate::operations::OperationError;
-
-struct Ring {
-    centre: Point3,
-    frame: Frame3,
-    major: f64,
-    minor: f64,
-    vertices: [u32; 2],
-    edges: [u32; 2],
-    perpendicular: bool,
-}
 
 struct SweptRings {
     rings: Vec<Ring>,
@@ -47,17 +38,16 @@ pub(super) fn build(
         offset,
     } = add_rings(&mut builder, profile, radius, course)?;
     let last = course.bends.len();
-    let end_centre = add(course.points[last], offset);
-    rings.push(section(
-        &mut builder,
-        end_centre,
-        course.ends[last - 1],
-        x,
-        radius,
-    )?);
+    let end = if course.closed {
+        rings[0]
+    } else {
+        let end_centre = add(course.points[last], offset);
+        section(&mut builder, end_centre, course.ends[last - 1], x, radius)?
+    };
+    rings.push(end);
     check_miter_planes(&rings, &cylinders, course, radius, accuracy)?;
     let seams = add_seams(&mut builder, &rings, course)?;
-    if caps {
+    if caps && !course.closed {
         let start_frame = Frame3::from_axis(rings[0].centre, scale(first_axis, -1.0), profile.x)?;
         let end_frame = Frame3::from_axis(rings[last].centre, course.ends[last - 1], x)?;
         add_caps(
@@ -92,7 +82,11 @@ fn add_rings(
     let mut x = profile.x;
     let mut offset = sub(profile.origin, path[0]);
     let mut rings = Vec::with_capacity(path.len());
-    rings.push(section(builder, profile.origin, first_axis, x, radius)?);
+    let closing = course.closing_bisector()?;
+    rings.push(match closing {
+        Some(bisector) => mitre_ring(builder, path[0], offset, first_axis, bisector, x, radius)?,
+        None => section(builder, profile.origin, first_axis, x, radius)?,
+    });
     let mut cylinders = Vec::with_capacity(course.bends.len());
     cylinders.push(Frame3::from_axis(add(path[0], offset), first_axis, x)?);
     for joint in 1..path.len() - 1 {
@@ -107,107 +101,40 @@ fn add_rings(
         let previous = course.ends[joint - 1];
         let bisector = unit(add(previous, next))
             .map_err(|_| OperationError::SweepSelfIntersection("sweep path reverses".into()))?;
-        let denominator = dot(previous, bisector);
-        let centre = add(
-            add(path[joint], offset),
-            scale(previous, -dot(offset, bisector) / denominator),
-        );
-        let projection =
-            |vector: Point3| sub(vector, scale(previous, dot(vector, bisector) / denominator));
-        let radial = scale(projection(x), radius);
-        let major_axis = unit(sub(previous, scale(bisector, denominator)))?;
-        let major = radius / denominator;
-        rings.push(ring(
-            builder, centre, bisector, radial, major_axis, major, radius,
+        rings.push(mitre_ring(
+            builder,
+            path[joint],
+            offset,
+            previous,
+            bisector,
+            x,
+            radius,
         )?);
         offset = reflection(offset, bisector);
         x = reflection(x, bisector);
         cylinders.push(Frame3::from_axis(add(path[joint], offset), next, x)?);
     }
     [offset, x] = turned(course, path.len() - 2, [offset, x]);
+    if course.closed {
+        let returned = match closing {
+            Some(bisector) => [reflection(offset, bisector), reflection(x, bisector)],
+            None => [offset, x],
+        };
+        let start = sub(profile.origin, path[0]);
+        if norm(sub(returned[0], start)).max(radius * norm(sub(returned[1], profile.x)))
+            > 4.0 * builder.brep.accuracy.geometric
+        {
+            return Err(OperationError::InvalidParameter(
+                "closed path does not return the profile to its start".into(),
+            ));
+        }
+    }
     Ok(SweptRings {
         rings,
         cylinders,
         x,
         offset,
     })
-}
-
-fn ring(
-    builder: &mut Builder,
-    centre: Point3,
-    axis: Point3,
-    radial: Point3,
-    major_axis: Point3,
-    major: f64,
-    minor: f64,
-) -> Result<Ring, OperationError> {
-    let y_axis = unit(cross(axis, major_axis))?;
-    let frame = Frame3::from_axis(centre, axis, major_axis)?;
-    let start = (dot(radial, y_axis) / minor).atan2(dot(radial, major_axis) / major);
-    let curve = if (major - minor).abs() <= 1e-14 * major {
-        CurveGeometry::Circle {
-            frame,
-            radius: major,
-        }
-    } else {
-        CurveGeometry::Ellipse {
-            frame,
-            major_radius: major,
-            minor_radius: minor,
-        }
-    };
-    let vertices = [
-        builder.vertex(curve.elementary_point(start)?),
-        builder.vertex(curve.elementary_point(start + std::f64::consts::PI)?),
-    ];
-    let edges = [
-        builder.edge(
-            curve.clone(),
-            Interval::new(start, start + std::f64::consts::PI).map_err(GeometryError::from)?,
-            false,
-        ),
-        builder.edge(
-            curve,
-            Interval::new(start + std::f64::consts::PI, start + std::f64::consts::TAU)
-                .map_err(GeometryError::from)?,
-            false,
-        ),
-    ];
-    Ok(Ring {
-        centre,
-        frame,
-        major,
-        minor,
-        vertices,
-        edges,
-        perpendicular: false,
-    })
-}
-
-fn section(
-    builder: &mut Builder,
-    centre: Point3,
-    axis: Point3,
-    x: Point3,
-    radius: f64,
-) -> Result<Ring, OperationError> {
-    let ring = ring(builder, centre, axis, scale(x, radius), x, radius, radius)?;
-    Ok(Ring {
-        perpendicular: true,
-        ..ring
-    })
-}
-
-fn turned(course: &Course, segment: usize, vectors: [Point3; 2]) -> [Point3; 2] {
-    match course.bends[segment] {
-        Some(frame) => vectors.map(|vector| frame.rotated(vector)),
-        None => vectors,
-    }
-}
-
-fn reflection(vector: Point3, normal: Point3) -> Point3 {
-    sub(vector, scale(normal, 2.0 * dot(vector, normal)))
 }
 
 fn check_miter_planes(

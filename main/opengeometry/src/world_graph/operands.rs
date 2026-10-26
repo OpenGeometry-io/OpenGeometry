@@ -23,15 +23,16 @@ pub(super) fn sweep_path(
         .wires
         .first()
         .ok_or_else(|| GraphError::code(ErrorCode::InvalidOperand, "path is not a wire"))?;
-    if wire.is_closed || brep.topology.wires.len() != 1 {
+    if brep.topology.wires.len() != 1 {
         return Err(GraphError::code(
             ErrorCode::InvalidParameter,
-            "path must be one open wire",
+            "path must be one wire",
         ));
     }
     let mut result = SweepPath {
         points: Vec::new(),
         bends: Vec::new(),
+        closed: wire.is_closed,
     };
     let mut cursor = wire.start_halfedge;
     for _ in 0..brep.topology.halfedges.len() {
@@ -49,8 +50,11 @@ pub(super) fn sweep_path(
         cursor = halfedge.next.ok_or_else(|| {
             GraphError::code(ErrorCode::InvalidTopology, "path ends unexpectedly")
         })?;
+        if cursor == wire.start_halfedge {
+            break;
+        }
     }
-    if result.points.len() < 2 {
+    if result.bends.is_empty() {
         return Err(GraphError::code(
             ErrorCode::InvalidParameter,
             "path is too short",

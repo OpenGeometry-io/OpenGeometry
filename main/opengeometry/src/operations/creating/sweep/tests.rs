@@ -5,6 +5,7 @@ use crate::brep::{
 };
 use crate::math::Point3;
 use crate::operations::creating::ProfileLoop;
+use crate::operations::OperationError;
 
 const L_PATH: [Point3; 3] = [[0.0, 0.0, 0.0], [0.0, 3.0, 0.0], [3.0, 3.0, 0.0]];
 const SPATIAL_PATH: [Point3; 4] = [
@@ -24,6 +25,7 @@ fn circular_sweep(radius: f64, path: &[Point3]) -> BrepEnvelope {
         SweepPath {
             points: path.to_vec(),
             bends: vec![None; path.len() - 1],
+            closed: false,
         },
         true,
         coarse_accuracy(1e-6),
@@ -133,4 +135,21 @@ fn no_chart_seam_edge_spans_two_surfaces() {
             .filter(|edge| is_line(&body, edge))
             .all(|edge| !edge.chart_seam));
     }
+}
+
+#[test]
+fn closed_path_of_one_straight_segment_is_invalid_parameter() {
+    let path = SweepPath {
+        points: vec![[0.0; 3]],
+        bends: vec![None],
+        closed: true,
+    };
+    let profile = ProfileLoop::Circle {
+        frame: GROUND,
+        radius: 0.5,
+    };
+    assert_eq!(
+        build("solid".into(), profile, path, true, coarse_accuracy(1e-6)).unwrap_err(),
+        OperationError::InvalidParameter("sweep path is invalid".into())
+    );
 }
