@@ -8,4 +8,5 @@ mod flush_openings;
 mod multi_tool;
 mod point_classification;
 mod routing;
+mod stair_waist;
 mod support;

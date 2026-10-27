@@ -1,6 +1,6 @@
 use super::mesh::Tessellation;
 use crate::brep::{BrepEnvelope, Face, GeometryError, Orientation, Surface};
-use crate::math::{scale, Point3};
+use crate::math::{cross, dot, scale, sub, Point3};
 
 pub(super) fn planar_face(
     brep: &BrepEnvelope,
@@ -73,6 +73,10 @@ pub(super) fn planar_face(
         let c = *ids
             .get(tri[2])
             .ok_or_else(|| GeometryError::InvalidTopology("triangulation index".into()))?;
+        let [pa, pb, pc] = [a, b, c].map(|id| mesh.point(id));
+        if dot(cross(sub(pb, pa), sub(pc, pa)), normal) == 0.0 {
+            continue;
+        }
         mesh.triangle([a, b, c], face.id, normal, max_triangles)?;
     }
     Ok(())
