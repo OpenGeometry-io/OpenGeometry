@@ -12,7 +12,9 @@ It is written for people and for coding assistants alike: each section says what
 4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
 5. Finish with its "Check your result" steps.
 
-## Unreleased
+## 2.5 to 3.0
+
+2.5 was not published. From 2.0, follow 2.0 to 2.5, then 2.5 to 3.0.
 
 ### What changed
 
@@ -59,7 +61,7 @@ const roof = new AnalyticSolid({
 });
 ```
 
-Unreleased:
+3.0:
 
 ```ts
 import {
@@ -114,7 +116,7 @@ const world = AnalyticSolid.fromBrep(solid.getWorldBrepSerialized());
 const normal = solid.normalAtFace(faceId, new Vector3(0, 0, 0));
 ```
 
-Unreleased:
+3.0:
 
 ```ts
 import * as THREE from 'three';
@@ -135,7 +137,7 @@ if (bottom) {
 }
 ```
 
-Both read the box's world vertices without making a body. The Unreleased normal is `[0, -1, 0]` in the box's own coordinates; `worldNormal` is that normal turned by the box's 30 degree rotation, about `[0.5, -0.866, 0]`. `OpenGeometry.flush()` brings `matrixWorld` up to date with the transform.
+Both read the box's world vertices without making a body. The 3.0 normal is `[0, -1, 0]` in the box's own coordinates; `worldNormal` is that normal turned by the box's 30 degree rotation, about `[0.5, -0.866, 0]`. `OpenGeometry.flush()` brings `matrixWorld` up to date with the transform.
 
 2.0:
 
@@ -150,7 +152,7 @@ const duct = new Sweep({
 });
 ```
 
-Unreleased:
+3.0:
 
 ```ts
 import {
@@ -171,7 +173,7 @@ const duct = new Sheet(OG_OPERATION_SWEEP, OG_OPERATION_PARAMS_SWEEP({ profile, 
 console.log(duct.bodyType, duct.getBrep().topology.faces.length);
 ```
 
-Both make the same open duct, 0.7 m by 0.4 m, along an L-shaped path: eight side faces and no end faces. The Unreleased line prints `Sheet 8`.
+Both make the same open duct, 0.7 m by 0.4 m, along an L-shaped path: eight side faces and no end faces. The 3.0 line prints `Sheet 8`.
 
 2.0:
 
@@ -184,7 +186,7 @@ const elbow = new Sweep({
 });
 ```
 
-Unreleased:
+3.0:
 
 ```ts
 import {
@@ -220,7 +222,7 @@ const { report } = await OpenGeometry.exportStep({ nodes: [duct, pipe] });
 console.log(duct.getBrep().topology.faces.length, pipe.getBrep().topology.faces.length, report.pcurvelessEdges);
 ```
 
-Both follow a quarter turn at a bend radius of 0.6 m, one and a half times the 0.4 m duct width. 2.0 can only follow the arc with straight pieces, here eight. Unreleased makes one exact bend with two cylindrical walls and prints `6 4 0`; the pipe elbow has two torus faces.
+Both follow a quarter turn at a bend radius of 0.6 m, one and a half times the 0.4 m duct width. 2.0 can only follow the arc with straight pieces, here eight. 3.0 makes one exact bend with two cylindrical walls and prints `6 4 0`; the pipe elbow has two torus faces.
 
 2.0:
 
@@ -228,7 +230,7 @@ Both follow a quarter turn at a bend radius of 0.6 m, one and a half times the 0
 const body = solid.prepareIfcExchange();
 ```
 
-Unreleased:
+3.0:
 
 ```ts
 import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, OG_TRANSFORM_TRANSLATE, type AnalyticExchangeBodyV2 } from 'opengeometry';
@@ -241,7 +243,7 @@ const body: AnalyticExchangeBodyV2 = OpenGeometry.exportIfcBody(solid);
 console.log(body.representation_type, body.up_axis, body.solids.length, body.faces.length);
 ```
 
-Both give the solid's exchange body in world metres with Z up. The Unreleased line prints `AdvancedBrep Z 1 6`.
+Both give the solid's exchange body in world metres with Z up. The 3.0 line prints `AdvancedBrep Z 1 6`.
 
 2.0:
 
@@ -249,7 +251,7 @@ Both give the solid's exchange body in world metres with Z up. The Unreleased li
 const left = booleanRegions2D([square(0)], [square(0.5)], 'subtraction');
 ```
 
-Unreleased:
+3.0:
 
 ```ts
 import { OpenGeometry, OG_REGION_TOLERANCE, type OffsetRegion } from 'opengeometry';
@@ -264,7 +266,7 @@ const left: OffsetRegion[] = OpenGeometry.booleanRegions2D([square(0)], [square(
 console.log(left.length, left[0]?.outer.length, OG_REGION_TOLERANCE);
 ```
 
-Both cut one unit square by another moved half a metre along x. The Unreleased line prints `1 4 0.000001`.
+Both cut one unit square by another moved half a metre along x. The 3.0 line prints `1 4 0.000001`.
 
 2.0:
 
@@ -274,7 +276,7 @@ const points = inset[0].outer.map((point) => [point.x, point.z]);
 const offset = polyline.getOffset(1, 35, true);
 ```
 
-Unreleased:
+3.0:
 
 ```ts
 import { OpenGeometry, type CurvedRegion2D, type OffsetPath2D } from 'opengeometry';
@@ -290,11 +292,11 @@ const side: OffsetPath2D = OpenGeometry.offsetPolyline(flat([[0, 0], [5, 0]]), 1
 console.log(inset.length, corner?.kind === 'arc' ? corner.radius : 0, duct.length, side.edges.length);
 ```
 
-Both inset an L-shaped lot by 2 m. 2.0 draws the inside corner as short segments outside the circle; the Unreleased line prints `1 2 1 1`: one region whose inside corner is one arc of radius 2, one duct region and one offset edge.
+Both inset an L-shaped lot by 2 m. 2.0 draws the inside corner as short segments outside the circle; the 3.0 line prints `1 2 1 1`: one region whose inside corner is one arc of radius 2, one duct region and one offset edge.
 
 ### Replace this with that
 
-| 2.0 | Unreleased |
+| 2.0 | 3.0 |
 | --- | --- |
 | `new AnalyticSolid({ kind: 'arcEdgedExtrusion', outer, holes, height, frame })` | one `new Wire(OG_PRIMITIVE_PROFILE, { start, segments, closed: true }, { plane })` per loop, then `new Solid(OG_OPERATION_EXTRUDE, { profile, holes, distance: height })` |
 | `{ kind: 'line', from, to }` | `{ to }`; the first `from` becomes `start` |
@@ -508,7 +510,7 @@ A 2.0 export this guide does not name has no direct 2.5 form; the full 2.5 surfa
 
 ### Check your result
 
-1. Open `node_modules/opengeometry/package.json`. Its `version` should start with `2.5`.
+1. Open `node_modules/opengeometry/package.json`. Its `version` starts with `3.`.
 2. Run your type check, for example `npx tsc --noEmit`. Imports that no longer exist, such as `Cuboid` or `Vector3`, fail here.
 3. Run your app. Check that bodies sit and face the way they did before, cuboids, cylinders and sweeps above all, and that STEP files have the units and up axis you expect.
 

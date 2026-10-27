@@ -26,7 +26,7 @@
 
 > **Actively maintained and growing.** We're building OpenGeometry in the open. APIs, examples, and package structure are evolving, and we are actively improving and expanding the project. Star the repo to follow along. If you have questions or want to get involved, join the [Discord](https://discord.com/invite/9wJpbfgGGA) or check out the [issues](https://github.com/OpenGeometry-io/OpenGeometry/issues).
 
-> **Version note.** This README describes OpenGeometry 2.5. Check which line you have installed with `npm ls opengeometry`: the 2.0 line has a different API. The hosted documentation still describes 2.0.
+> **Version note.** This README describes OpenGeometry 3.0. Check which line you have installed with `npm ls opengeometry`: the 2.0 line has a different API. The hosted documentation still describes 2.0.
 
 ---
 
@@ -40,7 +40,7 @@ It is the geometry engine layer, not a full CAD application. Floorkit is a downs
 
 ## Features
 
-| Area | What 2.5 has |
+| Area | What 3.0 has |
 | --- | --- |
 | **Primitives** | Wires: rectangle, circle, polyline (open or closed). Solids: cuboid, cylinder. Each can be placed on any plane. |
 | **Operations** | Extrude a closed wire into a solid, with holes. Sweep a profile along an open or closed path of lines and arcs, each arc an exact bend, capped into a solid, open-ended into a sheet, or closed into a ring. Union, subtract and intersect, with one to a hundred tool solids in one call. |
@@ -51,7 +51,7 @@ It is the geometry engine layer, not a full CAD application. Floorkit is a downs
 | **Queries** | Bounds, placements, the B-rep of a body, that B-rep placed in the world, the normal of a face at a point, and the report of its last boolean. |
 | **Export** | STEP, in millimetres or metres, with Y or Z up, together with an export report. The IFC exchange body of a solid, in world metres with Z up, for an IFC writer. |
 
-Not in 2.5, though 2.0 had them: IFC file text and STL export; projection; loft; triangulation as a public call; curves, spheres and wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
+Not in 3.0, though 2.0 had them: IFC file text and STL export; projection; loft; triangulation as a public call; curves, spheres and wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
 
 ## Installation
 
@@ -153,11 +153,11 @@ If you just want a quick look, start with the [hosted demos](https://demos.openg
 
 ## Using OpenGeometry with AI coding assistants
 
-This section is a compact reference for writing OpenGeometry 2.5 code, by hand or with a coding assistant.
+This section is a compact reference for writing OpenGeometry 3.0 code, by hand or with a coding assistant.
 
 **Package.** `opengeometry` on npm. ES modules only, types included, peer dependency `three` `>=0.168.0 <0.185.0`.
 
-**Which line is installed.** The 2.5 entry exports `OpenGeometry.create`, `Solid` and `Wire`. Code that uses `Cuboid`, `Vector3` or `setPlacement` is written for 2.0 and does not work with 2.5. The `version` in `node_modules/opengeometry/package.json` settles it.
+**Which line is installed.** The 3.0 entry exports `OpenGeometry.create`, `Solid` and `Wire`. Code that uses `Cuboid`, `Vector3` or `setPlacement` is written for 2.0 and does not work with 3.0. The `version` in `node_modules/opengeometry/package.json` settles it.
 
 **The whole public surface.** The entry exports `OpenGeometry`, `Solid`, `Sheet`, `Wire`, `SystemAssembly`, `OGMark`, `OGError` and the `OG_*` constants. Every point and vector is `[x, y, z]`. Model units are metres, and Y is up.
 
@@ -216,11 +216,11 @@ This section is a compact reference for writing OpenGeometry 2.5 code, by hand o
 
 **What does not exist.** IFC, STL and PDF export, projection, offset, loft, public triangulation, arcs, curves, spheres, wedges, and the 2.0 classes. Do not call them.
 
-**Where the truth is.** `index.d.ts` in the installed package lists every export and its types. The examples in [`main/opengeometry-three/examples-vite/`](./main/opengeometry-three/examples-vite/) are working 2.5 code, except that they import the built package by path (`../../../dist/index.js`) where an app imports from `'opengeometry'`.
+**Where the truth is.** `index.d.ts` in the installed package lists every export and its types. The examples in [`main/opengeometry-three/examples-vite/`](./main/opengeometry-three/examples-vite/) are working 3.0 code, except that they import the built package by path (`../../../dist/index.js`) where an app imports from `'opengeometry'`.
 
 ## Documentation
 
-The hosted documentation at **[docs.opengeometry.io](https://docs.opengeometry.io?utm_source=github)** still describes the 2.0 API. For 2.5, use this README, the types in the package and the examples. To move code written for 2.0 to 2.5, follow [MIGRATION.md](./MIGRATION.md).
+The hosted documentation at **[docs.opengeometry.io](https://docs.opengeometry.io?utm_source=github)** still describes the 2.0 API. For 3.0, use this README, the types in the package and the examples. To move code written for 2.0 to 3.0, follow [MIGRATION.md](./MIGRATION.md).
 
 ## Repository structure
 
@@ -229,7 +229,7 @@ The hosted documentation at **[docs.opengeometry.io](https://docs.opengeometry.i
 | [`main/opengeometry/`](./main/opengeometry/) | The Rust kernel, built to WebAssembly |
 | [`main/opengeometry-three/`](./main/opengeometry-three/) | The Three.js SDK, published as `opengeometry` |
 | [`main/scripts/`](./main/scripts/) | Build, check, benchmark and snapshot scripts |
-| [`docs/`](./docs/) | The 2.0 documentation source, not yet rewritten for 2.5 |
+| [`docs/`](./docs/) | The 2.0 documentation source, not yet rewritten for 3.0 |
 
 ## Building from source
 

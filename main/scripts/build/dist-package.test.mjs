@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { test } from 'node:test';
+import { REPOSITORY_ROOT } from '../lib/paths.mjs';
 import { distManifest, packageReadme } from './dist-package.mjs';
 
 const REPOSITORY = {
@@ -8,7 +11,7 @@ const REPOSITORY = {
 const BUGS = { url: 'https://github.com/OpenGeometry-io/OpenGeometry/issues' };
 const SOURCE_MANIFEST = {
   name: 'opengeometry',
-  version: '2.5.0',
+  version: '3.0.0',
   private: true,
   type: 'module',
   license: 'MPL-2.0',
@@ -29,7 +32,7 @@ test('the dist manifest carries the package details and the entry points', () =>
   const manifest = distManifest(SOURCE_MANIFEST);
   assert.deepEqual(manifest, {
     name: 'opengeometry',
-    version: '2.5.0',
+    version: '3.0.0',
     description: 'A CAD kernel.',
     keywords: ['cad', 'brep'],
     homepage: 'https://opengeometry.io?utm_source=npm',
@@ -99,4 +102,11 @@ test('a data-src attribute is left alone', () => {
     packageReadme('<img data-src="./docs/x.png" src="./docs/x.png">'),
     `<img data-src="./docs/x.png" src="${RAW}/docs/x.png">`,
   );
+});
+
+test('the package version is the kernel crate version, in the 3 line', () => {
+  const manifest = JSON.parse(readFileSync(path.join(REPOSITORY_ROOT, 'package.json'), 'utf8'));
+  const crate = readFileSync(path.join(REPOSITORY_ROOT, 'opengeometry/Cargo.toml'), 'utf8');
+  assert.equal(manifest.version, crate.match(/^version = "(.*)"$/m)?.[1]);
+  assert(manifest.version.startsWith('3.'), manifest.version);
 });
