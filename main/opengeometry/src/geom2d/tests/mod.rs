@@ -1,5 +1,6 @@
 mod boolean2d;
 mod curved_boolean2d;
+mod curved_boolean2d_slivers;
 mod curved_intersections;
 mod curved_winding;
 mod region_probe;
