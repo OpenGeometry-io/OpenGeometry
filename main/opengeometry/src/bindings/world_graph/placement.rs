@@ -25,6 +25,21 @@ impl OGWorldGraph {
         )
     }
 
+    pub fn shell(
+        &mut self,
+        og_id: &str,
+        thickness: f64,
+        scope_json: &str,
+    ) -> Result<String, JsValue> {
+        params::id(og_id).map_err(errors::json)?;
+        let scope: EditScope = params::parse(scope_json).map_err(errors::json)?;
+        changed(
+            self.inner
+                .shell(og_id, thickness, scope)
+                .map_err(errors::json)?,
+        )
+    }
+
     pub fn transform(&mut self, og_id: &str, transform_json: &str) -> Result<String, JsValue> {
         params::id(og_id).map_err(errors::json)?;
         let transform: Transform = params::parse(transform_json).map_err(errors::json)?;

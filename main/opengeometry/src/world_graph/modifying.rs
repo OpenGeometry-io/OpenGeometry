@@ -53,9 +53,20 @@ impl WorldGraph {
         } = self
             .operated(target, operation, tools, scope)
             .map_err(|error| error.in_context(ErrorContext::Operate))?;
+        self.replace_shape(&shape_id, result, handlers, revision)
+            .map_err(|error| error.in_context(ErrorContext::Operate))
+    }
+
+    pub(super) fn replace_shape(
+        &mut self,
+        shape_id: &ShapeId,
+        result: BooleanResult,
+        handlers: Vec<String>,
+        revision: u64,
+    ) -> Result<ChangeSet, GraphError> {
         let report = serde_json::json!({ "report": result.report, "handlers": handlers, "revision": revision });
         self.mutate(|draft| {
-            let shape = draft.shapes.get_mut(&shape_id).ok_or_else(|| {
+            let shape = draft.shapes.get_mut(shape_id).ok_or_else(|| {
                 GraphError::code(ErrorCode::InvalidTopology, "target shape is missing")
             })?;
             shape.brep = Arc::new(result.brep);
@@ -64,7 +75,6 @@ impl WorldGraph {
             shape.report = Some(report);
             Ok(())
         })
-        .map_err(|error| error.in_context(ErrorContext::Operate))
     }
 
     fn operated(
@@ -141,7 +151,7 @@ impl WorldGraph {
     }
 }
 
-fn validate_solid(body: &BrepEnvelope) -> Result<(), GraphError> {
+pub(super) fn validate_solid(body: &BrepEnvelope) -> Result<(), GraphError> {
     if body.body_type()? != BodyType::Solid {
         return Err(GraphError::code(
             ErrorCode::InvalidOperand,

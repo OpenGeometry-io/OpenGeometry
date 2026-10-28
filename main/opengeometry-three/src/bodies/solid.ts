@@ -1,3 +1,4 @@
+import { OG_OPERATION_SHELL } from '../constants/operations';
 import { OGError } from '../errors';
 import { call } from '../kernel/kernel-session';
 import { flush } from '../rendering/geometry/geometry-scheduler';
@@ -16,11 +17,20 @@ export class Solid extends Body {
       throw new OGError('BodyTypeMismatch', 'Solid.constructor', 'expected Solid');
     }
   }
-  operate(kind: string, options: { tools: Solid[]; instances?: 'all' }): void {
+  operate(
+    kind: string,
+    options: { tools: Solid[]; instances?: 'all' } | { thickness: number; instances?: 'all' },
+  ): void {
     this.check('Solid.operate');
-    call('Solid.operate', () => worldGraph().operate(
-      this.ogId, encode(kind), encode(options.tools.map((tool) => tool.ogId)), scope(options),
-    ));
+    if (kind === OG_OPERATION_SHELL) {
+      const thickness = 'thickness' in options ? options.thickness : Number.NaN;
+      call('Solid.operate', () => worldGraph().shell(this.ogId, thickness, scope(options)));
+    } else {
+      const tools = 'tools' in options ? options.tools : [];
+      call('Solid.operate', () => worldGraph().operate(
+        this.ogId, encode(kind), encode(tools.map((tool) => tool.ogId)), scope(options),
+      ));
+    }
     flush();
   }
   getReport(): ShapeReport | null {

@@ -19,6 +19,7 @@ mod placement;
 mod primitive;
 mod queries;
 mod shape_store;
+mod shelling;
 mod tree_walk;
 
 pub use change_log::{ChangeSet, NodeChange};

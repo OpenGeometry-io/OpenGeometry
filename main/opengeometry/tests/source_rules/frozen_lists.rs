@@ -54,7 +54,7 @@ pub(crate) const SERDE_JSON_OUTSIDE_EDGES: ListSpec = ListSpec {
     key_fields: 2,
     measured: false,
     frozen: &[
-        "world_graph/modifying.rs WorldGraph::operate B5",
+        "world_graph/modifying.rs WorldGraph::replace_shape B5",
         "world_graph/modifying.rs WorldGraph::report B5",
         "world_graph/shape_store.rs Shape B5",
     ],

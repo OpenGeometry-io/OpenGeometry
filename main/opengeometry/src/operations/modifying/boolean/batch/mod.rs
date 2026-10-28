@@ -8,6 +8,8 @@ use super::types::{BooleanOp, BooleanResult};
 use crate::brep::{Accuracy, BrepEnvelope, GeometryError, PatchBounds, SurfaceGeometry};
 use prismatic_profile::subtract_prismatic_profile_batch;
 
+pub(super) use prismatic_profile::profile_edges;
+
 pub fn subtract_planar_cutters(
     host: &BrepEnvelope,
     cutters: &[BrepEnvelope],

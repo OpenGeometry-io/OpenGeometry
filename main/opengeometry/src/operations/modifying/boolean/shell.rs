@@ -1,13 +1,34 @@
-use super::handlers::analytic_containment_boolean;
+use super::batch::profile_edges;
+use super::handlers::{analytic_containment_boolean, sectional_regions};
 use super::operands::{
-    brep_face_source, full_box, full_conic_section, full_cylinder, full_planar_extrusion,
-    full_sphere, full_torus, prismatic_gap, unique_sources, BoxInput,
+    all_planar, brep_face_source, full_box, full_conic_section, full_cylinder,
+    full_planar_extrusion, full_sphere, full_torus, prismatic_gap, unique_sources, BoxInput,
 };
 use super::types::{BooleanOp, BooleanResult, FaceMapping};
-use crate::brep::{BrepEnvelope, Frame3, GeometryError, SurfaceGeometry};
-use crate::geom2d::{self_intersects2, signed_area2, Pt2};
-use crate::math::{scale, Point3};
+use crate::brep::{BrepEnvelope, EdgeGeometry, Frame3, GeometryError, SurfaceGeometry};
+use crate::geom2d::{
+    inset_curved_region, inset_tolerance, offset_from, oriented_ring, pinched, self_intersects2,
+    signed_area2, CurveEdge2, CurveRegion2, Pt2,
+};
+use crate::math::{dot, scale, Point3};
 use crate::primitives;
+
+struct Cavity {
+    body: BrepEnvelope,
+    faces: Vec<Vec<u32>>,
+}
+
+struct ArcEdgedPrism {
+    base: Frame3,
+    height: f64,
+    section: CurveRegion2,
+    sides: Vec<Side>,
+}
+
+struct Side {
+    face: u32,
+    points: [Pt2; 3],
+}
 
 pub fn shell_brep(
     input: &BrepEnvelope,
@@ -21,10 +42,11 @@ pub fn shell_brep(
         ));
     }
     let inner_id = format!("{id}:offset-cavity");
-    let inner = offset_cavity(input, thickness, inner_id)?;
-    let inner_identity = inner.id.clone();
-    let mut result = analytic_containment_boolean(input, &inner, true, BooleanOp::Subtraction, id)?;
-    set_cavity_provenance(&mut result.brep, input, &inner_identity)?;
+    let cavity = offset_cavity(input, thickness, inner_id)?;
+    let inner_identity = cavity.body.id.clone();
+    let mut result =
+        analytic_containment_boolean(input, &cavity.body, true, BooleanOp::Subtraction, id)?;
+    set_cavity_provenance(&mut result.brep, input, &inner_identity, &cavity.faces)?;
     result.report.face_mappings = input
         .topology
         .faces
@@ -60,11 +82,14 @@ fn offset_cavity(
     input: &BrepEnvelope,
     thickness: f64,
     inner_id: String,
-) -> Result<BrepEnvelope, GeometryError> {
-    match input.geometry.surfaces.first() {
+) -> Result<Cavity, GeometryError> {
+    let body = match input.geometry.surfaces.first() {
         Some(SurfaceGeometry::Sphere { .. }) => sphere_cavity(input, thickness, inner_id),
         Some(SurfaceGeometry::Cylinder { .. }) => cylinder_cavity(input, thickness, inner_id),
         Some(SurfaceGeometry::Torus { .. }) => torus_cavity(input, thickness, inner_id),
+        Some(SurfaceGeometry::Plane { .. }) if !all_planar(input) => {
+            return arc_edged_cavity(input, thickness, inner_id)
+        }
         Some(SurfaceGeometry::Plane { .. }) => match full_box(input) {
             Ok(input) => cuboid_cavity(&input, thickness, inner_id),
             Err(GeometryError::CoverageGap { .. }) => extrusion_cavity(input, thickness, inner_id),
@@ -74,7 +99,11 @@ fn offset_cavity(
         None => Err(GeometryError::CoverageGap {
             families: ["restricted analytic shell".into(), "input solid".into()],
         }),
-    }
+    }?;
+    let faces = (0..body.topology.faces.len() as u32)
+        .map(|face| vec![face])
+        .collect();
+    Ok(Cavity { body, faces })
 }
 
 fn sphere_cavity(
@@ -345,23 +374,193 @@ fn set_cavity_provenance(
     brep: &mut BrepEnvelope,
     input: &BrepEnvelope,
     inner_identity: &str,
+    faces: &[Vec<u32>],
 ) -> Result<(), GeometryError> {
+    let count = input.topology.faces.len();
     for face in &mut brep.topology.faces {
-        for source in &mut face.provenance.sources {
-            if source.entity == inner_identity && source.body == inner_identity {
-                let original = input
-                    .topology
-                    .faces
-                    .get(source.face as usize)
-                    .ok_or_else(|| {
-                        GeometryError::InvalidTopology(
-                            "shell offset face has no source face".into(),
-                        )
-                    })?;
-                *source = brep_face_source(input, original.id);
+        let mut sources = Vec::new();
+        for source in std::mem::take(&mut face.provenance.sources) {
+            if source.entity != inner_identity || source.body != inner_identity {
+                sources.push(source);
+                continue;
             }
+            let originals = faces
+                .get(source.face as usize)
+                .filter(|originals| originals.iter().all(|face| (*face as usize) < count))
+                .ok_or_else(|| {
+                    GeometryError::InvalidTopology("shell offset face has no source face".into())
+                })?;
+            sources.extend(originals.iter().map(|original| {
+                brep_face_source(input, input.topology.faces[*original as usize].id)
+            }));
         }
-        face.provenance.sources = unique_sources(std::mem::take(&mut face.provenance.sources));
+        face.provenance.sources = unique_sources(sources);
     }
     Ok(())
+}
+
+fn arc_edged_gap() -> GeometryError {
+    GeometryError::CoverageGap {
+        families: [
+            "restricted analytic shell".into(),
+            "arc-edged profile extrusion".into(),
+        ],
+    }
+}
+
+fn arc_edged_cavity(
+    input: &BrepEnvelope,
+    thickness: f64,
+    inner_id: String,
+) -> Result<Cavity, GeometryError> {
+    let prism = arc_edged_prism(input)?;
+    let height = prism.height - 2.0 * thickness;
+    if height <= 4.0 * input.accuracy.geometric {
+        return Err(GeometryError::UnresolvedIntersection(
+            "shell thickness consumes the profile extrusion height".into(),
+        ));
+    }
+    let tolerance = inset_tolerance(&prism.section, input.accuracy.intersection);
+    let inset = inset_curved_region(&prism.section, thickness, tolerance)?;
+    let region = match inset.as_slice() {
+        [region] if !pinched(region, 4.0 * input.accuracy.geometric) => region,
+        _ => {
+            return Err(GeometryError::UnresolvedIntersection(
+                "shell offset of the arc-edged profile collapses or splits".into(),
+            ))
+        }
+    };
+    let rings = std::iter::once(oriented_ring(&region.outer, true))
+        .chain(region.holes.iter().map(|hole| oriented_ring(hole, false)))
+        .collect::<Vec<_>>();
+    let mut faces = vec![vec![0], vec![1]];
+    for edge in rings.iter().flatten() {
+        faces.push(offset_sources(&prism, edge, thickness, tolerance));
+    }
+    let profiles = rings.into_iter().map(profile_edges).collect::<Vec<_>>();
+    let frame = Frame3 {
+        origin: prism.base.point([0.0, 0.0, thickness]),
+        ..prism.base
+    };
+    let body = primitives::arc_edged_extrusion_with_holes(
+        inner_id,
+        frame,
+        profiles[0].clone(),
+        profiles[1..].to_vec(),
+        height,
+        input.accuracy,
+    )
+    .map_err(|error| match error {
+        GeometryError::InvalidGeometry(message) => GeometryError::UnresolvedIntersection(message),
+        error => error,
+    })?;
+    Ok(Cavity { body, faces })
+}
+
+fn arc_edged_prism(input: &BrepEnvelope) -> Result<ArcEdgedPrism, GeometryError> {
+    let g = input.accuracy.geometric;
+    let plane = |face: usize| match input
+        .geometry
+        .surfaces
+        .get(input.topology.faces.get(face)?.surface as usize)
+    {
+        Some(SurfaceGeometry::Plane { frame }) => Some(*frame),
+        _ => None,
+    };
+    let (Some(top), Some(bottom)) = (plane(0), plane(1)) else {
+        return Err(arc_edged_gap());
+    };
+    let base = Frame3 {
+        origin: bottom.origin,
+        x: bottom.x,
+        y: scale(bottom.y, -1.0),
+        z: scale(bottom.z, -1.0),
+    };
+    let height = base.local(top.origin)[2];
+    let on_caps = input.topology.vertices.iter().all(|vertex| {
+        let level = base.local(vertex.position)[2];
+        level.abs() <= g || (level - height).abs() <= g
+    });
+    let sides = (2..input.topology.faces.len() as u32)
+        .map(|face| side(input, base, face, g))
+        .collect::<Option<Vec<_>>>();
+    let (Some(sides), true) = (sides, on_caps) else {
+        return Err(arc_edged_gap());
+    };
+    if input.solids.len() != 1
+        || !input.solids[0].cavity_shells.is_empty()
+        || dot(top.z, base.z) < 1.0 - 1e-10
+        || height <= 4.0 * g
+    {
+        return Err(arc_edged_gap());
+    }
+    let mut sections = sectional_regions(input, base, height / 2.0, input.accuracy.intersection)?;
+    let (Some(section), true) = (sections.pop(), sections.is_empty()) else {
+        return Err(arc_edged_gap());
+    };
+    Ok(ArcEdgedPrism {
+        base,
+        height,
+        section,
+        sides,
+    })
+}
+
+fn side(input: &BrepEnvelope, base: Frame3, face: u32, g: f64) -> Option<Side> {
+    let upright = match input
+        .geometry
+        .surfaces
+        .get(input.topology.faces[face as usize].surface as usize)?
+    {
+        SurfaceGeometry::Plane { frame } => dot(frame.z, base.z).abs() <= 1e-10,
+        SurfaceGeometry::Cylinder { frame, .. } => dot(frame.z, base.z).abs() >= 1.0 - 1e-10,
+        _ => false,
+    };
+    let planar = |point: Point3| {
+        let local = base.local(point);
+        (local[2].abs() <= g).then(|| Pt2::new(local[0], local[1]))
+    };
+    let vertex = |id: u32| planar(input.topology.vertices[id as usize].position);
+    let (bottom, from, to) = input.topology.halfedges.iter().find_map(|halfedge| {
+        let ends = (vertex(halfedge.from)?, vertex(halfedge.to)?);
+        (halfedge.face == Some(face)).then_some((halfedge.edge, ends.0, ends.1))
+    })?;
+    let EdgeGeometry::Curve { curve, range } = input.topology.edges[bottom as usize].geometry
+    else {
+        return None;
+    };
+    let middle = input.geometry.curves.get(curve as usize)?;
+    let middle = planar(middle.elementary_point((range.lo + range.hi) / 2.0).ok()?)?;
+    upright.then_some(Side {
+        face,
+        points: [from, middle, to],
+    })
+}
+
+fn offset_sources(
+    prism: &ArcEdgedPrism,
+    edge: &CurveEdge2,
+    thickness: f64,
+    tolerance: f64,
+) -> Vec<u32> {
+    std::iter::once(&prism.section.outer)
+        .chain(&prism.section.holes)
+        .flatten()
+        .filter(|source| offset_from(edge, source, thickness, tolerance))
+        .filter_map(|source| {
+            prism
+                .sides
+                .iter()
+                .find(|side| side_carries(side, source, tolerance))
+                .map(|side| side.face)
+        })
+        .collect()
+}
+
+fn side_carries(side: &Side, source: &CurveEdge2, tolerance: f64) -> bool {
+    let close = |a: Pt2, b: Pt2| (a.x - b.x).hypot(a.z - b.z) <= tolerance;
+    let [from, middle, to] = side.points;
+    let (start, end) = (source.point(0.0), source.point(1.0));
+    close(source.point(0.5), middle)
+        && ((close(start, from) && close(end, to)) || (close(start, to) && close(end, from)))
 }

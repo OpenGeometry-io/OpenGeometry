@@ -4,6 +4,7 @@ export const OG_OPERATION_REVOLVE = 'Revolve' as const;
 export const OG_OPERATION_UNION = 'Union' as const;
 export const OG_OPERATION_SUBTRACT = 'Subtract' as const;
 export const OG_OPERATION_INTERSECT = 'Intersect' as const;
+export const OG_OPERATION_SHELL = 'Shell' as const;
 
 export const OG_OPERATION_PARAMS_EXTRUDE = (
   value: { profile: { ogId: string }; holes?: { ogId: string }[]; distance: number },

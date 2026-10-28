@@ -89,7 +89,7 @@ fn assert_stroke_exact(regions: &[CurveRegion2], path: &[Pt2], closed: bool, wid
     }
 }
 
-fn filled(regions: &[CurveRegion2], point: Pt2) -> bool {
+pub(super) fn filled(regions: &[CurveRegion2], point: Pt2) -> bool {
     regions.iter().any(|region| {
         winding(point, &region.outer, DEFAULT_EPS) != 0
             && region

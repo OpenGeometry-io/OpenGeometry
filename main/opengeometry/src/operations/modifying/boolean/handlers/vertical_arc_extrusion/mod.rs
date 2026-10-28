@@ -16,7 +16,8 @@ use section::{coverage, face_profile};
 
 pub(super) use cap_provenance::{finish, source_for_cap_region, source_for_side};
 pub(super) use facets::{add_sides, Facets, SidePatch};
-pub(super) use section::{append_points, sectional_regions, split_regions};
+pub(crate) use section::sectional_regions;
+pub(super) use section::{append_points, split_regions};
 
 struct SectionFrame {
     base: Frame3,

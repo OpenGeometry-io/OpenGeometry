@@ -36,5 +36,5 @@ pub(super) use sphere_box::sphere_box_boolean;
 pub(super) use sphere_cylinder::sphere_cylinder_boolean;
 pub use sphere_sphere::boolean_spheres;
 pub(super) use vertical_arc_extrusion::{
-    subtract_vertical_arc_extrusion, subtract_vertical_arc_extrusion_batch,
+    sectional_regions, subtract_vertical_arc_extrusion, subtract_vertical_arc_extrusion_batch,
 };

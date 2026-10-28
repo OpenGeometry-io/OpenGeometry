@@ -1,3 +1,4 @@
+mod curved_ring;
 mod noisy;
 mod polyline;
 mod ring;

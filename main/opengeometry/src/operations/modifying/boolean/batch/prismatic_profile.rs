@@ -309,7 +309,7 @@ fn profile_solid(
     Ok(out)
 }
 
-fn profile_edges(ring: Vec<CurveEdge2>) -> Vec<primitives::ProfileEdge> {
+pub(crate) fn profile_edges(ring: Vec<CurveEdge2>) -> Vec<primitives::ProfileEdge> {
     ring.into_iter()
         .map(|edge| match edge {
             CurveEdge2::Line { from, to } => primitives::ProfileEdge::Line { from, to },

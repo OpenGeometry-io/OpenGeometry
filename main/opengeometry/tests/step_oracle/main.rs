@@ -7,4 +7,5 @@ mod placed;
 mod prismatic;
 mod rejections;
 mod revolved;
+mod shelled;
 mod support;
