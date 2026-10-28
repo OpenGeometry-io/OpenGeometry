@@ -40,6 +40,7 @@ console.log(side);
 - When that failure is `CoverageGap`, `details` also has `families`. It names the specialised gap the kernel met, such as `['cylinder', 'side-intersecting cuboid']`; for two planar bodies, that of the last box handler tried. With no specialised gap, it is the error's own pair. The `message` is the same as in 3.0, which for most gaps is the generic pair, and the `code` is still `CoverageGap`.
 - `OGError.details` is typed as `ErrorDetails`, which the package exports with `OperateErrorDetails`. A `details` value that is not an object becomes `{}`.
 - Point classification counts each solid of a body on its own, outer shell and cavities. A body is Inside if any solid holds the point. Before, the faces of all solids were counted together, so a point inside one of two touching solids could read Outside, and a Boolean that tested such a point could go wrong.
+- A full circle or ellipse, and the round direction of a cylinder, cone, sphere or torus, now has at least 12 segments, rounded up to an even number, at every display bucket. Before, a cylinder of radius 0.011 showed 5 sides in plan view, and an odd count made a lying cylinder look different from its mirror image. An arc has at least `ceil(12 * sweep / 2π)` segments, so a sphere has at least 6 rows from pole to pole. Curved bodies have more triangles. Above this minimum the count still changes with the display bucket; to keep one count at every zoom, set `appearance.deflection`.
 
 ### Check your result
 

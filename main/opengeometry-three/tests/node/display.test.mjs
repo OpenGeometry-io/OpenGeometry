@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three';
-import { OG_TRANSFORM_TRANSLATE } from '../../../dist/index.js';
+import { Solid, OG_PRIMITIVE_CYLINDER, OG_TRANSFORM_TRANSLATE } from '../../../dist/index.js';
 import { graph } from '../../../dist/testing.js';
 import { boot, cuboid, listen, nextTask } from './support.mjs';
 
@@ -10,6 +10,14 @@ function assertNear(actual, expected, tolerance) {
   actual.forEach((value, index) => {
     assert(Math.abs(value - (expected[index] ?? Number.NaN)) <= tolerance, `${String(value)} at ${String(index)}`);
   });
+}
+
+function capSegments(body, bucket) {
+  const { shapeId } = JSON.parse(graph().node(body.ogId));
+  const { edgeIds } = graph().buffers(shapeId, bucket, 2_000_000);
+  const counts = new Map();
+  for (const id of edgeIds) counts.set(id, (counts.get(id) ?? 0) + 1);
+  return [...counts.values()].filter((count) => count > 1);
 }
 
 test('a body without a record is visible, culled and bounded by the kernel local bounds', async () => {
@@ -70,6 +78,19 @@ test('a Three parent that moves after placement keeps the body at the kernel wor
     assert.deepEqual(warnings.events, []);
   } finally {
     warnings.stop();
+    body.dispose();
+  }
+});
+
+test('a thin cylinder keeps an even count of twelve or more cap segments at rest and in plan view', async () => {
+  await boot();
+  await nextTask();
+  const body = new Solid(OG_PRIMITIVE_CYLINDER, { radius: 0.011, height: 0.45 }, { ogId: 'thin-leg' });
+  try {
+    const { static: bucket } = JSON.parse(graph().displayBuckets(body.ogId));
+    assert.deepEqual(capSegments(body, bucket), [18, 18]);
+    assert.deepEqual(capSegments(body, 2 ** -7), [12, 12]);
+  } finally {
     body.dispose();
   }
 });

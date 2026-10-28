@@ -3,7 +3,7 @@ use crate::math::{cross, norm, sub};
 use crate::primitives::{self, ProfileEdge};
 use crate::tessellation::tessellate;
 use std::collections::BTreeSet;
-use std::f64::consts::PI;
+use std::f64::consts::{PI, TAU};
 
 const RADIUS: f64 = 0.05;
 const STOREY_DEFLECTION: f64 = 0.1875;
@@ -51,34 +51,46 @@ fn cap_points_and_smallest_area(profile: Vec<ProfileEdge>) -> Vec<(usize, f64)> 
     caps
 }
 
+fn ear_area(step: f64) -> f64 {
+    0.5 * RADIUS * RADIUS * (2.0 * step.sin() - (2.0 * step).sin())
+}
+
 #[test]
 fn two_arc_planar_loop_tessellates_at_a_coarse_deflection() {
     let caps = cap_points_and_smallest_area(vec![half_circle(0.0), half_circle(PI)]);
     assert_eq!(caps.len(), 2);
     for (points, smallest) in caps {
         assert!(points >= 4, "cap has {points} boundary points");
+        let bound = 0.5 * ear_area(TAU / points as f64);
         assert!(
-            smallest > 0.1 * RADIUS * RADIUS,
-            "cap triangle area {smallest}"
+            smallest > bound,
+            "cap triangle area {smallest} below {bound}"
         );
     }
 }
 
 #[test]
-fn arc_and_line_planar_loop_tessellates_at_a_coarse_deflection() {
+fn short_arc_and_chord_planar_loop_tessellates_at_a_coarse_deflection() {
+    let sweep = PI / 6.0;
     let caps = cap_points_and_smallest_area(vec![
-        half_circle(0.0),
+        ProfileEdge::Arc {
+            center: [0.0, 0.0],
+            radius: RADIUS,
+            start_angle: 0.0,
+            sweep_angle: sweep,
+        },
         ProfileEdge::Line {
-            from: [-RADIUS, 0.0],
+            from: [RADIUS * sweep.cos(), RADIUS * sweep.sin()],
             to: [RADIUS, 0.0],
         },
     ]);
     assert_eq!(caps.len(), 2);
     for (points, smallest) in caps {
         assert!(points >= 3, "cap has {points} boundary points");
+        let bound = 0.5 * ear_area(sweep / (points - 1) as f64);
         assert!(
-            smallest > 0.1 * RADIUS * RADIUS,
-            "cap triangle area {smallest}"
+            smallest > bound,
+            "cap triangle area {smallest} below {bound}"
         );
     }
 }

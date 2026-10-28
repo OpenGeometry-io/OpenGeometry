@@ -2,6 +2,9 @@ use crate::brep::{
     period_lifted_uv, BrepEnvelope, Face, GeometryError, PcurveGeometry, Surface, SurfaceGeometry,
 };
 use crate::math::Interval;
+use std::f64::consts::TAU;
+
+const TURN_SEGMENTS: usize = 12;
 
 pub(super) struct Rect {
     pub(super) halfedges: [u32; 4],
@@ -96,28 +99,29 @@ pub(super) fn grid_size(
     let v = bounds[1].width();
     let (nu, nv) = match surface {
         SurfaceGeometry::Cylinder { radius, .. } => (
-            count(u * (radius / (8.0 * error)).sqrt(), 3, max_triangles)?,
+            turn_count(u * (radius / (8.0 * error)).sqrt(), u, 3, max_triangles)?,
             1,
         ),
         SurfaceGeometry::Cone { semi_angle, .. } => (
-            count(
+            turn_count(
                 u * (bounds[1].hi * semi_angle.tan() / (8.0 * error)).sqrt(),
+                u,
                 3,
                 max_triangles,
             )?,
             1,
         ),
         SurfaceGeometry::Sphere { radius, .. } => (
-            count(u * (2.0 * radius / error).sqrt(), 3, max_triangles)?,
-            count(v * (2.0 * radius / error).sqrt(), 2, max_triangles)?,
+            turn_count(u * (2.0 * radius / error).sqrt(), u, 3, max_triangles)?,
+            turn_count(v * (2.0 * radius / error).sqrt(), v, 2, max_triangles)?,
         ),
         SurfaceGeometry::Torus {
             major_radius: r,
             minor_radius: a,
             ..
         } => (
-            count(u * ((r + 2.0 * a) / error).sqrt(), 3, max_triangles)?,
-            count(v * (2.0 * a / error).sqrt(), 3, max_triangles)?,
+            turn_count(u * ((r + 2.0 * a) / error).sqrt(), u, 3, max_triangles)?,
+            turn_count(v * (2.0 * a / error).sqrt(), v, 3, max_triangles)?,
         ),
         SurfaceGeometry::Plane { .. } => {
             return Err(GeometryError::InvalidGeometry(
@@ -137,11 +141,20 @@ pub(super) fn grid_size(
     Ok([nu, nv])
 }
 
-pub(super) fn count(
+pub(super) fn turn_count(
     value: f64,
+    sweep: f64,
     minimum: usize,
     max_triangles: usize,
 ) -> Result<usize, GeometryError> {
+    if sweep >= TAU - 1e-12 {
+        return count(2.0 * (value / 2.0).ceil(), TURN_SEGMENTS, max_triangles);
+    }
+    let floor = (TURN_SEGMENTS as f64 * sweep / TAU - 1e-6).ceil() as usize;
+    count(value, floor.max(minimum), max_triangles)
+}
+
+fn count(value: f64, minimum: usize, max_triangles: usize) -> Result<usize, GeometryError> {
     let value = value.ceil().max(minimum as f64);
     if !value.is_finite() || value > max_triangles as f64 {
         return Err(GeometryError::LimitExceeded(

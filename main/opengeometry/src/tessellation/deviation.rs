@@ -1,4 +1,4 @@
-use super::grid::count;
+use super::grid::turn_count;
 use crate::brep::{
     bounds_chord_deviation, point_segment_distance, BrepEnvelope, Curve, CurveGeometry,
     EdgeGeometry, GeometryError, PatchBounds, Surface,
@@ -169,22 +169,16 @@ pub(super) fn edge_count(
         EdgeGeometry::Collapsed { .. } => Ok(1),
         EdgeGeometry::Curve { curve, range } => match &brep.geometry.curves[curve as usize] {
             CurveGeometry::Line { .. } => Ok(1),
-            CurveGeometry::Circle { radius, .. } => count(
+            CurveGeometry::Circle { radius, .. } => turn_count(
                 range.width() * (radius / (8.0 * error)).sqrt(),
-                if range.width() >= std::f64::consts::TAU - 1e-12 {
-                    3
-                } else {
-                    1
-                },
+                range.width(),
+                1,
                 max_triangles,
             ),
-            CurveGeometry::Ellipse { major_radius, .. } => count(
+            CurveGeometry::Ellipse { major_radius, .. } => turn_count(
                 range.width() * (major_radius / (8.0 * error)).sqrt(),
-                if range.width() >= std::f64::consts::TAU - 1e-12 {
-                    3
-                } else {
-                    1
-                },
+                range.width(),
+                1,
                 max_triangles,
             ),
             CurveGeometry::Intersection { definition } => {
