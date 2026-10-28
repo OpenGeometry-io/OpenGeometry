@@ -8,13 +8,19 @@ import {
   OG_OPERATION_SUBTRACT,
   OG_PRIMITIVE_ARC,
   OG_PRIMITIVE_CIRCLE,
+  OG_PRIMITIVE_CONE,
   OG_PRIMITIVE_CUBOID,
   OG_PRIMITIVE_CYLINDER_SECTOR,
+  OG_PRIMITIVE_PARAMS_CONE,
   OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR,
   OG_PRIMITIVE_PARAMS_POLYHEDRON,
+  OG_PRIMITIVE_PARAMS_SPHERE,
+  OG_PRIMITIVE_PARAMS_TORUS,
   OG_PRIMITIVE_POLYHEDRON,
   OG_PRIMITIVE_PROFILE,
   OG_PRIMITIVE_RECTANGLE,
+  OG_PRIMITIVE_SPHERE,
+  OG_PRIMITIVE_TORUS,
   OG_TRANSFORM_TRANSLATE,
 } from '../../../dist/index.js';
 import { boot, failsWith } from './support.mjs';
@@ -108,4 +114,28 @@ test('a roof minus a chimney goes through the planar polyhedra handler', async (
   chimney.transform(OG_TRANSFORM_TRANSLATE, { offset: [2, -1, 1] });
   roof.operate(OG_OPERATION_SUBTRACT, { tools: [chimney] });
   assert.deepEqual(roof.getReport()?.handlers, ['subtract_planar_polyhedra']);
+});
+
+async function assertOneSurface(body, surface) {
+  assert.equal(body.lastInfo.bodyType, 'Solid');
+  const { text } = await OpenGeometry.exportStep({ nodes: [body] });
+  assert.equal(text.match(surface)?.length, 1);
+}
+
+test('a sphere, a cone and a torus are Solids that export one analytic STEP surface each', async () => {
+  await boot();
+  const knob = new Solid(OG_PRIMITIVE_SPHERE, OG_PRIMITIVE_PARAMS_SPHERE({ radius: 0.5 }), { ogId: 'knob' });
+  await assertOneSurface(knob, /SPHERICAL_SURFACE/g);
+  const cone = OG_PRIMITIVE_PARAMS_CONE({ radiusBottom: 1, radiusTop: 0.4, height: 2 });
+  await assertOneSurface(new Solid(OG_PRIMITIVE_CONE, cone, { ogId: 'pedestal' }), /CONICAL_SURFACE/g);
+  const torus = OG_PRIMITIVE_PARAMS_TORUS({ majorRadius: 1, minorRadius: 0.25 });
+  await assertOneSurface(new Solid(OG_PRIMITIVE_TORUS, torus, { ogId: 'torus-ring' }), /TOROIDAL_SURFACE/g);
+});
+
+test('a torus with minor radius equal to major and a cone with two zero radii are InvalidParameter', async () => {
+  await boot();
+  const torus = { majorRadius: 1, minorRadius: 1 };
+  assert.throws(() => new Solid(OG_PRIMITIVE_TORUS, torus, { ogId: 'spindle' }), failsWith('InvalidParameter'));
+  const cone = { radiusBottom: 0, radiusTop: 0, height: 1 };
+  assert.throws(() => new Solid(OG_PRIMITIVE_CONE, cone, { ogId: 'needle' }), failsWith('InvalidParameter'));
 });

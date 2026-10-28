@@ -1,4 +1,6 @@
-import type { ArcParams, CylinderSectorParams, PolyhedronParams, ProfileParams } from '../dto/primitives';
+import type {
+  ArcParams, ConeParams, CylinderSectorParams, PolyhedronParams, ProfileParams, SphereParams, TorusParams,
+} from '../dto/primitives';
 
 export const OG_PRIMITIVE_RECTANGLE = 'Rectangle' as const;
 export const OG_PRIMITIVE_CIRCLE = 'Circle' as const;
@@ -7,6 +9,9 @@ export const OG_PRIMITIVE_CUBOID = 'Cuboid' as const;
 export const OG_PRIMITIVE_CYLINDER = 'Cylinder' as const;
 export const OG_PRIMITIVE_CYLINDER_SECTOR = 'CylinderSector' as const;
 export const OG_PRIMITIVE_POLYHEDRON = 'Polyhedron' as const;
+export const OG_PRIMITIVE_SPHERE = 'Sphere' as const;
+export const OG_PRIMITIVE_CONE = 'Cone' as const;
+export const OG_PRIMITIVE_TORUS = 'Torus' as const;
 export const OG_PRIMITIVE_PROFILE = 'Profile' as const;
 export const OG_PRIMITIVE_ARC = 'Arc' as const;
 
@@ -27,3 +32,6 @@ export const OG_PRIMITIVE_PARAMS_PROFILE = (value: ProfileParams): ProfileParams
 export const OG_PRIMITIVE_PARAMS_ARC = (value: ArcParams): ArcParams => value;
 export const OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR = (value: CylinderSectorParams): CylinderSectorParams => value;
 export const OG_PRIMITIVE_PARAMS_POLYHEDRON = (value: PolyhedronParams): PolyhedronParams => value;
+export const OG_PRIMITIVE_PARAMS_SPHERE = (value: SphereParams): SphereParams => value;
+export const OG_PRIMITIVE_PARAMS_CONE = (value: ConeParams): ConeParams => value;
+export const OG_PRIMITIVE_PARAMS_TORUS = (value: TorusParams): TorusParams => value;

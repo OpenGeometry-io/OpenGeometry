@@ -16,8 +16,31 @@ It is written for people and for coding assistants alike: each section says what
 
 ### What changed
 
+- `OG_PRIMITIVE_SPHERE` makes a solid sphere: `{ radius }`, centred on the `plane` origin.
+- `OG_PRIMITIVE_CONE` makes a solid cone or frustum standing on the `plane`, its axis along the normal: `{ radiusBottom, radiusTop, height }`. One radius may be `0` for a pointed cone; radii within four times the geometric tolerance of each other make a cylinder.
+- `OG_PRIMITIVE_TORUS` makes a solid ring torus lying on the `plane`, its axis along the normal: `{ majorRadius, minorRadius }`, with the minor radius below the major one.
+- `OG_PRIMITIVE_PARAMS_SPHERE`, `OG_PRIMITIVE_PARAMS_CONE` and `OG_PRIMITIVE_PARAMS_TORUS` type their parameters. The entry exports the types `SphereParams`, `ConeParams` and `TorusParams`. A size that is not finite or not above four times the geometric tolerance, two zero cone radii, or a minor radius not below the major one by more than four times the geometric tolerance throws `InvalidParameter`.
 - An `operate` error says which handler family refused the bodies and which handlers were tried.
 - `body.classifyPoint([x, y, z])` is new. It says whether a point in the body's own coordinates is `'Inside'`, `'Outside'`, on the `'Boundary'` or `'Unknown'`. A Wire or a Sheet throws `InvalidOperand`.
+
+### Before and after: sphere, cone and torus
+
+3.0 had no sphere, cone or torus primitive. Now:
+
+```ts
+import {
+  OpenGeometry, Solid, OG_PRIMITIVE_CONE, OG_PRIMITIVE_PARAMS_CONE, OG_PRIMITIVE_PARAMS_SPHERE,
+  OG_PRIMITIVE_PARAMS_TORUS, OG_PRIMITIVE_SPHERE, OG_PRIMITIVE_TORUS,
+} from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const knob = new Solid(OG_PRIMITIVE_SPHERE, OG_PRIMITIVE_PARAMS_SPHERE({ radius: 0.03 }));
+const flare = OG_PRIMITIVE_PARAMS_CONE({ radiusBottom: 0.25, radiusTop: 0.15, height: 0.7 });
+const pedestal = new Solid(OG_PRIMITIVE_CONE, flare);
+const ring = new Solid(OG_PRIMITIVE_TORUS, OG_PRIMITIVE_PARAMS_TORUS({ majorRadius: 0.2, minorRadius: 0.02 }));
+console.log(knob.ogId, pedestal.ogId, ring.ogId);
+```
 
 ### Before and after
 

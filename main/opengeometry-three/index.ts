@@ -11,7 +11,8 @@ export type { OperateErrorDetails } from './src/dto/boolean-report';
 export type { AnalyticExchangeBodyV2, IfcPreparedValue } from './src/dto/ifc-body';
 export * from './src/constants/index';
 export type {
-  ArcParams, CylinderSectorParams, PolyhedronParams, ProfileArc, ProfileParams, ProfileSegment,
+  ArcParams, ConeParams, CylinderSectorParams, PolyhedronParams, ProfileArc, ProfileParams, ProfileSegment,
+  SphereParams, TorusParams,
 } from './src/dto/primitives';
 export type {
   CurvedRegion2D, CurvedRegionEdge, OffsetHole, OffsetPath2D, OffsetPolylineOptions, OffsetRegion,

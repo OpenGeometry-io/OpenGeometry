@@ -476,6 +476,7 @@
   "graph.operate.serial-union-and-intersection": "ef868c48bc13320e8379398d52657b7fcaa0ebb8fb0e6411a5beb74bdd709b8f",
   "graph.operate.shared-target": "9a9a58e2ba1ba20d4a10a9dee72deaba30b99d0209dbfac691edaa42eabdf7cf",
   "graph.operate.sweep-result": "494735b1197242444f19eff63e4e5d74b2d6051c84511163f7809ebbc7a27b3e",
+  "graph.primitive.revolved": "d60e91aa784b7aae84a5bd99761c99026c61389880ad5f0eb30a8cbd6dcf1ea7",
   "graph.scenario.copies-and-planes": "435b1e4bb1d258c8cbd258fcfcbcefc6e398616669966fc2db9dda197238d592",
   "graph.scenario.failed-calls": "5bd6c20c7e44aa77b5021118987d64ca4af4110568c6870baca83da9c34f1d00",
   "graph.scenario.instances-and-duplicates": "dc00a666d143f42bba422b662bbf168b1b18b83dead2c3c37f6ccfd8ecc0fa73",

@@ -2,7 +2,9 @@ use crate::builder_case::built;
 use crate::fixtures::{
     at, fine, ground, moved, scaled_accuracy, standard, tilted_about_y, y_axis_frame,
 };
-use crate::kernel::{placed, primitives, Frame3, GeometryError};
+use crate::graph_case::{create_options, graph_case, inspect, primitive};
+use crate::kernel::{placed, primitives, Frame3, GeometryError, Primitive, WorldGraph};
+use crate::record::{Failure, Record};
 use crate::runner::Case;
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
@@ -260,6 +262,45 @@ fn polyhedra() -> Vec<Case> {
     ]
 }
 
+fn revolved_kinds() -> [(&'static str, Primitive); 8] {
+    let cone = |radius_bottom, radius_top, height| Primitive::Cone {
+        radius_bottom,
+        radius_top,
+        height,
+    };
+    [
+        ("knob", Primitive::Sphere { radius: 0.5 }),
+        ("spike", cone(1.0, 0.0, 2.0)),
+        ("funnel", cone(0.0, 0.6, 1.0)),
+        ("pedestal", cone(1.0, 0.5, 2.0)),
+        ("flare", cone(0.4, 0.9, 1.5)),
+        ("post", cone(0.5, 0.5, 1.0)),
+        (
+            "ring",
+            Primitive::Torus {
+                major_radius: 1.0,
+                minor_radius: 0.25,
+            },
+        ),
+        (
+            "spindle",
+            Primitive::Torus {
+                major_radius: 1.0,
+                minor_radius: 1.0,
+            },
+        ),
+    ]
+}
+
+fn revolved_primitives(graph: &mut WorldGraph, record: &mut Record) -> Result<(), Failure> {
+    for (og_id, kind) in revolved_kinds() {
+        if primitive(record, graph, kind, create_options(og_id)).is_some() {
+            inspect(record, graph, og_id)?;
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn cases() -> Vec<Case> {
     [
         cuboids(),
@@ -269,6 +310,7 @@ pub(crate) fn cases() -> Vec<Case> {
         rounds(),
         placements(),
         polyhedra(),
+        vec![graph_case("graph.primitive.revolved", revolved_primitives)],
     ]
     .into_iter()
     .flatten()

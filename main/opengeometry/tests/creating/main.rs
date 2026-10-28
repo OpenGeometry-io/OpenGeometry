@@ -3,6 +3,7 @@ mod holes;
 mod polyhedron;
 mod profiles;
 mod rebuild;
+mod revolved;
 mod sectors;
 mod support;
 mod sweep;

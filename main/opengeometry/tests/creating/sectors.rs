@@ -1,9 +1,9 @@
+use super::support::assert_volume;
 use opengeometry::world_graph::{
     CreateOptions, EditScope, ErrorCode, ModifyingOperation, Plane, Primitive, StepOptions,
-    Transform, WorldGraph,
+    Transform,
 };
 use opengeometry_test_support::part21::Document;
-use opengeometry_test_support::volume;
 use opengeometry_test_support::world_graph::{graph, named};
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
@@ -14,18 +14,6 @@ fn sector(size: [f64; 2], angles: [f64; 2]) -> Primitive {
         start_angle: angles[0],
         sweep_angle: angles[1],
     }
-}
-
-fn assert_volume(world: &WorldGraph, og_id: &str, expected: f64) {
-    let body = world.brep(og_id).unwrap();
-    body.validate().unwrap();
-    let measured = volume::estimate(&body, 0.001);
-    assert!(
-        (measured.value - expected).abs() <= measured.error_bound,
-        "{} versus {expected} with bound {}",
-        measured.value,
-        measured.error_bound
-    );
 }
 
 #[test]

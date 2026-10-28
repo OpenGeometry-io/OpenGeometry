@@ -1,3 +1,6 @@
+mod sizes;
+mod solids;
+
 use super::candidate::IdKind;
 use super::change_log::ChangeSet;
 use super::error::{ErrorCode, ErrorContext, GraphError};
@@ -9,6 +12,7 @@ use crate::brep::{
 use crate::math::{norm, sub, Point3};
 use crate::primitives::{self, ProfileEdge, ProfileSegment};
 use serde::{Deserialize, Serialize};
+use sizes::{parameter, required_size};
 use std::f64::consts::TAU;
 use std::sync::Arc;
 
@@ -34,6 +38,20 @@ pub enum Primitive {
     Polyhedron {
         points: Vec<Point3>,
         faces: Vec<Vec<u32>>,
+    },
+    Sphere {
+        radius: f64,
+    },
+    #[serde(rename_all = "camelCase")]
+    Cone {
+        radius_bottom: f64,
+        radius_top: f64,
+        height: f64,
+    },
+    #[serde(rename_all = "camelCase")]
+    Torus {
+        major_radius: f64,
+        minor_radius: f64,
     },
     Rectangle {
         width: f64,
@@ -82,7 +100,10 @@ impl Primitive {
             Self::Cuboid { .. }
             | Self::Cylinder { .. }
             | Self::CylinderSector { .. }
-            | Self::Polyhedron { .. } => BodyType::Solid,
+            | Self::Polyhedron { .. }
+            | Self::Sphere { .. }
+            | Self::Cone { .. }
+            | Self::Torus { .. } => BodyType::Solid,
             Self::Rectangle { .. }
             | Self::Circle { .. }
             | Self::Polyline { .. }
@@ -267,12 +288,7 @@ fn build_primitive(
             depth,
         } => cuboid_body(shape_id.clone(), [width, height, depth], accuracy)?,
         Primitive::Cylinder { radius, height } => {
-            required_size(radius, accuracy.geometric, "radius")?;
-            required_size(height, accuracy.geometric, "height")?;
-            (
-                primitives::cylinder(shape_id.clone(), GROUND, radius, height, accuracy)?,
-                Vec::new(),
-            )
+            cylinder_body(shape_id.clone(), [radius, height], accuracy)?
         }
         Primitive::CylinderSector {
             radius,
@@ -288,17 +304,23 @@ fn build_primitive(
         Primitive::Polyhedron { points, faces } => {
             polyhedron_body(shape_id.clone(), &points, &faces, accuracy)?
         }
+        Primitive::Sphere { radius } => solids::sphere_body(shape_id.clone(), radius, accuracy)?,
+        Primitive::Cone {
+            radius_bottom,
+            radius_top,
+            height,
+        } => solids::cone_body(
+            shape_id.clone(),
+            [radius_bottom, radius_top],
+            height,
+            accuracy,
+        )?,
+        Primitive::Torus {
+            major_radius,
+            minor_radius,
+        } => solids::torus_body(shape_id.clone(), [major_radius, minor_radius], accuracy)?,
         Primitive::Rectangle { width, breadth } => {
-            required_size(width, accuracy.geometric, "width")?;
-            required_size(breadth, accuracy.geometric, "breadth")?;
-            let (brep, keys) = primitives::rectangle_with_keys(
-                shape_id.clone(),
-                GROUND,
-                width,
-                breadth,
-                accuracy,
-            )?;
-            (brep, keys)
+            rectangle_body(shape_id.clone(), [width, breadth], accuracy)?
         }
         Primitive::Circle { radius } => {
             required_size(radius, accuracy.geometric, "radius")?;
@@ -364,6 +386,31 @@ fn cuboid_body(
     ))
 }
 
+fn cylinder_body(
+    shape_id: String,
+    [radius, height]: [f64; 2],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    required_size(radius, accuracy.geometric, "radius")?;
+    required_size(height, accuracy.geometric, "height")?;
+    Ok((
+        primitives::cylinder(shape_id, GROUND, radius, height, accuracy)?,
+        Vec::new(),
+    ))
+}
+
+fn rectangle_body(
+    shape_id: String,
+    [width, breadth]: [f64; 2],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    required_size(width, accuracy.geometric, "width")?;
+    required_size(breadth, accuracy.geometric, "breadth")?;
+    Ok(primitives::rectangle_with_keys(
+        shape_id, GROUND, width, breadth, accuracy,
+    )?)
+}
+
 fn polyhedron_body(
     shape_id: String,
     points: &[Point3],
@@ -422,16 +469,6 @@ fn arc_body(
         primitives::arc_wire(shape_id, curve, start_angle, sweep_angle, accuracy)?,
         vec!["edge-0".into()],
     ))
-}
-
-fn required_size(value: f64, accuracy: f64, name: &str) -> Result<(), GraphError> {
-    if !value.is_finite() || value <= 4.0 * accuracy {
-        return Err(GraphError::code(
-            ErrorCode::InvalidParameter,
-            format!("{name} must exceed four times geometric tolerance"),
-        ));
-    }
-    Ok(())
 }
 
 fn check_polyline(points: &[Point3], closed: bool, accuracy: Accuracy) -> Result<(), GraphError> {
@@ -549,8 +586,4 @@ fn check_profile_edge(edge: &ProfileEdge, to: [f64; 2], g: f64) -> Result<(), Gr
         }
     }
     Ok(())
-}
-
-fn parameter(message: &str) -> GraphError {
-    GraphError::code(ErrorCode::InvalidParameter, message)
 }
