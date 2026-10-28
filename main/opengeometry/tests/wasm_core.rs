@@ -25,6 +25,10 @@ fn embedded_stored_corpus_roundtrips_with_cross_target_float_tolerance() {
             "cylinder-with-hole",
             include_str!("fixtures/cases/cylinder-with-hole.brep.json"),
         ),
+        (
+            "revolved-bowl",
+            include_str!("fixtures/cases/revolved-bowl.brep.json"),
+        ),
         ("circle", include_str!("fixtures/cases/circle.brep.json")),
         (
             "linear-extrusion",
@@ -95,6 +99,7 @@ fn embedded_stored_tessellation_corpus_matches_within_four_ulp() {
     check!("torus");
     check!("annular-cylinder");
     check!("cylinder-with-hole");
+    check!("revolved-bowl");
     check!("circle");
     check!("linear-extrusion");
     check!("arc-edged-extrusion");
@@ -146,6 +151,7 @@ fn embedded_stored_step_corpus_keeps_entity_structure_and_four_ulp_reals() {
     check!("torus");
     check!("annular-cylinder");
     check!("cylinder-with-hole");
+    check!("revolved-bowl");
     check!("linear-extrusion");
     check!("arc-edged-extrusion");
     check!("arc-edged-extrusion-with-holes");

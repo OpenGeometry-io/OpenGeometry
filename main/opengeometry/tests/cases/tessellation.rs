@@ -33,6 +33,7 @@ fn primitive_tessellation_matches_stored_fixtures() {
     check!("torus");
     check!("annular-cylinder");
     check!("cylinder-with-hole");
+    check!("revolved-bowl");
     check!("circle");
     check!("linear-extrusion");
     check!("arc-edged-extrusion");

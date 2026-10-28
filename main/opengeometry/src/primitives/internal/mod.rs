@@ -6,6 +6,7 @@ mod cylinder_with_circular_hole;
 mod extruded_loop;
 mod frustum;
 mod linear_extrusion;
+mod revolved_profile;
 mod sphere;
 mod torus;
 
@@ -16,5 +17,6 @@ pub use cylinder_sector::cylinder_sector;
 pub use cylinder_with_circular_hole::cylinder_with_circular_hole;
 pub use frustum::frustum;
 pub use linear_extrusion::linear_extrusion;
+pub use revolved_profile::revolved_profile;
 pub use sphere::sphere;
 pub use torus::torus;

@@ -61,6 +61,24 @@ fn primitive_builders_match_stored_json() {
             .unwrap(),
         ),
         (
+            "revolved-bowl",
+            primitives::revolved_profile(
+                "revolved-bowl".into(),
+                frame,
+                serde_json::from_value(json!([
+                    { "kind": "arc", "center": [0.0, 0.0], "radius": 0.5, "start_angle": -std::f64::consts::FRAC_PI_2, "sweep_angle": std::f64::consts::FRAC_PI_2 },
+                    { "kind": "arc", "center": [0.5, 0.03], "radius": 0.03, "start_angle": -std::f64::consts::FRAC_PI_2, "sweep_angle": std::f64::consts::PI },
+                    { "kind": "line", "from": [0.5, 0.06], "to": [0.42, 0.06] },
+                    { "kind": "line", "from": [0.42, 0.06], "to": [0.25, -0.3] },
+                    { "kind": "line", "from": [0.25, -0.3], "to": [0.0, -0.3] },
+                    { "kind": "line", "from": [0.0, -0.3], "to": [0.0, -0.5] }
+                ]))
+                .unwrap(),
+                accuracy,
+            )
+            .unwrap(),
+        ),
+        (
             "circle",
             primitives::arc_wire(
                 "circle".into(),
@@ -93,6 +111,7 @@ fn primitive_builders_match_stored_json() {
                 "cylinder-with-hole" => {
                     include_str!("../fixtures/cases/cylinder-with-hole.brep.json")
                 }
+                "revolved-bowl" => include_str!("../fixtures/cases/revolved-bowl.brep.json"),
                 "circle" => include_str!("../fixtures/cases/circle.brep.json"),
                 _ => unreachable!(),
             };

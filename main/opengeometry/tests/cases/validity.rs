@@ -17,6 +17,7 @@ fn stored_brep_json_round_trips_byte_identically() {
     check!("torus");
     check!("annular-cylinder");
     check!("cylinder-with-hole");
+    check!("revolved-bowl");
     check!("circle");
     check!("linear-extrusion");
     check!("arc-edged-extrusion");

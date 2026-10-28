@@ -100,9 +100,28 @@ fn assert_export_matches_stored(name: &str, body: &BrepEnvelope) {
 #[test]
 fn single_body_step_matches_stored_fixtures_in_both_units() {
     let fixtures = single_body_fixtures();
-    assert_eq!(fixtures.len(), 17);
+    assert_eq!(fixtures.len(), 18);
     for (name, body) in fixtures {
         assert_export_matches_stored(&name, &body);
+    }
+}
+
+#[test]
+fn revolved_bowl_exports_one_analytic_surface_per_profile_edge_off_the_axis() {
+    let body = BrepEnvelope::from_json(&fixture_text("revolved-bowl.brep.json").unwrap()).unwrap();
+    for (unit, _) in UNITS {
+        let (text, report) = export_step(&body, unit).unwrap();
+        let report = serde_json::to_value(&report).unwrap();
+        let parsed = parse_and_match(&text, &report, unit, from_ref(&body));
+        for (surface, count) in [
+            ("SPHERICAL_SURFACE", 1),
+            ("TOROIDAL_SURFACE", 1),
+            ("CONICAL_SURFACE", 1),
+            ("PLANE", 2),
+            ("MANIFOLD_SOLID_BREP", 1),
+        ] {
+            assert_eq!(parsed.count(surface), count, "{unit} {surface}");
+        }
     }
 }
 

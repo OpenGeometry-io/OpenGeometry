@@ -3,7 +3,10 @@ use crate::fixtures::{
     at, fine, ground, moved, scaled_accuracy, standard, tilted_about_y, y_axis_frame,
 };
 use crate::graph_case::{create_options, graph_case, inspect, primitive};
-use crate::kernel::{placed, primitives, Frame3, GeometryError, Primitive, WorldGraph};
+use crate::kernel::{
+    placed, primitives, BrepEnvelope, Frame3, GeometryError, Primitive, ProfileEdge, WorldGraph,
+};
+use crate::profiles::{arc_at, line, polygon};
 use crate::record::{Failure, Record};
 use crate::runner::Case;
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
@@ -262,6 +265,86 @@ fn polyhedra() -> Vec<Case> {
     ]
 }
 
+fn revolve(
+    name: &str,
+    frame: Frame3,
+    edges: Vec<ProfileEdge>,
+) -> Result<BrepEnvelope, GeometryError> {
+    primitives::revolved_profile(name.into(), frame, edges, standard())
+}
+
+fn basin() -> Vec<ProfileEdge> {
+    vec![
+        arc_at([0.0, 0.0], 0.5, -FRAC_PI_2, FRAC_PI_2),
+        arc_at([0.5, 0.03], 0.03, -FRAC_PI_2, PI),
+        line([0.5, 0.06], [0.42, 0.06]),
+        line([0.42, 0.06], [0.25, -0.3]),
+        line([0.25, -0.3], [0.0, -0.3]),
+        line([0.0, -0.3], [0.0, -0.5]),
+    ]
+}
+
+fn revolved_lathe() -> Vec<Case> {
+    vec![
+        built("revolved.tube", || {
+            let points = [[0.4, 0.0], [1.0, 0.0], [1.0, 2.0], [0.4, 2.0]];
+            revolve("tube", Frame3::IDENTITY, polygon(&points))
+        }),
+        built("revolved.cone", || {
+            let points = [[0.0, 0.0], [1.0, 0.0], [0.0, 2.0]];
+            revolve("cone", ground(), polygon(&points))
+        }),
+        built("revolved.funnel", || {
+            let points = [[0.0, 0.0], [1.0, 2.0], [0.0, 2.0]];
+            revolve("funnel", Frame3::IDENTITY, polygon(&points))
+        }),
+        built("revolved.frustum", || {
+            let points = [[0.0, 0.0], [1.0, 0.0], [0.4, 2.0], [0.0, 2.0]];
+            revolve("frustum", skewed()?, polygon(&points))
+        }),
+        built("revolved.crossing-axis", || {
+            let points = [[-0.5, 0.0], [1.0, 0.0], [1.0, 1.0], [-0.5, 1.0]];
+            revolve("crossing", Frame3::IDENTITY, polygon(&points))
+        }),
+    ]
+}
+
+fn revolved_arcs() -> Vec<Case> {
+    vec![
+        built("revolved.ball", || {
+            let edges = vec![
+                arc_at([0.0, 0.0], 1.0, -FRAC_PI_2, PI),
+                line([0.0, 1.0], [0.0, -1.0]),
+            ];
+            revolve("ball", Frame3::IDENTITY, edges)
+        }),
+        built("revolved.ring", || {
+            let edges = vec![
+                arc_at([2.0, 0.0], 0.5, -FRAC_PI_2, PI),
+                arc_at([2.0, 0.0], 0.5, FRAC_PI_2, PI),
+            ];
+            revolve("ring", Frame3::IDENTITY, edges)
+        }),
+        built("revolved.bowl", || {
+            let edges = vec![
+                arc_at([0.0, 0.0], 1.0, -FRAC_PI_2, FRAC_PI_2),
+                line([1.0, 0.0], [0.8, 0.0]),
+                arc_at([0.0, 0.0], 0.8, 0.0, -FRAC_PI_2),
+                line([0.0, -0.8], [0.0, -1.0]),
+            ];
+            revolve("bowl", Frame3::IDENTITY, edges)
+        }),
+        built("revolved.basin", || revolve("basin", ground(), basin())),
+        built("revolved.arc-through-pole", || {
+            let edges = vec![
+                arc_at([0.0, 0.0], 1.0, 0.0, 1.75 * PI),
+                line([0.5_f64.sqrt(), -(0.5_f64.sqrt())], [1.0, 0.0]),
+            ];
+            revolve("pole", Frame3::IDENTITY, edges)
+        }),
+    ]
+}
+
 fn revolved_kinds() -> [(&'static str, Primitive); 8] {
     let cone = |radius_bottom, radius_top, height| Primitive::Cone {
         radius_bottom,
@@ -310,6 +393,8 @@ pub(crate) fn cases() -> Vec<Case> {
         rounds(),
         placements(),
         polyhedra(),
+        revolved_lathe(),
+        revolved_arcs(),
         vec![graph_case("graph.primitive.revolved", revolved_primitives)],
     ]
     .into_iter()

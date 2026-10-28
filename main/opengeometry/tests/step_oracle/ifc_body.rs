@@ -119,7 +119,7 @@ fn prepared_ifc_has_shared_geometry_backreferences_and_single_axis_conversion() 
 #[test]
 fn ifc_bodies_of_the_fixture_bodies_match_the_2_0_18_oracle() {
     let fixtures = single_body_fixtures();
-    assert_eq!(fixtures.len(), 17);
+    assert_eq!(fixtures.len(), 18);
     for (name, body) in fixtures {
         let Some(stored_text) = fixture_text(&format!("ifc-body/{name}.ifc.json")) else {
             let error = exported(&body).unwrap_err();
