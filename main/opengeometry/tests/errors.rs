@@ -246,6 +246,7 @@ fn multi_tool_operate_failure_carries_handlers_tool_index_and_og_ids() {
                 "generic_multiple_closed_loops_boolean",
                 "generic_single_closed_loop_boolean",
                 "generic_non_intersecting_boolean",
+                "prismatic_curved_boolean",
             ]
             .map(String::from)
             .to_vec(),

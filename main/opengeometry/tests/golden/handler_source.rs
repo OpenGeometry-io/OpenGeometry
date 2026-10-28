@@ -8,7 +8,7 @@ const BOOLEAN_SOURCE: &str = concat!(
     "/src/operations/modifying/boolean"
 );
 
-const BOOLEAN_HANDLER_FLOOR: usize = 29;
+const BOOLEAN_HANDLER_FLOOR: usize = 30;
 
 const HANDLER_LITERAL: &str = "Handler {";
 

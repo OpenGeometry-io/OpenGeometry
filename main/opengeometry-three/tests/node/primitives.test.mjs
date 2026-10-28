@@ -139,3 +139,30 @@ test('a torus with minor radius equal to major and a cone with two zero radii ar
   const cone = { radiusBottom: 0, radiusTop: 0, height: 1 };
   assert.throws(() => new Solid(OG_PRIMITIVE_CONE, cone, { ogId: 'needle' }), failsWith('InvalidParameter'));
 });
+
+function dShape(inset) {
+  const far = 0.35 - inset;
+  return {
+    start: [inset, inset],
+    segments: [
+      { to: [0.325, inset] },
+      { to: [0.325, far], arc: { center: [0.325, 0.175], counterClockwise: true } },
+      { to: [inset, far] },
+      { to: [inset, inset] },
+    ],
+    closed: true,
+  };
+}
+
+test('an arc-edged pan minus a blind inset is one Solid built by the prismatic curved handler', async () => {
+  await boot();
+  const outline = new Wire(OG_PRIMITIVE_PROFILE, dShape(0), { ogId: 'pan-outline' });
+  const pan = new Solid(OG_OPERATION_EXTRUDE, { profile: outline, distance: 0.4 }, { ogId: 'pan' });
+  const rim = new Wire(OG_PRIMITIVE_PROFILE, dShape(0.03), { ogId: 'inset-outline', plane: { origin: [0, 0.05, 0] } });
+  const inset = new Solid(OG_OPERATION_EXTRUDE, { profile: rim, distance: 0.4 }, { ogId: 'inset' });
+  pan.operate(OG_OPERATION_SUBTRACT, { tools: [inset] });
+  assert.deepEqual(pan.getReport()?.handlers, ['prismatic_curved_boolean']);
+  assert.equal(pan.getBrep().solids.length, 1);
+  const { text } = await OpenGeometry.exportStep({ nodes: [pan] });
+  assert.equal(text.match(/CYLINDRICAL_SURFACE/g)?.length, 2);
+});

@@ -186,7 +186,7 @@ pub(super) fn area(ring: &[CurveEdge2]) -> f64 {
     ring.iter().map(CurveEdge2::twice_area).sum::<f64>() / 2.0
 }
 
-pub(super) fn sectional_regions(
+pub(crate) fn sectional_regions(
     host: &BrepEnvelope,
     base: Frame3,
     level: f64,
@@ -502,7 +502,7 @@ fn nested_regions(
     Ok(regions.into_iter().map(|(_, region)| region).collect())
 }
 
-pub(super) fn append_points(regions: &[CurveRegion2], points: &mut Vec<[f64; 2]>) {
+pub(crate) fn append_points(regions: &[CurveRegion2], points: &mut Vec<[f64; 2]>) {
     for region in regions {
         for ring in std::iter::once(&region.outer).chain(&region.holes) {
             points.extend(ring.iter().map(|edge| {
@@ -513,7 +513,7 @@ pub(super) fn append_points(regions: &[CurveRegion2], points: &mut Vec<[f64; 2]>
     }
 }
 
-pub(super) fn split_regions(regions: &mut [CurveRegion2], points: &[[f64; 2]], tolerance: f64) {
+pub(crate) fn split_regions(regions: &mut [CurveRegion2], points: &[[f64; 2]], tolerance: f64) {
     for region in regions {
         region.outer = split_ring(&region.outer, points, tolerance);
         for hole in &mut region.holes {

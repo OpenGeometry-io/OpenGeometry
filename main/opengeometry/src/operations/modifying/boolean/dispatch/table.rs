@@ -6,10 +6,11 @@ use crate::operations::modifying::boolean::handlers::{
     boolean_spheres, conic_box_containment, conic_containment_boolean, cylinder_box_boolean,
     cylinder_conic_containment, generic_multiple_closed_loops_boolean,
     generic_non_intersecting_boolean, generic_single_closed_loop_boolean,
-    generic_two_sided_cutter_band_subtraction, sphere_box_boolean, sphere_conic_containment,
-    sphere_cylinder_boolean, sphere_torus_containment, subtract_layered_extrusions,
-    subtract_planar_polyhedra, subtract_vertical_arc_extrusion, torus_box_containment,
-    torus_conic_containment, torus_containment_boolean, torus_cylinder_containment,
+    generic_two_sided_cutter_band_subtraction, prismatic_curved_boolean, sphere_box_boolean,
+    sphere_conic_containment, sphere_cylinder_boolean, sphere_torus_containment,
+    subtract_layered_extrusions, subtract_planar_polyhedra, subtract_vertical_arc_extrusion,
+    torus_box_containment, torus_conic_containment, torus_containment_boolean,
+    torus_cylinder_containment,
 };
 use crate::operations::modifying::boolean::operands::all_planar;
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
@@ -288,6 +289,10 @@ const GENERIC_HANDLERS: &[GenericHandler] = &[
         name: HandlerId::GenericNonIntersectingBoolean,
         call: generic_non_intersecting_boolean,
     },
+    GenericHandler {
+        name: HandlerId::PrismaticCurvedBoolean,
+        call: prismatic_curved_boolean,
+    },
 ];
 
 pub(super) fn generic_boolean(
@@ -297,11 +302,17 @@ pub(super) fn generic_boolean(
     id: String,
     trace: &mut Trace,
 ) -> Result<BooleanResult, GeometryError> {
-    for entry in GENERIC_HANDLERS {
-        if let Some(result) = record_optional(trace, entry.name, || {
+    let last = GENERIC_HANDLERS.len() - 1;
+    for (index, entry) in GENERIC_HANDLERS.iter().enumerate() {
+        match record_optional(trace, entry.name, || {
             (entry.call)(a, b, operation, id.clone())
-        })? {
-            return Ok(result);
+        }) {
+            Ok(Some(result)) => return Ok(result),
+            Ok(None) => {}
+            Err(error) if index < last => {
+                return prismatic_after_error(a, b, operation, id, trace, error)
+            }
+            Err(error) => return Err(error),
         }
     }
     Err(GeometryError::CoverageGap {
@@ -310,4 +321,20 @@ pub(super) fn generic_boolean(
             "intersecting analytic solid".into(),
         ],
     })
+}
+
+fn prismatic_after_error(
+    a: &BrepEnvelope,
+    b: &BrepEnvelope,
+    operation: BooleanOp,
+    id: String,
+    trace: &mut Trace,
+    error: GeometryError,
+) -> Result<BooleanResult, GeometryError> {
+    match record_optional(trace, HandlerId::PrismaticCurvedBoolean, || {
+        prismatic_curved_boolean(a, b, operation, id)
+    }) {
+        Ok(Some(result)) => Ok(result),
+        Ok(None) | Err(_) => Err(error),
+    }
 }

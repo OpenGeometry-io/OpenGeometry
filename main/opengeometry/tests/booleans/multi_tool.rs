@@ -1,3 +1,4 @@
+use crate::support::assert_valid_closed;
 use opengeometry::world_graph::{
     CreatingOperation, EditScope, ErrorCode, ErrorDetails, ModifyingOperation, Primitive,
     Transform, WorldGraph,
@@ -117,7 +118,7 @@ fn subtract(world: &mut WorldGraph, tools: &[&str]) -> Result<(), ErrorCode> {
         .map_err(|error| error.error_code())
 }
 
-fn add_round(world: &mut WorldGraph, x: f64) {
+fn add_round(world: &mut WorldGraph, x: f64, degrees: f64) {
     world
         .create_primitive(
             Primitive::Cylinder {
@@ -132,7 +133,7 @@ fn add_round(world: &mut WorldGraph, x: f64) {
             "round",
             Transform::Rotate {
                 axis: [1.0, 0.0, 0.0],
-                degrees: 90.0,
+                degrees,
                 pivot: Some([0.0; 3]),
             },
         )
@@ -185,7 +186,7 @@ fn mixed_cutter_batch_gap_never_falls_back() {
         offset: [x, 1.5, 0.0],
     };
     let mut world = wall_with(&[rotated("first", -2.5), rotated("second", 0.0)]);
-    add_round(&mut world, 2.5);
+    add_round(&mut world, 2.5, 90.0);
     let revision = world.revision();
     let node_count = world.node_count();
     let brep_before = world.brep("wall").unwrap().to_json().unwrap();
@@ -235,7 +236,7 @@ fn mixed_cutter_batch_gap_never_falls_back() {
 #[test]
 fn mixed_cutter_batch_gap_names_the_failing_cylindrical_step_gap() {
     let mut world = wall_with(&OVERLAPPING_DOORS[..1]);
-    add_round(&mut world, 4.8);
+    add_round(&mut world, 4.8, 80.0);
     let tools = ["first", "round"].map(String::from);
     let error = world
         .operate(
@@ -280,8 +281,28 @@ fn mixed_cutter_batch_gap_names_the_failing_cylindrical_step_gap() {
         "generic_multiple_closed_loops_boolean",
         "generic_single_closed_loop_boolean",
         "generic_non_intersecting_boolean",
+        "prismatic_curved_boolean",
     ];
     assert_eq!(attempted, expected.map(String::from).to_vec());
+}
+
+#[test]
+fn a_round_opening_crossing_the_end_of_a_notched_wall_builds_with_the_prismatic_handler() {
+    let mut world = wall_with(&OVERLAPPING_DOORS[..1]);
+    add_round(&mut world, 4.8, 90.0);
+    subtract(&mut world, &["first", "round"]).unwrap();
+    assert!(handlers(&world).contains(&"prismatic_curved_boolean".to_string()));
+    let body = world.brep("wall").unwrap();
+    assert_valid_closed(&body, 1, "notched wall");
+    let segment = 0.16 * (0.5_f64).acos() - 0.2 * 0.12_f64.sqrt();
+    let opening = (std::f64::consts::PI * 0.16 - segment) * 0.3;
+    let measured = volume::estimate(&body, 1e-4);
+    assert!(
+        (measured.value - (9.0 - 0.48 - opening)).abs() <= measured.error_bound,
+        "{} within {}",
+        measured.value,
+        measured.error_bound
+    );
 }
 
 #[test]

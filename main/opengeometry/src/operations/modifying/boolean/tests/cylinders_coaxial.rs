@@ -1,4 +1,4 @@
-use super::support::{cylinder, volume};
+use super::support::{assert_prismatic_volume, cylinder, volume};
 use crate::brep::{placed, FaceRole, Frame3, GeometryError};
 use crate::operations::modifying::boolean::dispatch::boolean_brep;
 use crate::operations::modifying::boolean::operands::full_cylinder;
@@ -181,10 +181,12 @@ fn coextensive_unequal_cylinders_produce_exact_radial_results() {
         accuracy,
     )
     .unwrap();
-    assert!(matches!(
-        boolean_brep(&outer, &shifted, BooleanOp::Subtraction, "gap".into()),
-        Err(GeometryError::CoverageGap { .. })
-    ));
+    assert_prismatic_volume(
+        &outer,
+        &shifted,
+        BooleanOp::Subtraction,
+        std::f64::consts::PI * (4.0 * 3.0 - 2.5),
+    );
 }
 
 #[test]

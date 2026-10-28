@@ -8,7 +8,7 @@ use crate::math::{add, cross, norm, scale, sub, Interval, Point3};
 use crate::operations::modifying::boolean::assembly::add_welded_vertex;
 use std::collections::BTreeMap;
 
-pub(super) struct Facets {
+pub(crate) struct Facets {
     pub(super) builder: Builder,
     vertices: Vec<(Point3, u32)>,
     edges: BTreeMap<(u32, u32, i64, i64, i64), (u32, u32, u32, bool)>,
@@ -27,13 +27,13 @@ struct SideLoop {
     start_segments: Vec<(u32, u32, u32, Orientation, f64, f64)>,
 }
 
-pub(super) struct SidePatch {
-    pub(super) edge: CurveEdge2,
-    pub(super) levels: Vec<f64>,
-    pub(super) provenance: FaceProvenance,
+pub(crate) struct SidePatch {
+    pub(crate) edge: CurveEdge2,
+    pub(crate) levels: Vec<f64>,
+    pub(crate) provenance: FaceProvenance,
 }
 
-pub(super) fn same_side_patch(a: &SidePatch, b: &SidePatch, tolerance: f64) -> bool {
+fn same_side_patch(a: &SidePatch, b: &SidePatch, tolerance: f64) -> bool {
     if std::mem::discriminant(&a.edge) != std::mem::discriminant(&b.edge)
         || a.provenance.role != b.provenance.role
         || a.provenance.reversed != b.provenance.reversed
@@ -58,7 +58,7 @@ pub(super) fn same_side_patch(a: &SidePatch, b: &SidePatch, tolerance: f64) -> b
 }
 
 impl Facets {
-    pub(super) fn new(id: String, accuracy: Accuracy, base: Frame3) -> Result<Self, GeometryError> {
+    pub(crate) fn new(id: String, accuracy: Accuracy, base: Frame3) -> Result<Self, GeometryError> {
         Ok(Self {
             builder: Builder::new(id, accuracy)?,
             vertices: Vec::new(),
@@ -176,7 +176,7 @@ impl Facets {
         Ok(uses)
     }
 
-    pub(super) fn cap(
+    pub(crate) fn cap(
         &mut self,
         regions: &[CurveRegion2],
         level: f64,
@@ -264,7 +264,7 @@ impl Facets {
         padded_uv_bounds(points, self.accuracy.geometric)
     }
 
-    pub(super) fn side(
+    fn side(
         &mut self,
         edge: &CurveEdge2,
         levels: &[f64],
@@ -489,4 +489,45 @@ fn cylinder_side_uses(side_loop: &SideLoop, start_angle: f64, end_angle: f64) ->
         ));
     }
     uses
+}
+
+pub(crate) fn add_sides(
+    facets: &mut Facets,
+    side_patches: &[SidePatch],
+    accuracy: Accuracy,
+) -> Result<(), GeometryError> {
+    let mut consumed = vec![false; side_patches.len()];
+    for first in 0..side_patches.len() {
+        if consumed[first] {
+            continue;
+        }
+        consumed[first] = true;
+        let mut levels = side_patches[first].levels.clone();
+        loop {
+            let candidates = (first + 1..side_patches.len())
+                .filter(|&index| {
+                    !consumed[index]
+                        && (side_patches[index].levels[0] - levels[levels.len() - 1]).abs()
+                            <= accuracy.geometric
+                        && same_side_patch(
+                            &side_patches[first],
+                            &side_patches[index],
+                            accuracy.geometric / 4.0,
+                        )
+                })
+                .collect::<Vec<_>>();
+            if candidates.len() != 1 {
+                break;
+            }
+            let next = candidates[0];
+            consumed[next] = true;
+            levels.push(side_patches[next].levels[1]);
+        }
+        facets.side(
+            &side_patches[first].edge,
+            &levels,
+            side_patches[first].provenance.clone(),
+        )?;
+    }
+    Ok(())
 }

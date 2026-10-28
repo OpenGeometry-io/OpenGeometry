@@ -1,4 +1,4 @@
-use super::support::{cylinder, volume};
+use super::support::{assert_prismatic_volume, cylinder, volume};
 use crate::brep::{Accuracy, FaceRole, Frame3, GeometryError, SurfaceGeometry};
 use crate::exchange::export_step;
 use crate::operations::modifying::boolean::dispatch::boolean_brep;
@@ -153,11 +153,12 @@ fn transverse_parallel_cylinders_build_two_arc_caps_and_shared_edges() {
         accuracy,
     )
     .unwrap();
-    let shifted_union = boolean_brep(&a, &shifted, BooleanOp::Union, "gap".into());
-    assert!(
-        matches!(shifted_union, Err(GeometryError::CoverageGap { .. })),
-        "unexpected shifted-cylinder result: {:?}",
-        shifted_union.err()
+    let lens = 2.0 * std::f64::consts::PI / 3.0 - 3.0_f64.sqrt() / 2.0;
+    assert_prismatic_volume(
+        &a,
+        &shifted,
+        BooleanOp::Union,
+        2.0 * cylinder_volume - lens * 1.75,
     );
     let tangent = primitives::cylinder(
         "tangent".into(),

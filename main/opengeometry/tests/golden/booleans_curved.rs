@@ -1,11 +1,11 @@
-use crate::boolean_case::{boolean, operands, stage, Operands};
+use crate::boolean_case::{boolean, every_operation, operands, stage, Operands};
 use crate::fine_solids::cuboid_at;
 use crate::fixtures::{at, fine, rectangle, standard};
 use crate::kernel::{primitives, BooleanOp, BrepEnvelope, Frame3, GeometryError};
 use crate::profiles::{arc_at, line, quarter_annulus, sector, split_quarter_annulus};
 use crate::record::Failure;
 use crate::runner::Case;
-use std::f64::consts::FRAC_PI_2;
+use std::f64::consts::{FRAC_PI_2, PI};
 
 fn prism(
     name: &str,
@@ -335,6 +335,43 @@ fn arched_openings() -> Vec<Case> {
     ]
 }
 
+fn d_shape(name: &str, inset: f64, bottom: f64) -> Result<BrepEnvelope, GeometryError> {
+    let (far, straight) = (0.35 - inset, 0.325);
+    let profile = vec![
+        line([inset, inset], [straight, inset]),
+        arc_at([straight, 0.175], 0.175 - inset, -FRAC_PI_2, PI),
+        line([straight, far], [inset, far]),
+        line([inset, far], [inset, inset]),
+    ];
+    primitives::arc_edged_extrusion(name.into(), at([0.0, 0.0, bottom]), profile, 0.4, fine())
+}
+
+fn prismatic_pairs() -> Vec<Case> {
+    let block = || cuboid_at("block", [-0.5, -0.5, 0.0], [1.0, 1.0, 0.5]);
+    let pan = operands(|| Ok((d_shape("pan", 0.0, 0.0)?, d_shape("inset", 0.03, 0.05)?)));
+    let leg = operands(move || {
+        let leg = primitives::cylinder("leg".into(), at([0.5, 0.0, -0.1]), 0.1, 0.7, fine())?;
+        Ok((block()?, leg))
+    });
+    let pocket = operands(move || Ok((block()?, d_shape("pocket", 0.0, 0.3)?)));
+    [
+        every_operation("booleans.curved.prismatic.pan-inset", "pan-inset", &pan),
+        every_operation(
+            "booleans.curved.prismatic.block-side-leg",
+            "block-leg",
+            &leg,
+        ),
+        every_operation(
+            "booleans.curved.prismatic.block-pocket",
+            "block-pocket",
+            &pocket,
+        ),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
 pub(crate) fn cases() -> Vec<Case> {
     [
         ring_sectors(),
@@ -346,5 +383,6 @@ pub(crate) fn cases() -> Vec<Case> {
     .flatten()
     .chain(arched_openings())
     .chain(arched_doors())
+    .chain(prismatic_pairs())
     .collect()
 }

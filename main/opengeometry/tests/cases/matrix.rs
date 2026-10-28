@@ -119,13 +119,19 @@ fn boolean_support_matrix_matches_stored_outcomes_and_handlers() {
                     "wall-round" => Some(6.0 - std::f64::consts::PI / 8.0),
                     "box-round" => Some(27.0 - 3.0 * std::f64::consts::PI * 0.4 * 0.4),
                     "cylinder-coaxial" => Some(3.0 * std::f64::consts::PI * (1.0 - 0.4 * 0.4)),
+                    "cylinder-sliced" => Some(std::f64::consts::PI * (3.0 - 0.4 * 0.4 * 2.5)),
                     "sphere-contained" => Some(10.5 * std::f64::consts::PI),
                     "cone-contained" => Some(std::f64::consts::PI * (1.0 - 0.04 / 3.0)),
                     "torus-contained" => Some(1.28 * std::f64::consts::PI.powi(2)),
                     _ => None,
                 };
                 if let Some(expected) = expected_volume {
-                    let measured = volume::estimate(&result.brep, 0.01);
+                    let deflection = if name == "cylinder-sliced" {
+                        1e-4
+                    } else {
+                        0.01
+                    };
+                    let measured = volume::estimate(&result.brep, deflection);
                     assert!(
                         (measured.value - expected).abs() <= measured.error_bound,
                         "{name}: measured={} expected={} bound={}",

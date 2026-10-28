@@ -13,7 +13,7 @@ use crate::operations::modifying::boolean::operands::brep_face_source;
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanReport, BooleanResult};
 use crate::query::{classify_point_in_shell, face_contains_uv, PointClassification};
 
-pub(super) fn source_for_side(
+pub(crate) fn source_for_side(
     brep: &BrepEnvelope,
     point: Point3,
     axis: Point3,
@@ -75,7 +75,7 @@ pub(super) fn cap_provenance(
     })
 }
 
-fn source_for_cap_region(
+pub(crate) fn source_for_cap_region(
     brep: &BrepEnvelope,
     base: Frame3,
     level: f64,
@@ -176,10 +176,11 @@ fn contains_region_point(region: &CurveRegion2, point: Pt2, tolerance: f64) -> b
             .all(|hole| winding(point, hole, tolerance) == 0)
 }
 
-pub(super) fn finish(
+pub(crate) fn finish(
     mut facets: Facets,
     a: &BrepEnvelope,
     cutters: &[&BrepEnvelope],
+    operation: BooleanOp,
 ) -> Result<BooleanResult, GeometryError> {
     let mut assigned = vec![false; facets.builder.brep.topology.faces.len()];
     let mut outer_shells = Vec::new();
@@ -234,7 +235,7 @@ pub(super) fn finish(
             .cavity_shells
             .push(cavity_shell);
     }
-    finish_arc_extrusion_result(facets.builder.brep, a, cutters)
+    finish_arc_extrusion_result(facets.builder.brep, a, cutters, operation)
 }
 
 fn signed_shell_volume(facets: &Facets, faces: &[u32]) -> Result<f64, GeometryError> {
@@ -274,6 +275,7 @@ fn finish_arc_extrusion_result(
     mut out: BrepEnvelope,
     a: &BrepEnvelope,
     cutters: &[&BrepEnvelope],
+    operation: BooleanOp,
 ) -> Result<BooleanResult, GeometryError> {
     out.revision = cutters
         .iter()
@@ -285,7 +287,7 @@ fn finish_arc_extrusion_result(
         analytic_face_mappings(&out, std::iter::once(a).chain(cutters.iter().copied()));
     Ok(BooleanResult {
         report: BooleanReport {
-            operation: BooleanOp::Subtraction,
+            operation,
             quality: GeometryQuality::Analytic,
             contacts: Vec::new(),
             coincident: true,

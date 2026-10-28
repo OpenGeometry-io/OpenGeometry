@@ -7,6 +7,8 @@ mod face_normals;
 mod flush_openings;
 mod multi_tool;
 mod point_classification;
+mod prismatic_curved;
+mod prismatic_placed;
 mod routing;
 mod stair_waist;
 mod support;

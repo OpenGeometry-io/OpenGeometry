@@ -172,7 +172,7 @@ fn exported_matrix_rows(
 fn boolean_matrix_results_export_through_the_oracle_or_pin_an_error() {
     assert_eq!(
         exported_matrix_rows("boolean-matrix", 18, &[], &["cylinder-empty"]),
-        14
+        15
     );
 }
 
@@ -180,7 +180,7 @@ fn boolean_matrix_results_export_through_the_oracle_or_pin_an_error() {
 fn batch_matrix_results_export_through_the_oracle() {
     assert_eq!(
         exported_matrix_rows("batch-matrix", 23, &[".fallback."], &[]),
-        18
+        19
     );
 }
 

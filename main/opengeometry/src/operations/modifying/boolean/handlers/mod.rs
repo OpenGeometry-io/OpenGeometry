@@ -27,6 +27,7 @@ pub(super) use disjoint::disjoint_boolean;
 pub(super) use generic::{
     generic_multiple_closed_loops_boolean, generic_non_intersecting_boolean,
     generic_single_closed_loop_boolean, generic_two_sided_cutter_band_subtraction,
+    prismatic_curved_boolean,
 };
 pub(super) use planar::{subtract_layered_extrusions, subtract_planar_polyhedra};
 pub(super) use planar_extrusions::boolean_planar_extrusions;

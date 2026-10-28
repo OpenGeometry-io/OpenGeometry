@@ -1,5 +1,7 @@
 use crate::brep::{Accuracy, BrepEnvelope, Frame3};
 use crate::math::{cross, dot, Point3};
+use crate::operations::modifying::boolean::dispatch::boolean_brep_with_handlers;
+use crate::operations::modifying::boolean::types::BooleanOp;
 use crate::primitives;
 use crate::tessellation::tessellate;
 
@@ -100,4 +102,28 @@ pub(super) fn extrusion_span(
         },
     )
     .unwrap()
+}
+
+pub(super) fn assert_prismatic_volume(
+    a: &BrepEnvelope,
+    b: &BrepEnvelope,
+    operation: BooleanOp,
+    expected: f64,
+) {
+    let (result, handlers) =
+        boolean_brep_with_handlers(a, b, operation, "prismatic".into()).unwrap();
+    assert_eq!(handlers, ["prismatic_curved_boolean"]);
+    result.brep.validate().unwrap();
+    assert_eq!(result.brep.solids.len(), 1);
+    assert!(result
+        .brep
+        .topology
+        .shells
+        .iter()
+        .all(|shell| shell.is_closed));
+    let measured = volume_at_deflection(&result.brep, 1e-4).abs();
+    assert!(
+        (measured - expected).abs() <= 1e-3 * expected,
+        "{measured} != {expected}"
+    );
 }

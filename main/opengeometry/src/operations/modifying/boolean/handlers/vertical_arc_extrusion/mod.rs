@@ -10,10 +10,13 @@ use crate::brep::{
 use crate::geom2d::{boolean_curved_regions, CurveEdge2, CurveRegion2, PlanarBooleanOp};
 use crate::math::dot;
 use crate::operations::modifying::boolean::operands::all_planar;
-use crate::operations::modifying::boolean::types::BooleanResult;
-use cap_provenance::{cap_provenance, finish, source_for_side};
-use facets::{same_side_patch, Facets, SidePatch};
-use section::{append_points, coverage, face_profile, sectional_regions, split_regions};
+use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
+use cap_provenance::cap_provenance;
+use section::{coverage, face_profile};
+
+pub(super) use cap_provenance::{finish, source_for_cap_region, source_for_side};
+pub(super) use facets::{add_sides, Facets, SidePatch};
+pub(super) use section::{append_points, sectional_regions, split_regions};
 
 struct SectionFrame {
     base: Frame3,
@@ -104,7 +107,7 @@ pub(crate) fn subtract_vertical_arc_extrusion_batch(
         true,
     )?;
     add_sides(&mut facets, &side_patches, accuracy)?;
-    finish(facets, a, cutters)
+    finish(facets, a, cutters, BooleanOp::Subtraction)
 }
 
 fn section_frame(a: &BrepEnvelope, accuracy: Accuracy) -> Result<SectionFrame, GeometryError> {
@@ -426,45 +429,4 @@ fn side_patch(
             reversed: cut,
         },
     })
-}
-
-fn add_sides(
-    facets: &mut Facets,
-    side_patches: &[SidePatch],
-    accuracy: Accuracy,
-) -> Result<(), GeometryError> {
-    let mut consumed = vec![false; side_patches.len()];
-    for first in 0..side_patches.len() {
-        if consumed[first] {
-            continue;
-        }
-        consumed[first] = true;
-        let mut levels = side_patches[first].levels.clone();
-        loop {
-            let candidates = (first + 1..side_patches.len())
-                .filter(|&index| {
-                    !consumed[index]
-                        && (side_patches[index].levels[0] - levels[levels.len() - 1]).abs()
-                            <= accuracy.geometric
-                        && same_side_patch(
-                            &side_patches[first],
-                            &side_patches[index],
-                            accuracy.geometric / 4.0,
-                        )
-                })
-                .collect::<Vec<_>>();
-            if candidates.len() != 1 {
-                break;
-            }
-            let next = candidates[0];
-            consumed[next] = true;
-            levels.push(side_patches[next].levels[1]);
-        }
-        facets.side(
-            &side_patches[first].edge,
-            &levels,
-            side_patches[first].provenance.clone(),
-        )?;
-    }
-    Ok(())
 }

@@ -3,7 +3,7 @@ use opengeometry::brep::BrepEnvelope;
 use opengeometry::operations::modifying::boolean::{
     multi_tool_boolean, subtract_planar_cutters_with_handlers, BooleanOp, MultiToolOutcome,
 };
-use opengeometry_test_support::stored;
+use opengeometry_test_support::{stored, volume};
 use serde_json::json;
 use std::collections::BTreeSet;
 
@@ -20,6 +20,7 @@ fn batch_subtraction_matches_stored_brep_and_handlers() {
         match subtract_planar_cutters_with_handlers(&host, &cutters, format!("batch-{name}")) {
             Ok((result, handlers)) => {
                 result.brep.validate().unwrap();
+                assert_round_opening_volume(name, &result.brep);
                 let actual = json!({"brep": serde_json::to_value(result.brep).unwrap()});
                 if stored::compared() {
                     assert_eq!(actual, fixture["result"], "{name}");
@@ -68,6 +69,7 @@ fn fallback_rows_match_stored_serial_results() {
         let actual = match result {
             Ok(result) => {
                 result.brep.validate().unwrap();
+                assert_round_opening_volume(name, &result.brep);
                 json!({"brep": serde_json::to_value(result.brep).unwrap()})
             }
             Err(error) => json!({"error": error}),
@@ -77,4 +79,18 @@ fn fallback_rows_match_stored_serial_results() {
         }
         assert_eq!(json!(handlers), fixture["handlers"], "{name}");
     }
+}
+
+fn assert_round_opening_volume(name: &str, brep: &BrepEnvelope) {
+    if name != "prismatic.single-round" {
+        return;
+    }
+    let measured = volume::estimate(brep, 1e-4);
+    let expected = 5.4 - 0.048 * std::f64::consts::PI;
+    assert!(
+        (measured.value - expected).abs() <= measured.error_bound,
+        "{name}: measured {} within {}, expected {expected}",
+        measured.value,
+        measured.error_bound
+    );
 }
