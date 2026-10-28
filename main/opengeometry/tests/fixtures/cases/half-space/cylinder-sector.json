@@ -1,0 +1,6 @@
+{
+  "faces": 5,
+  "handlers": [
+    "subtract_vertical_arc_extrusion"
+  ]
+}

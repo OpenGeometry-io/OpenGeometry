@@ -30,7 +30,7 @@ fn fixture_paths() -> Result<Vec<PathBuf>, Failure> {
     Ok(paths)
 }
 
-fn record_verdict(record: &mut Record, subject: &str, equal: bool) {
+pub(crate) fn record_verdict(record: &mut Record, subject: &str, equal: bool) {
     record.field(subject, if equal { "equal" } else { "different" });
     record.note_verdict(subject);
     if !equal {

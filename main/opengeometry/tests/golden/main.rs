@@ -32,6 +32,7 @@ mod graph_record;
 mod graph_scenarios;
 mod graph_session;
 mod graph_state;
+mod half_space;
 mod handler_source;
 mod json;
 mod kernel;
@@ -65,6 +66,7 @@ fn corpus() -> Result<Vec<Case>, Failure> {
         booleans_planar::cases(),
         booleans_oblique::cases(),
         booleans_curved::cases(),
+        half_space::cases(),
         batch::cases(),
         batch_staged::cases(),
         shell::cases(),

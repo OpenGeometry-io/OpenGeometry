@@ -1,0 +1,6 @@
+{
+  "faces": 9,
+  "handlers": [
+    "subtract_planar_polyhedra"
+  ]
+}
