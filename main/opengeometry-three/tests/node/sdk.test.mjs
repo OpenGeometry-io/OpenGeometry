@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import * as THREE from 'three';
 import {
-  OpenGeometry, OGError, Solid, Wire, OG_PRIMITIVE_CUBOID, OG_PRIMITIVE_PARAMS_RECTANGLE,
-  OG_PRIMITIVE_RECTANGLE, OG_TRANSFORM_ROTATE, OG_TRANSFORM_TRANSLATE,
+  OpenGeometry, OGError, Solid, Wire, OG_OPERATION_SUBTRACT, OG_PRIMITIVE_CUBOID, OG_PRIMITIVE_CYLINDER,
+  OG_PRIMITIVE_PARAMS_RECTANGLE, OG_PRIMITIVE_RECTANGLE, OG_TRANSFORM_ROTATE, OG_TRANSFORM_TRANSLATE,
 } from '../../../dist/index.js';
 import { activeBackend, ensureGeometry, graph, noteDisplayed, runtime, wanted } from '../../../dist/testing.js';
 
@@ -107,5 +107,26 @@ test('display buckets are read once per shape and revision', () => {
   } finally {
     delete target.displayBuckets;
     sized.dispose();
+  }
+});
+
+test('an operate CoverageGap names the specialised families and the handlers attempted', () => {
+  const box = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 0.5, depth: 1 }, { ogId: 'gap-box' });
+  const leg = new Solid(OG_PRIMITIVE_CYLINDER, { radius: 0.1, height: 0.7 }, { ogId: 'gap-leg' });
+  leg.transform(OG_TRANSFORM_TRANSLATE, { offset: [0.5, -0.1, 0] });
+  try {
+    assert.throws(() => box.operate(OG_OPERATION_SUBTRACT, { tools: [leg] }), (error) => {
+      assert(error instanceof OGError);
+      assert.equal(error.code, 'CoverageGap');
+      assert.deepEqual(error.details.families, ['cylinder', 'side-intersecting cuboid']);
+      assert(error.details.attempted?.includes('cylinder_box_boolean'));
+      assert.deepEqual(error.details.handlers, []);
+      assert.equal(error.details.toolIndex, 0);
+      assert.deepEqual(error.details.ogIds, ['gap-box', 'gap-leg']);
+      return true;
+    });
+  } finally {
+    leg.dispose();
+    box.dispose();
   }
 });

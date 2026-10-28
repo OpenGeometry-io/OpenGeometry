@@ -169,6 +169,8 @@ fn bindings_payloads_are_camel_case() {
         message: "bad tool".into(),
         details: ErrorDetails::Operate {
             handlers: vec!["box".into()],
+            attempted: vec!["box".into()],
+            families: Some(Box::new(["planar solid".into(), "planar solid".into()])),
             tool_index: 0,
             og_ids: vec!["cube".into()],
         },

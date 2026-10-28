@@ -117,6 +117,36 @@ fn subtract(world: &mut WorldGraph, tools: &[&str]) -> Result<(), ErrorCode> {
         .map_err(|error| error.error_code())
 }
 
+fn add_round(world: &mut WorldGraph, x: f64) {
+    world
+        .create_primitive(
+            Primitive::Cylinder {
+                radius: 0.4,
+                height: 2.0,
+            },
+            named("round"),
+        )
+        .unwrap();
+    world
+        .transform(
+            "round",
+            Transform::Rotate {
+                axis: [1.0, 0.0, 0.0],
+                degrees: 90.0,
+                pivot: Some([0.0; 3]),
+            },
+        )
+        .unwrap();
+    world
+        .transform(
+            "round",
+            Transform::Translate {
+                offset: [x, 1.5, -1.0],
+            },
+        )
+        .unwrap();
+}
+
 fn handlers(world: &WorldGraph) -> Vec<String> {
     serde_json::from_value(world.report("wall").unwrap().unwrap()["handlers"].clone()).unwrap()
 }
@@ -155,33 +185,7 @@ fn mixed_cutter_batch_gap_never_falls_back() {
         offset: [x, 1.5, 0.0],
     };
     let mut world = wall_with(&[rotated("first", -2.5), rotated("second", 0.0)]);
-    world
-        .create_primitive(
-            Primitive::Cylinder {
-                radius: 0.4,
-                height: 2.0,
-            },
-            named("round"),
-        )
-        .unwrap();
-    world
-        .transform(
-            "round",
-            Transform::Rotate {
-                axis: [1.0, 0.0, 0.0],
-                degrees: 90.0,
-                pivot: Some([0.0; 3]),
-            },
-        )
-        .unwrap();
-    world
-        .transform(
-            "round",
-            Transform::Translate {
-                offset: [2.5, 1.5, -1.0],
-            },
-        )
-        .unwrap();
+    add_round(&mut world, 2.5);
     let revision = world.revision();
     let node_count = world.node_count();
     let brep_before = world.brep("wall").unwrap().to_json().unwrap();
@@ -205,6 +209,14 @@ fn mixed_cutter_batch_gap_never_falls_back() {
         error.details(),
         ErrorDetails::Operate {
             handlers: Vec::new(),
+            attempted: vec![
+                "subtract_planar_cutters".into(),
+                "subtract_planar_cutters".into()
+            ],
+            families: Some(Box::new([
+                "mixed cutter batch".into(),
+                "planar stage".into()
+            ])),
             tool_index: 0,
             og_ids: vec![
                 "wall".into(),
@@ -218,6 +230,58 @@ fn mixed_cutter_batch_gap_never_falls_back() {
     assert_eq!(world.node_count(), node_count);
     assert_eq!(world.brep("wall").unwrap().to_json().unwrap(), brep_before);
     assert_eq!(world.report("wall").unwrap().cloned(), report_before);
+}
+
+#[test]
+fn mixed_cutter_batch_gap_names_the_failing_cylindrical_step_gap() {
+    let mut world = wall_with(&OVERLAPPING_DOORS[..1]);
+    add_round(&mut world, 4.8);
+    let tools = ["first", "round"].map(String::from);
+    let error = world
+        .operate(
+            "wall",
+            ModifyingOperation::Subtract,
+            &tools,
+            EditScope::Node,
+        )
+        .unwrap_err();
+    assert_eq!(error.error_code(), ErrorCode::CoverageGap);
+    assert!(
+        error.message().contains("cylindrical stage"),
+        "{}",
+        error.message()
+    );
+    let ErrorDetails::Operate {
+        attempted,
+        families,
+        ..
+    } = error.details()
+    else {
+        panic!("{error:?}");
+    };
+    assert_eq!(
+        families,
+        Some(Box::new([
+            "canonical aligned cuboid".into(),
+            "canonical aligned cuboid".into()
+        ]))
+    );
+    let expected = [
+        "subtract_planar_cutters",
+        "subtract_planar_cutters",
+        "separate_boolean",
+        "boolean_boxes",
+        "boolean_planar_extrusions",
+        "boolean_rectilinear",
+        "separate_boolean",
+        "cylinder_box_boolean",
+        "subtract_vertical_arc_extrusion",
+        "generic_two_sided_cutter_band_subtraction",
+        "generic_multiple_closed_loops_boolean",
+        "generic_single_closed_loop_boolean",
+        "generic_non_intersecting_boolean",
+    ];
+    assert_eq!(attempted, expected.map(String::from).to_vec());
 }
 
 #[test]

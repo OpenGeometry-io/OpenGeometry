@@ -54,16 +54,19 @@ pub enum ErrorDetails {
         kind: String,
         index: u32,
     },
+    Operate {
+        handlers: Vec<String>,
+        attempted: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        families: Option<Box<[String; 2]>>,
+        tool_index: usize,
+        og_ids: Vec<String>,
+    },
     CoverageGap {
         families: [String; 2],
     },
     Math {
         math: String,
-    },
-    Operate {
-        handlers: Vec<String>,
-        tool_index: usize,
-        og_ids: Vec<String>,
     },
     Export {
         og_id: String,

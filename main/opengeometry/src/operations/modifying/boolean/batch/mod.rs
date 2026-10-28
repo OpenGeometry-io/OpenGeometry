@@ -1,7 +1,7 @@
 mod prismatic_profile;
 
 use super::assembly::{analytic_face_mappings, append_analytic_input};
-use super::dispatch::{boolean_brep_with_handlers, record_handler, HandlerId};
+use super::dispatch::{boolean_brep_outcome_with_trace, record_handler, HandlerId, Trace};
 use super::handlers::{boolean_rectilinear, subtract_vertical_arc_extrusion_batch};
 use super::operands::{all_planar, full_cylinder, unique_sources};
 use super::types::{BooleanOp, BooleanResult};
@@ -30,22 +30,33 @@ pub fn subtract_planar_cutters_outcome_with_handlers(
     cutters: &[BrepEnvelope],
     id: String,
 ) -> (Result<BooleanResult, GeometryError>, Vec<String>) {
-    let mut handlers = Vec::new();
-    let result = subtract_planar_cutters_inner(host, cutters, id, &mut handlers);
-    (result, handlers)
+    let (result, trace) = subtract_planar_cutters_outcome_with_trace(host, cutters, id);
+    (result, trace.handlers)
+}
+
+pub(crate) fn subtract_planar_cutters_outcome_with_trace(
+    host: &BrepEnvelope,
+    cutters: &[BrepEnvelope],
+    id: String,
+) -> (Result<BooleanResult, GeometryError>, Trace) {
+    let mut trace = Trace::default();
+    let result = subtract_planar_cutters_inner(host, cutters, id, &mut trace);
+    (result, trace)
 }
 
 fn subtract_planar_cutters_inner(
     host: &BrepEnvelope,
     cutters: &[BrepEnvelope],
     id: String,
-    handlers: &mut Vec<String>,
+    trace: &mut Trace,
 ) -> Result<BooleanResult, GeometryError> {
-    let mut nested = Vec::new();
-    let result = record_handler(handlers, HandlerId::SubtractPlanarCutters, || {
+    let mut nested = Trace::default();
+    let result = record_handler(trace, HandlerId::SubtractPlanarCutters, || {
         planar_cutters_boolean(host, cutters, id, &mut nested)
-    })?;
-    handlers.append(&mut nested);
+    });
+    trace.add_attempts(&mut nested);
+    let result = result?;
+    trace.handlers.append(&mut nested.handlers);
     Ok(result)
 }
 
@@ -53,7 +64,7 @@ fn planar_cutters_boolean(
     host: &BrepEnvelope,
     cutters: &[BrepEnvelope],
     id: String,
-    handlers: &mut Vec<String>,
+    trace: &mut Trace,
 ) -> Result<BooleanResult, GeometryError> {
     if cutters.is_empty() || cutters.len() > 100 {
         return Err(GeometryError::InvalidGeometry(
@@ -61,9 +72,11 @@ fn planar_cutters_boolean(
         ));
     }
     if cutters.len() == 1 {
-        let (result, nested) =
-            boolean_brep_with_handlers(host, &cutters[0], BooleanOp::Subtraction, id)?;
-        handlers.extend(nested);
+        let (result, mut nested) =
+            boolean_brep_outcome_with_trace(host, &cutters[0], BooleanOp::Subtraction, id);
+        trace.add_attempts(&mut nested);
+        let result = result?;
+        trace.handlers.extend(nested.handlers);
         return Ok(result);
     }
     let (accuracy, bounds) = accuracy_and_bounds(host, cutters)?;
@@ -81,6 +94,7 @@ fn planar_cutters_boolean(
     };
     if !cylinders.is_empty() && planar.len() + cylinders.len() == cutters.len() {
         if let Some(result) = subtract_prismatic_profile_batch(host, cutters, id.clone())? {
+            let handlers = &mut trace.handlers;
             handlers.push(HandlerId::SubtractPrismaticProfileBatch.as_str().into());
             return Ok(result);
         }
@@ -89,7 +103,7 @@ fn planar_cutters_boolean(
         && !cylinders.is_empty()
         && planar.len() + cylinders.len() == cutters.len()
     {
-        return mixed_cutters_boolean(host, cutters, planar, cylinders, id, handlers);
+        return mixed_cutters_boolean(host, cutters, planar, cylinders, id, trace);
     }
     if host
         .geometry
@@ -104,6 +118,7 @@ fn planar_cutters_boolean(
             id.clone(),
         ) {
             Ok(result) => {
+                let handlers = &mut trace.handlers;
                 handlers.push(HandlerId::SubtractVerticalArcExtrusionBatch.as_str().into());
                 return Ok(result);
             }
@@ -118,6 +133,7 @@ fn planar_cutters_boolean(
     }
     combined.validate()?;
     let result = boolean_rectilinear(host, &combined, BooleanOp::Subtraction, id)?;
+    let handlers = &mut trace.handlers;
     handlers.push(HandlerId::BooleanRectilinear.as_str().into());
     Ok(result)
 }
@@ -146,11 +162,11 @@ fn mixed_cutters_boolean(
     planar: Vec<&BrepEnvelope>,
     cylinders: Vec<&BrepEnvelope>,
     id: String,
-    handlers: &mut Vec<String>,
+    trace: &mut Trace,
 ) -> Result<BooleanResult, GeometryError> {
     let planar_cutters = planar.into_iter().cloned().collect::<Vec<_>>();
     let mut result =
-        subtract_planar_cutters_inner(host, &planar_cutters, format!("{id}:planar"), handlers)
+        subtract_planar_cutters_inner(host, &planar_cutters, format!("{id}:planar"), trace)
             .map_err(|error| match error {
                 GeometryError::CoverageGap { .. } => GeometryError::CoverageGap {
                     families: ["mixed cutter batch".into(), "planar stage".into()],
@@ -160,7 +176,7 @@ fn mixed_cutters_boolean(
     let count = cylinders.len();
     for (index, cylinder) in cylinders.into_iter().enumerate() {
         let prior = result;
-        let (mut next, nested) = boolean_brep_with_handlers(
+        let (next, mut nested) = boolean_brep_outcome_with_trace(
             &prior.brep,
             cylinder,
             BooleanOp::Subtraction,
@@ -169,14 +185,15 @@ fn mixed_cutters_boolean(
             } else {
                 format!("{id}:round-{index}")
             },
-        )
-        .map_err(|error| match error {
+        );
+        trace.add_attempts(&mut nested);
+        let mut next = next.map_err(|error| match error {
             GeometryError::CoverageGap { .. } => GeometryError::CoverageGap {
                 families: ["mixed cutter batch".into(), "cylindrical stage".into()],
             },
             other => other,
         })?;
-        handlers.extend(nested);
+        trace.handlers.extend(nested.handlers);
         set_lineage_provenance(&mut next.brep, &prior.brep)?;
         next.brep.validate()?;
         result = next;

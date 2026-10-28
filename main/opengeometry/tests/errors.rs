@@ -234,6 +234,25 @@ fn multi_tool_operate_failure_carries_handlers_tool_index_and_og_ids() {
         error.details(),
         ErrorDetails::Operate {
             handlers: step_one_handlers,
+            attempted: [
+                "separate_boolean",
+                "boolean_boxes",
+                "separate_boolean",
+                "boolean_boxes",
+                "boolean_planar_extrusions",
+                "boolean_rectilinear",
+                "subtract_vertical_arc_extrusion",
+                "generic_two_sided_cutter_band_subtraction",
+                "generic_multiple_closed_loops_boolean",
+                "generic_single_closed_loop_boolean",
+                "generic_non_intersecting_boolean",
+            ]
+            .map(String::from)
+            .to_vec(),
+            families: Some(Box::new([
+                "canonical aligned cuboid".into(),
+                "canonical aligned cuboid".into()
+            ])),
             tool_index: 1,
             og_ids: vec!["target".into(), "tool-1".into(), "tool-2".into()],
         }
@@ -243,6 +262,23 @@ fn multi_tool_operate_failure_carries_handlers_tool_index_and_og_ids() {
         world.brep("target").unwrap().to_json().unwrap(),
         brep_before
     );
+}
+
+#[test]
+fn operate_details_with_families_round_trip_through_json() {
+    let details = ErrorDetails::Operate {
+        handlers: Vec::new(),
+        attempted: vec!["separate_boolean".into(), "cylinder_box_boolean".into()],
+        families: Some(Box::new([
+            "cylinder".into(),
+            "side-intersecting cuboid".into(),
+        ])),
+        tool_index: 0,
+        og_ids: vec!["box".into(), "leg".into()],
+    };
+    let json = serde_json::to_string(&details).unwrap();
+    let read: ErrorDetails = serde_json::from_str(&json).unwrap();
+    assert_eq!(read, details, "{json}");
 }
 
 #[test]

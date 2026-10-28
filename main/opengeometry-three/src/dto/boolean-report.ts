@@ -11,3 +11,11 @@ export type BooleanReport = {
 };
 
 export type ShapeReport = { report: BooleanReport; handlers: string[]; revision: number };
+
+export type OperateErrorDetails = {
+  handlers: string[];
+  attempted: string[];
+  families?: [string, string];
+  toolIndex: number;
+  ogIds: string[];
+};

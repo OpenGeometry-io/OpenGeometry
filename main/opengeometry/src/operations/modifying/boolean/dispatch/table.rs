@@ -1,5 +1,5 @@
 use super::handler_id::HandlerId;
-use super::trace::{record_handler, record_optional};
+use super::trace::{record_handler, record_optional, Trace};
 use crate::brep::{BrepEnvelope, GeometryError, SurfaceGeometry};
 use crate::operations::modifying::boolean::handlers::{
     boolean_boxes, boolean_cylinders, boolean_planar_extrusions, boolean_rectilinear,
@@ -201,12 +201,12 @@ pub(super) fn specialized_boolean(
     b: &BrepEnvelope,
     operation: BooleanOp,
     id: String,
-    handlers: &mut Vec<String>,
+    trace: &mut Trace,
 ) -> Result<BooleanResult, GeometryError> {
     let pair = [operand_family(a), operand_family(b)];
     for entry in FAMILY_HANDLERS {
         if pair == entry.pair || (entry.symmetric && pair == [entry.pair[1], entry.pair[0]]) {
-            return record_handler(handlers, entry.name, || (entry.call)(a, b, operation, id));
+            return record_handler(trace, entry.name, || (entry.call)(a, b, operation, id));
         }
     }
     if pair == [OperandFamily::Planar, OperandFamily::Planar] {
@@ -215,7 +215,7 @@ pub(super) fn specialized_boolean(
             if entry.subtract_only && operation != BooleanOp::Subtraction {
                 break;
             }
-            match record_handler(handlers, entry.name, || {
+            match record_handler(trace, entry.name, || {
                 (entry.call)(a, b, operation, id.clone())
             }) {
                 Ok(result) => return Ok(result),
@@ -227,7 +227,7 @@ pub(super) fn specialized_boolean(
             families: ["planar solid".into(), "planar solid".into()],
         }));
     }
-    record_handler(handlers, HandlerId::BooleanSpheres, || {
+    record_handler(trace, HandlerId::BooleanSpheres, || {
         boolean_spheres(a, b, operation, id)
     })
 }
@@ -295,10 +295,10 @@ pub(super) fn generic_boolean(
     b: &BrepEnvelope,
     operation: BooleanOp,
     id: String,
-    handlers: &mut Vec<String>,
+    trace: &mut Trace,
 ) -> Result<BooleanResult, GeometryError> {
     for entry in GENERIC_HANDLERS {
-        if let Some(result) = record_optional(handlers, entry.name, || {
+        if let Some(result) = record_optional(trace, entry.name, || {
             (entry.call)(a, b, operation, id.clone())
         })? {
             return Ok(result);

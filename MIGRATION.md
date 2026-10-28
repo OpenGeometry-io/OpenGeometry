@@ -12,6 +12,22 @@ It is written for people and for coding assistants alike: each section says what
 4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
 5. Finish with its "Check your result" steps.
 
+## Unreleased
+
+### What changed
+
+- An `operate` error says which handler family refused the bodies and which handlers were tried.
+
+### Different behaviour
+
+- When a tool of `operate` fails, `details` now has `attempted` beside `handlers`, `toolIndex` and `ogIds`: every handler tried, in order.
+- When that failure is `CoverageGap`, `details` also has `families`. It names the specialised gap the kernel met, such as `['cylinder', 'side-intersecting cuboid']`; for two planar bodies, that of the last box handler tried. With no specialised gap, it is the error's own pair. The `message` is the same as in 3.0, which for most gaps is the generic pair, and the `code` is still `CoverageGap`.
+- `OGError.details` is typed as `ErrorDetails`, which the package exports with `OperateErrorDetails`. A `details` value that is not an object becomes `{}`.
+
+### Check your result
+
+1. A cuboid minus an upright cylinder that crosses one side face throws `CoverageGap` with `details.families` equal to `['cylinder', 'side-intersecting cuboid']` and `details.attempted` containing `'cylinder_box_boolean'`.
+
 ## 2.5 to 3.0
 
 2.5 was not published. From 2.0, follow 2.0 to 2.5, then 2.5 to 3.0.

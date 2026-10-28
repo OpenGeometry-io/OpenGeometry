@@ -29,6 +29,8 @@ struct ToolFailure {
     tool_index: usize,
     error: GeometryError,
     handlers: Vec<String>,
+    attempted: Vec<String>,
+    families: Option<Box<[String; 2]>>,
 }
 
 impl WorldGraph {
@@ -157,12 +159,20 @@ fn validate_solid(body: &BrepEnvelope) -> Result<(), GraphError> {
 
 impl ToolFailure {
     fn graph_error(self, target: &str, tools: &[String]) -> GraphError {
+        let families = match &self.error {
+            GeometryError::CoverageGap { families } => {
+                Some(self.families.unwrap_or_else(|| Box::new(families.clone())))
+            }
+            _ => None,
+        };
         let source = GraphError::Geometry(self.error);
         GraphError::with_details(
             source.error_code(),
             source.message(),
             ErrorDetails::Operate {
                 handlers: self.handlers,
+                attempted: self.attempted,
+                families,
                 tool_index: self.tool_index,
                 og_ids: std::iter::once(target.to_string())
                     .chain(tools.iter().cloned())
@@ -186,6 +196,8 @@ fn kernel_result(
     let MultiToolOutcome {
         result,
         handlers,
+        attempted,
+        families,
         tool_index,
     } = multi_tool_boolean(&target_shape.brep, mapped, kernel_op, shape_id.clone());
     match result {
@@ -194,6 +206,8 @@ fn kernel_result(
             tool_index,
             error,
             handlers,
+            attempted,
+            families: families.map(Box::new),
         }),
     }
 }

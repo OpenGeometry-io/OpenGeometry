@@ -1,14 +1,22 @@
+import type { OperateErrorDetails } from './dto/boolean-report';
+
+export type ErrorDetails = Partial<OperateErrorDetails> & Record<string, unknown>;
+
+function isDetails(value: unknown): value is ErrorDetails {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export class OGError extends Error {
   readonly code: string;
   readonly call: string;
-  readonly details: unknown;
+  readonly details: ErrorDetails;
 
   constructor(code: string, call: string, message: string, details: unknown = {}) {
     super(message);
     this.name = 'OGError';
     this.code = code;
     this.call = call;
-    this.details = details;
+    this.details = isDetails(details) ? details : {};
   }
 
   toJSON(): { code: string; call: string; message: string; details: unknown } {
