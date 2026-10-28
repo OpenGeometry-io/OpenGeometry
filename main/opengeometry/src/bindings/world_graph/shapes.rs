@@ -1,6 +1,7 @@
 use super::{serialise, OGWorldGraph};
 use crate::bindings::errors;
 use crate::bindings::tessellator::buffers_to_js;
+use crate::query::PointClassification;
 use crate::tessellation::display::{bucket_floor, static_bucket};
 use crate::world_graph::{ErrorCode, GraphError};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -37,21 +38,27 @@ impl OGWorldGraph {
         point: &[f64],
     ) -> Result<Vec<f64>, JsValue> {
         self.inner.node(og_id).map_err(errors::json)?;
-        let point: [f64; 3] = point
-            .try_into()
-            .ok()
-            .filter(|point: &[f64; 3]| point.iter().all(|value| value.is_finite()))
-            .ok_or_else(|| {
-                errors::json(GraphError::code(
-                    ErrorCode::InvalidParameter,
-                    "point must be three finite numbers",
-                ))
-            })?;
         Ok(self
             .inner
-            .face_normal_at(og_id, face_id, point)
+            .face_normal_at(og_id, face_id, finite_point(point)?)
             .map_err(errors::json)?
             .to_vec())
+    }
+
+    #[wasm_bindgen(js_name = classifyPoint)]
+    pub fn classify_point(&self, og_id: &str, point: &[f64]) -> Result<String, JsValue> {
+        self.inner.node(og_id).map_err(errors::json)?;
+        let classification = self
+            .inner
+            .classify_point(og_id, finite_point(point)?)
+            .map_err(errors::json)?;
+        Ok(match classification {
+            PointClassification::Inside => "Inside",
+            PointClassification::Outside => "Outside",
+            PointClassification::Boundary => "Boundary",
+            PointClassification::Unknown => "Unknown",
+        }
+        .into())
     }
 
     pub fn report(&self, og_id: &str) -> Result<String, JsValue> {
@@ -87,4 +94,17 @@ impl OGWorldGraph {
                 .map_err(errors::json)?,
         )
     }
+}
+
+fn finite_point(point: &[f64]) -> Result<[f64; 3], JsValue> {
+    point
+        .try_into()
+        .ok()
+        .filter(|point: &[f64; 3]| point.iter().all(|value| value.is_finite()))
+        .ok_or_else(|| {
+            errors::json(GraphError::code(
+                ErrorCode::InvalidParameter,
+                "point must be three finite numbers",
+            ))
+        })
 }

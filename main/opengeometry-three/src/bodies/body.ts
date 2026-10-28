@@ -21,9 +21,10 @@ import { derivePose, keepPose, poseMemory } from './body-placement';
 import { register, unregister } from './body-registry';
 import { DisplayClone } from './display-clone';
 import {
-  addChild, checkNode, faceNormalAt, getBounds, getBrep, getChildren, getInstanceCount, getParent, getPlacement,
-  getWorldBrep, getWorldPlacement, localBounds, removeChild,
+  addChild, checkNode, classifyPoint, faceNormalAt, getBounds, getBrep, getChildren, getInstanceCount, getParent,
+  getPlacement, getWorldBrep, getWorldPlacement, localBounds, removeChild,
 } from './node-methods';
+import type { PointClassification } from './node-methods';
 import type { SystemAssembly } from './system-assembly';
 
 function singleMaterial(material: THREE.Material | THREE.Material[], label: string): THREE.Material {
@@ -187,6 +188,11 @@ export abstract class Body extends THREE.Group {
   faceNormalAt(faceId: number, point: [number, number, number]): [number, number, number] {
     this.check(`${this.bodyType}.faceNormalAt`);
     return faceNormalAt(this.bodyType, this.ogId, faceId, point);
+  }
+
+  classifyPoint(point: [number, number, number]): PointClassification {
+    this.check(`${this.bodyType}.classifyPoint`);
+    return classifyPoint(this.bodyType, this.ogId, point);
   }
 
   getInstanceCount(): number {

@@ -17,16 +17,34 @@ It is written for people and for coding assistants alike: each section says what
 ### What changed
 
 - An `operate` error says which handler family refused the bodies and which handlers were tried.
+- `body.classifyPoint([x, y, z])` is new. It says whether a point in the body's own coordinates is `'Inside'`, `'Outside'`, on the `'Boundary'` or `'Unknown'`. A Wire or a Sheet throws `InvalidOperand`.
+
+### Before and after
+
+3.0 had no point classification. Now:
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_PARAMS_CYLINDER } from 'opengeometry';
+import type { PointClassification } from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const leg = new Solid(OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_PARAMS_CYLINDER({ radius: 0.1, height: 0.7 }));
+const side: PointClassification = leg.classifyPoint([0, 0.35, 0]);
+console.log(side);
+```
 
 ### Different behaviour
 
 - When a tool of `operate` fails, `details` now has `attempted` beside `handlers`, `toolIndex` and `ogIds`: every handler tried, in order.
 - When that failure is `CoverageGap`, `details` also has `families`. It names the specialised gap the kernel met, such as `['cylinder', 'side-intersecting cuboid']`; for two planar bodies, that of the last box handler tried. With no specialised gap, it is the error's own pair. The `message` is the same as in 3.0, which for most gaps is the generic pair, and the `code` is still `CoverageGap`.
 - `OGError.details` is typed as `ErrorDetails`, which the package exports with `OperateErrorDetails`. A `details` value that is not an object becomes `{}`.
+- Point classification counts each solid of a body on its own, outer shell and cavities. A body is Inside if any solid holds the point. Before, the faces of all solids were counted together, so a point inside one of two touching solids could read Outside, and a Boolean that tested such a point could go wrong.
 
 ### Check your result
 
 1. A cuboid minus an upright cylinder that crosses one side face throws `CoverageGap` with `details.families` equal to `['cylinder', 'side-intersecting cuboid']` and `details.attempted` containing `'cylinder_box_boolean'`.
+2. `classifyPoint` on a cylinder of radius 0.1 and height 0.7 gives `'Inside'` at `[0, 0.35, 0]` and `'Outside'` at `[1, 0.35, 0]`, before and after the body is moved.
 
 ## 2.5 to 3.0
 

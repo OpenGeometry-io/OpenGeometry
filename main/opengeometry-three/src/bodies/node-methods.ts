@@ -74,6 +74,15 @@ export function faceNormalAt(
   return [x, y, z];
 }
 
+export type PointClassification = 'Inside' | 'Outside' | 'Boundary' | 'Unknown';
+
+export function classifyPoint(owner: string, ogId: string, point: [number, number, number]): PointClassification {
+  const label = `${owner}.classifyPoint`;
+  const answer = call(label, () => worldGraph().classifyPoint(ogId, Float64Array.from(point)));
+  if (answer === 'Inside' || answer === 'Outside' || answer === 'Boundary' || answer === 'Unknown') return answer;
+  throw new OGError('InvalidGeometry', label, `malformed classification ${answer}`);
+}
+
 export function getInstanceCount(owner: string, ogId: string): number {
   return call(`${owner}.getInstanceCount`, () => worldGraph().instanceCount(ogId));
 }

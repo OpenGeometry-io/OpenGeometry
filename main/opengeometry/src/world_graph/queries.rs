@@ -5,6 +5,7 @@ use super::placement::is_identity;
 use super::shape_store::Shape;
 use crate::brep::{placed, BrepEnvelope};
 use crate::math::Point3;
+use crate::query::{classify_point, PointClassification};
 use crate::tessellation::display::{display_buffers, DisplayBuffers};
 use std::sync::Arc;
 
@@ -59,6 +60,21 @@ impl WorldGraph {
             ));
         }
         Ok(brep.face_normal_at(face_id, point)?)
+    }
+
+    pub fn classify_point(
+        &self,
+        og_id: &str,
+        point: Point3,
+    ) -> Result<PointClassification, GraphError> {
+        let brep = &self.shape(og_id)?.brep;
+        if brep.solids.is_empty() {
+            return Err(GraphError::code(
+                ErrorCode::InvalidOperand,
+                "point classification needs a solid",
+            ));
+        }
+        Ok(classify_point(brep, point)?)
     }
 
     pub fn snapshot(&self, shape_id: &str) -> Result<Vec<u8>, GraphError> {

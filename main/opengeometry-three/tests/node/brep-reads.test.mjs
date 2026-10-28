@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  OpenGeometry, Solid, OG_PRIMITIVE_CYLINDER, OG_TRANSFORM_ROTATE, OG_TRANSFORM_SCALE, OG_TRANSFORM_TRANSLATE,
+  OpenGeometry, Sheet, Solid, Wire, OG_OPERATION_SWEEP, OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_POLYLINE,
+  OG_PRIMITIVE_RECTANGLE, OG_TRANSFORM_ROTATE, OG_TRANSFORM_SCALE, OG_TRANSFORM_TRANSLATE,
 } from '../../../dist/index.js';
 import { graph } from '../../../dist/testing.js';
 import { boot, cuboid, failsWith } from './support.mjs';
@@ -119,6 +120,35 @@ test("a disposed body's reads throw Disposed", async () => {
   body.dispose();
   assert.throws(() => body.getWorldBrep(), failsWith('Disposed'));
   assert.throws(() => body.faceNormalAt(0, [0, 0, 0]), failsWith('Disposed'));
+});
+
+test("classifyPoint answers in the body's own coordinates, and a Wire is InvalidOperand", async () => {
+  await boot();
+  const body = new Solid(OG_PRIMITIVE_CYLINDER, { radius: 0.5, height: 2 }, { ogId: 'classify-cylinder' });
+  body.transform(OG_TRANSFORM_TRANSLATE, { offset: [10, 0, 0] });
+  assert.equal(body.classifyPoint([0, 1, 0]), 'Inside');
+  assert.equal(body.classifyPoint([10, 1, 0]), 'Outside');
+  assert.equal(body.classifyPoint([0.1, 2, 0.1]), 'Boundary');
+  assert.throws(() => Reflect.apply(body.classifyPoint, body, [[0, 0]]), failsWith('InvalidParameter'));
+  const wire = new Wire(OG_PRIMITIVE_RECTANGLE, { width: 1, breadth: 1 }, { ogId: 'classify-wire' });
+  assert.throws(() => wire.classifyPoint([0, 0, 0]), failsWith('InvalidOperand'));
+  body.dispose();
+  wire.dispose();
+});
+
+test('classifyPoint refuses a Sheet with InvalidOperand and a NaN coordinate with InvalidParameter', async () => {
+  await boot();
+  const profile = new Wire(OG_PRIMITIVE_RECTANGLE, { width: 1, breadth: 1 }, { ogId: 'classify-sheet-profile' });
+  const points = [[0, 0, 0], [0, 3, 0]];
+  const path = new Wire(OG_PRIMITIVE_POLYLINE, { points }, { ogId: 'classify-sheet-path' });
+  const sheet = new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false }, { ogId: 'classify-sheet' });
+  assert.throws(() => sheet.classifyPoint([0, 1, 0]), failsWith('InvalidOperand'));
+  const body = cuboid('classify-nan');
+  assert.throws(() => body.classifyPoint([Number.NaN, 0, 0]), failsWith('InvalidParameter'));
+  body.dispose();
+  sheet.dispose();
+  path.dispose();
+  profile.dispose();
 });
 
 function state(body, revision) {

@@ -1,7 +1,7 @@
 use super::classification::PointClassification;
 use super::face_trim::face_contains_uv;
 use super::ray_roots::{ray_box_domain, support_roots};
-use crate::brep::{unit, BrepEnvelope, Face, GeometryError, Surface};
+use crate::brep::{unit, BrepEnvelope, Face, GeometryError, SolidRegion, Surface};
 use crate::math::{dot, norm, scale, sub, Point3};
 
 fn classify_with_ray<'a>(
@@ -86,8 +86,38 @@ pub(crate) fn classify_point_validated(
             "point classification requires finite coordinates".into(),
         ));
     }
-    let faces: Vec<u32> = brep.topology.faces.iter().map(|face| face.id).collect();
-    classify_point_in_shell(brep, &faces, point)
+    let mut answer = PointClassification::Outside;
+    for solid in &brep.solids {
+        match classify_point_in_solid(brep, solid, point)? {
+            PointClassification::Inside => return Ok(PointClassification::Inside),
+            PointClassification::Boundary => answer = PointClassification::Boundary,
+            PointClassification::Unknown if answer == PointClassification::Outside => {
+                answer = PointClassification::Unknown
+            }
+            _ => {}
+        }
+    }
+    Ok(answer)
+}
+
+fn classify_point_in_solid(
+    brep: &BrepEnvelope,
+    solid: &SolidRegion,
+    point: Point3,
+) -> Result<PointClassification, GeometryError> {
+    let shell_faces = |shell: u32| &brep.topology.shells[shell as usize].faces;
+    let outer = classify_point_in_shell(brep, shell_faces(solid.outer_shell), point)?;
+    if outer != PointClassification::Inside {
+        return Ok(outer);
+    }
+    for cavity in &solid.cavity_shells {
+        match classify_point_in_shell(brep, shell_faces(*cavity), point)? {
+            PointClassification::Outside => {}
+            PointClassification::Inside => return Ok(PointClassification::Outside),
+            other => return Ok(other),
+        }
+    }
+    Ok(PointClassification::Inside)
 }
 
 pub(crate) fn classify_point_in_shell(
