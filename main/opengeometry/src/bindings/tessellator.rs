@@ -3,7 +3,7 @@ use crate::tessellation::{display::DisplayBuffers, SnapshotStore};
 use js_sys::{Float32Array, Float64Array, Object, Reflect, Uint32Array};
 use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
 
-fn field(object: &Object, name: &str, value: &JsValue) -> Result<(), JsValue> {
+pub(super) fn field(object: &Object, name: &str, value: &JsValue) -> Result<(), JsValue> {
     Reflect::set(object, &JsValue::from_str(name), value).map(|_| ())
 }
 

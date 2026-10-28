@@ -1,5 +1,6 @@
 import type { Bounds } from '../dto/bounds';
 import type { Brep } from '../dto/brep';
+import type { Measure, Validity } from '../dto/measure';
 import type { Placement } from '../dto/placement';
 import { OGError } from '../errors';
 import { call } from '../kernel/kernel-session';
@@ -85,4 +86,35 @@ export function classifyPoint(owner: string, ogId: string, point: [number, numbe
 
 export function getInstanceCount(owner: string, ogId: string): number {
   return call(`${owner}.getInstanceCount`, () => worldGraph().instanceCount(ogId));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isValidity(value: unknown): value is Validity {
+  if (!isRecord(value) || typeof value['valid'] !== 'boolean' || typeof value['closed'] !== 'boolean') return false;
+  const { bodyType, error } = value;
+  const typed = bodyType === null || bodyType === 'Wire' || bodyType === 'Sheet' || bodyType === 'Solid';
+  const reported = isRecord(error) && typeof error['code'] === 'string' && typeof error['message'] === 'string';
+  return typed && (error === undefined || reported);
+}
+
+export function measure(owner: string, ogId: string, options: { deflection?: number }): Measure {
+  const label = `${owner}.measure`;
+  const { deflection } = options;
+  if (deflection !== undefined && typeof deflection !== 'number') {
+    throw new OGError('InvalidParameter', label, 'deflection must be a number');
+  }
+  const [volume = Number.NaN, area = Number.NaN, errorBound = Number.NaN, achieved = Number.NaN] = call(
+    label, () => worldGraph().measure(ogId, deflection),
+  );
+  return { volume, area, errorBound, deflection: achieved };
+}
+
+export function validity(owner: string, ogId: string): Validity {
+  const label = `${owner}.validity`;
+  const value = call(label, (): unknown => worldGraph().validity(ogId));
+  if (isValidity(value)) return value;
+  throw new OGError('InvalidGeometry', label, 'malformed validity');
 }

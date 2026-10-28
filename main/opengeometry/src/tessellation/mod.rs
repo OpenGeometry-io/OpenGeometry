@@ -6,6 +6,7 @@ pub mod display;
 mod edges;
 mod grid;
 mod loop_minimum;
+mod measure;
 mod mesh;
 mod planar_face;
 mod snapshot_store;
@@ -15,6 +16,7 @@ mod tests;
 mod trim;
 mod trimmed_face;
 
+pub use measure::{measure, Measure};
 pub use mesh::Tessellation;
 pub use snapshot_store::SnapshotStore;
 pub use tessellate::tessellate;

@@ -1,9 +1,11 @@
 use super::{serialise, OGWorldGraph};
 use crate::bindings::errors;
-use crate::bindings::tessellator::buffers_to_js;
+use crate::bindings::tessellator::{buffers_to_js, field};
 use crate::query::PointClassification;
 use crate::tessellation::display::{bucket_floor, static_bucket};
 use crate::world_graph::{ErrorCode, GraphError};
+use js_sys::Object;
+use serde::Serialize;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -61,6 +63,34 @@ impl OGWorldGraph {
         .into())
     }
 
+    pub fn measure(&self, og_id: &str, deflection: Option<f64>) -> Result<Vec<f64>, JsValue> {
+        let measured = self
+            .inner
+            .measure(og_id, deflection)
+            .map_err(errors::json)?;
+        Ok(vec![
+            measured.volume,
+            measured.area,
+            measured.error_bound,
+            measured.deflection,
+        ])
+    }
+
+    pub fn validity(&self, og_id: &str) -> Result<JsValue, JsValue> {
+        let report = self.inner.validity(og_id).map_err(errors::json)?;
+        let result = Object::new();
+        field(&result, "valid", &report.valid.into())?;
+        field(&result, "closed", &report.closed.into())?;
+        field(&result, "bodyType", &name(report.body_type)?)?;
+        if let Some(error) = report.error.map(GraphError::from) {
+            let detail = Object::new();
+            field(&detail, "code", &name(error.error_code())?)?;
+            field(&detail, "message", &JsValue::from_str(&error.message()))?;
+            field(&result, "error", &detail)?;
+        }
+        Ok(result.into())
+    }
+
     pub fn report(&self, og_id: &str) -> Result<String, JsValue> {
         serialise(&self.inner.report(og_id).map_err(errors::json)?)
     }
@@ -107,4 +137,9 @@ fn finite_point(point: &[f64]) -> Result<[f64; 3], JsValue> {
                 "point must be three finite numbers",
             ))
         })
+}
+
+fn name(value: impl Serialize) -> Result<JsValue, JsValue> {
+    let named = serde_json::to_value(value).map_err(errors::serialization)?;
+    Ok(named.as_str().map_or(JsValue::NULL, JsValue::from_str))
 }

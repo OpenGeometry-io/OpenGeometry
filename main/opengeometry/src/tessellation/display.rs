@@ -3,6 +3,8 @@ use super::tessellate::{coordinate_magnitude, tessellate};
 use crate::brep::{BrepEnvelope, GeometryError};
 use std::collections::BTreeSet;
 
+pub const MAX_TRIANGLES: usize = 2_000_000;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct DisplayBuffers {
     pub positions: Vec<f32>,
@@ -86,7 +88,7 @@ pub fn display_buffers(
     if !bucket.is_finite() || bucket <= 0.0 || bucket < bucket_floor(brep)? {
         return Err(limit("display bucket is below the precision floor"));
     }
-    if max_triangles == 0 || max_triangles > 2_000_000 {
+    if max_triangles == 0 || max_triangles > MAX_TRIANGLES {
         return Err(limit("display triangle budget"));
     }
     let mesh = tessellate(brep, 0.75 * bucket, max_triangles)?;

@@ -168,3 +168,65 @@ test('both reads leave revision, changes, mark stats and getBrep unchanged', asy
   assert.equal(state(body, revision), before);
   body.dispose();
 });
+
+test('measure bounds a cylinder against its exact volume and a cuboid measures exactly', async () => {
+  await boot();
+  const cylinder = new Solid(OG_PRIMITIVE_CYLINDER, { radius: 0.5, height: 2 }, { ogId: 'measure-cylinder' });
+  const coarse = cylinder.measure();
+  assert.equal(coarse.deflection, 0.01);
+  assert(Math.abs(coarse.volume - Math.PI * 0.5) <= coarse.errorBound);
+  const fine = cylinder.measure({ deflection: 0.001 });
+  assert.equal(fine.deflection, 0.001);
+  assert(fine.errorBound < coarse.errorBound);
+  assert(Math.abs(fine.volume - Math.PI * 0.5) <= fine.errorBound);
+  const body = cuboid('measure-box', 2);
+  const box = body.measure();
+  assert(Math.abs(box.volume - 2) <= 1e-12);
+  assert(Math.abs(box.area - 10) <= 1e-12);
+  assert(box.errorBound <= 1e-8);
+  cylinder.dispose();
+  body.dispose();
+});
+
+test('measure refuses a deflection that is not a positive number with InvalidParameter', async () => {
+  await boot();
+  const body = cuboid('measure-reject');
+  for (const deflection of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.throws(() => body.measure({ deflection }), failsWith('InvalidParameter'));
+  }
+  assert.throws(() => Reflect.apply(body.measure, body, [{ deflection: '0.1' }]), failsWith('InvalidParameter'));
+  body.dispose();
+  assert.throws(() => body.measure(), failsWith('Disposed'));
+  assert.throws(() => body.validity(), failsWith('Disposed'));
+});
+
+test('validity reports a closed valid Solid, an open Sheet and closed and open Wires', async () => {
+  await boot();
+  const profile = new Wire(OG_PRIMITIVE_RECTANGLE, { width: 1, breadth: 1 }, { ogId: 'validity-profile' });
+  const points = [[0, 0, 0], [0, 3, 0]];
+  const path = new Wire(OG_PRIMITIVE_POLYLINE, { points }, { ogId: 'validity-path' });
+  const sheet = new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false }, { ogId: 'validity-sheet' });
+  const body = cuboid('validity-box');
+  assert.deepEqual(body.validity(), { valid: true, closed: true, bodyType: 'Solid' });
+  assert.deepEqual(sheet.validity(), { valid: true, closed: false, bodyType: 'Sheet' });
+  assert.deepEqual(profile.validity(), { valid: true, closed: true, bodyType: 'Wire' });
+  assert.deepEqual(path.validity(), { valid: true, closed: false, bodyType: 'Wire' });
+  body.dispose();
+  sheet.dispose();
+  path.dispose();
+  profile.dispose();
+});
+
+test('measure and validity leave revision, changes, mark stats and getBrep unchanged', async () => {
+  await boot();
+  const body = cuboid('measure-state');
+  body.transform(OG_TRANSFORM_TRANSLATE, { offset: [1, 2, 3] });
+  const revision = graph().revision();
+  const before = state(body, revision);
+  body.measure();
+  body.measure({ deflection: 0.002 });
+  body.validity();
+  assert.throws(() => body.measure({ deflection: -1 }), failsWith('InvalidParameter'));
+  assert.equal(state(body, revision), before);
+  body.dispose();
+});

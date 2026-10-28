@@ -11,6 +11,7 @@ mod graph;
 mod hierarchy;
 mod instancing;
 mod journal;
+mod measure;
 mod modifying;
 mod node;
 mod operands;

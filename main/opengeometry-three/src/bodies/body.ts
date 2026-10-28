@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Brep } from '../dto/brep';
+import type { Measure, Validity } from '../dto/measure';
 import type { NodeInfo } from '../dto/node-info';
 import type { Placement } from '../dto/placement';
 import { OGError } from '../errors';
@@ -22,7 +23,7 @@ import { register, unregister } from './body-registry';
 import { DisplayClone } from './display-clone';
 import {
   addChild, checkNode, classifyPoint, faceNormalAt, getBounds, getBrep, getChildren, getInstanceCount, getParent,
-  getPlacement, getWorldBrep, getWorldPlacement, localBounds, removeChild,
+  getPlacement, getWorldBrep, getWorldPlacement, localBounds, measure, removeChild, validity,
 } from './node-methods';
 import type { PointClassification } from './node-methods';
 import type { SystemAssembly } from './system-assembly';
@@ -193,6 +194,16 @@ export abstract class Body extends THREE.Group {
   classifyPoint(point: [number, number, number]): PointClassification {
     this.check(`${this.bodyType}.classifyPoint`);
     return classifyPoint(this.bodyType, this.ogId, point);
+  }
+
+  measure(options: { deflection?: number } = {}): Measure {
+    this.check(`${this.bodyType}.measure`);
+    return measure(this.bodyType, this.ogId, options);
+  }
+
+  validity(): Validity {
+    this.check(`${this.bodyType}.validity`);
+    return validity(this.bodyType, this.ogId);
   }
 
   getInstanceCount(): number {
