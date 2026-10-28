@@ -16,15 +16,20 @@ It is written for people and for coding assistants alike: each section says what
 
 ### What changed
 
+- The plane mapping is not new, but it is easy to miss. A `Profile` point `[u, v]` on the default plane lands at world `(u, 0, −v)`: v runs along −z, not +z. With `plane: { normal: [0, 0, 1], xDirection: [1, 0, 0] }` a point `[u, v]` lands at `(u, v, 0)`. If you miss the sign, a D-shape comes out the wrong way round.
 - `OG_PRIMITIVE_SPHERE` makes a solid sphere: `{ radius }`, centred on the `plane` origin.
 - `OG_PRIMITIVE_CONE` makes a solid cone or frustum standing on the `plane`, its axis along the normal: `{ radiusBottom, radiusTop, height }`. One radius may be `0` for a pointed cone; radii within four times the geometric tolerance of each other make a cylinder.
 - `OG_PRIMITIVE_TORUS` makes a solid ring torus lying on the `plane`, its axis along the normal: `{ majorRadius, minorRadius }`, with the minor radius below the major one.
+- Not built: horn, spindle and lemon tori, whose minor radius is equal to or above the major one.
 - `OG_PRIMITIVE_PARAMS_SPHERE`, `OG_PRIMITIVE_PARAMS_CONE` and `OG_PRIMITIVE_PARAMS_TORUS` type their parameters. The entry exports the types `SphereParams`, `ConeParams` and `TorusParams`. A size that is not finite or not above four times the geometric tolerance, two zero cone radii, or a minor radius not below the major one by more than four times the geometric tolerance throws `InvalidParameter`.
 - An `operate` error says which handler family refused the bodies and which handlers were tried.
 - `OG_OPERATION_REVOLVE` turns a closed `Profile` wire a full turn into a solid: `{ profile, axis? }`. `axis` is `{ point: [u, v], direction: [du, dv] }` in the profile's own `[u, v]` and defaults to `{ point: [0, 0], direction: [0, 1] }`, the profile plane's v axis. `OG_OPERATION_PARAMS_REVOLVE` types the parameters. Each profile edge off the axis becomes one plane, cylinder, cone, sphere or ring torus face; an edge on the axis makes no face. A profile that crosses the axis, touches it at a single point, or meets it along two separate stretches, an arc whose circle meets the axis, and a zero direction throw `InvalidParameter`.
 - `OG_OPERATION_SHELL` hollows a solid in place: `solid.operate(OG_OPERATION_SHELL, { thickness })`. It takes a cuboid, cylinder, sphere, ring torus, cone, frustum, planar profile extrusion, or extrusion of a line-and-arc profile with or without holes, and leaves one closed void `thickness` inside every face. The inner walls of a line-and-arc extrusion are its exact inset: lines parallel to the sides, arcs on the same centres, and arcs of radius `thickness` at inward corners. The report's `face_mappings` lists, for each face of the body before the call, its outer face and every inner face offset from any part of it; `handlers` is `[]`. A thickness that is not finite or not above four times the geometric tolerance throws `InvalidParameter`. A cavity that would vanish, and a profile inset that is empty, splits into separate regions or narrows to within four times the geometric tolerance, throw `UnresolvedIntersection`. A shape shared by other instances throws `SharedShape` unless `instances: 'all'` is given, a solid of another kind throws `CoverageGap`, and a solid with approximate geometry throws `UnsupportedGeometry`.
 - Not built: a Sheet is not thickened into a solid. `Sheet` has no `operate`, and the shell of an open sheet in the kernel graph throws `CoverageGap` with `details.families` equal to `['restricted analytic shell', 'open sheet']`.
 - `body.classifyPoint([x, y, z])` is new. It says whether a point in the body's own coordinates is `'Inside'`, `'Outside'`, on the `'Boundary'` or `'Unknown'`. A Wire or a Sheet throws `InvalidOperand`.
+- `body.measure({ deflection? })` is new. It returns `{ volume, area, errorBound, deflection }`, measured in the body's own coordinates: a scale in the body's placement is not applied. The kernel tessellates at `deflection` (default: the tessellation accuracy of the graph, `0.01` unless you set it), sums the signed triangle volumes and the triangle areas, and caps the mesh at 2 000 000 triangles. The volume is approximate: `|volume − exact| ≤ errorBound`, where `errorBound` is `4 · area · deflection` for a body with a curved face and `1e-10 · max(area, 1)` for a body with only flat faces, so a flat body measures exactly. A smaller `deflection` gives a smaller bound and a slower call. A `deflection` that is not a positive finite number throws `InvalidParameter`; one that is not above twice the geometric tolerance throws `InvalidGeometry`; a mesh that needs more than 2 000 000 triangles throws `LimitExceeded`. The call does not change the graph. The entry exports the type `Measure`.
+- `body.validity()` is new. It returns `{ valid, closed, bodyType }`, plus `error: { code, message }` when the body is not valid. `closed` is true when every shell of a Sheet or a Solid is closed and when every wire of a Wire is closed; an invalid body has `closed: false` and `bodyType: null`. The call does not change the graph. The entry exports the type `Validity`.
+- Not built: a reflecting placement. A scale that is not positive still throws `InvalidTransform`.
 
 ### Before and after: sphere, cone and torus
 
@@ -63,8 +68,8 @@ console.log(side);
 ### Before and after: revolve a profile
 
 3.0 had no revolve.
-A `Profile` on the default plane maps `[u, v]` to `(u, 0, -v)`: it lies flat on the ground, and the default axis, its v axis, runs along -z, so the solid lies on its side.
-With `plane: { normal: [0, 0, 1], xDirection: [1, 0, 0] }` the profile maps `[u, v]` to `(u, v, 0)`, and a bowl drawn with u as the radius and v as the height stands upright about the y axis:
+On the default plane the default axis, the profile's v axis, runs along −z, so the solid lies on its side.
+With the upright plane named at the top of "What changed", a bowl drawn with u as the radius and v as the height stands upright about the y axis:
 
 ```ts
 import {
@@ -94,6 +99,75 @@ console.log(bowl.ogId);
 A partial turn is not built: there is no sweep angle, and every revolve is a full turn.
 A profile with holes is not built: `OG_OPERATION_REVOLVE` takes no `holes`.
 
+### Before and after: measure a body and check it is a valid solid
+
+3.0 had no volume, area or validity read. Now:
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_PARAMS_CYLINDER } from 'opengeometry';
+import type { Measure, Validity } from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const leg = new Solid(OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_PARAMS_CYLINDER({ radius: 0.1, height: 0.7 }));
+const size: Measure = leg.measure({ deflection: 0.001 });
+const exact = Math.PI * 0.1 * 0.1 * 0.7;
+console.log(Math.abs(size.volume - exact) <= size.errorBound);
+const check: Validity = leg.validity();
+console.log(check.valid && check.closed && check.bodyType === 'Solid');
+```
+
+### Before and after: a WC pan
+
+3.0 could not build this pan. The pocket subtraction threw `CoverageGap`, and there was no revolve or shell.
+Now the pan is a D-shape extruded 0.4 m with a blind D-shaped pocket subtracted from its top, the cistern is a D-shape shelled to 0.01 m walls, and the bowl is a profile revolved about an upright axis at the round end:
+
+```ts
+import {
+  OpenGeometry, Solid, Wire, OG_OPERATION_EXTRUDE, OG_OPERATION_REVOLVE, OG_OPERATION_SHELL, OG_OPERATION_SUBTRACT,
+  OG_PRIMITIVE_PROFILE, OG_TRANSFORM_TRANSLATE,
+} from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+function dShape(inset: number): Wire {
+  return new Wire(OG_PRIMITIVE_PROFILE, {
+    start: [inset, inset],
+    segments: [
+      { to: [0.36, inset] },
+      { to: [0.36, 0.38 - inset], arc: { center: [0.36, 0.19], counterClockwise: true } },
+      { to: [inset, 0.38 - inset] },
+      { to: [inset, inset] },
+    ],
+    closed: true,
+  });
+}
+
+const pan = new Solid(OG_OPERATION_EXTRUDE, { profile: dShape(0), distance: 0.4 });
+const pocket = new Solid(OG_OPERATION_EXTRUDE, { profile: dShape(0.04), distance: 0.35 });
+pocket.transform(OG_TRANSFORM_TRANSLATE, { offset: [0, 0.1, 0] });
+pan.operate(OG_OPERATION_SUBTRACT, { tools: [pocket] });
+
+const cistern = new Solid(OG_OPERATION_EXTRUDE, { profile: dShape(0), distance: 0.3 });
+cistern.transform(OG_TRANSFORM_TRANSLATE, { offset: [0, 0.4, 0] });
+cistern.operate(OG_OPERATION_SHELL, { thickness: 0.01 });
+
+const outline = new Wire(OG_PRIMITIVE_PROFILE, {
+  start: [0, 0],
+  segments: [
+    { to: [0.07, 0] },
+    { to: [0.1, 0.26] },
+    { to: [0.1, 0.3], arc: { center: [0.1, 0.28], counterClockwise: true } },
+    { to: [0.08, 0.3] },
+    { to: [0, 0.22], arc: { center: [0, 0.3], counterClockwise: false } },
+    { to: [0, 0] },
+  ],
+  closed: true,
+}, { plane: { origin: [0.36, 0.1, -0.19], normal: [0, 0, 1], xDirection: [1, 0, 0] } });
+const bowl = new Solid(OG_OPERATION_REVOLVE, { profile: outline });
+console.log(pan.getReport()?.handlers, cistern.getReport()?.handlers, bowl.ogId);
+```
+
 ### Different behaviour
 
 - When a tool of `operate` fails, `details` now has `attempted` beside `handlers`, `toolIndex` and `ogIds`: every handler tried, in order.
@@ -104,11 +178,13 @@ A profile with holes is not built: `OG_OPERATION_REVOLVE` takes no `holes`.
 - `operate` now builds a union, intersection or subtraction of two bodies that are prisms along one shared cylinder axis, however the pair is placed: every flat face is square to the axis or parallel to it, every curved face is a cylinder around a parallel axis, and every side face is a plain strip with no notch or hole. This covers an arc-edged extrusion minus a blind inset or pocket, a cuboid minus a blind arc-edged pocket, and a cuboid with an upright cylinder that crosses a side face. Before, these threw `CoverageGap`, or `UnresolvedIntersection` when the pair was turned off the world axes. The report's `handlers` is `['prismatic_curved_boolean']`, and a gap that reaches the generic handlers has `'prismatic_curved_boolean'` last in `details.attempted`.
 - An arc of one such body that touches a side or an arc of the other, within four times the geometric tolerance, throws `UnresolvedIntersection`. A touch at the end of the other body's own arc on the same circle is not refused, so a bore of the same radius at a D-shape's round end builds. A face of one body square to the axis that lies closer than four times the geometric tolerance to such a face of the other, without being level with it, also throws `UnresolvedIntersection`.
 - Not built: a cylinder tilted against every axis of a cuboid still throws `CoverageGap`, with `details.families` equal to `['cylinder', 'oblique cuboid intersection']`.
+- Not built: a cuboid that cuts through the curved faces of a torus, a cone, a sweep with a bend, or a revolve with a face that is not a plane or a cylinder, such as a box that removes half of it, is refused with `CoverageGap` or `UnresolvedIntersection`. A cuboid tilted against the axis of a cylinder or a cylinder sector is refused too.
 
 ### Check your result
 
 1. A cuboid minus an upright cylinder that crosses one side face is one solid, and its report's `handlers` is `['prismatic_curved_boolean']`. Tilt the cylinder by 10 degrees and the same call throws `CoverageGap` with `details.families` equal to `['cylinder', 'oblique cuboid intersection']`.
 2. `classifyPoint` on a cylinder of radius 0.1 and height 0.7 gives `'Inside'` at `[0, 0.35, 0]` and `'Outside'` at `[1, 0.35, 0]`, before and after the body is moved.
+3. `measure()` on a cuboid of width 2, height 1 and depth 1 gives `volume` 2 and `area` 10 to within `1e-12`. `validity()` on that cuboid gives `{ valid: true, closed: true, bodyType: 'Solid' }`, and on a Sheet swept with `caps: false` it gives `closed: false`.
 
 ## 2.5 to 3.0
 
@@ -449,6 +525,7 @@ Both inset an L-shaped lot by 2 m. 2.0 draws the inside corner as short segments
 - An arc in a sweep path must meet its neighbours tangentially, within 1e-9 radians. A corner at an arc throws `InvalidParameter`; a corner between two lines is still mitred.
 - Each bend radius must exceed the profile's reach from the path start, the largest distance from the start to the profile, by four geometric tolerances. A tighter bend throws `SweepSelfIntersection`.
 - An arc above half a turn sweeps as equal bends of at most half a turn each, and each bend has its own `seg-` face keys.
+- A sweep of a profile with arc segments throws `UnsupportedGeometry`. Only a capped sweep along one straight segment builds, as the same solid as an extrude. For any other sweep, use a circle or a profile of lines only as the profile.
 - A closed path must bring the profile back to where it started. A path that does not lie in one plane can turn the profile on the way round; it throws `InvalidParameter`.
 - A closed path has no ends, so `caps: false` with a closed path throws `InvalidParameter`.
 - The overlap rule is unchanged: two path segments that are not neighbours must stay more than twice the reach apart. A tight line, bend, line path can still throw `SweepSelfIntersection` although the bend keeps its two lines apart.

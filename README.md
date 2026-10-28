@@ -42,16 +42,16 @@ It is the geometry engine layer, not a full CAD application. Floorkit is a downs
 
 | Area | What 3.0 has |
 | --- | --- |
-| **Primitives** | Wires: rectangle, circle, polyline (open or closed). Solids: cuboid, cylinder. Each can be placed on any plane. |
-| **Operations** | Extrude a closed wire into a solid, with holes. Sweep a profile along an open or closed path of lines and arcs, each arc an exact bend, capped into a solid, open-ended into a sheet, or closed into a ring. Revolve a closed line-and-arc profile a full turn about an axis in its plane. Union, subtract and intersect, with one to a hundred tool solids in one call. |
+| **Primitives** | Wires: rectangle, circle, polyline (open or closed), line-and-arc profile, arc. Solids: cuboid, cylinder, cylinder sector, sphere, cone or frustum, ring torus, planar polyhedron. Each can be placed on any plane. |
+| **Operations** | Extrude a closed wire into a solid, with holes. Sweep a profile along an open or closed path of lines and arcs, each arc an exact bend, capped into a solid, open-ended into a sheet, or closed into a ring. Revolve a closed line-and-arc profile a full turn about an axis in its plane. Shell a solid into a hollow one with walls of one thickness. Union, subtract and intersect, with one to a hundred tool solids in one call. |
 | **Parametric edits** | `rebuild` gives an existing body new parameters in place. |
 | **Assemblies** | Assemblies with parent and child placement; translate, rotate, scale and place; independent copies and shared instances. |
 | **History** | Marks with rollback and release; transactions, with a dry-run option. |
 | **Display for Three.js** | Every body is a `THREE.Group`. Level of detail that follows the camera, tessellation in a web worker or inline, picking down to face and edge, outlines, colour and opacity. |
-| **Queries** | Bounds, placements, the B-rep of a body, that B-rep placed in the world, the normal of a face at a point, and the report of its last boolean. |
+| **Queries** | Bounds, placements, the B-rep of a body, that B-rep placed in the world, the normal of a face at a point, whether a point is inside, volume and area within a stated error bound, whether a body is valid and closed, and the report of its last boolean. |
 | **Export** | STEP, in millimetres or metres, with Y or Z up, together with an export report. The IFC exchange body of a solid, in world metres with Z up, for an IFC writer. |
 
-Not in 3.0, though 2.0 had them: IFC file text and STL export; projection; loft; triangulation as a public call; curves, spheres and wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
+Not in 3.0, though 2.0 had them: IFC file text and STL export; projection; loft; triangulation as a public call; curves other than lines, circles and arcs; wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
 
 ## Installation
 
@@ -171,11 +171,12 @@ This section is a compact reference for writing OpenGeometry 3.0 code, by hand o
 | `Sheet` | `new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false })`: an open-ended sweep, faces that enclose no volume. It shows its surface, from the front only, and its outline; `OpenGeometry.exportStep` refuses it. |
 | Body options | `{ ogId?, parent?, appearance?, plane? }`. `plane` is `{ origin?, normal?, xDirection? }` and applies to primitives only; by default it is the ground plane through the origin, normal `[0, 1, 0]`, x direction `[1, 0, 0]`. |
 | Booleans | `solid.operate(kind, { tools, instances? })` with `OG_OPERATION_SUBTRACT`, `OG_OPERATION_UNION` or `OG_OPERATION_INTERSECT`; `tools` is one to a hundred solids. |
+| Shell | `solid.operate(OG_OPERATION_SHELL, { thickness, instances? })` hollows the solid in place and leaves walls `thickness` thick inside every face. |
 | Transforms | `node.transform(kind, params)` on a body or an assembly: `OG_TRANSFORM_TRANSLATE` `{ offset }`, `OG_TRANSFORM_ROTATE` `{ axis, degrees, pivot? }`, `OG_TRANSFORM_SCALE` `{ factor, pivot? }`, `OG_TRANSFORM_PLACE` `{ origin?, xDirection?, normal?, scale? }`. `getPlacement()` and `getWorldPlacement()` return `{ origin, xDirection, normal, scale }`. |
 | Edits | `body.rebuild(kind, params, { instances? })` with the kinds and parameters above; a wire stays a wire and a solid a solid. |
 | Copies | `body.duplicate({ ogId?, parent? })` makes an independent copy; `body.instance({ ogId?, parent? })` shares the shape. `getInstanceCount()`, `makeUnique()`. |
 | `SystemAssembly` | `new SystemAssembly({ ogId?, parent? })`. `addChild(children, { keepWorld? })`, `removeChild(child, { keepWorld? })`, `getChildren()`, `getParent()`, `getBounds()`, `transform`, `dispose()`. Bodies have the same tree methods. |
-| Queries | `getBounds()` (`[minX, minY, minZ, maxX, maxY, maxZ]`, or `null`), `getBrep()`, `getWorldBrep()` (the BRep placed in the world), `faceNormalAt(faceId, [x, y, z])` (the face's unit normal in the body's own coordinates), `solid.getReport()` (the last boolean's report, or `null`). |
+| Queries | `getBounds()` (`[minX, minY, minZ, maxX, maxY, maxZ]`, or `null`), `getBrep()`, `getWorldBrep()` (the BRep placed in the world), `faceNormalAt(faceId, [x, y, z])` (the face's unit normal in the body's own coordinates), `classifyPoint([x, y, z])` (`'Inside'`, `'Outside'`, `'Boundary'` or `'Unknown'`, in the body's own coordinates), `measure({ deflection? })` (`{ volume, area, errorBound, deflection }`; the volume is within `errorBound` of the exact one), `validity()` (`{ valid, closed, bodyType, error? }`), `solid.getReport()` (the last boolean's report, or `null`). |
 | Appearance | `appearance` in the options, or `body.setAppearance({ color?, opacity?, outline?, pickOutline?, deflection? })`. |
 | Display | `OpenGeometry.settled({ deflection? })` resolves to `{ failed }`; `OpenGeometry.flush({ geometry?: 'sync' })`; `OpenGeometry.setDisplayDeflection(world?)`; `OpenGeometry.setCameraMotion(moving)`. |
 | Picking | `OpenGeometry.resolveHit(intersection)` takes a Three.js raycast hit and returns `{ ogId, shapeRevision, faceId?, edgeId? }` or `undefined`. |
@@ -187,7 +188,7 @@ This section is a compact reference for writing OpenGeometry 3.0 code, by hand o
 | 2D offsets | `OpenGeometry.offsetRingVariable(ring, distances, holes?)` insets a closed ring by one distance per edge, each hole `{ ring, distances }` grown by its own; `OpenGeometry.offsetPolylineRegions(path, width, closed, miterLimit?)` strokes a path. Both return `CurvedRegion2D[]` with exact arcs. `OpenGeometry.offsetPolyline(path, distance, { acuteThresholdDegrees?, bevel?, closed? })` offsets a path to one side and returns `{ edges, bevelled, closed }` (type `OffsetPath2D`). Rings and paths are flat `[x, y, z, ...]` lists; `y` is ignored. |
 | `OGError` | Failures throw an `OGError` with `code` (for example `InvalidParameter`, `SharedShape`, `Disposed`), `call`, `message` and `details`. |
 | Reset | `OpenGeometry.reset()` frees every body and leaves an empty document. |
-| Typed parameters | `OG_PRIMITIVE_PARAMS_<KIND>(params)`, `OG_OPERATION_PARAMS_EXTRUDE(params)` and `OG_OPERATION_PARAMS_SWEEP(params)` return their argument unchanged; they only give the object a type. |
+| Typed parameters | `OG_PRIMITIVE_PARAMS_<KIND>(params)`, `OG_OPERATION_PARAMS_EXTRUDE(params)`, `OG_OPERATION_PARAMS_SWEEP(params)` and `OG_OPERATION_PARAMS_REVOLVE(params)` return their argument unchanged; they only give the object a type. |
 
 **Rules that are easy to get wrong.**
 
@@ -210,11 +211,13 @@ This section is a compact reference for writing OpenGeometry 3.0 code, by hand o
 - Add bodies to the Three.js scene yourself; a `SystemAssembly` is not a Three.js object.
 - Surfaces use `MeshStandardMaterial`, so the scene needs a light.
 - Rendering is what asks for geometry. Render in a loop, or render once, `await OpenGeometry.settled()`, and render again. `settled` returns at once if nothing has been rendered.
+- In Node nothing renders, so nothing asks for geometry: add the body to a `THREE.Scene`, call `scene.updateMatrixWorld()`, then call `OpenGeometry.flush({ geometry: 'sync' })` or `await OpenGeometry.settled()`; the mesh is then in `body.surface.geometry`.
 - STEP export defaults to millimetres and Z up. A wire cannot be exported on its own: the selection must contain a solid.
+- To check that a body is a valid solid, call `body.validity()`: a valid closed solid gives `{ valid: true, closed: true, bodyType: 'Solid' }`.
 - Call `dispose()` on bodies and assemblies you no longer need.
 - Catch `OGError` and branch on `code`. After a `'fatal'` event the runtime refuses every call until `OpenGeometry.reset()`.
 
-**What does not exist.** IFC, STL and PDF export, projection, offset, loft, public triangulation, arcs, curves, spheres, wedges, and the 2.0 classes. Do not call them.
+**What does not exist.** IFC file text, STL and PDF export, projection, loft, public triangulation, curves other than lines, circles and arcs, wedges, and the 2.0 classes. Do not call them.
 
 **Where the truth is.** `index.d.ts` in the installed package lists every export and its types. The examples in [`main/opengeometry-three/examples-vite/`](./main/opengeometry-three/examples-vite/) are working 3.0 code, except that they import the built package by path (`../../../dist/index.js`) where an app imports from `'opengeometry'`.
 
