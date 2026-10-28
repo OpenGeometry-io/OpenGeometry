@@ -39,6 +39,7 @@ export function operationParams(kind: string, params: Record<string, unknown>, c
     const profile = ogIdOf(params['profile'], call, 'profile');
     return { kind, profile, path: ogIdOf(params['path'], call, 'path'), caps: params['caps'] };
   }
+  if (kind === 'Revolve') return { ...params, kind, profile: ogIdOf(params['profile'], call, 'profile') };
   return { kind, ...params };
 }
 

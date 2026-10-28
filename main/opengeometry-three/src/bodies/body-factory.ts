@@ -20,7 +20,7 @@ export function createBody(
     const closed = Boolean(params['closed']);
     return creation(call(label, () => graph.createPolyline(points, closed, encode(settings))), label);
   }
-  const operation = kind === 'Extrude' || kind === 'Sweep';
+  const operation = kind === 'Extrude' || kind === 'Sweep' || kind === 'Revolve';
   return creation(call(label, () => operation
     ? graph.createOperation(encode(operationParams(kind, params, label)), encode(settings))
     : graph.createPrimitive(encode({ kind, ...params }), encode(settings))), label);

@@ -5,7 +5,8 @@ use super::graph::WorldGraph;
 use super::node::EditScope;
 use super::operands::{profile_loop, sweep_path};
 use super::primitive::{check_body_type, check_no_plane, CreateOptions};
-use crate::brep::{BodyType, BrepEnvelope, Similarity3};
+use crate::brep::{BodyType, BrepEnvelope, Similarity3, GROUND};
+use crate::operations::creating::revolve::{self, Axis};
 use crate::operations::creating::{extrude, sweep};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -24,12 +25,24 @@ pub enum CreatingOperation {
         #[serde(default)]
         caps: Option<bool>,
     },
+    Revolve {
+        profile: String,
+        #[serde(default)]
+        axis: Option<RevolveAxis>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RevolveAxis {
+    pub point: [f64; 2],
+    pub direction: [f64; 2],
 }
 
 impl CreatingOperation {
     fn anchor(&self) -> &str {
         match self {
-            Self::Extrude { profile, .. } => profile,
+            Self::Extrude { profile, .. } | Self::Revolve { profile, .. } => profile,
             Self::Sweep { path, .. } => path,
         }
     }
@@ -82,7 +95,29 @@ impl WorldGraph {
                 sweep::build(id, profile, path, caps.unwrap_or(true), self.accuracy)
                     .map_err(GraphError::from)
             }
+            CreatingOperation::Revolve { profile, axis } => {
+                let outer = profile_loop(self, profile, target)?;
+                let axis = self.revolve_axis(profile, target, *axis)?;
+                revolve::build(id, outer, axis, self.accuracy).map_err(GraphError::from)
+            }
         }
+    }
+
+    fn revolve_axis(
+        &self,
+        profile: &str,
+        target: &str,
+        axis: Option<RevolveAxis>,
+    ) -> Result<Axis, GraphError> {
+        let RevolveAxis { point, direction } = axis.unwrap_or(RevolveAxis {
+            point: [0.0, 0.0],
+            direction: [0.0, 1.0],
+        });
+        let mapping = self.relative_placement(profile, target)?;
+        Ok(Axis {
+            point: mapping.apply_point(GROUND.point([point[0], point[1], 0.0])),
+            direction: mapping.apply_vector(GROUND.vector([direction[0], direction[1], 0.0])),
+        })
     }
 
     pub fn create_operation(

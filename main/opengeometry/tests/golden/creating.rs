@@ -9,6 +9,7 @@ use crate::kernel::{
 use crate::record::{Failure, Record};
 use crate::runner::Case;
 use opengeometry::primitives::ProfileSegment;
+use opengeometry_test_support::scenes::revolve::{revolve_scenes, RevolveScene};
 use std::f64::consts::{FRAC_PI_2, PI};
 
 type Profiles = fn() -> Vec<(&'static str, Primitive)>;
@@ -58,6 +59,16 @@ fn extruded(entry: &Extrusion) -> Case {
         }
         solid(record, graph, extrude("profile", holes, distance))
     })
+}
+
+fn revolved(scene: RevolveScene) -> Case {
+    graph_case(
+        &format!("creating.revolve.{}", scene.name),
+        move |graph, record| {
+            primitive(record, graph, scene.profile.clone(), scene.options.clone());
+            solid(record, graph, scene.operation.clone())
+        },
+    )
 }
 
 fn swept(entry: &Sweep) -> Case {
@@ -566,6 +577,7 @@ pub(crate) fn cases() -> Vec<Case> {
     cases.extend(SWEEPS.iter().map(swept));
     cases.extend(OPEN_SWEEPS.iter().map(open_ended));
     cases.extend(ELBOWS.iter().map(bent));
+    cases.extend(revolve_scenes().into_iter().map(revolved));
     cases.extend([
         graph_case("creating.extrude.offset-circle-hole", offset_hole),
         graph_case("creating.extrude.far-parent", far_parent),

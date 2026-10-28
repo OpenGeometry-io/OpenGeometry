@@ -213,7 +213,7 @@ export abstract class Body extends THREE.Group {
     if (kind === 'Polyline') {
       const points = polylinePoints(params, label);
       call(label, () => graph.rebuildPolyline(this.ogId, points, Boolean(params['closed']), scope(options)));
-    } else if (kind === 'Extrude' || kind === 'Sweep') {
+    } else if (kind === 'Extrude' || kind === 'Sweep' || kind === 'Revolve') {
       const operation = encode(operationParams(kind, params, label));
       call(label, () => graph.rebuildOperation(this.ogId, operation, scope(options)));
     } else {

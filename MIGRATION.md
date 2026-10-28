@@ -21,6 +21,7 @@ It is written for people and for coding assistants alike: each section says what
 - `OG_PRIMITIVE_TORUS` makes a solid ring torus lying on the `plane`, its axis along the normal: `{ majorRadius, minorRadius }`, with the minor radius below the major one.
 - `OG_PRIMITIVE_PARAMS_SPHERE`, `OG_PRIMITIVE_PARAMS_CONE` and `OG_PRIMITIVE_PARAMS_TORUS` type their parameters. The entry exports the types `SphereParams`, `ConeParams` and `TorusParams`. A size that is not finite or not above four times the geometric tolerance, two zero cone radii, or a minor radius not below the major one by more than four times the geometric tolerance throws `InvalidParameter`.
 - An `operate` error says which handler family refused the bodies and which handlers were tried.
+- `OG_OPERATION_REVOLVE` turns a closed `Profile` wire a full turn into a solid: `{ profile, axis? }`. `axis` is `{ point: [u, v], direction: [du, dv] }` in the profile's own `[u, v]` and defaults to `{ point: [0, 0], direction: [0, 1] }`, the profile plane's v axis. `OG_OPERATION_PARAMS_REVOLVE` types the parameters. Each profile edge off the axis becomes one plane, cylinder, cone, sphere or ring torus face; an edge on the axis makes no face. A profile that crosses the axis, touches it at a single point, or meets it along two separate stretches, an arc whose circle meets the axis, and a zero direction throw `InvalidParameter`.
 - `body.classifyPoint([x, y, z])` is new. It says whether a point in the body's own coordinates is `'Inside'`, `'Outside'`, on the `'Boundary'` or `'Unknown'`. A Wire or a Sheet throws `InvalidOperand`.
 
 ### Before and after: sphere, cone and torus
@@ -56,6 +57,40 @@ const leg = new Solid(OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_PARAMS_CYLINDER({ radi
 const side: PointClassification = leg.classifyPoint([0, 0.35, 0]);
 console.log(side);
 ```
+
+### Before and after: revolve a profile
+
+3.0 had no revolve.
+A `Profile` on the default plane maps `[u, v]` to `(u, 0, -v)`: it lies flat on the ground, and the default axis, its v axis, runs along -z, so the solid lies on its side.
+With `plane: { normal: [0, 0, 1], xDirection: [1, 0, 0] }` the profile maps `[u, v]` to `(u, v, 0)`, and a bowl drawn with u as the radius and v as the height stands upright about the y axis:
+
+```ts
+import {
+  OpenGeometry, Solid, Wire, OG_OPERATION_PARAMS_REVOLVE, OG_OPERATION_REVOLVE, OG_PRIMITIVE_PARAMS_PROFILE,
+  OG_PRIMITIVE_PROFILE,
+} from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const pan = OG_PRIMITIVE_PARAMS_PROFILE({
+  start: [0, 0],
+  segments: [
+    { to: [0.12, 0] },
+    { to: [0.19, 0.3] },
+    { to: [0.19, 0.34], arc: { center: [0.19, 0.32], counterClockwise: true } },
+    { to: [0.16, 0.34] },
+    { to: [0, 0.18], arc: { center: [0, 0.34], counterClockwise: false } },
+    { to: [0, 0] },
+  ],
+  closed: true,
+});
+const profile = new Wire(OG_PRIMITIVE_PROFILE, pan, { plane: { normal: [0, 0, 1], xDirection: [1, 0, 0] } });
+const bowl = new Solid(OG_OPERATION_REVOLVE, OG_OPERATION_PARAMS_REVOLVE({ profile }));
+console.log(bowl.ogId);
+```
+
+A partial turn is not built: there is no sweep angle, and every revolve is a full turn.
+A profile with holes is not built: `OG_OPERATION_REVOLVE` takes no `holes`.
 
 ### Different behaviour
 
