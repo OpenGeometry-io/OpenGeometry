@@ -1,11 +1,18 @@
+mod oblique;
 mod perpendicular;
+mod span;
+#[cfg(test)]
+mod tests;
 
 use super::containment::analytic_containment_boolean;
 use crate::brep::{Accuracy, BrepEnvelope, GeometryError, SurfaceGeometry};
-use crate::math::dot;
-use crate::operations::modifying::boolean::operands::{full_box, full_cylinder};
+use crate::operations::modifying::boolean::operands::{
+    full_box, full_cylinder, BoxInput, CylinderInput,
+};
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
+use oblique::cylinder_half_space_boolean;
 use perpendicular::perpendicular_cylinder_box_boolean;
+use span::cylinder_spans;
 
 pub(crate) fn cylinder_box_boolean(
     a: &BrepEnvelope,
@@ -27,15 +34,8 @@ pub(crate) fn cylinder_box_boolean(
             .accuracy
             .geometric
             .max(box_.brep.accuracy.geometric);
-    let origin = box_.frame.local(cylinder.frame.origin);
-    let box_axes = [box_.frame.x, box_.frame.y, box_.frame.z];
     let mut cylinder_margin = f64::INFINITY;
-    for axis in 0..3 {
-        let axial_rate = dot(cylinder.frame.z, box_axes[axis]);
-        let radial_extent = cylinder.radius * (1.0 - axial_rate * axial_rate).max(0.0).sqrt();
-        let other = origin[axis] + axial_rate * cylinder.height;
-        let lo = origin[axis].min(other) - radial_extent;
-        let hi = origin[axis].max(other) + radial_extent;
+    for (axis, [lo, hi]) in cylinder_spans(&box_, &cylinder).into_iter().enumerate() {
         cylinder_margin = cylinder_margin.min(lo).min(box_.size[axis] - hi);
     }
     let mut box_margin = f64::INFINITY;
@@ -69,5 +69,38 @@ pub(crate) fn cylinder_box_boolean(
         ));
     }
     let accuracy = Accuracy::combined(cylinder.brep.accuracy, box_.brep.accuracy);
-    perpendicular_cylinder_box_boolean(&box_, &cylinder, cylinder_is_a, operation, id, accuracy)
+    perpendicular_or_half_space(&box_, &cylinder, cylinder_is_a, operation, id, accuracy)
+}
+
+fn perpendicular_or_half_space(
+    box_: &BoxInput<'_>,
+    cylinder: &CylinderInput<'_>,
+    cylinder_is_a: bool,
+    operation: BooleanOp,
+    id: String,
+    accuracy: Accuracy,
+) -> Result<BooleanResult, GeometryError> {
+    match perpendicular_cylinder_box_boolean(
+        box_,
+        cylinder,
+        cylinder_is_a,
+        operation,
+        id.clone(),
+        accuracy,
+    ) {
+        Err(error @ GeometryError::CoverageGap { .. }) => {
+            match cylinder_half_space_boolean(
+                box_,
+                cylinder,
+                cylinder_is_a,
+                operation,
+                id,
+                accuracy,
+            ) {
+                result @ (Ok(_) | Err(GeometryError::UnresolvedIntersection(_))) => result,
+                Err(_) => Err(error),
+            }
+        }
+        result => result,
+    }
 }

@@ -302,10 +302,73 @@ fn placed_roundoff() -> Vec<Case> {
     every_operation("booleans.cylinders.placed-roundoff", "placed", &pair)
 }
 
+fn tilted_cuboid(degrees: f64) -> Result<BrepEnvelope, GeometryError> {
+    let (sin, cos) = degrees.to_radians().sin_cos();
+    let frame = Frame3 {
+        origin: [-5.0 * cos, 1.0 - 5.0 * sin, -5.0],
+        x: [cos, sin, 0.0],
+        y: [-sin, cos, 0.0],
+        z: [0.0, 0.0, 1.0],
+    };
+    primitives::cuboid("tilted-cuboid".into(), frame, [10.0; 3], fine())
+}
+
+fn oblique_half_spaces() -> Vec<Case> {
+    let mut cases = Vec::new();
+    for degrees in [20.0, 45.0, 70.0] {
+        let pair = operands(move || {
+            let host = cylinder("half-space-host", ground(), 0.5, 2.0)?;
+            Ok((host, tilted_cuboid(degrees)?))
+        });
+        cases.extend(full_family(
+            &format!("booleans.cylinder-box.oblique-{degrees}"),
+            &format!("oblique-{degrees}"),
+            &pair,
+        ));
+    }
+    let parallel = operands(|| {
+        let cuboid = primitives::cuboid(
+            "parallel-cuboid".into(),
+            at([-50.0, 0.0, -50.0]),
+            [100.0, 50.0, 100.0],
+            fine(),
+        )?;
+        Ok((sloped_host("sloped-host", 6.0)?, cuboid))
+    });
+    cases.extend(full_family(
+        "booleans.cylinder-box.oblique-parallel",
+        "oblique-parallel",
+        &parallel,
+    ));
+    let capped = operands(|| {
+        let plane = 0.3 + 0.15 * 40f64.to_radians().cos();
+        let cuboid = primitives::cuboid(
+            "capped-cuboid".into(),
+            at([plane, -50.0, -50.0]),
+            [50.0, 100.0, 100.0],
+            fine(),
+        )?;
+        Ok((sloped_host("capped-host", 0.3)?, cuboid))
+    });
+    cases.extend(full_family(
+        "booleans.cylinder-box.oblique-capped",
+        "oblique-capped",
+        &capped,
+    ));
+    cases
+}
+
+fn sloped_host(name: &str, height: f64) -> Result<BrepEnvelope, GeometryError> {
+    let (sin, cos) = 40f64.to_radians().sin_cos();
+    let frame = Frame3::from_axis([0.3, -0.2, 1.0], [cos, 0.0, sin], [0.0, 0.0, 1.0])?;
+    cylinder(name, frame, 0.5, height)
+}
+
 pub(crate) fn cases() -> Vec<Case> {
     [
         through_axes(),
         blind_pockets(),
+        oblique_half_spaces(),
         through_cut(),
         coaxial(),
         radial(),
