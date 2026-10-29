@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Brep } from '../dto/brep';
 import type { Measure, Validity } from '../dto/measure';
+import type { MirrorPlane } from '../dto/mirror';
 import type { NodeInfo } from '../dto/node-info';
 import type { Placement } from '../dto/placement';
 import { OGError } from '../errors';
@@ -23,7 +24,7 @@ import { register, unregister } from './body-registry';
 import { DisplayClone } from './display-clone';
 import {
   addChild, checkNode, classifyPoint, faceNormalAt, getBounds, getBrep, getChildren, getInstanceCount, getParent,
-  getPlacement, getWorldBrep, getWorldPlacement, localBounds, measure, removeChild, validity,
+  getPlacement, getWorldBrep, getWorldPlacement, localBounds, measure, mirror, removeChild, validity,
 } from './node-methods';
 import type { PointClassification } from './node-methods';
 import type { SystemAssembly } from './system-assembly';
@@ -199,6 +200,11 @@ export abstract class Body extends THREE.Group {
   measure(options: { deflection?: number } = {}): Measure {
     this.check(`${this.bodyType}.measure`);
     return measure(this.bodyType, this.ogId, options);
+  }
+
+  mirror(plane: MirrorPlane, options: { instances?: 'all' } = {}): void {
+    this.check(`${this.bodyType}.mirror`);
+    mirror(this.bodyType, this.ogId, plane, options);
   }
 
   validity(): Validity {

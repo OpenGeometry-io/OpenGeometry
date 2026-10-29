@@ -1,6 +1,6 @@
 use super::{changed, serialise, OGWorldGraph};
 use crate::bindings::{errors, params};
-use crate::world_graph::{EditScope, ModifyingOperation, Transform};
+use crate::world_graph::{EditScope, MirrorPlane, ModifyingOperation, Transform};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -36,6 +36,22 @@ impl OGWorldGraph {
         changed(
             self.inner
                 .shell(og_id, thickness, scope)
+                .map_err(errors::json)?,
+        )
+    }
+
+    pub fn mirror(
+        &mut self,
+        og_id: &str,
+        plane_json: &str,
+        scope_json: &str,
+    ) -> Result<String, JsValue> {
+        params::id(og_id).map_err(errors::json)?;
+        let plane: MirrorPlane = params::parse(plane_json).map_err(errors::json)?;
+        let scope: EditScope = params::parse(scope_json).map_err(errors::json)?;
+        changed(
+            self.inner
+                .mirror(og_id, plane, scope)
                 .map_err(errors::json)?,
         )
     }

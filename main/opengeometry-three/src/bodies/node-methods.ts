@@ -1,12 +1,14 @@
 import type { Bounds } from '../dto/bounds';
 import type { Brep } from '../dto/brep';
 import type { Measure, Validity } from '../dto/measure';
+import type { MirrorPlane } from '../dto/mirror';
 import type { Placement } from '../dto/placement';
 import { OGError } from '../errors';
 import { call } from '../kernel/kernel-session';
+import { flush } from '../rendering/geometry/geometry-scheduler';
 import { runtime } from '../runtime/runtime-state';
 import {
-  decodeBounds, decodeBrep, decodeChildren, decodeParent, decodePlacement, encode,
+  decodeBounds, decodeBrep, decodeChildren, decodeParent, decodePlacement, encode, scope,
 } from '../world-graph/codec';
 import { worldGraph } from '../world-graph/world-graph-client';
 
@@ -117,4 +119,9 @@ export function validity(owner: string, ogId: string): Validity {
   const value = call(label, (): unknown => worldGraph().validity(ogId));
   if (isValidity(value)) return value;
   throw new OGError('InvalidGeometry', label, 'malformed validity');
+}
+
+export function mirror(owner: string, ogId: string, plane: MirrorPlane, options: { instances?: 'all' }): void {
+  call(`${owner}.mirror`, () => worldGraph().mirror(ogId, encode(plane), scope(options)));
+  flush();
 }

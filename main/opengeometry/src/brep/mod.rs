@@ -34,7 +34,7 @@ pub use geometry::{
     SurfaceJet2,
 };
 pub(super) use pcurve::{period_lifted_uv, IntersectionSide, PcurveGeometry};
-pub use placement::placed;
+pub use placement::{mirror::mirrored, placed};
 pub use similarity::Similarity3;
 #[cfg(test)]
 pub(super) use topology::{circular_face, coarse_accuracy, fine_accuracy};

@@ -1,3 +1,4 @@
+pub(super) mod mirror;
 #[cfg(test)]
 mod tests;
 
@@ -71,7 +72,10 @@ pub fn placed(
         *max_error *= scale;
     }
     output.validate()?;
-    check_coordinate_precision(&output)?;
+    check_coordinate_precision(
+        &output,
+        "placement coordinate precision exceeds geometric tolerance",
+    )?;
     Ok(output)
 }
 
@@ -261,15 +265,13 @@ fn place_intersections(
     Ok(())
 }
 
-fn check_coordinate_precision(output: &BrepEnvelope) -> Result<(), GeometryError> {
+fn check_coordinate_precision(output: &BrepEnvelope, message: &str) -> Result<(), GeometryError> {
     if let Some(bounds) = output.bounds()? {
         let magnitude = norm(std::array::from_fn(|i| {
             bounds.axes[i].lo.abs().max(bounds.axes[i].hi.abs())
         }));
         if !magnitude.is_finite() || magnitude * 64.0 * f64::EPSILON > output.accuracy.geometric {
-            return Err(GeometryError::LimitExceeded(
-                "placement coordinate precision exceeds geometric tolerance".into(),
-            ));
+            return Err(GeometryError::LimitExceeded(message.into()));
         }
     }
     Ok(())

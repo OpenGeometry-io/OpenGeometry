@@ -24,20 +24,14 @@ pub(crate) fn provenance(
 }
 
 pub(crate) fn reverse(sense: Orientation) -> Orientation {
-    if sense == Orientation::Forward {
-        Orientation::Reverse
-    } else {
-        Orientation::Forward
-    }
+    sense.reversed()
 }
 
 pub(crate) fn reverse_face(brep: &mut BrepEnvelope, face: u32) {
     brep.topology.faces[face as usize].sense = reverse(brep.topology.faces[face as usize].sense);
     for h in &mut brep.topology.halfedges {
         if h.face == Some(face) {
-            std::mem::swap(&mut h.from, &mut h.to);
-            std::mem::swap(&mut h.next, &mut h.prev);
-            h.geometry_use.sense = reverse(h.geometry_use.sense);
+            h.reverse();
         }
     }
     for vertex in &mut brep.topology.vertices {

@@ -38,6 +38,7 @@ mod json;
 mod kernel;
 mod matrix;
 mod mesh;
+mod mirror;
 mod planar_shapes;
 mod profiles;
 mod record;
@@ -70,6 +71,7 @@ fn corpus() -> Result<Vec<Case>, Failure> {
         batch::cases(),
         batch_staged::cases(),
         shell::cases(),
+        mirror::cases(),
         creating::cases(),
         graph_session::cases(),
         graph_operate::cases(),

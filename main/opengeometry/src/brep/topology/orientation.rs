@@ -6,6 +6,12 @@ pub(crate) enum Orientation {
     Reverse,
 }
 impl Orientation {
+    pub(crate) fn reversed(self) -> Self {
+        match self {
+            Self::Forward => Self::Reverse,
+            Self::Reverse => Self::Forward,
+        }
+    }
     pub(crate) fn multiplier(self) -> f64 {
         if self == Self::Forward {
             1.0

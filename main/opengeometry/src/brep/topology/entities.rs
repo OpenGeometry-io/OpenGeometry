@@ -59,6 +59,13 @@ pub struct HalfEdge {
     pub(crate) wire_ref: Option<u32>,
     pub(crate) geometry_use: HalfEdgeGeometryUse,
 }
+impl HalfEdge {
+    pub(crate) fn reverse(&mut self) {
+        std::mem::swap(&mut self.from, &mut self.to);
+        std::mem::swap(&mut self.next, &mut self.prev);
+        self.geometry_use.sense = self.geometry_use.sense.reversed();
+    }
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Loop {
