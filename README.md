@@ -26,7 +26,7 @@
 
 > **Actively maintained and growing.** We're building OpenGeometry in the open. APIs, examples, and package structure are evolving, and we are actively improving and expanding the project. Star the repo to follow along. If you have questions or want to get involved, join the [Discord](https://discord.com/invite/9wJpbfgGGA) or check out the [issues](https://github.com/OpenGeometry-io/OpenGeometry/issues).
 
-> **Version note.** This README describes OpenGeometry 3.0. Check which line you have installed with `npm ls opengeometry`: the 2.0 line has a different API. The hosted documentation still describes 2.0.
+> **Version note.** This README describes OpenGeometry 3.0.0. Check which line you have installed with `npm ls opengeometry`: the 2.0 line has a different API. The hosted documentation still describes 2.0.
 
 ---
 
@@ -44,7 +44,7 @@ It is the geometry engine layer, not a full CAD application. Floorkit is a downs
 | --- | --- |
 | **Primitives** | Wires: rectangle, circle, polyline (open or closed), line-and-arc profile, arc. Solids: cuboid, cylinder, cylinder sector, sphere, cone or frustum, ring torus, planar polyhedron. Each can be placed on any plane. |
 | **Operations** | Extrude a closed wire into a solid, with holes. Sweep a profile along an open or closed path of lines and arcs, each arc an exact bend, capped into a solid, open-ended into a sheet, or closed into a ring. Revolve a closed line-and-arc profile a full turn about an axis in its plane. Shell a solid into a hollow one with walls of one thickness. Union, subtract and intersect, with one to a hundred tool solids in one call. |
-| **Parametric edits** | `rebuild` gives an existing body new parameters in place. |
+| **Parametric edits** | `rebuild` gives an existing body new parameters in place. `mirror` rebuilds a body as its reflection across a plane. |
 | **Assemblies** | Assemblies with parent and child placement; translate, rotate, scale and place; independent copies and shared instances. |
 | **History** | Marks with rollback and release; transactions, with a dry-run option. |
 | **Display for Three.js** | Every body is a `THREE.Group`. Level of detail that follows the camera, tessellation in a web worker or inline, picking down to face and edge, outlines, colour and opacity. |
@@ -174,6 +174,7 @@ This section is a compact reference for writing OpenGeometry 3.0 code, by hand o
 | Shell | `solid.operate(OG_OPERATION_SHELL, { thickness, instances? })` hollows the solid in place and leaves walls `thickness` thick inside every face. |
 | Transforms | `node.transform(kind, params)` on a body or an assembly: `OG_TRANSFORM_TRANSLATE` `{ offset }`, `OG_TRANSFORM_ROTATE` `{ axis, degrees, pivot? }`, `OG_TRANSFORM_SCALE` `{ factor, pivot? }`, `OG_TRANSFORM_PLACE` `{ origin?, xDirection?, normal?, scale? }`. `getPlacement()` and `getWorldPlacement()` return `{ origin, xDirection, normal, scale }`. |
 | Edits | `body.rebuild(kind, params, { instances? })` with the kinds and parameters above; a wire stays a wire and a solid a solid. |
+| Mirror | `body.mirror({ origin, normal }, { instances? })` rebuilds the shape as its reflection across the plane through `origin` with normal `normal`, both in the body's own coordinates (type `MirrorPlane`). The placement does not change. A placement cannot hold a reflection: a negative scale throws `InvalidTransform`. |
 | Copies | `body.duplicate({ ogId?, parent? })` makes an independent copy; `body.instance({ ogId?, parent? })` shares the shape. `getInstanceCount()`, `makeUnique()`. |
 | `SystemAssembly` | `new SystemAssembly({ ogId?, parent? })`. `addChild(children, { keepWorld? })`, `removeChild(child, { keepWorld? })`, `getChildren()`, `getParent()`, `getBounds()`, `transform`, `dispose()`. Bodies have the same tree methods. |
 | Queries | `getBounds()` (`[minX, minY, minZ, maxX, maxY, maxZ]`, or `null`), `getBrep()`, `getWorldBrep()` (the BRep placed in the world), `faceNormalAt(faceId, [x, y, z])` (the face's unit normal in the body's own coordinates), `classifyPoint([x, y, z])` (`'Inside'`, `'Outside'`, `'Boundary'` or `'Unknown'`, in the body's own coordinates), `measure({ deflection? })` (`{ volume, area, errorBound, deflection }`; the volume is within `errorBound` of the exact one), `validity()` (`{ valid, closed, bodyType, error? }`), `solid.getReport()` (the last boolean's report, or `null`). |
@@ -184,7 +185,7 @@ This section is a compact reference for writing OpenGeometry 3.0 code, by hand o
 | Events | `OpenGeometry.on(event, handler)` with `'geometry'`, `'warning'`, `'error'` or `'fatal'`; it returns a function that unsubscribes. |
 | STEP | `await OpenGeometry.exportStep({ nodes, unit?, upAxis?, name?, timestamp? })` returns `{ text, report }`. `nodes`: bodies, assemblies or `ogId` strings. `unit`: `'millimetre'` (default) or `'metre'`; `upAxis`: `'Z'` (default) or `'Y'`. |
 | IFC body | `OpenGeometry.exportIfcBody(solid)` returns the IFC exchange body (type `AnalyticExchangeBodyV2`): `schema_version` 2, world metres, Z up, `representation_type` `'AdvancedBrep'` or `'CSG'` for a solid with a cavity, `entities`, `solids` and `faces`. It refuses a Sheet, a Wire or an assembly. |
-| 2D regions | `OpenGeometry.booleanRegions2D(a, b, operation)` and `OpenGeometry.booleanCurvedRegions2D(a, b, operation)` with `'union'`, `'intersection'` or `'subtraction'`. Regions are rings of `{ x, y, z }` points at one height (type `OffsetRegion`) or of line and arc edges (type `CurvedRegion2D`), outer rings clockwise in XZ and holes counter-clockwise; the tolerance is `OG_REGION_TOLERANCE`. |
+| 2D regions | `OpenGeometry.booleanRegions2D(a, b, operation)` and `OpenGeometry.booleanCurvedRegions2D(a, b, operation)` with `'union'`, `'intersection'` or `'subtraction'`. A region is `{ outer, holes }`: an outer ring and a list of hole rings, each ring of `{ x, y, z }` points at one height (type `OffsetRegion`) or of line and arc edges (type `CurvedRegion2D`). Outer rings run clockwise in XZ and holes counter-clockwise. A plain ring is not a region and throws `InvalidParameter`; the tolerance is `OG_REGION_TOLERANCE`. |
 | 2D offsets | `OpenGeometry.offsetRingVariable(ring, distances, holes?)` insets a closed ring by one distance per edge, each hole `{ ring, distances }` grown by its own; `OpenGeometry.offsetPolylineRegions(path, width, closed, miterLimit?)` strokes a path. Both return `CurvedRegion2D[]` with exact arcs. `OpenGeometry.offsetPolyline(path, distance, { acuteThresholdDegrees?, bevel?, closed? })` offsets a path to one side and returns `{ edges, bevelled, closed }` (type `OffsetPath2D`). Rings and paths are flat `[x, y, z, ...]` lists; `y` is ignored. |
 | `OGError` | Failures throw an `OGError` with `code` (for example `InvalidParameter`, `SharedShape`, `Disposed`), `call`, `message` and `details`. |
 | Reset | `OpenGeometry.reset()` frees every body and leaves an empty document. |
