@@ -1,7 +1,9 @@
 use super::classification::PointClassification;
 use super::face_trim::face_contains_uv;
 use super::ray_roots::{ray_box_domain, support_roots};
-use crate::brep::{unit, BrepEnvelope, Face, GeometryError, SolidRegion, Surface};
+use crate::brep::{
+    unit, BrepEnvelope, Face, GeometryError, SolidRegion, Surface, SurfaceGeometry, UV,
+};
 use crate::math::{dot, norm, scale, sub, Point3};
 
 fn classify_with_ray<'a>(
@@ -125,6 +127,11 @@ pub(crate) fn classify_point_in_shell(
     faces: &[u32],
     point: Point3,
 ) -> Result<PointClassification, GeometryError> {
+    for face in faces {
+        if on_face(brep, &brep.topology.faces[*face as usize], point)? {
+            return Ok(PointClassification::Boundary);
+        }
+    }
     let directions = [
         unit([1.0, 0.371, 0.127])?,
         unit([0.193, 1.0, 0.419])?,
@@ -144,4 +151,58 @@ pub(crate) fn classify_point_in_shell(
         }
     }
     Ok(PointClassification::Unknown)
+}
+
+fn on_face(brep: &BrepEnvelope, face: &Face, point: Point3) -> Result<bool, GeometryError> {
+    let surface = brep.geometry.surface(face.surface)?;
+    let uv = match surface.project(point, None) {
+        Ok(uv) => uv,
+        Err(GeometryError::SingularParameterization) => {
+            return Ok(near_face_vertex(brep, face, point))
+        }
+        Err(error) => return Err(error),
+    };
+    if norm(sub(surface.point_at(uv)?, point)) > brep.accuracy.geometric {
+        return Ok(false);
+    }
+    let uv = within_face_bounds(surface, face, uv, brep.accuracy.geometric)?;
+    Ok(face_contains_uv(brep, face, uv)? != Some(false))
+}
+
+fn within_face_bounds(
+    surface: &SurfaceGeometry,
+    face: &Face,
+    uv: UV,
+    geometric: f64,
+) -> Result<UV, GeometryError> {
+    let jet = surface.derivatives(uv)?;
+    let lengths = [norm(jet.du), norm(jet.dv)];
+    let periods = surface.charts()[face.trim.chart as usize].periods;
+    Ok(std::array::from_fn(|axis| {
+        let bounds = face.trim.uv_bounds[axis];
+        let value = periods[axis].map_or(uv[axis], |period| {
+            uv[axis] + ((bounds.midpoint() - uv[axis]) / period).round() * period
+        });
+        let slack = geometric / lengths[axis];
+        if value < bounds.lo && bounds.lo - value <= slack {
+            bounds.lo
+        } else if value > bounds.hi && value - bounds.hi <= slack {
+            bounds.hi
+        } else {
+            value
+        }
+    }))
+}
+
+fn near_face_vertex(brep: &BrepEnvelope, face: &Face, point: Point3) -> bool {
+    brep.topology
+        .halfedges
+        .iter()
+        .filter(|halfedge| halfedge.face == Some(face.id))
+        .any(|halfedge| {
+            norm(sub(
+                brep.topology.vertices[halfedge.from as usize].position,
+                point,
+            )) <= brep.accuracy.geometric
+        })
 }
