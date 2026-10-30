@@ -9,6 +9,7 @@ declare module 'node:fs' {
   export function readFileSync(path: string | URL): Uint8Array;
   export function readdirSync(path: string, options: { withFileTypes: true; recursive?: boolean }): Dirent[];
   export function existsSync(path: string): boolean;
+  export function rmSync(path: string, options?: { recursive?: boolean; force?: boolean }): void;
   export function mkdirSync(path: string, options?: { recursive?: boolean }): string | undefined;
   export function openSync(path: string, flags: string): number;
   export function writeSync(fd: number, text: string): number;

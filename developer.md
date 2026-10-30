@@ -24,10 +24,12 @@ npm run build              # Full pipeline: Rust → WASM → TS bundle → main
 npm test                   # Cargo unit + integration tests
 ```
 
-`npm run build` runs `build-core` (wasm-pack only), then `rollup -c`, then
+`npm run build` runs `build-core` (wasm-pack only), then
+`node scripts/build/clean-dist.mjs` (remove `dist/`), then `rollup -c`, then
 `node scripts/build/prepare-dist.mjs` (copy WASM, package metadata, the README and the
-licence) in order, all inside `main/`. There is no clean step. Running the stages out of
-order produces stale `pkg/` and bundle mismatches.
+licence) in order, all inside `main/`. Each build starts from an empty `dist/`, so no file
+from an earlier build stays. Running the stages out of order produces stale `pkg/` and
+bundle mismatches.
 
 ## Running the example app
 

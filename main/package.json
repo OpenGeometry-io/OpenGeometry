@@ -42,7 +42,7 @@
   },
   "scripts": {
     "build-core": "cd opengeometry && wasm-pack build --target web --out-dir pkg",
-    "build": "npm run build-core && rollup -c && node scripts/build/prepare-dist.mjs",
+    "build": "npm run build-core && node scripts/build/clean-dist.mjs && rollup -c && node scripts/build/prepare-dist.mjs",
     "lint:check": "eslint .",
     "lint:fix": "eslint --fix .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.examples.json && tsc --noEmit -p tsconfig.tests.json && tsc --noEmit -p tsconfig.scripts.json",
