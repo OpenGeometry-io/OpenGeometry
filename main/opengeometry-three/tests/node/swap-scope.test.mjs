@@ -274,8 +274,7 @@ async function disposeCost(world) {
 }
 
 async function costs(world) {
-  /** @type {{ rebuild: number[], settled: number[], dispose: number[] }} */
-  const sample = { rebuild: [], settled: [], dispose: [] };
+  const sample = { rebuild: [Infinity], settled: [Infinity], dispose: [Infinity] };
   for (let round = 0; round < ROUNDS; round++) {
     sample.rebuild.push(await rebuildCost(world, round));
     sample.settled.push(await settledCost(world, round));
@@ -289,8 +288,7 @@ async function costs(world) {
 test('cost per body at 4,000 live bodies is at most 2x the cost at 1,000', async (context) => {
   await fresh();
   const world = { scene: new THREE.Scene(), view: camera(), live: [] };
-  /** @type {Map<number, Map<string, number>>} */
-  const best = new Map([[1000, new Map()], [4000, new Map()]]);
+  const best = new Map([[1000, new Map([['rebuild', Infinity]])], [4000, new Map([['rebuild', Infinity]])]]);
   try {
     for (const size of [1000, 4000, 1000, 4000]) {
       await resize(world, size);
