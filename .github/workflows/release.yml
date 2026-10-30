@@ -1,10 +1,7 @@
 name: Release Package
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,43 +13,29 @@ jobs:
   check-version:
     runs-on: ubuntu-latest
     outputs:
-      version-changed: ${{ steps.version-check.outputs.changed }}
-      current-version: ${{ steps.version-check.outputs.current-version }}
-      previous-version: ${{ steps.version-check.outputs.previous-version }}
-      is-valid-increment: ${{ steps.version-check.outputs.is-valid-increment }}
+      current-version: ${{ steps.current-version.outputs.version }}
       npm-exists: ${{ steps.npm-check.outputs.exists }}
       should-publish: ${{ steps.publish-decision.outputs.should-publish }}
     
     steps:
       - name: Checkout current commit
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '26'
 
       - name: Get current version
         id: current-version
         run: |
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          CURRENT_VERSION=$(node -p "require('./main/package.json').version")
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Get previous version
-        id: previous-version
-        run: |
-          # Get the previous commit
-          PREV_COMMIT=$(git rev-parse HEAD~1)
-          # Get package.json from previous commit
-          PREV_VERSION=$(git show $PREV_COMMIT:package.json | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version")
-          echo "version=$PREV_VERSION" >> $GITHUB_OUTPUT
 
       - name: Check if current version exists on NPM
         id: npm-check
         run: |
-          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_NAME=$(node -p "require('./main/package.json').name")
           CURRENT_VERSION="${{ steps.current-version.outputs.version }}"
           
           echo "Checking if $PACKAGE_NAME@$CURRENT_VERSION exists on NPM..."
@@ -65,70 +48,27 @@ jobs:
             echo "❌ Version $CURRENT_VERSION does not exist on NPM"
           fi
 
-      - name: Check version change and validate increment
-        id: version-check
-        run: |
-          CURRENT="${{ steps.current-version.outputs.version }}"
-          PREVIOUS="${{ steps.previous-version.outputs.version }}"
-          
-          echo "current-version=$CURRENT" >> $GITHUB_OUTPUT
-          echo "previous-version=$PREVIOUS" >> $GITHUB_OUTPUT
-          
-          if [ "$CURRENT" != "$PREVIOUS" ]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "Version changed from $PREVIOUS to $CURRENT"
-            
-            # Install semver for version comparison
-            npm install -g semver
-            
-            # Check if current version is greater than previous
-            if semver gt "$CURRENT" "$PREVIOUS"; then
-              echo "is-valid-increment=true" >> $GITHUB_OUTPUT
-              echo "✅ Valid version increment: $PREVIOUS → $CURRENT"
-            else
-              echo "is-valid-increment=false" >> $GITHUB_OUTPUT
-              echo "❌ Invalid version increment: $PREVIOUS → $CURRENT"
-              echo "Current version must be greater than previous version"
-              exit 1
-            fi
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "Version unchanged: $CURRENT"
-          fi
-
       - name: Decide whether to publish
         id: publish-decision
         run: |
-          VERSION_CHANGED="${{ steps.version-check.outputs.changed }}"
-          IS_VALID_INCREMENT="${{ steps.version-check.outputs.is-valid-increment }}"
           NPM_EXISTS="${{ steps.npm-check.outputs.exists }}"
           CURRENT_VERSION="${{ steps.current-version.outputs.version }}"
-          
-          echo "🔍 Publishing Decision Matrix:"
-          echo "  Version Changed: $VERSION_CHANGED"
-          echo "  Valid Increment: $IS_VALID_INCREMENT"  
-          echo "  Exists on NPM: $NPM_EXISTS"
-          echo "  Current Version: $CURRENT_VERSION"
-          
-          # Publish if:
-          # 1. Version changed AND it's a valid increment, OR
-          # 2. Current version doesn't exist on NPM (failed previous build)
-          if [[ "$VERSION_CHANGED" == "true" && "$IS_VALID_INCREMENT" == "true" ]] || [[ "$NPM_EXISTS" == "false" ]]; then
+
+          echo "Exists on NPM: $NPM_EXISTS"
+          echo "Current Version: $CURRENT_VERSION"
+
+          if [[ "$NPM_EXISTS" == "false" ]]; then
             echo "should-publish=true" >> $GITHUB_OUTPUT
-            if [[ "$VERSION_CHANGED" == "true" ]]; then
-              echo "✅ Will publish: Version increment detected"
-            else
-              echo "✅ Will publish: Version missing from NPM (likely failed previous build)"
-            fi
+            echo "✅ Will publish: Version $CURRENT_VERSION is not on NPM"
           else
             echo "should-publish=false" >> $GITHUB_OUTPUT
-            echo "⏭️ Will skip: Version unchanged and already exists on NPM"
+            echo "⏭️ Will skip: Version $CURRENT_VERSION already exists on NPM"
           fi
 
   build-and-publish:
     needs: check-version
     runs-on: ubuntu-latest
-    if: needs.check-version.outputs.should-publish == 'true'
+    if: github.ref == 'refs/heads/main' && needs.check-version.outputs.should-publish == 'true'
     
     steps:
       - name: Checkout code
@@ -137,67 +77,82 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '26'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          override: true
+          toolchain: '1.88.0'
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - id: wasm-pack
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-pack
+          key: wasm-pack-0.13.1-${{ runner.os }}-${{ runner.arch }}
 
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        if: steps.wasm-pack.outputs.cache-hit != 'true'
+        run: cargo install wasm-pack --version 0.13.1 --locked
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
             main/opengeometry/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+            main/opengeometry/test-support/target
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('main/**/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache Node.js dependencies
         uses: actions/cache@v3
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('main/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
 
       - name: Install dependencies
+        working-directory: main
         run: npm ci
 
-      - name: Lint TypeScript
-        run: npm run lint:check
+      - name: Fetch crate dependencies
+        working-directory: main
+        run: |
+          git ls-files '*Cargo.lock' | while read -r lock; do
+            cargo fetch --locked --manifest-path "$(dirname "$lock")/Cargo.toml"
+          done
 
       - name: Run build
+        working-directory: main
         run: npm run build
 
       - name: Verify dist directory
         run: |
           echo "Checking dist directory contents:"
-          ls -la dist/
+          ls -la main/dist/
           echo "Checking if package.json exists in dist:"
-          if [ -f "dist/package.json" ]; then
+          if [ -f "main/dist/package.json" ]; then
             echo "✅ package.json found in dist"
-            echo "Dist package version: $(node -p "require('./dist/package.json').version")"
+            echo "Dist package version: $(node -p "require('./main/dist/package.json').version")"
           else
             echo "❌ package.json not found in dist"
             exit 1
           fi
 
-      - name: Run tests
-        run: npm test
+      - name: Run checks
+        working-directory: main
+        run: npm run check
 
       - name: Final NPM existence check
         id: final-npm-check
         run: |
-          PACKAGE_NAME=$(node -p "require('./dist/package.json').name")
+          PACKAGE_NAME=$(node -p "require('./main/dist/package.json').name")
           VERSION="${{ needs.check-version.outputs.current-version }}"
           
           echo "🔍 Final check before publishing..."
@@ -211,9 +166,8 @@ jobs:
 
       - name: Publish to NPM
         if: steps.final-npm-check.outputs.exists == 'false'
-        run: |
-          cd dist
-          npm publish --access public
+        working-directory: main/dist
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -226,7 +180,7 @@ jobs:
           body: |
             ## Changes in v${{ needs.check-version.outputs.current-version }}
             
-            ${{ needs.check-version.outputs.version-changed == 'true' && format('Version bumped from {0} to {1}', needs.check-version.outputs.previous-version, needs.check-version.outputs.current-version) || format('Recovery publish for version {0}', needs.check-version.outputs.current-version) }}
+            Published from a manual run of the release workflow.
             
             ### Package Information
             - **Package Name**: opengeometry  
@@ -256,11 +210,7 @@ jobs:
           echo "**Package**: [opengeometry@${{ needs.check-version.outputs.current-version }}](https://www.npmjs.com/package/opengeometry)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Publish Reason" >> $GITHUB_STEP_SUMMARY
-          if [[ "${{ needs.check-version.outputs.version-changed }}" == "true" ]]; then
-            echo "- 📈 Version increment: ${{ needs.check-version.outputs.previous-version }} → ${{ needs.check-version.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- 🔄 Recovery publish: Version was missing from NPM registry" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "- Manual run: Version was not on NPM" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "- Check the [NPM package page](https://www.npmjs.com/package/opengeometry)" >> $GITHUB_STEP_SUMMARY
@@ -286,13 +236,9 @@ jobs:
         run: |
           echo "## ⏭️ Build Skipped" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Reason**: No version change and package already exists on NPM" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason**: This version already exists on NPM" >> $GITHUB_STEP_SUMMARY
           echo "**Current Version**: ${{ needs.check-version.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
           echo "**NPM Status**: ✅ Already published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### To trigger a new release:" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo 'npm version patch  # for bug fixes' >> $GITHUB_STEP_SUMMARY
-          echo 'npm version minor  # for new features' >> $GITHUB_STEP_SUMMARY
-          echo 'npm version major  # for breaking changes' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "### To publish a new release:" >> $GITHUB_STEP_SUMMARY
+          echo "Bump the version in main/package.json, main/package-lock.json, main/opengeometry/Cargo.toml, main/opengeometry/Cargo.lock and main/opengeometry/test-support/Cargo.lock, merge to main, then start this workflow by hand on main." >> $GITHUB_STEP_SUMMARY

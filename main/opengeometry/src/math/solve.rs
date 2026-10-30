@@ -1,13 +1,13 @@
-use super::{finite, MathError};
+use super::error::{finite, MathError};
 
 #[derive(Clone, Debug)]
 pub struct LinearSolution<const N: usize> {
-    pub value: [f64; N],
+    pub(crate) value: [f64; N],
     pub residual: f64,
-    pub minimum_scaled_pivot: f64,
+    pub(crate) minimum_scaled_pivot: f64,
 }
 
-pub fn solve<const N: usize>(
+pub(crate) fn solve<const N: usize>(
     matrix: [[f64; N]; N],
     rhs: [f64; N],
 ) -> Result<LinearSolution<N>, MathError> {
@@ -75,38 +75,4 @@ pub fn solve<const N: usize>(
         residual,
         minimum_scaled_pivot,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pivoting_and_row_scaling_recover_known_solution() {
-        let matrix = [
-            [0.0, 2.0, 1.0, 0.0],
-            [1e-12, 0.0, 0.0, 2e-12],
-            [1.0, 1.0, 1.0, 1.0],
-            [2.0, 0.0, 3.0, 1.0],
-        ];
-        let expected = [1.0, -2.0, 3.0, 0.5];
-        let rhs = matrix.map(|row| row.into_iter().zip(expected).map(|(a, x)| a * x).sum());
-        let solution = solve(matrix, rhs).unwrap();
-        for (a, b) in solution.value.into_iter().zip(expected) {
-            assert!((a - b).abs() < 1e-12);
-        }
-        assert!(solution.residual < 1e-12);
-    }
-
-    #[test]
-    fn singular_and_nonfinite_systems_return_errors() {
-        assert!(matches!(
-            solve([[1.0, 2.0], [2.0, 4.0]], [1.0, 2.0]),
-            Err(MathError::SingularSystem)
-        ));
-        assert!(matches!(
-            solve([[f64::NAN]], [1.0]),
-            Err(MathError::NonFinite)
-        ));
-    }
 }

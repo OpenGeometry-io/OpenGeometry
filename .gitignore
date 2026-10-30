@@ -25,22 +25,25 @@ node_modules/
 
 # JS/TS build artifacts
 dist/
-main/opengeometry-three/examples-dist/
-main/opengeometry-three/examples-vite/.generated/
 main/opengeometry/pkg/
+main/dist/
+main/opengeometry-three/examples-dist/
+main/**/target/
+main/test-results/
+main/playwright-report/
+main/.check/
+!main/opengeometry/Cargo.lock
+!main/opengeometry/test-support/Cargo.lock
 
 .DS_Store
 .vscode/
 settings.json
-# Track .claude/settings.json (team hook config); keep .claude/settings.local.json ignored.
-!.claude/settings.json
-.claude/settings.local.json
-.claude/scheduled_tasks.lock
+.claude/
 
 # AI and documentation files
 .requests/*.md
 .github/*.md
-# Agent instructions now live outside the repo (see AGENTS.md stub).
+# Agent instructions are never committed.
 AGENTS.md
 CLAUDE.md
 

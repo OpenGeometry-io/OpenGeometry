@@ -1,34 +1,20 @@
-pub mod interval;
-pub mod predicates;
-pub mod roots;
-pub mod solve;
+mod error;
+mod interval;
+mod predicates;
+mod roots;
+mod solve;
+mod union_find;
+mod vector;
 
-use serde::{Deserialize, Serialize};
-use std::fmt;
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum MathError {
-    NonFinite,
-    ArithmeticRange,
-    InvalidInterval,
-    DivisionByZero,
-    SingularSystem,
-    InvalidDimension,
-    IterationLimit,
-}
-
-impl fmt::Display for MathError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
-
-impl std::error::Error for MathError {}
-
-pub(crate) fn finite(value: f64) -> Result<f64, MathError> {
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(MathError::NonFinite)
-    }
-}
+pub(super) use error::finite;
+pub use error::MathError;
+pub use interval::Interval;
+pub use predicates::{discriminant, incircle2d, orient2d, orient3d, Sign};
+pub(super) use predicates::{plane_sphere_relation, sphere_sphere_relation};
+pub use roots::RootCandidates;
+pub(super) use roots::{isolate_candidates, quadratic, QuadraticRoots};
+pub(super) use solve::solve;
+pub use solve::LinearSolution;
+pub(super) use union_find::{find, union};
+pub use vector::Point3;
+pub(super) use vector::{add, cross, dot, norm, scale, sub};

@@ -132,7 +132,7 @@ Call `lod.update(camera, renderer.domElement.height)` each frame. Visible bodies
 
 Await `lod.refine(worldDeflection)` before image export to require explicit refinement. Positive uniform scale adjusts local deflection; unsupported placement returns an error. Render LOD never refreshes authored scene snapshots.
 
-OpenPlans `OpenThree.enableAnalyticLod(options)` uses this service. Await `syncAnalyticLod()` after authored tree replacements, then `refineAnalyticView(deflection)` before synchronous image capture. The downstream `views/analytic-rendering.html` example exercises those calls and semantic v2 exchange. Current development uses the local tested kernel artifact; a coordinated published major release remains pending.
+Floorkit `OpenThree.enableAnalyticLod(options)` uses this service. Await `syncAnalyticLod()` after authored tree replacements, then `refineAnalyticView(deflection)` before synchronous image capture. The downstream `views/analytic-rendering.html` example exercises those calls and semantic v2 exchange. Current development uses the local tested kernel artifact; a coordinated published major release remains pending.
 
 ## Feature outlines
 

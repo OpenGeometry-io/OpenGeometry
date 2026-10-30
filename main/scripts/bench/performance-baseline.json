@@ -1,0 +1,25 @@
+{
+  "sizes": {
+    "wall50Triangles": 1220,
+    "sliderTriangles": 92,
+    "mitred20Triangles": 332,
+    "storeyStepBytes": 48476818,
+    "storeyStepEntities": 830410,
+    "nonparallelCylinderStepBytes": 4924611
+  },
+  "timings": {
+    "darwin-arm64": {
+      "measuredOn": "2026-10-01",
+      "wall50BooleanMs": 627.670167,
+      "wall50TessellationMs": 19.105958,
+      "rotated20BooleanMs": 119.950083,
+      "mitred20BooleanMs": 637.486417,
+      "sliderRebuildMs": 1.542709,
+      "sliderBooleanMs": 9.603958,
+      "sliderTessellationMs": 1.4455,
+      "storeyFirstRenderMs": 341.2,
+      "storeyTransformFlushMs": 13.1,
+      "storeyStepMs": 1615.8
+    }
+  }
+}

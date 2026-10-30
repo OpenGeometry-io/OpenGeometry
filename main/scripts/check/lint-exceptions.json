@@ -1,0 +1,31 @@
+{
+  "returnTypeNames": {
+    "owner": "permanent",
+    "reason": "No public member needs an implicit return type now that kernel payloads have DTO types; the list stays so a later exemption is declared here.",
+    "names": []
+  },
+  "exceptions": [
+    {
+      "owner": "permanent",
+      "files": ["opengeometry-three/src/bodies/body.ts"],
+      "rules": ["@typescript-eslint/no-unsafe-type-assertion"],
+      "reason": "clone() returns a DisplayClone, which cannot be typed as this; a display copy is a plain Group, not a Body."
+    },
+    {
+      "owner": "permanent",
+      "files": ["opengeometry-three/src/rendering/inline-backend.ts"],
+      "rules": ["@typescript-eslint/no-empty-function"],
+      "reason": "The no-op members satisfy TessellationProvider, whose shape C5 owns."
+    },
+    {
+      "owner": "permanent",
+      "files": [
+        "opengeometry-three/tests/browser/pages/acceptance.ts",
+        "opengeometry-three/tests/browser/pages/acceptance-probes.ts",
+        "opengeometry-three/tests/browser/pages/smoke.ts"
+      ],
+      "rules": ["@typescript-eslint/no-unsafe-return", "@typescript-eslint/no-unsafe-type-assertion"],
+      "reason": "The pages read graph() payloads through dist/testing.js, whose glue methods return any or JSON text, and assert them."
+    }
+  ]
+}

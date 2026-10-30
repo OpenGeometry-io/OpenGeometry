@@ -1,19 +1,16 @@
-use super::{
-    finite,
-    interval::Interval,
-    predicates::{discriminant_estimate, Sign},
-    MathError,
-};
+use super::error::{finite, MathError};
+use super::interval::Interval;
+use super::predicates::{discriminant_estimate, Sign};
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum QuadraticRoots {
+pub(crate) enum QuadraticRoots {
     Empty,
     One(f64),
     Two([f64; 2]),
     IdenticallyZero,
 }
 
-pub fn quadratic(a: f64, b: f64, c: f64) -> Result<QuadraticRoots, MathError> {
+pub(crate) fn quadratic(a: f64, b: f64, c: f64) -> Result<QuadraticRoots, MathError> {
     for value in [a, b, c] {
         finite(value)?;
     }
@@ -57,23 +54,23 @@ pub fn quadratic(a: f64, b: f64, c: f64) -> Result<QuadraticRoots, MathError> {
     }
 }
 
-pub fn polynomial_bounds(coefficients: &[f64], domain: Interval) -> Result<Interval, MathError> {
+fn polynomial_bounds(coefficients: &[f64], domain: Interval) -> Result<Interval, MathError> {
     Interval::new(domain.lo, domain.hi)?;
     let mut result = Interval::point(0.0)?;
     for &coefficient in coefficients.iter().rev() {
-        result = result.mul(domain)?.add(Interval::point(coefficient)?)?;
+        result = result
+            .mul_interval(domain)?
+            .add_interval(Interval::point(coefficient)?)?;
     }
     Ok(result)
 }
 
 #[derive(Clone, Debug)]
 pub struct RootCandidates {
-    pub intervals: Vec<Interval>,
-    pub visited: usize,
+    pub(crate) intervals: Vec<Interval>,
 }
 
-// Every root is enclosed; a candidate interval need not actually contain a root.
-pub fn isolate_candidates(
+pub(crate) fn isolate_candidates(
     coefficients: &[f64],
     domain: Interval,
     width: f64,
@@ -117,60 +114,5 @@ pub fn isolate_candidates(
             pending.push(Interval::new(current.lo, middle)?);
         }
     }
-    Ok(RootCandidates { intervals, visited })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn stable_quadratic_preserves_small_root_and_contacts() {
-        let QuadraticRoots::Two(roots) = quadratic(1.0, -1e8, 1.0).unwrap() else {
-            panic!("two roots expected")
-        };
-        assert!((roots[0] - 1e-8).abs() < 1e-22);
-        assert!((roots[1] - 1e8).abs() < 1e-7);
-        assert_eq!(quadratic(1.0, 2.0, 1.0), Ok(QuadraticRoots::One(-1.0)));
-        assert_eq!(quadratic(1.0, 0.0, 1.0), Ok(QuadraticRoots::Empty));
-        assert_eq!(
-            quadratic(0.0, 0.0, 0.0),
-            Ok(QuadraticRoots::IdenticallyZero)
-        );
-    }
-
-    #[test]
-    fn subdivision_preserves_simple_and_even_multiplicity_roots() {
-        let roots = isolate_candidates(
-            &[0.0, 0.0, -1.0, 0.0, 1.0],
-            Interval::new(-2.0, 2.0).unwrap(),
-            1e-4,
-            100_000,
-        )
-        .unwrap();
-        for expected in [-1.0, 0.0, 1.0] {
-            assert!(roots.intervals.iter().any(|i| i.contains(expected)));
-        }
-        assert_eq!(
-            isolate_candidates(
-                &[1.0, 0.0, 1.0],
-                Interval::new(-2.0, 2.0).unwrap(),
-                1e-4,
-                100
-            )
-            .unwrap()
-            .intervals
-            .len(),
-            0
-        );
-        assert!(matches!(
-            isolate_candidates(
-                &[-1.0, 0.0, 1.0],
-                Interval::new(-2.0, 2.0).unwrap(),
-                1e-8,
-                1
-            ),
-            Err(MathError::IterationLimit)
-        ));
-    }
+    Ok(RootCandidates { intervals })
 }
