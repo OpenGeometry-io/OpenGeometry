@@ -493,7 +493,10 @@ console.log(pan.getReport()?.handlers, cistern.getReport()?.handlers, bowl.ogId)
 | `new AnalyticSolid({ kind: 'planarPolyhedron', vertices, faces })` | `new Solid(OG_PRIMITIVE_POLYHEDRON, { points: vertices, faces })`; a 2.0 `frame` becomes `plane`, which places the body instead of mapping each vertex, so check the result |
 | `new Arc({ center, radius, startAngle, sweepAngle })` | `new Wire(OG_PRIMITIVE_ARC, { radius, startAngle, sweepAngle }, { plane: { origin: [center.x, center.y, center.z] } })` |
 | `AnalyticSolid.fromBrep(solid.getWorldBrepSerialized())`, to read a world copy | `body.getWorldBrep()`, which returns the BRep object and makes no body; for a copy you will change, `body.duplicate()` |
-| `solid.normalAtFace(faceId, new Vector3(x, y, z))` | `body.faceNormalAt(faceId, [x, y, z])`, which returns `[x, y, z]` |
+| `solid.normalAtFace(faceId, new Vector3(x, y, z))` | `body.faceNormalAt(faceId, [x, y, z])`, which returns `[x, y, z]`. `normalAtFace` came from 2.0 and was removed in 2.5 |
+| `new Sphere({ center, radius })` | `new Solid(OG_PRIMITIVE_SPHERE, { radius }, { plane: { origin: [center.x, center.y, center.z] } })`. `Sphere` came from 2.0 and was removed in 2.5. Always give `radius`; 2.0 used 1 when you left it out |
+| `solid.shell(thickness, { deflection, color })` | `solid.operate(OG_OPERATION_SHELL, { thickness })`. `shell` came from 2.0 and was removed in 2.5. 2.0 returned a new hollow solid and kept the first one; 3.0 hollows the solid in place and returns nothing, so to keep the first solid, hollow `solid.duplicate()`. The options become `solid.setAppearance({ deflection, color })`, with `color` a number |
+| `solid.classifyPoint(new Vector3(x, y, z))` | `body.classifyPoint([x, y, z])`. `classifyPoint` came from 2.0 and was removed in 2.5. 2.0 took a world point; 3.0 takes a point in the body's own coordinates, those of `getBrep()`. For a world point, first use `body.worldToLocal(new THREE.Vector3(x, y, z))` after `OpenGeometry.flush()`. 2.0 returned `'inside'`, `'outside'`, `'boundary'` or `'unknown'`; 3.0 returns `'Inside'`, `'Outside'`, `'Boundary'` or `'Unknown'` |
 | `new Sweep({ path, profile, capStart: false, capEnd: false })` | `new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false })`, with the profile and path as wires (see the 2.0 to 2.5 sweep rows) |
 | `new Sweep({ path, profile, capStart: true, capEnd: true })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })` |
 | `new Sweep({ path: points along an arc, profile })` | `new Solid(OG_OPERATION_SWEEP, { profile, path })` with `path` an `OG_PRIMITIVE_ARC` wire, or an open `OG_PRIMITIVE_PROFILE` whose arc segments meet its lines tangentially |
@@ -737,6 +740,8 @@ These are gone:
 - Sweep caps (`capStart`, `capEnd`).
 - `OpenGeometry.version`, `enableDebug` and the `debugMeshes` option.
 - The `create*Example` builders.
+
+`Sphere`, `shell`, `classifyPoint` and `normalAtFace` came back in 3.0 in a new form; [Replace this with that](#replace-this-with-that) in 2.5 to 3.0 gives the 3.0 calls.
 
 A 2.0 export this guide does not name has no direct 2.5 form; the full 2.5 surface is `index.d.ts` in the package.
 
