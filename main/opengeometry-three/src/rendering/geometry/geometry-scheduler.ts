@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import type { ChangeSet } from '../../dto/change-set';
 import type { DisplayBuffers } from '../../dto/display-buffers';
 import { OGError } from '../../errors';
@@ -8,7 +9,8 @@ import { emit } from '../../runtime/event-bus';
 import { bodyKey, currentRuntime, reindexShape, runtime, type Runtime } from '../../runtime/runtime-state';
 import { decodeChangeSet } from '../../world-graph/codec';
 import {
-  clearError, displayedBodies, isDisplayed, markFailed, recordError, retryBucket, shapePriority, wantedKey,
+  clearError, displayedBodies, isDisplayed, markFailed, recordError, retryBucket, shapePriority, stampDisplayed,
+  wantedKey,
 } from '../lod/lod-controller';
 import type { TessellationRequest } from '../provider';
 import { GeometryRecord } from '../records/geometry-record';
@@ -16,13 +18,36 @@ import { validateDisplayBuffers } from '../records/validate-display-buffers';
 
 type GeometryTarget = { body: Body; shapeId: string; revision: number; bucket: number; key: string };
 
-export function flush(options: { geometry?: 'sync' } = {}): void {
+export type FlushOptions = { geometry?: 'sync'; bodies?: readonly Body[] };
+
+export function flush(options: FlushOptions = {}): void {
   const state = runtime();
+  const given = options.bodies && liveBodies(state, options.bodies, options.geometry);
   applyFlush(state);
-  if (options.geometry === 'sync') {
-    for (const body of displayedBodies(state)) ensureGeometry(body, true);
-    if (state.readyShapes.size > 0) flush();
+  if (options.geometry !== 'sync') return;
+  for (const body of given ?? displayedBodies(state)) {
+    if (given && (!body.visible || !body.lastInfo.shapeId || body.lastInfo.shapeRevision === null)) continue;
+    if (given) stampDisplayed(state, body);
+    ensureGeometry(body, true);
   }
+  if (state.readyShapes.size > 0) applyFlush(state);
+}
+
+function liveBodies(state: Runtime, bodies: readonly Body[], geometry: FlushOptions['geometry']): readonly Body[] {
+  const label = 'OpenGeometry.flush';
+  if (geometry !== 'sync') throw new OGError('InvalidParameter', label, "bodies needs geometry: 'sync'");
+  const list: unknown = bodies;
+  if (!Array.isArray(list)) throw new OGError('InvalidParameter', label, 'bodies must be an array of bodies');
+  for (const body of bodies) {
+    const item: unknown = body;
+    if (!(item instanceof THREE.Object3D) || !('swapReadyRecord' in item)) {
+      throw new OGError('InvalidParameter', label, 'bodies must hold only Wire, Sheet or Solid bodies');
+    }
+    if (state.bodies.get(bodyKey(body.handle, body.generation)) !== body) {
+      throw new OGError('Disposed', 'OpenGeometry.flush', `${body.ogId} is disposed`);
+    }
+  }
+  return bodies;
 }
 
 export function flushForDispose(): void {

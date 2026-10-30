@@ -121,6 +121,8 @@ export abstract class Body extends THREE.Group {
     this.outline.geometry = record.outline;
     this.surface.position.copy(record.origin);
     this.outline.position.copy(record.origin);
+    this.surface.updateMatrixWorld();
+    this.outline.updateMatrixWorld();
     this.surface.visible = this.bodyType !== 'Wire';
     this.outline.visible = this.appearance.outline;
   }

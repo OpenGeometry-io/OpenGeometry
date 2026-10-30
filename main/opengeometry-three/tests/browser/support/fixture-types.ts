@@ -132,6 +132,16 @@ export type RetryResult = {
 
 export type OrbitResult = { jobs: number; buckets: number[]; sendBuckets: number[] };
 
+export type ScopedSyncResult = {
+  backend: string;
+  pendingBefore: number;
+  tessellated: number;
+  onlyGiven: boolean;
+  current: boolean;
+  othersChanged: number;
+  placed: boolean;
+};
+
 export type AcceptanceFixture = {
   bodies: Solid[];
   renderer: THREE.WebGLRenderer;
@@ -162,6 +172,7 @@ export type AcceptanceFixture = {
   coarserRetryProbe(): Promise<RetryResult>;
   transactionProbe(): TransactionResult;
   reuseProbe(): Promise<ReuseResult>;
+  scopedSyncProbe(): Promise<ScopedSyncResult>;
   dispose(): void;
 };
 
