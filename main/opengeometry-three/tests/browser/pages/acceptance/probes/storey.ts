@@ -8,7 +8,7 @@ import type { StoreyPerformance, StoreyResult } from '../../../support/fixture-t
 import { required } from '../../../support/test-page';
 import type { AcceptancePage } from '../../acceptance-probes';
 
-type StoreyRender = Pick<StoreyResult, 'renderMs' | 'renderFlushes' | 'geometryCount' | 'failed'>;
+type StoreyRender = Pick<StoreyResult, 'renderMs' | 'buildAndRenderMs' | 'renderFlushes' | 'geometryCount' | 'failed'>;
 
 const WALLS = 200;
 const RAIL_INSTANCES = 1000;
@@ -88,18 +88,24 @@ function storeyCamera(bodies: Solid[]): THREE.PerspectiveCamera {
   return camera;
 }
 
-async function renderStorey(page: AcceptancePage, camera: THREE.PerspectiveCamera): Promise<StoreyRender> {
+async function renderStorey(
+  page: AcceptancePage, camera: THREE.PerspectiveCamera, buildStart: number,
+): Promise<StoreyRender> {
   const beforeRenderFlush = flushCount();
   const beforeRender = performance.now();
   page.renderer.render(page.scene, camera);
-  const renderMs = performance.now() - beforeRender;
+  const afterRender = performance.now();
+  const renderMs = afterRender - beforeRender;
+  const buildAndRenderMs = afterRender - buildStart;
   const renderFlushes = flushCount() - beforeRenderFlush;
   const { failed } = await OpenGeometry.settled();
   page.renderer.render(page.scene, camera);
-  return { renderMs, renderFlushes, geometryCount: page.renderer.info.memory.geometries, failed: failed.length };
+  const geometryCount = page.renderer.info.memory.geometries;
+  return { renderMs, buildAndRenderMs, renderFlushes, geometryCount, failed: failed.length };
 }
 
 export async function buildStorey(page: AcceptancePage): Promise<StoreyResult> {
+  const buildStart = performance.now();
   const storey = new SystemAssembly({ ogId: 'storey' });
   const members: (Wire | Solid)[] = [];
   const walls = await buildWalls(members);
@@ -107,7 +113,7 @@ export async function buildStorey(page: AcceptancePage): Promise<StoreyResult> {
   storey.addChild([...members, ...rails]);
   storeyData = { root: storey, bodies: [...walls, ...rails] };
   page.scene.add(...walls, ...rails);
-  const rendered = await renderStorey(page, storeyCamera(storeyData.bodies));
+  const rendered = await renderStorey(page, storeyCamera(storeyData.bodies), buildStart);
   return {
     walls: walls.length, uniqueWalls: walls.filter((wall) => wall.getInstanceCount() === 1).length,
     openingsPerWall: openingRange(walls), instances: rails.length, flushCount: flushCount(), ...rendered,

@@ -35,7 +35,7 @@ export class OpenGeometry {
   }
 
   static on(event: Events, handler: Listener): () => boolean { return on(event, handler); }
-  static flush(options: { geometry?: 'sync' } = {}): void { flush(options); }
+  static flush(options: { geometry?: 'sync'; bodies?: readonly Body[] } = {}): void { flush(options); }
   static settled(options: { deflection?: number } = {}): Promise<{ failed: { ogId: string; error: unknown }[] }> {
     return settled(options);
   }

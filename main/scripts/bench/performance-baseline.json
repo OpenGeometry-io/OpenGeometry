@@ -9,7 +9,7 @@
   },
   "timings": {
     "darwin-arm64": {
-      "measuredOn": "2026-10-01",
+      "measuredOn": "2026-10-30",
       "wall50BooleanMs": 627.670167,
       "wall50TessellationMs": 19.105958,
       "rotated20BooleanMs": 119.950083,
@@ -17,7 +17,7 @@
       "sliderRebuildMs": 1.542709,
       "sliderBooleanMs": 9.603958,
       "sliderTessellationMs": 1.4455,
-      "storeyFirstRenderMs": 341.2,
+      "storeyBuildAndFirstRenderMs": 2174.6,
       "storeyTransformFlushMs": 13.1,
       "storeyStepMs": 1615.8
     }

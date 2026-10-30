@@ -88,3 +88,22 @@ test('worker re-sends a missing snapshot and retries once', async ({ page }) => 
     await disposeFixture(page);
   }
 });
+
+test('a scoped sync flush meshes and places only the given body while the worker holds the rest', async ({ page }) => {
+  test.setTimeout(45_000);
+  await page.goto('/acceptance.html?backend=worker');
+  await expect(page.locator('#status')).toHaveText('Acceptance ready', { timeout: 20_000 });
+  try {
+    const result = await page.evaluate(() => {
+      const fixture = window.ogAcceptance;
+      if (!fixture) throw new Error('The acceptance page published no fixture');
+      return fixture.scopedSyncProbe();
+    });
+    expect(result).toEqual({
+      backend: 'worker', pendingBefore: 299, tessellated: 1, onlyGiven: true, current: true, othersChanged: 0,
+      placed: true,
+    });
+  } finally {
+    await disposeFixture(page);
+  }
+});

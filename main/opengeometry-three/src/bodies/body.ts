@@ -10,7 +10,7 @@ import { enterLimbo, revive } from '../marks/limbo';
 import { flush, flushForDispose, wanted } from '../rendering/geometry/geometry-scheduler';
 import { noteDisplayed } from '../rendering/geometry/render-pass';
 import { observeCamera } from '../rendering/lod/camera-observer';
-import { overrideChanged } from '../rendering/lod/lod-controller';
+import { isDisplayed, overrideChanged } from '../rendering/lod/lod-controller';
 import {
   lineMaterial, releaseLine, releaseSurface, surfaceMaterial, type MaterialAppearance,
 } from '../rendering/materials/material-pool';
@@ -102,7 +102,7 @@ export abstract class Body extends THREE.Group {
   }
 
   swapReadyRecord(): void {
-    if (!this.visible || !this.lastInfo.shapeId || this.lastInfo.shapeRevision === null) return;
+    if (!isDisplayed(runtime(), this) || !this.lastInfo.shapeId || this.lastInfo.shapeRevision === null) return;
     const bucket = wanted(this);
     if (bucket === undefined) return;
     const record = runtime().records.get(this.lastInfo.shapeId, this.lastInfo.shapeRevision, bucket);
@@ -121,6 +121,8 @@ export abstract class Body extends THREE.Group {
     this.outline.geometry = record.outline;
     this.surface.position.copy(record.origin);
     this.outline.position.copy(record.origin);
+    this.surface.updateMatrixWorld();
+    this.outline.updateMatrixWorld();
     this.surface.visible = this.bodyType !== 'Wire';
     this.outline.visible = this.appearance.outline;
   }

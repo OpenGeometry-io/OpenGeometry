@@ -6,4 +6,5 @@ mod marks;
 mod measure;
 mod mutation;
 mod placement;
+mod shelling;
 mod support;

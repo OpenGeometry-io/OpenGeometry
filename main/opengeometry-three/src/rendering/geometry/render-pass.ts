@@ -18,7 +18,7 @@ function endPass(state: Runtime): void {
   if (currentRuntime() !== state) return;
   state.renderPassActive = false;
   state.pass++;
-  if (state.readyVersion !== state.flushedReadyVersion) flush();
+  if (state.readyShapes.size > 0) flush();
   if (evaluatePass(state, Date.now(), false)) refreshDisplayed(state);
 }
 

@@ -77,13 +77,13 @@ test('storey transform flush and STEP export stay within file limits', async ({ 
       if (measured.products !== 1200 || measured.entities > 2_000_000 || measured.bytes > 64 * 1024 * 1024) {
         throw new Error(`Storey export exceeded expected limits: ${JSON.stringify(measured)}`);
       }
-      return { renderMs: built.renderMs, ...measured, flushRuns, stepRuns };
+      return { renderMs: built.renderMs, buildAndRenderMs: built.buildAndRenderMs, ...measured, flushRuns, stepRuns };
     }, PROBE_RUNS);
     const result = { ...probed, transformFlushMs: median(probed.flushRuns), stepMs: median(probed.stepRuns) };
     console.log(`Storey performance baseline: ${JSON.stringify(result)}`);
     const timings = timingBaseline();
     if (timings) {
-      expect(result.renderMs).toBeLessThanOrEqual(timings.storeyFirstRenderMs * MARGIN);
+      expect(result.buildAndRenderMs).toBeLessThanOrEqual(timings.storeyBuildAndFirstRenderMs * MARGIN);
       expect(result.transformFlushMs).toBeLessThanOrEqual(timings.storeyTransformFlushMs * MARGIN);
       expect(result.stepMs).toBeLessThanOrEqual(timings.storeyStepMs * MARGIN);
     }

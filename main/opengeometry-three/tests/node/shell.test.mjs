@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  OpenGeometry, Solid, Wire, OG_OPERATION_EXTRUDE, OG_OPERATION_SHELL, OG_PRIMITIVE_CUBOID, OG_PRIMITIVE_PROFILE,
+  OpenGeometry, OGError, Solid, Wire, OG_OPERATION_EXTRUDE, OG_OPERATION_REVOLVE, OG_OPERATION_SHELL,
+  OG_OPERATION_SUBTRACT, OG_PRIMITIVE_CUBOID, OG_PRIMITIVE_PROFILE, OG_TRANSFORM_TRANSLATE,
 } from '../../../dist/index.js';
 import { boot, failsWith } from './support.mjs';
 
@@ -15,6 +16,28 @@ const D_PAN = {
   ],
   closed: true,
 };
+
+const WC_BOWL = {
+  start: [0, 0],
+  segments: [
+    { to: [0.12, 0] },
+    { to: [0.19, 0.3] },
+    { to: [0.19, 0.34], arc: { center: [0.19, 0.32], counterClockwise: true } },
+    { to: [0.16, 0.34] },
+    { to: [0, 0.18], arc: { center: [0, 0.34], counterClockwise: false } },
+    { to: [0, 0] },
+  ],
+  closed: true,
+};
+
+function coverageGap(families) {
+  return (error) => {
+    assert(error instanceof OGError);
+    assert.equal(error.code, 'CoverageGap');
+    assert.deepEqual(error.details.families, families);
+    return true;
+  };
+}
 
 function cavityFaces(body) {
   const brep = body.getBrep();
@@ -62,4 +85,31 @@ test('a bad thickness is InvalidParameter and one past the half width is Unresol
   assert.throws(() => box.operate(OG_OPERATION_SHELL, { thickness: 0.6 }), failsWith('UnresolvedIntersection'));
   assert.deepEqual(box.getBrep().solids.map((solid) => solid.cavity_shells.length), [0]);
   assert.equal(box.getReport(), null);
+});
+
+test('a full-turn revolve shell is a CoverageGap that names the revolved profile family', async () => {
+  await boot();
+  const outline = new Wire(OG_PRIMITIVE_PROFILE, WC_BOWL, {
+    ogId: 'shell-bowl-outline',
+    plane: { normal: [0, 0, 1], xDirection: [1, 0, 0] },
+  });
+  const bowl = new Solid(OG_OPERATION_REVOLVE, { profile: outline }, { ogId: 'shell-bowl' });
+  assert.throws(
+    () => bowl.operate(OG_OPERATION_SHELL, { thickness: 0.005 }),
+    coverageGap(['restricted analytic shell', 'revolved profile']),
+  );
+  assert.deepEqual(bowl.getBrep().solids.map((solid) => solid.cavity_shells.length), [0]);
+});
+
+test('a notched arc-edged extrusion shell keeps the arc-edged profile extrusion family', async () => {
+  await boot();
+  const outline = new Wire(OG_PRIMITIVE_PROFILE, D_PAN, { ogId: 'notched-pan-outline' });
+  const pan = new Solid(OG_OPERATION_EXTRUDE, { profile: outline, distance: 0.1 }, { ogId: 'notched-pan' });
+  const notch = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.1, height: 0.1, depth: 0.1 }, { ogId: 'pan-notch' });
+  notch.transform(OG_TRANSFORM_TRANSLATE, { offset: [0, 0.05, 0] });
+  pan.operate(OG_OPERATION_SUBTRACT, { tools: [notch] });
+  assert.throws(
+    () => pan.operate(OG_OPERATION_SHELL, { thickness: 0.005 }),
+    coverageGap(['restricted analytic shell', 'arc-edged profile extrusion']),
+  );
 });
