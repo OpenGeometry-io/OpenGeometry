@@ -15,7 +15,7 @@ pub(super) fn descendants(nodes: &BTreeMap<String, Node>, id: &str) -> Vec<Strin
     result
 }
 
-impl Candidate {
+impl Candidate<'_> {
     pub(super) fn descendants(&self, id: &str) -> Result<Vec<String>, GraphError> {
         let mut stack = vec![id.to_string()];
         let mut result = Vec::new();

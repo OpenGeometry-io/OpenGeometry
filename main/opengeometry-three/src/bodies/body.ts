@@ -7,7 +7,7 @@ import type { Placement } from '../dto/placement';
 import { OGError } from '../errors';
 import { call } from '../kernel/kernel-session';
 import { enterLimbo, revive } from '../marks/limbo';
-import { flush, wanted } from '../rendering/geometry/geometry-scheduler';
+import { flush, flushForDispose, wanted } from '../rendering/geometry/geometry-scheduler';
 import { noteDisplayed } from '../rendering/geometry/render-pass';
 import { observeCamera } from '../rendering/lod/camera-observer';
 import { overrideChanged } from '../rendering/lod/lod-controller';
@@ -260,7 +260,7 @@ export abstract class Body extends THREE.Group {
     this.check(`${this.bodyType}.dispose`);
     call(`${this.bodyType}.dispose`, () => worldGraph().dispose(this.ogId));
     this.hideForDispose();
-    flush();
+    flushForDispose();
   }
 
   override clone(): this {

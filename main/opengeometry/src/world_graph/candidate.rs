@@ -21,10 +21,14 @@ pub(super) enum IdKind {
     Assembly,
 }
 
-#[derive(Clone)]
-pub(super) struct Candidate {
-    pub(super) nodes: BTreeMap<String, Node>,
-    pub(super) shapes: BTreeMap<ShapeId, Shape>,
+pub(super) struct Overlay<'a, V> {
+    base: &'a BTreeMap<String, V>,
+    pub(super) edits: BTreeMap<String, Option<V>>,
+}
+
+pub(super) struct Candidate<'a> {
+    pub(super) nodes: Overlay<'a, Node>,
+    pub(super) shapes: Overlay<'a, Shape>,
     pub(super) next_shape_id: u64,
     pub(super) next_handle: u32,
     pub(super) next_generation: u32,
@@ -32,7 +36,70 @@ pub(super) struct Candidate {
     pub(super) affected: BTreeSet<String>,
 }
 
-impl Candidate {
+pub(super) struct Edits {
+    pub(super) nodes: BTreeMap<String, Option<Node>>,
+    pub(super) shapes: BTreeMap<ShapeId, Option<Shape>>,
+    pub(super) next_shape_id: u64,
+    pub(super) next_handle: u32,
+    pub(super) next_generation: u32,
+    pub(super) next_og_ids: IdCounters,
+    pub(super) affected: BTreeSet<String>,
+}
+
+impl<'a, V: Clone> Overlay<'a, V> {
+    pub(super) fn new(base: &'a BTreeMap<String, V>) -> Self {
+        Self {
+            base,
+            edits: BTreeMap::new(),
+        }
+    }
+
+    pub(super) fn get(&self, id: &str) -> Option<&V> {
+        match self.edits.get(id) {
+            Some(edit) => edit.as_ref(),
+            None => self.base.get(id),
+        }
+    }
+
+    pub(super) fn contains_key(&self, id: &str) -> bool {
+        self.get(id).is_some()
+    }
+
+    pub(super) fn get_mut(&mut self, id: &str) -> Option<&mut V> {
+        if !self.edits.contains_key(id) {
+            let entry = self.base.get(id)?.clone();
+            self.edits.insert(id.to_string(), Some(entry));
+        }
+        self.edits.get_mut(id)?.as_mut()
+    }
+
+    pub(super) fn insert(&mut self, id: String, value: V) {
+        self.edits.insert(id, Some(value));
+    }
+
+    pub(super) fn remove(&mut self, id: &str) -> Option<V> {
+        let removed = match self.edits.remove(id) {
+            Some(edit) => edit,
+            None => self.base.get(id).cloned(),
+        };
+        self.edits.insert(id.to_string(), None);
+        removed
+    }
+}
+
+impl Candidate<'_> {
+    pub(super) fn into_edits(self) -> Edits {
+        Edits {
+            nodes: self.nodes.edits,
+            shapes: self.shapes.edits,
+            next_shape_id: self.next_shape_id,
+            next_handle: self.next_handle,
+            next_generation: self.next_generation,
+            next_og_ids: self.next_og_ids,
+            affected: self.affected,
+        }
+    }
+
     pub(super) fn copy_kind(&self, shape_id: &str) -> Result<IdKind, GraphError> {
         let shape = self.shapes.get(shape_id).ok_or_else(|| {
             GraphError::code(ErrorCode::InvalidTopology, "shape reference is missing")

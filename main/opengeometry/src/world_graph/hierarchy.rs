@@ -4,7 +4,7 @@ use super::error::{ErrorCode, GraphError};
 use super::graph::WorldGraph;
 use crate::brep::{BrepEnvelope, Similarity3};
 
-impl Candidate {
+impl Candidate<'_> {
     pub(super) fn world(&self, id: &str) -> Result<Similarity3, GraphError> {
         let mut path = Vec::new();
         let mut cursor = Some(id.to_string());

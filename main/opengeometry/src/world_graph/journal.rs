@@ -202,11 +202,10 @@ impl WorldGraph {
             Removed,
         }
         let mut compact: BTreeMap<(String, u32, u32), (Kind, NodeChange)> = BTreeMap::new();
-        for change_set in self
+        let first = self
             .changes
-            .iter()
-            .filter(|change| change.revision > revision)
-        {
+            .partition_point(|change| change.revision <= revision);
+        for change_set in &self.changes[first..] {
             for (kind, entries) in [
                 (Kind::Added, &change_set.added),
                 (Kind::Changed, &change_set.changed),

@@ -16,8 +16,22 @@ import { validateDisplayBuffers } from '../records/validate-display-buffers';
 
 type GeometryTarget = { body: Body; shapeId: string; revision: number; bucket: number; key: string };
 
+type SwapScope = 'every' | 'changed';
+
 export function flush(options: { geometry?: 'sync' } = {}): void {
   const state = runtime();
+  applyFlush(state, 'every');
+  if (options.geometry === 'sync') {
+    for (const body of displayedBodies(state)) ensureGeometry(body, true);
+    if (state.readyVersion !== state.flushedReadyVersion) flush();
+  }
+}
+
+export function flushForDispose(): void {
+  applyFlush(runtime(), 'changed');
+}
+
+function applyFlush(state: Runtime, scope: SwapScope): void {
   const revision = call('OpenGeometry.flush', () => state.graph.revision());
   if (!state.flushing
     && (revision !== state.revision || (!state.renderPassActive && state.readyVersion !== state.flushedReadyVersion))) {
@@ -27,7 +41,7 @@ export function flush(options: { geometry?: 'sync' } = {}): void {
       const { changes, matrices } = decodeChangeSet(packet, 'OpenGeometry.flush');
       state.revision = revision;
       applyChanges(state, changes, matrices);
-      for (const body of state.bodies.values()) body.swapReadyRecord();
+      for (const body of swapTargets(state, changes, scope)) body.swapReadyRecord();
       purgeChanged(state, changes);
       state.flushedReadyVersion = state.readyVersion;
       state.flushes++;
@@ -35,10 +49,12 @@ export function flush(options: { geometry?: 'sync' } = {}): void {
       state.flushing = false;
     }
   }
-  if (options.geometry === 'sync') {
-    for (const body of displayedBodies(state)) ensureGeometry(body, true);
-    if (state.readyVersion !== state.flushedReadyVersion) flush();
-  }
+}
+
+function swapTargets(state: Runtime, changes: ChangeSet, scope: SwapScope): Iterable<Body> {
+  if (scope === 'every' || state.readyVersion !== state.flushedReadyVersion) return state.bodies.values();
+  return [...changes.added, ...changes.changed]
+    .flatMap((change) => state.bodies.get(bodyKey(change.handle, change.generation)) ?? []);
 }
 
 function applyChanges(state: Runtime, changes: ChangeSet, matrices: Float64Array): void {
