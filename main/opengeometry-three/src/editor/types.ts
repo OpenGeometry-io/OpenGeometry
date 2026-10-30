@@ -221,6 +221,7 @@ export type ParametricEntityType =
   | "curve"
   | "elliptical_arc"
   | "rectangle"
+  | "line_slot"
   | "polygon"
   | "cuboid"
   | "cylinder"

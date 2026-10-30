@@ -31,6 +31,7 @@ pub mod primitives {
     pub mod cylinder;
     pub mod elliptical_arc;
     pub mod line;
+    pub mod line_slot;
     pub mod polygon;
     pub mod polyline;
     pub mod rectangle;
