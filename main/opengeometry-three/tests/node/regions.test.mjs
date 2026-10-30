@@ -24,9 +24,30 @@ function signedArea(ring) {
   }, 0) / 2;
 }
 
-function area(regions) {
-  return regions.reduce((sum, item) => sum - signedArea(item.outer)
-    - item.holes.reduce((holes, ring) => holes + signedArea(ring), 0), 0);
+function area(regions, ringArea = signedArea) {
+  return regions.reduce((sum, item) => sum - ringArea(item.outer)
+    - item.holes.reduce((holes, ring) => holes + ringArea(ring), 0), 0);
+}
+
+function chord(from, to) {
+  return (from[0] * to[1] - to[0] * from[1]) / 2;
+}
+
+function edgeArea(edge) {
+  if (edge.kind === 'line') {
+    return chord(edge.from, edge.to);
+  }
+  const { center: [cx, cz], radius, start_angle: start, sweep_angle: sweep } = edge;
+  const at = (angle) => [cx + radius * Math.cos(angle), cz + radius * Math.sin(angle)];
+  return chord(at(start), at(start + sweep)) + radius * radius * (sweep - Math.sin(sweep)) / 2;
+}
+
+function curvedArea(regions) {
+  return area(regions, (ring) => ring.reduce((sum, edge) => sum + edgeArea(edge), 0));
+}
+
+function assertNear(got, want) {
+  assert(Math.abs(got - want) <= 1e-9 * Math.abs(want), `${got} is not ${want}`);
 }
 
 function spanOf(xs) {
@@ -70,6 +91,11 @@ function sector(start, end) {
     outer: [arc(2, end, start), line(at(2, start), at(1, start)), arc(1, start, end), line(at(1, end), at(2, end))],
     holes: [],
   };
+}
+
+function disk(cx, radius) {
+  const half = (start) => ({ kind: 'arc', center: [cx, 0], radius, start_angle: start, sweep_angle: -Math.PI });
+  return { outer: [half(Math.PI), half(0)], holes: [] };
 }
 
 test('two squares 0.05 mm apart unite to two regions', () => {
@@ -149,6 +175,40 @@ test('a curved wall cut and clipped by a straight wall keeps its arcs on their c
     assert.deepEqual(arc.center, [0, 0]);
     assert(arc.radius === 1 || arc.radius === 2);
   }
+});
+
+test('a band across a square, straight or diagonal, leaves two regions of the closed-form area', () => {
+  const host = region(0, 0, 4, 4);
+  const diagonal = { outer: [[1, 5], [5, 1], [3, -1], [-1, 3]].map(([x, z]) => ({ x, y: 0, z })), holes: [] };
+  for (const [band, each] of [[region(-1, 1.5, 5, 2.5), 6], [diagonal, 2]]) {
+    const remaining = OpenGeometry.booleanRegions2D([host], [band], 'subtraction');
+    assert.equal(remaining.length, 2);
+    for (const item of remaining) {
+      assert.equal(item.holes.length, 0);
+      assertNear(area([item]), each);
+    }
+  }
+});
+
+test('curved booleans keep the exact closed-form area of their lines and arcs', () => {
+  const quarter = wire(sector(0, Math.PI / 2));
+  const side = 3 * Math.sqrt(3) / 2;
+  const [apex, near, far, low] = [[0, 0], [1.5, side], [3, 3], [side, 1.5]];
+  const wedge = { outer: [line(apex, near), line(near, far), line(far, low), line(low, apex)], holes: [] };
+  const lens = 2 * Math.PI / 3 - Math.sqrt(3) / 2;
+  const cases = [
+    [[quarter], [wedge], 'subtraction', Math.PI / 2],
+    [[quarter], [wedge], 'intersection', Math.PI / 4],
+    [[disk(0, 1)], [disk(1, 1)], 'intersection', lens],
+    [[disk(0, 1)], [disk(1, 1)], 'subtraction', Math.PI - lens],
+  ];
+  for (const [a, b, operation, want] of cases) {
+    assertNear(curvedArea(OpenGeometry.booleanCurvedRegions2D(a, b, operation)), want);
+  }
+  const ring = OpenGeometry.booleanCurvedRegions2D([disk(0, 2)], [disk(0, 1)], 'subtraction');
+  assert.equal(ring.length, 1);
+  assert.equal(ring[0]?.holes.length, 1);
+  assertNear(curvedArea(ring), 3 * Math.PI);
 });
 
 test('an overlap test reads the length of an intersection, and a result feeds back as an operand', () => {
