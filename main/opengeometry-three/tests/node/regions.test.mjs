@@ -180,7 +180,7 @@ test('a curved wall cut and clipped by a straight wall keeps its arcs on their c
 test('a band across a square, straight or diagonal, leaves two regions of the closed-form area', () => {
   const host = region(0, 0, 4, 4);
   const diagonal = { outer: [[1, 5], [5, 1], [3, -1], [-1, 3]].map(([x, z]) => ({ x, y: 0, z })), holes: [] };
-  for (const [band, each] of [[region(-1, 1.5, 5, 2.5), 6], [diagonal, 2]]) {
+  for (const { band, each } of [{ band: region(-1, 1.5, 5, 2.5), each: 6 }, { band: diagonal, each: 2 }]) {
     const remaining = OpenGeometry.booleanRegions2D([host], [band], 'subtraction');
     assert.equal(remaining.length, 2);
     for (const item of remaining) {
@@ -191,21 +191,17 @@ test('a band across a square, straight or diagonal, leaves two regions of the cl
 });
 
 test('curved booleans keep the exact closed-form area of their lines and arcs', () => {
-  const quarter = wire(sector(0, Math.PI / 2));
+  const quarter = wire([sector(0, Math.PI / 2)]);
   const side = 3 * Math.sqrt(3) / 2;
   const [apex, near, far, low] = [[0, 0], [1.5, side], [3, 3], [side, 1.5]];
-  const wedge = { outer: [line(apex, near), line(near, far), line(far, low), line(low, apex)], holes: [] };
+  const wedge = wire([{ outer: [line(apex, near), line(near, far), line(far, low), line(low, apex)], holes: [] }]);
+  const [left, right] = [wire([disk(0, 1)]), wire([disk(1, 1)])];
   const lens = 2 * Math.PI / 3 - Math.sqrt(3) / 2;
-  const cases = [
-    [[quarter], [wedge], 'subtraction', Math.PI / 2],
-    [[quarter], [wedge], 'intersection', Math.PI / 4],
-    [[disk(0, 1)], [disk(1, 1)], 'intersection', lens],
-    [[disk(0, 1)], [disk(1, 1)], 'subtraction', Math.PI - lens],
-  ];
-  for (const [a, b, operation, want] of cases) {
-    assertNear(curvedArea(OpenGeometry.booleanCurvedRegions2D(a, b, operation)), want);
-  }
-  const ring = OpenGeometry.booleanCurvedRegions2D([disk(0, 2)], [disk(0, 1)], 'subtraction');
+  assertNear(curvedArea(OpenGeometry.booleanCurvedRegions2D(quarter, wedge, 'subtraction')), Math.PI / 2);
+  assertNear(curvedArea(OpenGeometry.booleanCurvedRegions2D(quarter, wedge, 'intersection')), Math.PI / 4);
+  assertNear(curvedArea(OpenGeometry.booleanCurvedRegions2D(left, right, 'intersection')), lens);
+  assertNear(curvedArea(OpenGeometry.booleanCurvedRegions2D(left, right, 'subtraction')), Math.PI - lens);
+  const ring = OpenGeometry.booleanCurvedRegions2D(wire([disk(0, 2)]), left, 'subtraction');
   assert.equal(ring.length, 1);
   assert.equal(ring[0]?.holes.length, 1);
   assertNear(curvedArea(ring), 3 * Math.PI);
