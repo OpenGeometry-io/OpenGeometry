@@ -3,7 +3,7 @@ use crate::brep::accuracy::Accuracy;
 use crate::brep::bounds::PatchBounds;
 use crate::brep::error::{missing, GeometryError};
 use crate::brep::frame::unit;
-use crate::brep::geometry::{Curve, GeometryStore, Surface};
+use crate::brep::geometry::{Curve, GeometryStore, Surface, SurfaceGeometry};
 use crate::math::{Interval, Point3};
 use serde::{Deserialize, Serialize};
 
@@ -78,6 +78,18 @@ impl BrepEnvelope {
     }
 
     pub(crate) fn bounds_unchecked(&self) -> Result<Option<PatchBounds>, GeometryError> {
+        self.enclosure(|_| true)
+    }
+
+    pub(crate) fn boundary_bounds(&self) -> Result<Option<PatchBounds>, GeometryError> {
+        self.validate()?;
+        self.enclosure(|surface| !matches!(surface, SurfaceGeometry::Plane { .. }))
+    }
+
+    fn enclosure(
+        &self,
+        encloses_face: impl Fn(&SurfaceGeometry) -> bool,
+    ) -> Result<Option<PatchBounds>, GeometryError> {
         let mut result: Option<PatchBounds> = None;
         let mut include = |bounds: PatchBounds| {
             result = Some(match result {
@@ -88,11 +100,10 @@ impl BrepEnvelope {
             });
         };
         for face in &self.topology.faces {
-            include(
-                self.geometry
-                    .surface(face.surface)?
-                    .enclose(face.trim.uv_bounds)?,
-            );
+            let surface = self.geometry.surface(face.surface)?;
+            if encloses_face(surface) {
+                include(surface.enclose(face.trim.uv_bounds)?);
+            }
         }
         for edge in &self.topology.edges {
             if let EdgeGeometry::Curve { curve, range } = edge.geometry {

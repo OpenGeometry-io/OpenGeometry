@@ -42,7 +42,7 @@ impl WorldGraph {
                 let shape = self.shapes.shapes.get(shape_id).ok_or_else(|| {
                     GraphError::code(ErrorCode::InvalidTopology, "shape reference is missing")
                 })?;
-                if let Some(local_bounds) = shape.brep.bounds()? {
+                if let Some(local_bounds) = shape.brep.boundary_bounds()? {
                     let placement = self.world_placement(&current)?;
                     for corner in corners(local_bounds) {
                         bounds = Some(include(bounds, placement.apply_point(corner)));
@@ -60,7 +60,7 @@ impl WorldGraph {
         let shape = self.shapes.shapes.get(shape_id).ok_or_else(|| {
             GraphError::code(ErrorCode::InvalidTopology, "shape reference is missing")
         })?;
-        Ok(shape.brep.bounds()?.map(|bounds| {
+        Ok(shape.brep.boundary_bounds()?.map(|bounds| {
             [
                 bounds.axes[0].lo,
                 bounds.axes[1].lo,
