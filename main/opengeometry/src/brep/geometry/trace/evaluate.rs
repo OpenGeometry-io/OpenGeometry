@@ -190,11 +190,14 @@ impl IntersectionDefinition {
     ) -> Result<TracePredictor<'a>, GeometryError> {
         let first = &self.anchors[0];
         let last = &self.anchors[self.anchors.len() - 1];
-        if t < first.parameter || t > last.parameter {
+        let rounding =
+            16.0 * f64::EPSILON * first.parameter.abs().max(last.parameter.abs()).max(1.0);
+        if t < first.parameter - rounding || t > last.parameter + rounding {
             return Err(GeometryError::InvalidGeometry(
                 "parameter outside intersection branch".into(),
             ));
         }
+        let t = t.clamp(first.parameter, last.parameter);
         let index = self
             .anchors
             .partition_point(|a| a.parameter <= t)

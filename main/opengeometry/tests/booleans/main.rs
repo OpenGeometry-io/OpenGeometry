@@ -3,6 +3,7 @@ mod atomicity;
 mod batch;
 mod coverage_gap;
 mod curved_openings;
+mod curved_wall_arches;
 mod face_normals;
 mod flush_openings;
 mod multi_tool;

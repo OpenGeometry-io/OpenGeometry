@@ -98,6 +98,21 @@ fn budget_failure_and_invalid_anchor_are_explicit() {
 }
 
 #[test]
+fn evaluation_accepts_an_end_parameter_rounded_one_ulp_past_the_last_anchor() {
+    let store = circle_trace();
+    let definition = &store.intersections[0];
+    let last = &definition.anchors[8];
+    let point = definition
+        .evaluate(f64::from_bits(last.parameter.to_bits() + 1), &store)
+        .unwrap();
+    assert!(norm(sub(point.point, last.point)) < 1e-12);
+    assert!(matches!(
+        definition.evaluate(last.parameter + 1e-6, &store),
+        Err(GeometryError::InvalidGeometry(_))
+    ));
+}
+
+#[test]
 fn evaluation_converges_where_the_axial_tube_is_thinner_than_the_peak_between_anchors() {
     let mut store = GeometryStore::new();
     store.surfaces.push(SurfaceGeometry::Cylinder {

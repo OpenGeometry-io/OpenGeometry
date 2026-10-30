@@ -102,6 +102,7 @@ fn clipped_span(
             CurveGeometry::Intersection { .. }
         ) && tube_may_enter_boxes(geometry, branch, segment, bounds)?
             && !span_clears_boxes(membership, bounds, lo, hi)?
+            && !span_ends_on_boundary(membership, lo, hi)?
         {
             return Err(GeometryError::UnresolvedIntersection(
                 "bounded SSI branch may cross a trim box between certified anchors".into(),
@@ -129,6 +130,30 @@ fn clipped_span(
         (end, start)
     };
     Ok(Some((start, end)))
+}
+
+fn span_ends_on_boundary(
+    membership: &BranchMembership,
+    lo: f64,
+    hi: f64,
+) -> Result<bool, GeometryError> {
+    if membership.boxes_only {
+        return Ok(false);
+    }
+    for parameter in [lo, hi] {
+        let mut touching = true;
+        for side in 0..2 {
+            let uv = membership
+                .geometry
+                .pcurve_at(membership.branch.pcurves[side], parameter)?;
+            let (view, face) = membership.faces[side];
+            touching &= face_contains_uv(view.brep, face, uv)? != Some(false);
+        }
+        if touching {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn branch_inside_faces(
