@@ -14,6 +14,7 @@ import {
   transactionProbe, workerCrashProbe, workerFailureProbe,
 } from './acceptance-probes';
 import { coarserRetryProbe, lodHysteresisProbe, lodProbe, orbitProbe } from './acceptance/probes/lod';
+import { scopedSyncProbe } from './acceptance/probes/scoped-sync';
 import { buildStorey, storeyPerformanceProbe } from './acceptance/probes/storey';
 
 type Point = [number, number, number];
@@ -186,6 +187,7 @@ publishFixture('ogAcceptance', {
   coarserRetryProbe,
   transactionProbe,
   reuseProbe: () => reuseProbe(PAGE),
+  scopedSyncProbe: () => scopedSyncProbe(PAGE),
   dispose: () => {
     for (const body of [...BODIES].reverse()) { try { body.dispose(); } catch { continue; } }
     releasePage(RENDERER);

@@ -1,7 +1,10 @@
 import type * as THREE from 'three';
 import type { Body } from '../../bodies/body';
+import type { Bounds } from '../../dto/bounds';
+import { call } from '../../kernel/kernel-session';
 import { EVALUATION_INTERVAL_MS, MOTION_WINDOW_MS, PIXELS_AT_REST, PIXELS_MOVING } from '../../limits';
 import { currentRuntime, type Runtime } from '../../runtime/runtime-state';
+import { decodeBounds } from '../../world-graph/codec';
 import { finestLocal, localTarget, shapeBuckets, type ShapeBuckets } from './body-size';
 import { deflectionBucket, wantedBucket } from './deflection';
 import { worldUnitsPerPixel } from './screen-metrics';
@@ -107,7 +110,7 @@ function shapeTargets(state: Runtime, seen: SeenCamera, pixels: number): Map<str
   const targets = new Map<string, ShapeTarget>();
   for (const body of displayedBodies(state)) {
     const shapeId = body.lastInfo.shapeId;
-    const bounds = shapeId ? body.getBounds() : null;
+    const bounds = shapeId ? displayBounds(state, body) : null;
     const world = bounds ? worldUnitsPerPixel(seen.camera, bounds, seen.height) * pixels : undefined;
     const target = world === undefined ? undefined : localTarget(world, body);
     if (!shapeId || target === undefined || !Number.isFinite(target) || target <= 0) continue;
@@ -115,6 +118,11 @@ function shapeTargets(state: Runtime, seen: SeenCamera, pixels: number): Map<str
     if (!best || target < best.target) targets.set(shapeId, { target, body });
   }
   return targets;
+}
+
+function displayBounds(state: Runtime, body: Body): Bounds | null {
+  const label = `${body.bodyType}.getBounds`;
+  return decodeBounds(call(label, () => state.graph.bounds(body.ogId)), label);
 }
 
 export function wantedKey(state: Runtime, body: Body): number | undefined {

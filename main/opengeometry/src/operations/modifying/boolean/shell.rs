@@ -413,7 +413,15 @@ fn arc_edged_cavity(
     thickness: f64,
     inner_id: String,
 ) -> Result<Cavity, GeometryError> {
-    let prism = arc_edged_prism(input)?;
+    let prism = arc_edged_prism(input).map_err(|error| match error {
+        GeometryError::CoverageGap { .. } if revolved(input) => GeometryError::CoverageGap {
+            families: [
+                "restricted analytic shell".into(),
+                "revolved profile".into(),
+            ],
+        },
+        error => error,
+    })?;
     let height = prism.height - 2.0 * thickness;
     if height <= 4.0 * input.accuracy.geometric {
         return Err(GeometryError::UnresolvedIntersection(
@@ -455,6 +463,27 @@ fn arc_edged_cavity(
         error => error,
     })?;
     Ok(Cavity { body, faces })
+}
+
+fn revolved(input: &BrepEnvelope) -> bool {
+    let frame = |surface: &SurfaceGeometry| match *surface {
+        SurfaceGeometry::Plane { frame }
+        | SurfaceGeometry::Sphere { frame, .. }
+        | SurfaceGeometry::Cylinder { frame, .. }
+        | SurfaceGeometry::Cone { frame, .. }
+        | SurfaceGeometry::Torus { frame, .. } => frame,
+    };
+    let curved = |surface: &&SurfaceGeometry| !matches!(surface, SurfaceGeometry::Plane { .. });
+    let surfaces = &input.geometry.surfaces;
+    let Some(axis) = surfaces.iter().find(curved).map(frame) else {
+        return false;
+    };
+    surfaces.iter().all(|surface| {
+        let local = axis.local(frame(surface).origin);
+        (!curved(&surface) || local[0].hypot(local[1]) <= input.accuracy.geometric)
+            && (matches!(surface, SurfaceGeometry::Sphere { .. })
+                || dot(frame(surface).z, axis.z).abs() >= 1.0 - 1e-10)
+    })
 }
 
 fn arc_edged_prism(input: &BrepEnvelope) -> Result<ArcEdgedPrism, GeometryError> {

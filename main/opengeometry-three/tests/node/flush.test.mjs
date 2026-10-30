@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three';
-import { OpenGeometry, OG_TRANSFORM_TRANSLATE } from '../../../dist/index.js';
+import {
+  OpenGeometry, Solid, OG_OPERATION_SHELL, OG_OPERATION_SUBTRACT, OG_TRANSFORM_TRANSLATE,
+} from '../../../dist/index.js';
 import { graph, runtime } from '../../../dist/testing.js';
 import { boot, cuboid, nextTask } from './support.mjs';
 
@@ -53,4 +55,44 @@ test('flush purges records only for the shapes in the change set', async () => {
     disposeAll(bodies);
   }
   assert(calls <= 1, `${String(calls)} purge calls`);
+});
+
+async function shown(prefix) {
+  const bodies = cuboids(prefix);
+  const scene = new THREE.Scene();
+  scene.add(...bodies);
+  scene.updateMatrixWorld(true);
+  OpenGeometry.flush({ geometry: 'sync' });
+  await nextTask();
+  return bodies;
+}
+
+function swapsDuring(step) {
+  const prototype = Object.getPrototypeOf(Solid.prototype);
+  const swap = prototype.swapReadyRecord;
+  let calls = 0;
+  prototype.swapReadyRecord = function counted(...rest) { calls++; return Reflect.apply(swap, this, rest); };
+  try {
+    step();
+  } finally {
+    prototype.swapReadyRecord = swap;
+  }
+  return calls;
+}
+
+test('operate flushes with scope changed: only the operated bodies swap', async () => {
+  await boot();
+  await nextTask();
+  const bodies = await shown('operate');
+  const [host, tool, shelled] = bodies;
+  assert(host && tool && shelled);
+  try {
+    tool.transform(OG_TRANSFORM_TRANSLATE, { offset: [0.5, 0, 0] });
+    const cut = swapsDuring(() => host.operate(OG_OPERATION_SUBTRACT, { tools: [tool] }));
+    const shell = swapsDuring(() => shelled.operate(OG_OPERATION_SHELL, { thickness: 0.1 }));
+    assert(cut <= 2, `${String(cut)} swaps for one subtract with ${String(bodies.length)} displayed bodies`);
+    assert(shell <= 1, `${String(shell)} swaps for one shell with ${String(bodies.length)} displayed bodies`);
+  } finally {
+    disposeAll(bodies);
+  }
 });
