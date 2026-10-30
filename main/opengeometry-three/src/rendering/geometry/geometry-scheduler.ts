@@ -16,34 +16,30 @@ import { validateDisplayBuffers } from '../records/validate-display-buffers';
 
 type GeometryTarget = { body: Body; shapeId: string; revision: number; bucket: number; key: string };
 
-type SwapScope = 'every' | 'changed';
-
 export function flush(options: { geometry?: 'sync' } = {}): void {
   const state = runtime();
-  applyFlush(state, 'every');
+  applyFlush(state);
   if (options.geometry === 'sync') {
     for (const body of displayedBodies(state)) ensureGeometry(body, true);
-    if (state.readyVersion !== state.flushedReadyVersion) flush();
+    if (state.readyShapes.size > 0) flush();
   }
 }
 
 export function flushForDispose(): void {
-  applyFlush(runtime(), 'changed');
+  applyFlush(runtime());
 }
 
-function applyFlush(state: Runtime, scope: SwapScope): void {
+function applyFlush(state: Runtime): void {
   const revision = call('OpenGeometry.flush', () => state.graph.revision());
-  if (!state.flushing
-    && (revision !== state.revision || (!state.renderPassActive && state.readyVersion !== state.flushedReadyVersion))) {
+  if (!state.flushing && (revision !== state.revision || (!state.renderPassActive && state.readyShapes.size > 0))) {
     state.flushing = true;
     try {
       const packet = call('OpenGeometry.flush', (): unknown => state.graph.changesSince(state.revision));
       const { changes, matrices } = decodeChangeSet(packet, 'OpenGeometry.flush');
       state.revision = revision;
       applyChanges(state, changes, matrices);
-      for (const body of swapTargets(state, changes, scope)) body.swapReadyRecord();
+      for (const body of swapTargets(state, changes)) body.swapReadyRecord();
       purgeChanged(state, changes);
-      state.flushedReadyVersion = state.readyVersion;
       state.flushes++;
     } finally {
       state.flushing = false;
@@ -51,10 +47,15 @@ function applyFlush(state: Runtime, scope: SwapScope): void {
   }
 }
 
-function swapTargets(state: Runtime, changes: ChangeSet, scope: SwapScope): Iterable<Body> {
-  if (scope === 'every' || state.readyVersion !== state.flushedReadyVersion) return state.bodies.values();
-  return [...changes.added, ...changes.changed]
-    .flatMap((change) => state.bodies.get(bodyKey(change.handle, change.generation)) ?? []);
+function swapTargets(state: Runtime, changes: ChangeSet): Body[] {
+  const targets = new Set<Body>();
+  for (const change of [...changes.added, ...changes.changed]) {
+    const body = state.bodies.get(bodyKey(change.handle, change.generation));
+    if (body) targets.add(body);
+  }
+  for (const shapeId of state.readyShapes) for (const body of state.byShape.get(shapeId) ?? []) targets.add(body);
+  state.readyShapes.clear();
+  return [...targets].filter((body) => isDisplayed(state, body));
 }
 
 function applyChanges(state: Runtime, changes: ChangeSet, matrices: Float64Array): void {
@@ -181,7 +182,7 @@ function accepted(state: Runtime, target: GeometryTarget, buffers: DisplayBuffer
   const { body, shapeId, revision } = target;
   if (generation === (state.generations.get(shapeId) ?? 0)) return true;
   if (buffers.bucket === retryBucket(state, shapeId, revision)) return true;
-  const wanted = wantedKey(state, body);
+  const wanted = isDisplayed(state, body) ? wantedKey(state, body) : undefined;
   if (wanted === undefined) return false;
   const shown = body.record?.shapeId === shapeId && body.record.revision === revision ? body.record.bucket : undefined;
   return shown === undefined || Math.abs(Math.log2(buffers.bucket / wanted)) < Math.abs(Math.log2(shown / wanted));
@@ -201,11 +202,11 @@ function receive(state: Runtime, target: GeometryTarget, buffers: DisplayBuffers
   const current = holders.filter((body) => body.lastInfo.shapeRevision === revision);
   if (current.length === 0) return;
   const record = state.records.put(new GeometryRecord(shapeId, buffers));
-  state.readyVersion++;
+  state.readyShapes.add(shapeId);
   clearError(state, shapeId, revision);
   if (state.renderPassActive) {
     for (const body of current) if (isDisplayed(state, body)) body.install(record);
-  }
+  } else if (target.body.visible && current.includes(target.body)) target.body.install(record);
   const ogIds = holders.map((body) => body.ogId);
   emit('geometry', { shapeId, revision, bucket: buffers.bucket, ogIds, stats: { triangles: record.triangles } });
   if (!state.renderPassActive) flush();

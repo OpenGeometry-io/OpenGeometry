@@ -22,8 +22,7 @@ export type Runtime = {
   limbo: Map<Body, LimboEntry>;
   listeners: Map<Events, Set<Listener>>;
   revision: bigint;
-  readyVersion: number;
-  flushedReadyVersion: number;
+  readyShapes: Set<string>;
   renderPassActive: boolean;
   pass: number;
   displayed: Map<Body, number>;

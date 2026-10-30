@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import type { Bounds } from '../../dto/bounds';
 import type { GeometryRecord } from './geometry-record';
 
+const IDLE_BYTES = 256 * 1024 * 1024;
+const IDLE_PER_SHAPE = 2;
+
 type Placeholder = { key: string; geometry: THREE.BufferGeometry; holders: number };
 
 function placeholderGeometry(bounds: Bounds | null): THREE.BufferGeometry {
@@ -14,13 +17,16 @@ function placeholderGeometry(bounds: Bounds | null): THREE.BufferGeometry {
 
 export class RecordPool {
   private records = new Map<string, GeometryRecord>();
+  private byShape = new Map<string, Set<GeometryRecord>>();
+  private idle = new Set<GeometryRecord>();
+  private idleBytes = 0;
   private placeholders = new Map<string, Placeholder>();
   private placeholderOf = new Map<THREE.BufferGeometry, Placeholder>();
   private clock = 0;
 
   get(shapeId: string, revision: number, bucket: number): GeometryRecord | undefined {
     const record = this.records.get(`${shapeId}@${String(revision)}#${String(Math.log2(bucket))}`);
-    if (record) record.lastUse = ++this.clock;
+    if (record) this.touch(record);
     return record;
   }
 
@@ -30,29 +36,31 @@ export class RecordPool {
       record.dispose();
       return previous;
     }
-    record.lastUse = ++this.clock;
     this.records.set(record.key, record);
-    this.evict();
+    this.byShape.set(record.shapeId, (this.byShape.get(record.shapeId) ?? new Set()).add(record));
+    this.setIdle(record, true);
+    this.touch(record);
+    this.evict(record.shapeId);
     return record;
   }
 
   retain(record: GeometryRecord): void {
     record.refs++;
-    record.lastUse = ++this.clock;
+    this.setIdle(record, false);
+    this.touch(record);
   }
 
   release(record: GeometryRecord): void {
     record.refs = Math.max(0, record.refs - 1);
-    record.lastUse = ++this.clock;
-    this.evict();
+    if (!this.owns(record)) return;
+    if (record.refs === 0) this.setIdle(record, true);
+    this.touch(record);
+    this.evict(record.shapeId);
   }
 
   purge(shapeId: string, revision?: number): void {
-    for (const [key, record] of this.records) {
-      if (record.shapeId === shapeId && (revision === undefined || record.revision !== revision) && record.refs === 0) {
-        record.dispose();
-        this.records.delete(key);
-      }
+    for (const record of [...this.byShape.get(shapeId) ?? []]) {
+      if ((revision === undefined || record.revision !== revision) && record.refs === 0) this.drop(record);
     }
   }
 
@@ -82,23 +90,46 @@ export class RecordPool {
   clear(): void {
     for (const record of this.records.values()) record.dispose();
     this.records.clear();
+    this.byShape.clear();
+    this.idle.clear();
+    this.idleBytes = 0;
     for (const entry of this.placeholders.values()) entry.geometry.dispose();
     this.placeholders.clear();
     this.placeholderOf.clear();
   }
 
-  private evict(): void {
-    const idle = [...this.records.values()].filter((record) => record.refs === 0).sort((a, b) => a.lastUse - b.lastUse);
-    const perShape = new Map<string, number>();
-    let total = idle.reduce((sum, record) => sum + record.bytes, 0);
-    for (const record of idle.slice().reverse()) perShape.set(record.shapeId, (perShape.get(record.shapeId) ?? 0) + 1);
-    for (const record of idle) {
-      const count = perShape.get(record.shapeId) ?? 0;
-      if (count <= 2 && total <= 256 * 1024 * 1024) continue;
-      record.dispose();
-      this.records.delete(record.key);
-      total -= record.bytes;
-      perShape.set(record.shapeId, count - 1);
+  private owns(record: GeometryRecord): boolean {
+    return this.records.get(record.key) === record;
+  }
+
+  private touch(record: GeometryRecord): void {
+    record.lastUse = ++this.clock;
+    if (this.idle.delete(record)) this.idle.add(record);
+  }
+
+  private setIdle(record: GeometryRecord, idle: boolean): void {
+    if (idle === this.idle.has(record) || (idle && !this.owns(record))) return;
+    if (idle) this.idle.add(record);
+    else this.idle.delete(record);
+    this.idleBytes += idle ? record.bytes : -record.bytes;
+  }
+
+  private drop(record: GeometryRecord): void {
+    record.dispose();
+    if (this.owns(record)) this.records.delete(record.key);
+    const shape = this.byShape.get(record.shapeId);
+    shape?.delete(record);
+    if (shape?.size === 0) this.byShape.delete(record.shapeId);
+    this.setIdle(record, false);
+  }
+
+  private evict(shapeId: string): void {
+    const idle = [...this.byShape.get(shapeId) ?? []].filter((record) => record.refs === 0);
+    idle.sort((a, b) => a.lastUse - b.lastUse);
+    for (const record of idle.slice(0, Math.max(0, idle.length - IDLE_PER_SHAPE))) this.drop(record);
+    for (const record of this.idle) {
+      if (this.idleBytes <= IDLE_BYTES) break;
+      this.drop(record);
     }
   }
 }

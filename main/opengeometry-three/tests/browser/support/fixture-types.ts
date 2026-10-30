@@ -64,6 +64,7 @@ export type StoreyResult = {
   renderFlushes: number;
   geometryCount: number;
   renderMs: number;
+  buildAndRenderMs: number;
   failed: number;
 };
 
