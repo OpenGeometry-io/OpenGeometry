@@ -12,44 +12,6 @@ It is written for people and for coding assistants alike: each section says what
 4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
 5. Finish with its "Check your result" steps.
 
-## 3.0.0 to 3.0.1
-
-### What changed
-
-- `body.measure()` also returns `areaErrorBound`: `|area − exact| ≤ areaErrorBound`. `errorBound` is the bound on the volume only, as before; in 3.0.0 nothing bounded the area, and below unit size the area error was up to several thousand times `errorBound`.
-
-### Before and after
-
-3.0.0:
-
-```js
-const size = leg.measure({ deflection: 0.00001 });
-console.log(Math.abs(size.volume - exactVolume) <= size.errorBound);
-```
-
-3.0.1:
-
-```ts
-import { OpenGeometry, Solid, OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_PARAMS_CYLINDER } from 'opengeometry';
-import type { Measure } from 'opengeometry';
-
-await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
-
-const pin = new Solid(OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_PARAMS_CYLINDER({ radius: 0.001, height: 0.002 }));
-const size: Measure = pin.measure({ deflection: 0.00001 });
-const exactVolume = Math.PI * 0.001 * 0.001 * 0.002;
-const exactArea = 2 * Math.PI * 0.001 * 0.002 + 2 * Math.PI * 0.001 * 0.001;
-console.log(Math.abs(size.volume - exactVolume) <= size.errorBound);
-console.log(Math.abs(size.area - exactArea) <= size.areaErrorBound);
-```
-
-### Different behaviour
-
-- An `operate` call (subtract, union or intersect) whose intersection reaches the apex of a cone now throws `CoverageGap`. In 3.0.0 it threw `InvalidGeometry` with the message `SingularParameterization`. `details.families` names the pair, for example `['cone or frustum', 'cuboid']` or `['cylinder', 'noncoaxial cone or frustum']`. The `message` names `'singular surface point'`.
-- Spheres and tori usually get up to about 8 times fewer triangles at the same deflection. Small or coarse spheres and tori are held by the 12-segment minimum, so they change less or not at all. Their meshes and their `measure` results (volume, area, error bound) change; the shapes do not, and each result stays within its bound.
-- `getBounds()` of a circle or ellipse edge, a cylinder or cone face or a full torus on a frame turned against the world axes, such as a chair arm mirrored across a slanted plane, is its exact box; 3.0.0 boxed it through its turned local box, up to 0.41 times the radius too wide on a side, and up to 1.08 times the major radius on a torus; that arm was 0.0116 m too wide.
-- A body on a turned frame can get a finer display mesh than in 3.0.0, because its box is tighter and the display detail follows the box.
-
 ## 2.5 to 3.0
 
 2.5 was not published. From 2.0, follow 2.0 to 2.5, then 2.5 to 3.0.
@@ -81,13 +43,15 @@ console.log(Math.abs(size.area - exactArea) <= size.areaErrorBound);
 - `OG_PRIMITIVE_PARAMS_SPHERE`, `OG_PRIMITIVE_PARAMS_CONE` and `OG_PRIMITIVE_PARAMS_TORUS` type their parameters. The entry exports the types `SphereParams`, `ConeParams` and `TorusParams`. A size that is not finite or not above four times the geometric tolerance, two zero cone radii, or a minor radius not below the major one by more than four times the geometric tolerance throws `InvalidParameter`.
 - An `operate` error says which handler family refused the bodies and which handlers were tried.
 - `OG_OPERATION_REVOLVE` turns a closed `Profile` wire a full turn into a solid: `{ profile, axis? }`. `axis` is `{ point: [u, v], direction: [du, dv] }` in the profile's own `[u, v]` and defaults to `{ point: [0, 0], direction: [0, 1] }`, the profile plane's v axis. `OG_OPERATION_PARAMS_REVOLVE` types the parameters. Each profile edge off the axis becomes one plane, cylinder, cone, sphere or ring torus face; an edge on the axis makes no face. A profile that crosses the axis, touches it at a single point, or meets it along two separate stretches, an arc whose circle meets the axis, and a zero direction throw `InvalidParameter`.
-- `OG_OPERATION_SHELL` hollows a solid in place: `solid.operate(OG_OPERATION_SHELL, { thickness })`. It takes a cuboid, cylinder, sphere, ring torus, cone, frustum, planar profile extrusion, or extrusion of a line-and-arc profile with or without holes, and leaves one closed void `thickness` inside every face. The inner walls of a line-and-arc extrusion are its exact inset: lines parallel to the sides, arcs on the same centres, and arcs of radius `thickness` at inward corners. The report's `face_mappings` lists, for each face of the body before the call, its outer face and every inner face offset from any part of it; `handlers` is `[]`. A thickness that is not finite or not above four times the geometric tolerance throws `InvalidParameter`. A cavity that would vanish throws `UnresolvedIntersection`. So does a line-and-arc profile whose inset is empty or splits into separate regions. So do two inset edges that come closer than four times the geometric tolerance and do not share a corner, such as a hole that nears the outline or the floor of a slot that nears the opposite side. Two edges that share a corner are not compared: an exact inset cannot bring them that close anywhere else. The inset is found to within `1e-7` times half the larger side of the profile's box, or the body's intersection accuracy if that is larger. Any inset feature smaller than that tolerance can throw `UnresolvedIntersection`. This includes a neck, which can already split the inset, and an inset arc of about that radius, such as one from a rounded corner whose radius is just above `thickness`. In a narrow window of such radii, the call can throw `InvalidTopology` instead. A shape shared by other instances throws `SharedShape` unless `instances: 'all'` is given, a solid of another kind throws `CoverageGap`, and a solid with approximate geometry throws `UnsupportedGeometry`.
+- `OG_OPERATION_SHELL` hollows a solid in place: `solid.operate(OG_OPERATION_SHELL, { thickness })`. It takes a cuboid, cylinder, sphere, ring torus, cone, frustum, planar profile extrusion, or extrusion of a line-and-arc profile with or without holes, and leaves one closed void `thickness` inside every face. The inner walls of a line-and-arc extrusion are its exact inset: lines parallel to the sides, arcs on the same centres, and arcs of radius `thickness` at inward corners. The report's `face_mappings` lists, for each face of the body before the call, its outer face and every inner face offset from any part of it; `handlers` is `[]`. A thickness that is not finite or not above four times the geometric tolerance throws `InvalidParameter`. A cavity that would vanish throws `UnresolvedIntersection`. So does a line-and-arc profile whose inset is empty or splits into separate regions. So do two inset edges that come closer than four times the geometric tolerance and do not share a corner, such as a hole that nears the outline or the floor of a slot that nears the opposite side. Two edges that share a corner are not compared: an exact inset cannot bring them that close anywhere else. The inset is found to within `1e-7` times half the larger side of the profile's box, or the body's intersection accuracy if that is larger. Any inset feature smaller than that tolerance can throw `UnresolvedIntersection`. This includes a neck, which can already split the inset, and an inset arc of about that radius, such as one from a rounded corner whose radius is just above `thickness`. In a narrow window of such radii, the call can throw `InvalidTopology` instead. A shape shared by other instances throws `SharedShape` unless `instances: 'all'` is given, a solid of another kind throws `CoverageGap`, and a solid with approximate geometry throws `UnsupportedGeometry`. A shell of a full-turn revolve throws `CoverageGap` with `details.families` equal to `['restricted analytic shell', 'revolved profile']`.
 - Not built: a Sheet is not thickened into a solid. `Sheet` has no `operate`, and the shell of an open sheet in the kernel graph throws `CoverageGap` with `details.families` equal to `['restricted analytic shell', 'open sheet']`.
 - `body.classifyPoint([x, y, z])` is new. It says whether a point in the body's own coordinates is `'Inside'`, `'Outside'`, on the `'Boundary'` or `'Unknown'`. A Wire or a Sheet throws `InvalidOperand`.
-- `body.measure({ deflection? })` is new. It returns `{ volume, area, errorBound, deflection }`, measured in the body's own coordinates: a scale in the body's placement is not applied. The kernel tessellates at `deflection` (default: the tessellation accuracy of the graph, `0.01` unless you set it), sums the signed triangle volumes and the triangle areas, and caps the mesh at 2 000 000 triangles. The volume is approximate: `|volume − exact| ≤ errorBound`, where `errorBound` is the volume bound, `4 · area · deflection` for a body with a curved face and `1e-10 · max(area, 1)` for a body with only flat faces, so a flat body measures exactly. Since 3.0.1 the result also holds `areaErrorBound`, the area bound: `|area − exact| ≤ areaErrorBound`. For each triangle on a curved face, it adds the triangle's area times the most that the triangle's tilt against the surface and its distance from it can change the area under it. For each curved edge, it adds `deflection` times the edge's length once for each face beside the edge, and twice that when the face is curved. It then adds `1e-10 · area`. It is `Infinity` when a triangle is too coarse to bound; `JSON.stringify` writes `Infinity` as `null`. A smaller `deflection` gives a smaller bound and a slower call. A `deflection` that is not a positive finite number throws `InvalidParameter`; one that is not above twice the geometric tolerance throws `InvalidGeometry`; a mesh that needs more than 2 000 000 triangles throws `LimitExceeded`. The call does not change the graph. The entry exports the type `Measure`.
+- `body.measure({ deflection? })` is new. It returns `{ volume, area, errorBound, areaErrorBound, deflection }`, measured in the body's own coordinates: a scale in the body's placement is not applied. The kernel tessellates at `deflection` (default: the tessellation accuracy of the graph, `0.01` unless you set it), sums the signed triangle volumes and the triangle areas, and caps the mesh at 2 000 000 triangles. The volume is approximate: `|volume − exact| ≤ errorBound`, where `errorBound` is the volume bound, `4 · area · deflection` for a body with a curved face and `1e-10 · max(area, 1)` for a body with only flat faces, so a flat body measures exactly. The area is approximate too: `|area − exact| ≤ areaErrorBound`, where `areaErrorBound` is the area bound. For each triangle on a curved face, it adds the triangle's area times the most that the triangle's tilt against the surface and its distance from it can change the area under it. For each curved edge, it adds `deflection` times the edge's length once for each face beside the edge, and twice that when the face is curved. It then adds `1e-10 · area`. It is `Infinity` when a triangle is too coarse to bound; `JSON.stringify` writes `Infinity` as `null`. A smaller `deflection` gives a smaller bound and a slower call. A `deflection` that is not a positive finite number throws `InvalidParameter`; one that is not above twice the geometric tolerance throws `InvalidGeometry`; a mesh that needs more than 2 000 000 triangles throws `LimitExceeded`. The call does not change the graph. The entry exports the type `Measure`.
 - `body.validity()` is new. It returns `{ valid, closed, bodyType }`, plus `error: { code, message }` when the body is not valid. `closed` is true when every shell of a Sheet or a Solid is closed and when every wire of a Wire is closed; an invalid body has `closed: false` and `bodyType: null`. The call does not change the graph. The entry exports the type `Validity`.
 - `body.mirror({ origin, normal }, { instances? })` is new. It rebuilds the body's shape as its reflection across the plane through `origin` with normal `normal`, both given in the body's own coordinates. The normal does not need to be of unit length. It works on a Wire, a Sheet or a Solid. The placement does not change; the shape gets a new revision. Face ids, face keys and face sources are kept, and each face's `provenance.reversed` is toggled. A boolean report on the shape is cleared, so `getReport()` gives `null`. A shape shared by other instances throws `SharedShape` unless `instances: 'all'` is given. A normal of zero length, or a coordinate that is not finite, throws `InvalidParameter`. The entry exports the type `MirrorPlane`.
 - Not built: a reflecting placement. A placement cannot hold a reflection, so a `PLACE` with a negative `scale` and a `SCALE` with a negative `factor` still throw `InvalidTransform`. Use `mirror` instead.
+- `OpenGeometry.flush({ geometry: 'sync', bodies })` meshes and places only the bodies in `bodies`. Without `bodies`, a sync flush meshes every displayed body that waits for its mesh.
+- A flush swaps the mesh only of a displayed body whose shape changed and whose new mesh is ready.
 - Creating and disposing a body costs the same at any number of live bodies. In 2.5 the cost grew with the number of live bodies. Your code does not change.
 - Not built: a plane section of a body is not in 3.0.0.
 
@@ -431,9 +395,34 @@ const leg = new Solid(OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_PARAMS_CYLINDER({ radi
 const size: Measure = leg.measure({ deflection: 0.001 });
 const exact = Math.PI * 0.1 * 0.1 * 0.7;
 console.log(Math.abs(size.volume - exact) <= size.errorBound);
+const exactArea = 2 * Math.PI * 0.1 * 0.7 + 2 * Math.PI * 0.1 * 0.1;
+console.log(Math.abs(size.area - exactArea) <= size.areaErrorBound);
 const check: Validity = leg.validity();
 console.log(check.valid && check.closed && check.bodyType === 'Solid');
 ```
+
+### Before and after: mesh one body before the next frame
+
+`OpenGeometry.flush({ geometry: 'sync' })` meshes every displayed body that waits for its mesh. Pass `bodies` to mesh only those:
+
+```ts
+import * as THREE from 'three';
+import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, OG_TRANSFORM_TRANSLATE } from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const desk = new Solid(OG_PRIMITIVE_CUBOID, { width: 1.6, height: 0.75, depth: 0.8 });
+const chair = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.5, height: 0.9, depth: 0.5 });
+const scene = new THREE.Scene();
+scene.add(desk, chair);
+scene.updateMatrixWorld();
+
+chair.transform(OG_TRANSFORM_TRANSLATE, { offset: [0.6, 0, 0] });
+OpenGeometry.flush({ geometry: 'sync', bodies: [chair] });
+console.log(chair.surface.geometry.getAttribute('position').count > 0);
+```
+
+The call with `bodies` meshes only the chair, and the chair's mesh has its current world matrix when the call returns. The desk keeps waiting for the display worker.
 
 ### Before and after: mirror a chair arm
 
@@ -599,12 +588,14 @@ console.log(pan.getReport()?.handlers, cistern.getReport()?.handlers, bowl.ogId)
 - Some strokes now have their true area where 2.0 was wrong. A closed loop wider than its sides is solid: a 1 m square loop at width 1.2 covers 4.84 m², where 2.0 left a 0.2 m hole (4.8 m²). A U whose legs are shorter than its width covers 33 m² for a 10 m by 1 m U at width 2; 2.0 returned a ring that crosses itself (42 m²). An open path that crosses itself covers each place once, with a hole where it encloses space; 2.0 dropped or added pieces, and the mirrored path gave a different answer.
 - The offset calls throw `InvalidParameter` before the kernel for input of the wrong shape: a ring, path or distance list that is not a list of numbers, holes that are not a list of `{ ring, distances }`, an unknown hole or option field, a width, miter limit, distance or threshold that is not a number, or a `closed` or `bevel` that is not `true` or `false`. More than 100,000 points throws `LimitExceeded`; 2.0 had no limit.
 - When a tool of `operate` fails, `details` now has `attempted` beside `handlers`, `toolIndex` and `ogIds`: every handler tried, in order.
+- An `operate` call (subtract, union or intersect) whose intersection reaches the apex of a cone throws `CoverageGap`. `details.families` names the pair, for example `['cone or frustum', 'cuboid']` or `['cylinder', 'noncoaxial cone or frustum']`. The `message` names `'singular surface point'`.
 - When that failure is `CoverageGap`, `details` also has `families`. It names the specialised gap the kernel met, such as `['cylinder', 'oblique cuboid intersection']`; for two planar bodies, that of the last box handler tried. With no specialised gap, it is the error's own pair. For most gaps the `message` names only the generic pair, `generic analytic solid` and `intersecting analytic solid`, so read `details.families` for the specialised one. The `code` is `CoverageGap`.
+- `flush({ geometry: 'sync', bodies })` checks its input before it meshes anything. A body that was disposed, or that comes from a reset runtime, throws `Disposed`. `bodies` without `geometry: 'sync'`, a `bodies` that is not an array, and an item that is not a Wire, a Sheet or a Solid throw `InvalidParameter`. Hidden bodies, bodies with no shape and bodies disposed while a mark is live are skipped.
 - `OGError.details` is typed as `ErrorDetails`, which the package exports with `OperateErrorDetails`. A `details` value that is not an object becomes `{}`.
 - Point classification counts each solid of a body on its own, outer shell and cavities. A body is Inside if any solid holds the point. Before, the faces of all solids were counted together, so a point inside one of two touching solids could read Outside, and a Boolean that tested such a point could go wrong.
 - `classifyPoint` returns `'Boundary'` for a point within the geometric tolerance (`1e-8`) of the body's surface: on faces at any rotation, on seams, rims, edges, corners, sphere poles and a cone apex. Limit: the face test follows a circle, an ellipse or a full-turn line trim as 64 straight pieces, and an intersection curve as 128. So near such a trim the answer can be wrong. A point a little off a cylinder or cone cap near its rim (within about 1.2e-3 times the radius) can get the wrong side. A point on the surface just past a cut edge can read `'Boundary'`, up to about 7e-5 from the body on a cylinder minus a cuboid tilted 45 degrees. A point 1e-7 off a sphere pole or a cone apex can read `'Unknown'`.
 - A full circle or ellipse, and the round direction of a cylinder, cone, sphere or torus, now has at least 12 segments, rounded up to an even number, at every display bucket. Before, a cylinder of radius 0.011 showed 5 sides in plan view, and an odd count made a lying cylinder look different from its mirror image. An arc has at least `ceil(12 * sweep / 2π)` segments, so a sphere has at least 6 rows from pole to pole. Curved bodies have more triangles. Above this minimum the count still changes with the display bucket; to keep one count at every zoom, set `appearance.deflection`.
-- `getBounds()` of a body with sloped plane faces or arc-edged caps is the box of the body itself. The box of a plane face comes from its boundary edges. 2.5 boxed a face by the rectangle of its own face coordinates. By that rule a hip roof polyhedron would be 4.1 m too wide on each side, and a quarter of a curved wall would get the box of the full disk. From 3.0.1 a circle or ellipse edge, a cylinder or cone face and a full torus on a frame turned against the world axes get their exact box. A sphere face or a part of a torus on such a frame is still boxed through its turned local box, so such a box can be larger than the body.
+- `getBounds()` of a body with sloped plane faces or arc-edged caps is the box of the body itself. The box of a plane face comes from its boundary edges. 2.5 boxed a face by the rectangle of its own face coordinates. By that rule a hip roof polyhedron would be 4.1 m too wide on each side, and a quarter of a curved wall would get the box of the full disk. A circle or ellipse edge, a cylinder or cone face and a full torus on a frame turned against the world axes get their exact box. A sphere face or a part of a torus on such a frame is still boxed through its turned local box, so such a box can be larger than the body.
 - `operate` now builds a union, intersection or subtraction of two bodies that are prisms along one shared cylinder axis, however the pair is placed: every flat face is square to the axis or parallel to it, every curved face is a cylinder around a parallel axis, and every side face is a plain strip with no notch or hole. This covers an arc-edged extrusion minus a blind inset or pocket, a cuboid minus a blind arc-edged pocket, and a cuboid with an upright cylinder that crosses a side face. The report's `handlers` is `['prismatic_curved_boolean']`, and a gap that reaches the generic handlers has `'prismatic_curved_boolean'` last in `details.attempted`.
 - An arc of one such body that touches a side or an arc of the other, within four times the geometric tolerance, throws `UnresolvedIntersection`. A touch at the end of the other body's own arc on the same circle is not refused, so a bore of the same radius at a D-shape's round end builds. A face of one body square to the axis that lies closer than four times the geometric tolerance to such a face of the other, without being level with it, also throws `UnresolvedIntersection`.
 - `operate` now builds a full cylinder minus a cuboid, and the intersection of the two in either order, when the cuboid is tilted against the cylinder's axis and only one of its faces cuts the cylinder. The cylinder must not lie along any cuboid axis, and the other five faces must stay clear of it. The result is exact: the side face is trimmed by the cut ellipse, or by two straight lines when the cut face is parallel to the axis. The caps are kept whole or cut along a chord, and there is one flat cut face. The report's `handlers` is `['cylinder_box_boolean']`, the same as for a cut square to the axis. A cut within the sliver limit (1/1000 of the radius) of a side or rim is left to the other paths, which throw `CoverageGap`, or throws `UnresolvedIntersection`. The same happens when the cut face is so close to parallel to the axis that the ellipse cannot be placed within the geometric tolerance.
@@ -630,7 +621,7 @@ console.log(pan.getReport()?.handlers, cistern.getReport()?.handlers, bowl.ogId)
 | Circle swept along a quarter arc, cut through the tube | `CoverageGap` | `['planar/compound solid', 'planar/compound solid']` |
 
 - Not built: a cuboid minus a cylinder tilted against every axis of the cuboid, their union, and a tilted pair where two or more cuboid faces cut the cylinder still throw `CoverageGap`, with `details.families` equal to `['cylinder', 'oblique cuboid intersection']`.
-- Not built: a cuboid that cuts through a torus face, a cone face or a part-sphere face, such as a box that removes half of the body, is refused. The table above gives the error for each body it names: `CoverageGap` for most, and `InvalidGeometry` for a pointed cone. A cuboid tilted against the axis of a cylinder sector is refused too. For a full cylinder, see the cylinder minus a tilted cuboid above.
+- Not built: a cuboid that cuts through a torus face, a cone face or a part-sphere face, such as a box that removes half of the body, is refused. The table above gives the error for each body it names: `CoverageGap` for each of them. A cuboid tilted against the axis of a cylinder sector is refused too. For a full cylinder, see the cylinder minus a tilted cuboid above.
 
 ### Check your result
 
@@ -649,6 +640,9 @@ console.log(pan.getReport()?.handlers, cistern.getReport()?.handlers, bowl.ogId)
 13. `measure()` on a cuboid of width 2, height 1 and depth 1 gives `volume` 2 and `area` 10 to within `1e-12`. `validity()` on that cuboid gives `{ valid: true, closed: true, bodyType: 'Solid' }`, and on a Sheet swept with `caps: false` it gives `closed: false`.
 14. A cuboid of width 2, height 1 and depth 1, mirrored across `{ origin: [0.3, 0, 0], normal: [1, 0, 0] }`, has `getBounds()` x from -0.4 to 1.6. Its `faceNormalAt` on the face that pointed to +x now gives `[-1, 0, 0]` at the reflected point. Its `measure().volume` is still 2, and `validity()` gives `{ valid: true, closed: true, bodyType: 'Solid' }`.
 15. A curved wall of radius 2, thickness 0.3 and height 3, minus an arch-profile prism 0.6 m wide (bottom 0.4, height 1.4) placed radially through it, is one valid solid with 10 faces.
+16. `measure()` on a cylinder of radius 0.1 and height 0.7 has a number `areaErrorBound`, and its `area` is within `areaErrorBound` of `2π · 0.1 · 0.7 + 2π · 0.1²`.
+17. Subtract from a pointed cone a cuboid that holds its apex. The call throws an `OGError` whose `code` is `'CoverageGap'`.
+18. Dispose a body, then call `OpenGeometry.flush({ geometry: 'sync', bodies: [body] })`. The call throws an `OGError` whose `code` is `'Disposed'`.
 
 ## 2.0 to 2.5
 
