@@ -17,6 +17,7 @@ It is written for people and for coding assistants alike: each section says what
 ### Different behaviour
 
 - An `operate` call (subtract, union or intersect) whose intersection reaches the apex of a cone now throws `CoverageGap`. In 3.0.0 it threw `InvalidGeometry` with the message `SingularParameterization`. `details.families` names the pair, for example `['cone or frustum', 'cuboid']` or `['cylinder', 'noncoaxial cone or frustum']`. The `message` names `'singular surface point'`.
+- Spheres and tori usually get up to about 8 times fewer triangles at the same deflection. Small or coarse spheres and tori are held by the 12-segment minimum, so they change less or not at all. Their meshes and their `measure` results (volume, area, error bound) change; the shapes do not, and each result stays within its bound.
 
 ## 2.5 to 3.0
 

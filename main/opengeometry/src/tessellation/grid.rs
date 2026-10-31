@@ -112,16 +112,16 @@ pub(super) fn grid_size(
             1,
         ),
         SurfaceGeometry::Sphere { radius, .. } => (
-            turn_count(u * (2.0 * radius / error).sqrt(), u, 3, max_triangles)?,
-            turn_count(v * (2.0 * radius / error).sqrt(), v, 2, max_triangles)?,
+            turn_count(u * (radius / (4.0 * error)).sqrt(), u, 3, max_triangles)?,
+            turn_count(v * (radius / (4.0 * error)).sqrt(), v, 2, max_triangles)?,
         ),
         SurfaceGeometry::Torus {
             major_radius: r,
             minor_radius: a,
             ..
         } => (
-            turn_count(u * ((r + 2.0 * a) / error).sqrt(), u, 3, max_triangles)?,
-            turn_count(v * (2.0 * a / error).sqrt(), v, 3, max_triangles)?,
+            turn_count(u * ((r + a) / (4.0 * error)).sqrt(), u, 3, max_triangles)?,
+            turn_count(v * (a / (4.0 * error)).sqrt(), v, 3, max_triangles)?,
         ),
         SurfaceGeometry::Plane { .. } => {
             return Err(GeometryError::InvalidGeometry(
