@@ -8,6 +8,8 @@ use crate::geom2d::{point_in_ring2, Pt2};
 use crate::math::{scale, Interval, Point3};
 use std::collections::{BTreeSet, HashMap};
 
+const COUNT_ROUNDING: f64 = 1e-9;
+
 pub(super) struct FaceGrid<'a> {
     pub(super) rect: Option<&'a Rect>,
     pub(super) desired: [usize; 2],
@@ -48,20 +50,20 @@ pub(super) fn curved_trimmed_face(
         loops = vec![band];
     }
     let axis_aligned = all_axis_aligned(&loops);
+    let extent = loop_extent(&loops[0])?;
     if rect.is_some() && !face.trim.holes.is_empty() {
         shift_periodic_holes(face, surface, periods, &mut loops)?;
     }
     if !axis_aligned {
         return general_curved_trimmed_face(brep, face, size, &loops, error, mesh, max_triangles);
     }
-    let [u, v] = face.trim.uv_bounds;
     let all_boundary = loops.iter().flatten().collect::<Vec<_>>();
     let us = merged_grid_coordinates(
-        (0..=size[0]).map(|index| u.lo + u.width() * index as f64 / size[0] as f64),
+        uniform_coordinates(extent[0], face.trim.uv_bounds[0], size[0]),
         all_boundary.iter().map(|(uv, _)| uv[0]),
     );
     let vs = merged_grid_coordinates(
-        (0..=size[1]).map(|index| v.lo + v.width() * index as f64 / size[1] as f64),
+        uniform_coordinates(extent[1], face.trim.uv_bounds[1], size[1]),
         all_boundary.iter().map(|(uv, _)| uv[1]),
     );
     check_grid_budget(&us, &vs, max_triangles)?;
@@ -79,9 +81,40 @@ pub(super) fn curved_trimmed_face(
         surface,
         face,
     };
-    add_grid_vertices(&grid, &all_boundary, coordinate_tolerance, v, mesh)?;
+    add_grid_vertices(
+        &grid,
+        &all_boundary,
+        coordinate_tolerance,
+        face.trim.uv_bounds[1],
+        mesh,
+    )?;
     add_grid_triangles(&grid, &loops, start, mesh, max_triangles)?;
     Ok(())
+}
+
+fn loop_extent(points: &[([f64; 2], Point3)]) -> Result<[Interval; 2], GeometryError> {
+    let mut low = [f64::INFINITY; 2];
+    let mut high = [f64::NEG_INFINITY; 2];
+    for (uv, _) in points {
+        for axis in 0..2 {
+            low[axis] = low[axis].min(uv[axis]);
+            high[axis] = high[axis].max(uv[axis]);
+        }
+    }
+    Ok([
+        Interval::new(low[0], high[0])?,
+        Interval::new(low[1], high[1])?,
+    ])
+}
+
+fn uniform_coordinates(
+    extent: Interval,
+    bounds: Interval,
+    count: usize,
+) -> impl Iterator<Item = f64> {
+    let scaled = count as f64 * extent.width() / bounds.width() * (1.0 - COUNT_ROUNDING);
+    let count = (scaled.ceil() as usize).max(1);
+    (0..=count).map(move |index| extent.lo + extent.width() * index as f64 / count as f64)
 }
 
 fn all_axis_aligned(loops: &[Vec<([f64; 2], Point3)>]) -> bool {

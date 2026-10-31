@@ -1,5 +1,6 @@
 mod extrude;
 mod holes;
+mod mesh_walls;
 mod polyhedron;
 mod profiles;
 mod rebuild;
