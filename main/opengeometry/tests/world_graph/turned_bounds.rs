@@ -87,28 +87,22 @@ fn circle_box(frame: Frame3, radius: f64, range: [f64; 2]) -> [f64; 6] {
     arc_box(frame.origin, a, b, range)
 }
 
-#[test]
-fn a_full_circle_turned_about_the_vertical_gets_its_exact_box() {
-    let curve = CurveGeometry::Circle {
-        frame: about_z(),
-        radius: 1.0,
-    };
+fn assert_full_circle_box(frame: Frame3) {
+    let curve = CurveGeometry::Circle { frame, radius: 1.0 };
     assert_exact(
         curve_box(curve, 0.0, TAU),
-        circle_box(about_z(), 1.0, [0.0, TAU]),
+        circle_box(frame, 1.0, [0.0, TAU]),
     );
 }
 
 #[test]
+fn a_full_circle_turned_about_the_vertical_gets_its_exact_box() {
+    assert_full_circle_box(about_z());
+}
+
+#[test]
 fn a_full_circle_turned_about_a_skew_axis_gets_its_exact_box() {
-    let curve = CurveGeometry::Circle {
-        frame: skew(),
-        radius: 1.0,
-    };
-    assert_exact(
-        curve_box(curve, 0.0, TAU),
-        circle_box(skew(), 1.0, [0.0, TAU]),
-    );
+    assert_full_circle_box(skew());
 }
 
 #[test]
