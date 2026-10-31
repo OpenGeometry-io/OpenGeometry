@@ -1,3 +1,4 @@
+use super::turned::{narrowed, turned_axis};
 use crate::brep::bounds::PatchBounds;
 use crate::brep::error::GeometryError;
 use crate::brep::frame::{checked, Frame3};
@@ -125,20 +126,12 @@ impl CurveGeometry {
                 }
                 Ok(PatchBounds { axes })
             }
-            Self::Circle { frame, radius } => frame.bounds([
-                range.cos()?.mul_interval(Interval::point(*radius)?)?,
-                range.sin()?.mul_interval(Interval::point(*radius)?)?,
-                zero,
-            ]),
+            Self::Circle { frame, radius } => conic_bounds(frame, [*radius, *radius], range),
             Self::Ellipse {
                 frame,
                 major_radius: a,
                 minor_radius: b,
-            } => frame.bounds([
-                range.cos()?.mul_interval(Interval::point(*a)?)?,
-                range.sin()?.mul_interval(Interval::point(*b)?)?,
-                zero,
-            ]),
+            } => conic_bounds(frame, [*a, *b], range),
             Self::Intersection { definition } => Err(GeometryError::MissingReference {
                 kind: "intersection".into(),
                 index: *definition,
@@ -193,4 +186,24 @@ impl CurveGeometry {
         }
         Ok(samples)
     }
+}
+
+fn conic_bounds(
+    frame: &Frame3,
+    radii: [f64; 2],
+    range: Interval,
+) -> Result<PatchBounds, GeometryError> {
+    let mut bounds = frame.bounds([
+        range.cos()?.mul_interval(Interval::point(radii[0])?)?,
+        range.sin()?.mul_interval(Interval::point(radii[1])?)?,
+        Interval::point(0.0)?,
+    ])?;
+    for i in 0..3 {
+        if frame.x[i] != 0.0 && frame.y[i] != 0.0 {
+            let along = [radii[0] * frame.x[i], radii[1] * frame.y[i]];
+            let exact = turned_axis([frame.origin[i], 0.0], along, range)?;
+            bounds.axes[i] = narrowed(bounds.axes[i], exact)?;
+        }
+    }
+    Ok(bounds)
 }
