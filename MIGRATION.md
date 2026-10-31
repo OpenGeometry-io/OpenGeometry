@@ -14,6 +14,35 @@ It is written for people and for coding assistants alike: each section says what
 
 ## 3.0.0 to 3.0.1
 
+### What changed
+
+- `body.measure()` also returns `areaErrorBound`: `|area − exact| ≤ areaErrorBound`. `errorBound` is the bound on the volume only, as before; in 3.0.0 nothing bounded the area, and below unit size the area error was up to several thousand times `errorBound`.
+
+### Before and after
+
+3.0.0:
+
+```js
+const size = leg.measure({ deflection: 0.00001 });
+console.log(Math.abs(size.volume - exactVolume) <= size.errorBound);
+```
+
+3.0.1:
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_PARAMS_CYLINDER } from 'opengeometry';
+import type { Measure } from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
+
+const pin = new Solid(OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_PARAMS_CYLINDER({ radius: 0.001, height: 0.002 }));
+const size: Measure = pin.measure({ deflection: 0.00001 });
+const exactVolume = Math.PI * 0.001 * 0.001 * 0.002;
+const exactArea = 2 * Math.PI * 0.001 * 0.002 + 2 * Math.PI * 0.001 * 0.001;
+console.log(Math.abs(size.volume - exactVolume) <= size.errorBound);
+console.log(Math.abs(size.area - exactArea) <= size.areaErrorBound);
+```
+
 ### Different behaviour
 
 - An `operate` call (subtract, union or intersect) whose intersection reaches the apex of a cone now throws `CoverageGap`. In 3.0.0 it threw `InvalidGeometry` with the message `SingularParameterization`. `details.families` names the pair, for example `['cone or frustum', 'cuboid']` or `['cylinder', 'noncoaxial cone or frustum']`. The `message` names `'singular surface point'`.
@@ -55,7 +84,7 @@ It is written for people and for coding assistants alike: each section says what
 - `OG_OPERATION_SHELL` hollows a solid in place: `solid.operate(OG_OPERATION_SHELL, { thickness })`. It takes a cuboid, cylinder, sphere, ring torus, cone, frustum, planar profile extrusion, or extrusion of a line-and-arc profile with or without holes, and leaves one closed void `thickness` inside every face. The inner walls of a line-and-arc extrusion are its exact inset: lines parallel to the sides, arcs on the same centres, and arcs of radius `thickness` at inward corners. The report's `face_mappings` lists, for each face of the body before the call, its outer face and every inner face offset from any part of it; `handlers` is `[]`. A thickness that is not finite or not above four times the geometric tolerance throws `InvalidParameter`. A cavity that would vanish, and a profile inset that is empty, splits into separate regions or narrows to within four times the geometric tolerance, throw `UnresolvedIntersection`. A shape shared by other instances throws `SharedShape` unless `instances: 'all'` is given, a solid of another kind throws `CoverageGap`, and a solid with approximate geometry throws `UnsupportedGeometry`.
 - Not built: a Sheet is not thickened into a solid. `Sheet` has no `operate`, and the shell of an open sheet in the kernel graph throws `CoverageGap` with `details.families` equal to `['restricted analytic shell', 'open sheet']`.
 - `body.classifyPoint([x, y, z])` is new. It says whether a point in the body's own coordinates is `'Inside'`, `'Outside'`, on the `'Boundary'` or `'Unknown'`. A Wire or a Sheet throws `InvalidOperand`.
-- `body.measure({ deflection? })` is new. It returns `{ volume, area, errorBound, deflection }`, measured in the body's own coordinates: a scale in the body's placement is not applied. The kernel tessellates at `deflection` (default: the tessellation accuracy of the graph, `0.01` unless you set it), sums the signed triangle volumes and the triangle areas, and caps the mesh at 2 000 000 triangles. The volume is approximate: `|volume − exact| ≤ errorBound`, where `errorBound` is `4 · area · deflection` for a body with a curved face and `1e-10 · max(area, 1)` for a body with only flat faces, so a flat body measures exactly. A smaller `deflection` gives a smaller bound and a slower call. A `deflection` that is not a positive finite number throws `InvalidParameter`; one that is not above twice the geometric tolerance throws `InvalidGeometry`; a mesh that needs more than 2 000 000 triangles throws `LimitExceeded`. The call does not change the graph. The entry exports the type `Measure`.
+- `body.measure({ deflection? })` is new. It returns `{ volume, area, errorBound, deflection }`, measured in the body's own coordinates: a scale in the body's placement is not applied. The kernel tessellates at `deflection` (default: the tessellation accuracy of the graph, `0.01` unless you set it), sums the signed triangle volumes and the triangle areas, and caps the mesh at 2 000 000 triangles. The volume is approximate: `|volume − exact| ≤ errorBound`, where `errorBound` is the volume bound, `4 · area · deflection` for a body with a curved face and `1e-10 · max(area, 1)` for a body with only flat faces, so a flat body measures exactly. Since 3.0.1 the result also holds `areaErrorBound`, the area bound: `|area − exact| ≤ areaErrorBound`. For each triangle on a curved face, it adds the triangle's area times the most that the triangle's tilt against the surface and its distance from it can change the area under it. For each curved edge, it adds `deflection` times the edge's length once for each face beside the edge, and twice that when the face is curved. It then adds `1e-10 · area`. It is `Infinity` when a triangle is too coarse to bound; `JSON.stringify` writes `Infinity` as `null`. A smaller `deflection` gives a smaller bound and a slower call. A `deflection` that is not a positive finite number throws `InvalidParameter`; one that is not above twice the geometric tolerance throws `InvalidGeometry`; a mesh that needs more than 2 000 000 triangles throws `LimitExceeded`. The call does not change the graph. The entry exports the type `Measure`.
 - `body.validity()` is new. It returns `{ valid, closed, bodyType }`, plus `error: { code, message }` when the body is not valid. `closed` is true when every shell of a Sheet or a Solid is closed and when every wire of a Wire is closed; an invalid body has `closed: false` and `bodyType: null`. The call does not change the graph. The entry exports the type `Validity`.
 - `body.mirror({ origin, normal }, { instances? })` is new. It rebuilds the body's shape as its reflection across the plane through `origin` with normal `normal`, both given in the body's own coordinates. The normal does not need to be of unit length. It works on a Wire, a Sheet or a Solid. The placement does not change; the shape gets a new revision. Face ids, face keys and face sources are kept, and each face's `provenance.reversed` is toggled. A boolean report on the shape is cleared, so `getReport()` gives `null`. A shape shared by other instances throws `SharedShape` unless `instances: 'all'` is given. A normal of zero length, or a coordinate that is not finite, throws `InvalidParameter`. The entry exports the type `MirrorPlane`.
 - Not built: a reflecting placement. A placement cannot hold a reflection, so a `PLACE` with a negative `scale` and a `SCALE` with a negative `factor` still throw `InvalidTransform`. Use `mirror` instead.

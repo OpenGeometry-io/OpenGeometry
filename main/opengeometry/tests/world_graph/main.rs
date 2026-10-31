@@ -4,6 +4,7 @@ mod contract;
 mod hierarchy;
 mod marks;
 mod measure;
+mod measure_bounds;
 mod mutation;
 mod placement;
 mod shelling;

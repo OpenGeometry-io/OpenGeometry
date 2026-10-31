@@ -1,4 +1,4 @@
-export type Measure = { volume: number; area: number; errorBound: number; deflection: number };
+export type Measure = { volume: number; area: number; errorBound: number; areaErrorBound: number; deflection: number };
 
 export type Validity = {
   valid: boolean;
