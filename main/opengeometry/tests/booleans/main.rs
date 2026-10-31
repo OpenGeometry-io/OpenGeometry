@@ -8,6 +8,7 @@ mod face_normals;
 mod flush_openings;
 mod multi_tool;
 mod point_classification;
+mod pointed_cone;
 mod prismatic_curved;
 mod prismatic_placed;
 mod routing;

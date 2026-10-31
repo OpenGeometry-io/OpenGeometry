@@ -12,6 +12,12 @@ It is written for people and for coding assistants alike: each section says what
 4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
 5. Finish with its "Check your result" steps.
 
+## 3.0.0 to 3.0.1
+
+### Different behaviour
+
+- An `operate` call (subtract, union or intersect) whose intersection reaches the apex of a cone now throws `CoverageGap`. In 3.0.0 it threw `InvalidGeometry` with the message `SingularParameterization`. `details.families` names the pair, for example `['cone or frustum', 'cuboid']` or `['cylinder', 'noncoaxial cone or frustum']`. The `message` names `'singular surface point'`.
+
 ## 2.5 to 3.0
 
 2.5 was not published. From 2.0, follow 2.0 to 2.5, then 2.5 to 3.0.
@@ -570,7 +576,7 @@ console.log(pan.getReport()?.handlers, cistern.getReport()?.handlers, bowl.ogId)
 - `operate` now builds a union, intersection or subtraction of two bodies that are prisms along one shared cylinder axis, however the pair is placed: every flat face is square to the axis or parallel to it, every curved face is a cylinder around a parallel axis, and every side face is a plain strip with no notch or hole. This covers an arc-edged extrusion minus a blind inset or pocket, a cuboid minus a blind arc-edged pocket, and a cuboid with an upright cylinder that crosses a side face. The report's `handlers` is `['prismatic_curved_boolean']`, and a gap that reaches the generic handlers has `'prismatic_curved_boolean'` last in `details.attempted`.
 - An arc of one such body that touches a side or an arc of the other, within four times the geometric tolerance, throws `UnresolvedIntersection`. A touch at the end of the other body's own arc on the same circle is not refused, so a bore of the same radius at a D-shape's round end builds. A face of one body square to the axis that lies closer than four times the geometric tolerance to such a face of the other, without being level with it, also throws `UnresolvedIntersection`.
 - `operate` now builds a full cylinder minus a cuboid, and the intersection of the two in either order, when the cuboid is tilted against the cylinder's axis and only one of its faces cuts the cylinder. The cylinder must not lie along any cuboid axis, and the other five faces must stay clear of it. The result is exact: the side face is trimmed by the cut ellipse, or by two straight lines when the cut face is parallel to the axis. The caps are kept whole or cut along a chord, and there is one flat cut face. The report's `handlers` is `['cylinder_box_boolean']`, the same as for a cut square to the axis. A cut within the sliver limit (1/1000 of the radius) of a side or rim is left to the other paths, which throw `CoverageGap`, or throws `UnresolvedIntersection`. The same happens when the cut face is so close to parallel to the axis that the ellipse cannot be placed within the geometric tolerance.
-- A half-space cuboid is an axis-aligned cuboid much larger than the body, with one face through it, as a section clipper is. The table gives the result when such a cuboid removes the half of each body below a plane through its middle. The last column gives the handler that builds the body, or the `details.families` of the refusal. The `message` of a refused `CoverageGap` names the generic pair.
+- A half-space cuboid is an axis-aligned cuboid much larger than the body, with one face through it, as a section clipper is. The table gives the result when such a cuboid removes the half of each body below a plane through its middle. The last column gives the handler that builds the body, or the `details.families` of the refusal. The `message` of a refused `CoverageGap` names the generic pair unless its row says otherwise.
 
 | Body minus the half-space cuboid | Result | Handler, or `details.families` when refused |
 | --- | --- | --- |
@@ -583,7 +589,7 @@ console.log(pan.getReport()?.handlers, cistern.getReport()?.handlers, bowl.ogId)
 | Cuboid | Built, 6 faces | `boolean_boxes` |
 | Upright cylinder, cut along its axis | Built, 4 faces | `subtract_vertical_arc_extrusion` |
 | Sphere, cut through its centre | Built, 2 faces | `sphere_box_boolean` |
-| Pointed cone, cut along its axis | `InvalidGeometry`, message `SingularParameterization` | none |
+| Pointed cone, apex up or down, cut along its axis | `CoverageGap`, `message` names `'singular surface point'` | `['cone or frustum', 'cuboid']` |
 | Frustum, cut along its axis | `CoverageGap` | `['cone or frustum', 'cuboid']` |
 | Revolved frustum, cut through its axis | `CoverageGap` | `['planar/compound solid', 'planar/compound solid']` |
 | D-shaped extrusion, cut across its arc | Built, 6 faces | `subtract_vertical_arc_extrusion` |

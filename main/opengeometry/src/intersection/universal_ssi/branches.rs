@@ -14,7 +14,10 @@ pub(super) fn segment_endpoint_tangent(
     end: usize,
 ) -> Result<Point3, GeometryError> {
     let root = segment.ends[end];
-    let transverse = cross(source.normal_at(root.uv_a)?, target.normal_at(root.uv_b)?);
+    let transverse = cross(
+        regular_normal(source, root.uv_a)?,
+        regular_normal(target, root.uv_b)?,
+    );
     if norm(transverse) > 1.0e-8 {
         unit(transverse)
     } else {
@@ -24,6 +27,18 @@ pub(super) fn segment_endpoint_tangent(
             )
         })
     }
+}
+
+fn regular_normal(surface: &SurfaceGeometry, uv: UV) -> Result<Point3, GeometryError> {
+    surface.normal_at(uv).map_err(|error| match error {
+        GeometryError::SingularParameterization => GeometryError::CoverageGap {
+            families: [
+                "universal SSI branch end".into(),
+                "singular surface point".into(),
+            ],
+        },
+        other => other,
+    })
 }
 
 pub(super) fn normalized_key(
