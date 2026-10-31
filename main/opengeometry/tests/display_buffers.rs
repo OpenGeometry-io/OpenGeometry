@@ -1,4 +1,4 @@
-use opengeometry::brep::{BrepEnvelope, Frame3};
+use opengeometry::brep::{BrepEnvelope, Frame3, Surface};
 use opengeometry::operations::modifying::boolean::subtract_planar_cutters;
 use opengeometry::tessellation::{
     display::{bucket_floor, deflection_bucket, display_buffers, static_bucket},
@@ -232,8 +232,62 @@ fn torus_grid(bucket: Option<f64>) -> [usize; 2] {
 
 #[test]
 fn torus_grid_counts_are_even_and_at_least_twelve_in_both_directions() {
-    assert_eq!(torus_grid(None), [174, 94]);
+    assert_eq!(torus_grid(None), [82, 34]);
     assert_eq!(torus_grid(Some(0.125)), [12, 12]);
+}
+
+fn worst_deviation(brep: &BrepEnvelope, deflection: f64) -> f64 {
+    let mesh = tessellate(brep, deflection, 2_000_000).unwrap();
+    let corner = |index: u32| -> [f64; 3] {
+        std::array::from_fn(|axis| mesh.positions[index as usize * 3 + axis])
+    };
+    let mut worst = 0.0_f64;
+    for (triangle, ids) in mesh.indices.chunks_exact(3).enumerate() {
+        let face = &brep.topology.faces[mesh.triangle_face_ids[triangle] as usize];
+        let surface = brep.geometry.surface(face.surface).unwrap();
+        let corners = [corner(ids[0]), corner(ids[1]), corner(ids[2])];
+        for i in 0..=8_usize {
+            for j in 0..=8 - i {
+                let weights = [i, j, 8 - i - j];
+                if weights.contains(&8) {
+                    continue;
+                }
+                let point: [f64; 3] = std::array::from_fn(|axis| {
+                    (0..3)
+                        .map(|k| weights[k] as f64 * corners[k][axis])
+                        .sum::<f64>()
+                        / 8.0
+                });
+                let nearest = surface
+                    .point_at(surface.project(point, None).unwrap())
+                    .unwrap();
+                let gap: [f64; 3] = std::array::from_fn(|axis| point[axis] - nearest[axis]);
+                worst = worst.max(gap[0].hypot(gap[1]).hypot(gap[2]));
+            }
+        }
+    }
+    worst
+}
+
+#[test]
+fn a_sphere_and_a_torus_at_the_static_bucket_stay_within_half_the_deflection_in_few_triangles() {
+    let accuracy = graph().accuracy();
+    let sphere =
+        opengeometry::primitives::sphere("ball".into(), Frame3::IDENTITY, 0.5, accuracy).unwrap();
+    let torus =
+        opengeometry::primitives::torus("ring".into(), Frame3::IDENTITY, 1.0, 0.25, accuracy)
+            .unwrap();
+    for (brep, ceiling) in [(sphere, 8_000), (torus, 9_000)] {
+        let bucket = static_bucket(&brep).unwrap();
+        let triangles = display_buffers(&brep, bucket, 2_000_000).unwrap().triangles;
+        let deflection = 0.75 * bucket;
+        let worst = worst_deviation(&brep, deflection);
+        assert!(
+            worst <= 0.5 * deflection,
+            "{worst} above half of {deflection}"
+        );
+        assert!(triangles <= ceiling, "{triangles} above {ceiling}");
+    }
 }
 
 #[test]

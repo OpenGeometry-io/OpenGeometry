@@ -11,6 +11,7 @@ mod planar_batch;
 mod planar_extrusions;
 mod planar_oblique;
 mod shell;
+mod shell_necks;
 mod sphere_cylinder;
 mod spheres;
 mod support;

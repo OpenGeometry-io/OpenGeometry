@@ -108,10 +108,10 @@ export function measure(owner: string, ogId: string, options: { deflection?: num
   if (deflection !== undefined && typeof deflection !== 'number') {
     throw new OGError('InvalidParameter', label, 'deflection must be a number');
   }
-  const [volume = Number.NaN, area = Number.NaN, errorBound = Number.NaN, achieved = Number.NaN] = call(
-    label, () => worldGraph().measure(ogId, deflection),
-  );
-  return { volume, area, errorBound, deflection: achieved };
+  const [
+    volume = Number.NaN, area = Number.NaN, errorBound = Number.NaN, achieved = Number.NaN, areaErrorBound = Number.NaN,
+  ] = call(label, () => worldGraph().measure(ogId, deflection));
+  return { volume, area, errorBound, areaErrorBound, deflection: achieved };
 }
 
 export function validity(owner: string, ogId: string): Validity {

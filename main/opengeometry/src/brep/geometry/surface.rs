@@ -1,3 +1,4 @@
+use super::turned::{narrowed, reached, ring_axis, swept_axis};
 use crate::brep::bounds::PatchBounds;
 use crate::brep::error::GeometryError;
 use crate::brep::frame::{checked, Frame3, UVBox, UV};
@@ -351,6 +352,41 @@ impl Surface for SurfaceGeometry {
                 ]
             }
         };
-        self.frame().bounds(local)
+        let bounds = self.frame().bounds(local)?;
+        self.tightened(bounds, domain)
+    }
+}
+
+impl SurfaceGeometry {
+    fn tightened(
+        &self,
+        mut bounds: PatchBounds,
+        domain: UVBox,
+    ) -> Result<PatchBounds, GeometryError> {
+        let frame = self.frame();
+        for i in 0..3 {
+            let exact = match self {
+                Self::Cylinder { radius, .. } if frame.x[i] != 0.0 && frame.y[i] != 0.0 => {
+                    swept_axis(frame, i, |_| *radius, domain)?
+                }
+                Self::Cone { semi_angle, .. } if reached(frame, i) > 1 => {
+                    let slope = semi_angle.tan();
+                    swept_axis(frame, i, |v| v * slope, domain)?
+                }
+                Self::Torus {
+                    major_radius,
+                    minor_radius,
+                    ..
+                } if reached(frame, i) > 1
+                    && domain[0].width() >= std::f64::consts::TAU
+                    && domain[1].width() >= std::f64::consts::TAU =>
+                {
+                    ring_axis(frame, i, *major_radius, *minor_radius)?
+                }
+                _ => continue,
+            };
+            bounds.axes[i] = narrowed(bounds.axes[i], exact)?;
+        }
+        Ok(bounds)
     }
 }

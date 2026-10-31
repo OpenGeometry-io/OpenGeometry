@@ -1,4 +1,4 @@
-use super::support::{sphere, volume};
+use super::support::{sphere, volume_at_deflection};
 use crate::brep::{
     placed, Accuracy, BrepEnvelope, Frame3, GeometryError, Orientation, Surface, SurfaceGeometry,
 };
@@ -56,7 +56,7 @@ fn transverse_spheres_preserve_surfaces_shared_edge_and_occupancy_volumes() {
             .collect();
         assert_eq!(shared.len(), 1);
         assert!(shared[0].twin_halfedge.is_some());
-        assert!((volume(&r.brep) - expected).abs() < 0.04);
+        assert!((volume_at_deflection(&r.brep, 0.005) - expected).abs() < 0.04);
         assert_eq!(r.report.face_mappings[0].result_faces, vec![0]);
         assert_eq!(r.report.face_mappings[1].result_faces, vec![1]);
         assert_eq!(
@@ -77,7 +77,11 @@ fn enclosed_subtraction_orients_cavity_and_preserves_ancestry() {
         r.brep.topology.faces[1].provenance.sources[0].entity,
         "cutter"
     );
-    assert!((volume(&r.brep) - 4.0 * std::f64::consts::PI / 3.0 * (8.0 - 0.125)).abs() < 0.1);
+    assert!(
+        (volume_at_deflection(&r.brep, 0.005) - 4.0 * std::f64::consts::PI / 3.0 * (8.0 - 0.125))
+            .abs()
+            < 0.1
+    );
 }
 
 #[test]

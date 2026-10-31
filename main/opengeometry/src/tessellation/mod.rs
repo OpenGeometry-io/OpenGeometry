@@ -1,3 +1,4 @@
+mod area_bound;
 #[cfg(test)]
 mod cache;
 mod curved_face;

@@ -6,6 +6,7 @@ mod surface;
 #[cfg(test)]
 mod tests;
 mod trace;
+mod turned;
 
 pub(crate) use chord::{bounds_chord_deviation, point_segment_distance};
 pub(crate) use curve::Curve;

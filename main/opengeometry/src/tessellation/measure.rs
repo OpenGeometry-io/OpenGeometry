@@ -1,3 +1,4 @@
+use super::area_bound::area_error_bound;
 use super::display::MAX_TRIANGLES;
 use super::tessellate::tessellate;
 use crate::brep::{BrepEnvelope, GeometryError, SurfaceGeometry};
@@ -7,6 +8,7 @@ pub struct Measure {
     pub volume: f64,
     pub area: f64,
     pub error_bound: f64,
+    pub area_error_bound: f64,
     pub deflection: f64,
 }
 
@@ -44,14 +46,16 @@ pub fn measure(body: &BrepEnvelope, deflection: f64) -> Result<Measure, Geometry
         .surfaces
         .iter()
         .any(|surface| !matches!(surface, SurfaceGeometry::Plane { .. }));
+    let error_bound = if curved {
+        area * deflection * 4.0
+    } else {
+        1e-10 * area.max(1.0)
+    };
     Ok(Measure {
         volume: six_volume.abs() / 6.0,
         area,
-        error_bound: if curved {
-            area * deflection * 4.0
-        } else {
-            1e-10 * area.max(1.0)
-        },
+        error_bound,
+        area_error_bound: area_error_bound(body, &mesh, deflection, area)?,
         deflection,
     })
 }

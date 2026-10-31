@@ -129,3 +129,44 @@ fn invalid_frames_tori_and_apices_fail_explicitly() {
     .sample_elementary(Interval::new(0.0, 1.0).unwrap(), 0.0, 100)
     .is_err());
 }
+
+#[test]
+fn partial_cylinder_and_cone_patches_on_a_skew_frame_get_their_exact_box() {
+    let box_uv = [
+        Interval::new(0.2, 1.8).unwrap(),
+        Interval::new(0.1, 0.9).unwrap(),
+    ];
+    for surface in surfaces().into_iter().skip(2).take(2) {
+        let frame = *surface.frame();
+        let mut angles = vec![box_uv[0].lo, box_uv[0].hi];
+        for i in 0..3 {
+            for k in -2..=2 {
+                let u = frame.y[i].atan2(frame.x[i]) + k as f64 * std::f64::consts::PI;
+                if box_uv[0].contains(u) {
+                    angles.push(u);
+                }
+            }
+        }
+        let mut expected = [[f64::INFINITY, -f64::INFINITY]; 3];
+        for &u in &angles {
+            for v in [box_uv[1].lo, box_uv[1].hi] {
+                let p = surface.point_at([u, v]).unwrap();
+                for i in 0..3 {
+                    expected[i] = [expected[i][0].min(p[i]), expected[i][1].max(p[i])];
+                }
+            }
+        }
+        let bounds = surface.enclose(box_uv).unwrap();
+        let size = expected.iter().map(|[lo, hi]| hi - lo).fold(0.0, f64::max);
+        for i in 0..3 {
+            assert!(
+                (bounds.axes[i].lo - expected[i][0]).abs() < 1e-10 * size,
+                "{surface:?} {i}"
+            );
+            assert!(
+                (bounds.axes[i].hi - expected[i][1]).abs() < 1e-10 * size,
+                "{surface:?} {i}"
+            );
+        }
+    }
+}

@@ -188,6 +188,20 @@ test('measure bounds a cylinder against its exact volume and a cuboid measures e
   body.dispose();
 });
 
+test('areaErrorBound bounds the area of a millimetre cylinder and of a cuboid within 1e-8', async () => {
+  await boot();
+  const cylinder = new Solid(OG_PRIMITIVE_CYLINDER, { radius: 0.001, height: 0.002 }, { ogId: 'measure-area' });
+  const size = cylinder.measure({ deflection: 0.00001 });
+  assert(Math.abs(size.area - Math.PI * 0.000006) <= size.areaErrorBound);
+  assert(size.areaErrorBound < size.area * 0.1);
+  const body = cuboid('measure-area-box', 2);
+  const box = body.measure();
+  assert(Math.abs(box.area - 10) <= box.areaErrorBound);
+  assert(box.areaErrorBound <= 1e-8);
+  cylinder.dispose();
+  body.dispose();
+});
+
 test('measure refuses a deflection that is not a positive number with InvalidParameter', async () => {
   await boot();
   const body = cuboid('measure-reject');

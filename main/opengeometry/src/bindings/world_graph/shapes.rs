@@ -73,6 +73,7 @@ impl OGWorldGraph {
             measured.area,
             measured.error_bound,
             measured.deflection,
+            measured.area_error_bound,
         ])
     }
 
