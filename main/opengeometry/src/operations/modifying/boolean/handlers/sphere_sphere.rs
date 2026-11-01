@@ -100,6 +100,7 @@ fn sphere_operands<'a>(
             Some(SurfaceGeometry::Torus { .. }) => "torus",
             Some(SurfaceGeometry::Plane { .. }) => "planar/compound solid",
             Some(SurfaceGeometry::Wrapped { .. }) => "wrapped",
+            Some(SurfaceGeometry::Conoid { .. }) => "conoid",
             None => "empty solid",
         }
         .to_string()

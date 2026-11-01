@@ -11,13 +11,13 @@ const REACH: f64 = 0.1;
 fn check_budget(budget: f64) -> Result<(), GeometryError> {
     if budget <= 0.0 {
         return Err(GeometryError::LimitExceeded(
-            "STEP exchange budget leaves no room for wrapped geometry fitting".into(),
+            "STEP exchange budget leaves no room for B-spline fitting".into(),
         ));
     }
     Ok(())
 }
 
-pub(super) fn add_wrapped_surface(
+pub(super) fn add_fitted_surface(
     writer: &mut Part21Writer,
     brep: &BrepEnvelope,
     surface_id: u32,

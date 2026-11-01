@@ -40,6 +40,11 @@ impl GeometryStore {
                 .iter()
                 .any(|c| matches!(c, CurveGeometry::Wrapped { .. }))
     }
+    pub(crate) fn has_conoid(&self) -> bool {
+        self.surfaces
+            .iter()
+            .any(|s| matches!(s, SurfaceGeometry::Conoid { .. }))
+    }
     pub fn surface(&self, id: u32) -> Result<&SurfaceGeometry, GeometryError> {
         self.surfaces
             .get(id as usize)

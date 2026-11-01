@@ -85,7 +85,9 @@ pub fn placed(
 fn metric(surface: &SurfaceGeometry, scale: f64) -> [f64; 2] {
     match surface {
         SurfaceGeometry::Plane { .. } => [scale; 2],
-        SurfaceGeometry::Cylinder { .. } | SurfaceGeometry::Cone { .. } => [1.0, scale],
+        SurfaceGeometry::Cylinder { .. }
+        | SurfaceGeometry::Cone { .. }
+        | SurfaceGeometry::Conoid { .. } => [1.0, scale],
         _ => [1.0; 2],
     }
 }
@@ -112,6 +114,10 @@ fn place_surfaces(surfaces: &mut [SurfaceGeometry], placement: Frame3, scale: f6
             }
             SurfaceGeometry::Wrapped { wrap, .. } => {
                 transform_frame(&mut wrap.frame, placement, 1.0)
+            }
+            SurfaceGeometry::Conoid { frame, c } => {
+                transform_frame(frame, placement, scale);
+                *c = c.map(|value| value * scale);
             }
         }
     }

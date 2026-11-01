@@ -132,7 +132,7 @@ fn deviation(
             sense,
             deflection,
         ),
-        SurfaceGeometry::Wrapped { .. } => None,
+        SurfaceGeometry::Wrapped { .. } | SurfaceGeometry::Conoid { .. } => None,
     }
 }
 

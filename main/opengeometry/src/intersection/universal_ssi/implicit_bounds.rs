@@ -1,4 +1,6 @@
-use crate::brep::{unsupported_wrapped, GeometryError, PatchBounds, SurfaceGeometry};
+use crate::brep::{
+    unsupported_conoid, unsupported_wrapped, GeometryError, PatchBounds, SurfaceGeometry,
+};
 use crate::math::{Interval, Point3};
 
 fn local_intervals(
@@ -60,6 +62,7 @@ pub(super) fn implicit_interval(
                 .sub_interval(Interval::point(minor_radius * minor_radius)?)?
         }
         SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
+        SurfaceGeometry::Conoid { .. } => return Err(unsupported_conoid("intersection")),
     })
 }
 
@@ -89,6 +92,7 @@ pub(super) fn implicit_value(
             (radial.sqrt() - major_radius).powi(2) + z * z - minor_radius * minor_radius
         }
         SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
+        SurfaceGeometry::Conoid { .. } => return Err(unsupported_conoid("intersection")),
     };
     if value.is_finite() {
         Ok(value)
@@ -112,5 +116,6 @@ pub(super) fn surface_scale(surface: &SurfaceGeometry) -> f64 {
             ..
         } => major_radius + minor_radius,
         SurfaceGeometry::Wrapped { wrap, .. } => wrap.radius,
+        SurfaceGeometry::Conoid { c, .. } => 1.0 + c[1].hypot(c[2]),
     }
 }

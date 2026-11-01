@@ -6,7 +6,8 @@ use super::handlers::{boolean_rectilinear, subtract_vertical_arc_extrusion_batch
 use super::operands::{all_planar, full_cylinder, unique_sources};
 use super::types::{BooleanOp, BooleanResult};
 use crate::brep::{
-    unsupported_wrapped, Accuracy, BrepEnvelope, GeometryError, PatchBounds, SurfaceGeometry,
+    unsupported_conoid, unsupported_wrapped, Accuracy, BrepEnvelope, GeometryError, PatchBounds,
+    SurfaceGeometry,
 };
 use prismatic_profile::subtract_prismatic_profile_batch;
 
@@ -56,6 +57,9 @@ fn subtract_planar_cutters_inner(
 ) -> Result<BooleanResult, GeometryError> {
     if host.geometry.has_wrapped() || cutters.iter().any(|c| c.geometry.has_wrapped()) {
         return Err(unsupported_wrapped("booleans"));
+    }
+    if host.geometry.has_conoid() || cutters.iter().any(|c| c.geometry.has_conoid()) {
+        return Err(unsupported_conoid("booleans"));
     }
     let mut nested = Trace::default();
     let result = record_handler(trace, HandlerId::SubtractPlanarCutters, || {

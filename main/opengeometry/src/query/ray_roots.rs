@@ -69,6 +69,7 @@ pub(super) fn support_roots(
             tolerance,
         )?),
         SurfaceGeometry::Wrapped { .. } => None,
+        SurfaceGeometry::Conoid { c, .. } => conoid_roots(o, d, c, domain, tolerance),
     };
     Ok(result.map(|roots| {
         roots
@@ -76,6 +77,45 @@ pub(super) fn support_roots(
             .filter(|root| domain.contains(*root))
             .collect()
     }))
+}
+
+fn conoid_roots(
+    o: Point3,
+    d: Point3,
+    c: &[f64; 3],
+    domain: Interval,
+    tolerance: f64,
+) -> Option<Vec<f64>> {
+    let w = [o[2] - c[0], d[2]];
+    let l = [c[1] * o[0] + c[2] * o[1], c[1] * d[0] + c[2] * d[1]];
+    let square = |p: [f64; 2]| [p[0] * p[0], 2.0 * p[0] * p[1], p[1] * p[1]];
+    let radial = [
+        o[0].mul_add(o[0], o[1] * o[1]),
+        2.0 * o[0].mul_add(d[0], o[1] * d[1]),
+        d[0].mul_add(d[0], d[1] * d[1]),
+    ];
+    let (w2, l2) = (square(w), square(l));
+    let mut coefficients = [0.0; 5];
+    for i in 0..3 {
+        coefficients[i] -= l2[i];
+        for j in 0..3 {
+            coefficients[i + j] += w2[i] * radial[j];
+        }
+    }
+    let candidates = isolate_candidates(&coefficients, domain, tolerance, 100_000).ok()?;
+    let on_sheet = |t: f64| {
+        let rho = (o[0] + t * d[0]).hypot(o[1] + t * d[1]);
+        let (height, lean) = ((w[0] + t * w[1]) * rho, l[0] + t * l[1]);
+        rho > tolerance && (height - lean).abs() <= (height + lean).abs()
+    };
+    Some(
+        candidates
+            .intervals
+            .into_iter()
+            .map(|candidate| refine_polynomial_root(&coefficients, candidate))
+            .filter(|t| on_sheet(*t))
+            .collect(),
+    )
 }
 
 fn torus_roots(

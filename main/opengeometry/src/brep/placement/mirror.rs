@@ -141,6 +141,10 @@ fn reflect_surfaces(
             | SurfaceGeometry::Cone { frame, .. }
             | SurfaceGeometry::Torus { frame, .. } => *frame = reflection.surface_frame(*frame),
             SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("mirroring")),
+            SurfaceGeometry::Conoid { frame, c } => {
+                *frame = reflection.surface_frame(*frame);
+                c[2] = -c[2];
+            }
         }
     }
     Ok(())

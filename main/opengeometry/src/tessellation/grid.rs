@@ -124,7 +124,9 @@ pub(super) fn grid_size(
             turn_count(u * ((r + a) / (4.0 * error)).sqrt(), u, 3, max_triangles)?,
             turn_count(v * (a / (4.0 * error)).sqrt(), v, 3, max_triangles)?,
         ),
-        SurfaceGeometry::Wrapped { .. } => wrapped_grid(surface, bounds, error, max_triangles)?,
+        SurfaceGeometry::Wrapped { .. } | SurfaceGeometry::Conoid { .. } => {
+            sampled_grid(surface, bounds, error, max_triangles)?
+        }
         SurfaceGeometry::Plane { .. } => {
             return Err(GeometryError::InvalidGeometry(
                 "plane does not use a curved grid".into(),
@@ -143,7 +145,7 @@ pub(super) fn grid_size(
     Ok([nu, nv])
 }
 
-fn wrapped_grid(
+fn sampled_grid(
     surface: &SurfaceGeometry,
     bounds: [Interval; 2],
     error: f64,
@@ -159,7 +161,13 @@ fn wrapped_grid(
             None => count(value, minimum, max_triangles),
         }
     };
-    Ok((side(0, 3)?, side(1, 1)?))
+    let nu = side(0, 3)?;
+    let nv = side(1, 1)?;
+    if !matches!(surface, SurfaceGeometry::Conoid { .. }) {
+        return Ok((nu, nv));
+    }
+    let twist = bounds[1].width() * second[2] * bounds[0].width() / (4.0 * error * nu as f64);
+    Ok((nu, nv.max(count(twist, 1, max_triangles)?)))
 }
 
 pub(super) fn turn_count(

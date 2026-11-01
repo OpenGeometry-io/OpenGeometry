@@ -7,8 +7,8 @@ const GRID: usize = 8;
 pub(super) fn second_derivative_bounds(
     surface: &SurfaceGeometry,
     bounds: [Interval; 2],
-) -> Result<[f64; 2], GeometryError> {
-    let mut maximum = [0.0_f64; 2];
+) -> Result<[f64; 3], GeometryError> {
+    let mut maximum = [0.0_f64; 3];
     for i in 0..=GRID {
         for j in 0..=GRID {
             let uv = [
@@ -18,6 +18,7 @@ pub(super) fn second_derivative_bounds(
             let jet = surface.derivatives(uv)?;
             maximum[0] = maximum[0].max(norm(jet.duu));
             maximum[1] = maximum[1].max(norm(jet.dvv));
+            maximum[2] = maximum[2].max(norm(jet.duv));
         }
     }
     Ok(maximum.map(|m| m * MARGIN))

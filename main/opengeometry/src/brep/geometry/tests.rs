@@ -1,9 +1,10 @@
+use super::conoid::conoid_ellipse;
 use super::curve::CurveGeometry;
 use super::surface::{Surface, SurfaceGeometry};
 use super::wrap::Wrap;
 use crate::brep::error::GeometryError;
 use crate::brep::frame::Frame3;
-use crate::math::{dot, norm, scale, sub, Interval};
+use crate::math::{cross, dot, norm, scale, sub, Interval};
 
 fn surfaces() -> Vec<SurfaceGeometry> {
     let frame = Frame3::from_axis([3.0, -2.0, 7.0], [1.0, 2.0, 3.0], [0.0, 1.0, 0.0]).unwrap();
@@ -20,6 +21,7 @@ fn surfaces() -> Vec<SurfaceGeometry> {
             major_radius: 3.0,
             minor_radius: 1.0,
         },
+        conoid(),
         SurfaceGeometry::Wrapped {
             wrap: wrap(),
             surface: Box::new(SurfaceGeometry::Cylinder {
@@ -38,6 +40,13 @@ fn surfaces() -> Vec<SurfaceGeometry> {
             }),
         },
     ]
+}
+
+fn conoid() -> SurfaceGeometry {
+    SurfaceGeometry::Conoid {
+        frame: Frame3::from_axis([3.0, -2.0, 7.0], [1.0, 2.0, 3.0], [0.0, 1.0, 0.0]).unwrap(),
+        c: [1.5, 0.8, -0.6],
+    }
 }
 
 fn wrap() -> Wrap {
@@ -268,4 +277,78 @@ fn partial_cylinder_and_cone_patches_on_a_skew_frame_get_their_exact_box() {
             );
         }
     }
+}
+
+#[test]
+fn conoid_rulings_are_radial_and_constant_radius_curves_are_planar() {
+    let surface = conoid();
+    let frame = *surface.frame();
+    let SurfaceGeometry::Conoid { c, .. } = surface else {
+        unreachable!()
+    };
+    for u in [0.0, 0.9, 2.5, 4.0] {
+        let a = surface.point_at([u, 1.0]).unwrap();
+        let b = surface.point_at([u, 3.0]).unwrap();
+        assert!(dot(sub(b, a), frame.z).abs() < 1e-12);
+        let mid = surface.point_at([u, 2.0]).unwrap();
+        assert!(norm(sub(mid, scale(add3(a, b), 0.5))) < 1e-12);
+        for r in [0.5, 2.0] {
+            let local = frame.local(surface.point_at([u, r]).unwrap());
+            assert!((local[0].hypot(local[1]) - r).abs() < 1e-12);
+            let plane = c[0] + c[1] / r * local[0] + c[2] / r * local[1];
+            assert!((local[2] - plane).abs() < 1e-12);
+        }
+    }
+    let jet = surface.derivatives([0.7, 2.0]).unwrap();
+    let n = surface.normal_at([0.7, 2.0]).unwrap();
+    let expected = cross(jet.du, jet.dv);
+    assert!(norm(sub(n, scale(expected, 1.0 / norm(expected)))) < 1e-12);
+}
+
+#[test]
+fn conoid_projection_finds_the_closest_point_and_respects_the_hint() {
+    let surface = conoid();
+    for (u, v, offset) in [(0.3, 1.2, 0.2), (2.0, 2.5, -0.4), (5.5, 0.8, 0.05)] {
+        let p = surface.point_at([u, v]).unwrap();
+        let off = add3(p, scale(surface.normal_at([u, v]).unwrap(), offset));
+        let uv = surface.project(off, Some([u, v])).unwrap();
+        assert!(
+            (uv[0] - u).abs() < 1e-9 && (uv[1] - v).abs() < 1e-9,
+            "{uv:?}"
+        );
+        let lifted = surface
+            .project(p, Some([u + std::f64::consts::TAU, v]))
+            .unwrap();
+        assert!((lifted[0] - u - std::f64::consts::TAU).abs() < 1e-12);
+    }
+    let bad = SurfaceGeometry::Conoid {
+        frame: Frame3::IDENTITY,
+        c: [0.0, f64::NAN, 0.0],
+    };
+    assert!(bad.validate().is_err());
+}
+
+fn add3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    std::array::from_fn(|i| a[i] + b[i])
+}
+
+#[test]
+fn conoid_ellipses_trace_the_constant_radius_curves() {
+    let surface = conoid();
+    let SurfaceGeometry::Conoid { frame, c } = surface else {
+        unreachable!()
+    };
+    for radius in [0.5, 2.0, 7.0] {
+        let (ellipse, phase) = conoid_ellipse(frame, c, radius).unwrap();
+        for t in [-1.0, 0.0, 0.4, 2.5] {
+            let on_surface = surface.point_at([t + phase, radius]).unwrap();
+            assert!(norm(sub(ellipse.elementary_point(t).unwrap(), on_surface)) < 1e-12);
+        }
+    }
+    let (circle, _) = conoid_ellipse(frame, [c[0], 0.0, 0.0], 1.0).unwrap();
+    assert!(matches!(
+        circle,
+        CurveGeometry::Ellipse { major_radius, minor_radius, .. } if major_radius == minor_radius
+    ));
+    assert!(conoid_ellipse(frame, c, 0.0).is_err());
 }

@@ -1,7 +1,7 @@
 use super::entities::{
     bspline_curve, curve, pcurve, placement, point, real, refs, sense, PcurveOnSurface,
 };
-use super::wrapped::{add_wrapped_curve, add_wrapped_surface};
+use super::wrapped::{add_fitted_surface, add_wrapped_curve};
 use crate::brep::{
     BrepEnvelope, CurveGeometry, Edge, EdgeGeometry, GeometryError, Orientation, PcurveGeometry,
     SurfaceGeometry,
@@ -96,9 +96,12 @@ fn add_surfaces(
             continue;
         }
         let surface = brep.geometry.surface(face.surface)?;
-        if let SurfaceGeometry::Wrapped { .. } = surface {
+        if matches!(
+            surface,
+            SurfaceGeometry::Wrapped { .. } | SurfaceGeometry::Conoid { .. }
+        ) {
             let (id, error) =
-                add_wrapped_surface(writer, brep, face.surface, fitting_budget, scale)?;
+                add_fitted_surface(writer, brep, face.surface, fitting_budget, scale)?;
             fitting_error = fitting_error.max(error);
             surfaces[face.surface as usize] = Some(id);
             continue;
@@ -124,9 +127,9 @@ fn add_surfaces(
                 real(major_radius * scale),
                 real(minor_radius * scale)
             ),
-            SurfaceGeometry::Wrapped { .. } => {
+            SurfaceGeometry::Wrapped { .. } | SurfaceGeometry::Conoid { .. } => {
                 return Err(GeometryError::UnsupportedGeometry(
-                    "STEP wrapped surfaces require B-spline fitting".into(),
+                    "STEP wrapped and conoid surfaces require B-spline fitting".into(),
                 ))
             }
         };

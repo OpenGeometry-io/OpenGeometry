@@ -1,4 +1,5 @@
 mod chord;
+mod conoid;
 mod curve;
 mod intersection_definition;
 mod store;
@@ -10,6 +11,7 @@ mod turned;
 mod wrap;
 
 pub(crate) use chord::{bounds_chord_deviation, point_segment_distance};
+pub use conoid::conoid_ellipse;
 pub(crate) use curve::Curve;
 pub use curve::CurveGeometry;
 pub(crate) use intersection_definition::{IntersectionDefinition, TraceAnchor};

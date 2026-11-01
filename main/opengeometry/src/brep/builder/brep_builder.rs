@@ -146,10 +146,15 @@ impl Builder {
         key: &str,
         surface: SurfaceGeometry,
         bounds: [[f64; 2]; 2],
-        outer_uses: Vec<Use>,
-        hole_uses: Vec<Vec<Use>>,
+        mut outer_uses: Vec<Use>,
+        mut hole_uses: Vec<Vec<Use>>,
     ) -> Result<u32, GeometryError> {
         let surface_id = self.brep.geometry.surfaces.len() as u32;
+        for u in outer_uses.iter_mut().chain(hole_uses.iter_mut().flatten()) {
+            if let PcurveGeometry::ProjectedCurve { surface, .. } = &mut u.pcurve {
+                *surface = surface_id;
+            }
+        }
         self.brep.geometry.surfaces.push(surface);
         let face = self.brep.topology.faces.len() as u32;
         let outer = self.face_loop(face, false, outer_uses)?;

@@ -5,7 +5,7 @@ use super::operands::{
     full_planar_extrusion, full_sphere, full_torus, prismatic_gap, unique_sources, BoxInput,
 };
 use super::types::{BooleanOp, BooleanResult, FaceMapping};
-use crate::brep::unsupported_wrapped;
+use crate::brep::{unsupported_conoid, unsupported_wrapped};
 use crate::brep::{BrepEnvelope, EdgeGeometry, Frame3, GeometryError, SurfaceGeometry};
 use crate::geom2d::{
     inset_curved_region, inset_tolerance, offset_from, oriented_ring, pinched, self_intersects2,
@@ -87,6 +87,7 @@ fn offset_cavity(
 ) -> Result<Cavity, GeometryError> {
     let body = match input.geometry.surfaces.first() {
         Some(_) if input.geometry.has_wrapped() => Err(unsupported_wrapped("shelling")),
+        Some(_) if input.geometry.has_conoid() => Err(unsupported_conoid("shelling")),
         Some(SurfaceGeometry::Sphere { .. }) => sphere_cavity(input, thickness, inner_id),
         Some(SurfaceGeometry::Cylinder { .. }) => cylinder_cavity(input, thickness, inner_id),
         Some(SurfaceGeometry::Torus { .. }) => torus_cavity(input, thickness, inner_id),
@@ -100,6 +101,7 @@ fn offset_cavity(
         },
         Some(SurfaceGeometry::Cone { .. }) => cone_cavity(input, thickness, inner_id),
         Some(SurfaceGeometry::Wrapped { .. }) => Err(unsupported_wrapped("shelling")),
+        Some(SurfaceGeometry::Conoid { .. }) => Err(unsupported_conoid("shelling")),
         None => Err(GeometryError::CoverageGap {
             families: ["restricted analytic shell".into(), "input solid".into()],
         }),
@@ -470,14 +472,7 @@ fn arc_edged_cavity(
 }
 
 fn revolved(input: &BrepEnvelope) -> bool {
-    let frame = |surface: &SurfaceGeometry| match *surface {
-        SurfaceGeometry::Plane { frame }
-        | SurfaceGeometry::Sphere { frame, .. }
-        | SurfaceGeometry::Cylinder { frame, .. }
-        | SurfaceGeometry::Cone { frame, .. }
-        | SurfaceGeometry::Torus { frame, .. } => frame,
-        SurfaceGeometry::Wrapped { wrap, .. } => wrap.frame,
-    };
+    let frame = |surface: &SurfaceGeometry| *surface.frame();
     let curved = |surface: &&SurfaceGeometry| !matches!(surface, SurfaceGeometry::Plane { .. });
     let surfaces = &input.geometry.surfaces;
     let Some(axis) = surfaces.iter().find(curved).map(frame) else {

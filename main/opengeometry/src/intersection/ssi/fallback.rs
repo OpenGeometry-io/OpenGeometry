@@ -61,7 +61,8 @@ fn finite_target_domain(
         ]),
         SurfaceGeometry::Sphere { .. }
         | SurfaceGeometry::Torus { .. }
-        | SurfaceGeometry::Wrapped { .. } => Err(GeometryError::UnsupportedGeometry(
+        | SurfaceGeometry::Wrapped { .. }
+        | SurfaceGeometry::Conoid { .. } => Err(GeometryError::UnsupportedGeometry(
             "SSI trim surface".into(),
         )),
     }

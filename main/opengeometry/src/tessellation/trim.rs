@@ -263,7 +263,9 @@ pub(super) fn trimmed_surface_edge_deviation(
         }
     };
     let acceleration = match surface {
-        SurfaceGeometry::Wrapped { .. } => return chord_deviation(surface, uv[a], uv[b]),
+        SurfaceGeometry::Wrapped { .. } | SurfaceGeometry::Conoid { .. } => {
+            return chord_deviation(surface, uv[a], uv[b])
+        }
         SurfaceGeometry::Plane { .. } => 0.0,
         SurfaceGeometry::Sphere { radius, .. } => {
             let cos_v = maximum_trig(0.0, f64::cos);

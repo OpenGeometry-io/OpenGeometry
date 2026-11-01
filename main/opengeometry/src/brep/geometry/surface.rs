@@ -1,3 +1,4 @@
+use super::conoid;
 use super::turned::{lift, narrowed, reached, ring_axis, swept_axis};
 use super::wrap::Wrap;
 use crate::brep::bounds::PatchBounds;
@@ -27,6 +28,10 @@ const CYLINDER_CHART: [SurfaceChart; 1] = [SurfaceChart {
     periods: [Some(std::f64::consts::TAU), None],
 }];
 const CONE_CHART: [SurfaceChart; 1] = [SurfaceChart {
+    domain: [[0.0, std::f64::consts::TAU], [0.0, f64::MAX]],
+    periods: [Some(std::f64::consts::TAU), None],
+}];
+const CONOID_CHART: [SurfaceChart; 1] = [SurfaceChart {
     domain: [[0.0, std::f64::consts::TAU], [0.0, f64::MAX]],
     periods: [Some(std::f64::consts::TAU), None],
 }];
@@ -62,6 +67,10 @@ pub enum SurfaceGeometry {
         wrap: Wrap,
         surface: Box<SurfaceGeometry>,
     },
+    Conoid {
+        frame: Frame3,
+        c: [f64; 3],
+    },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -90,7 +99,8 @@ impl SurfaceGeometry {
             | Self::Sphere { frame, .. }
             | Self::Cylinder { frame, .. }
             | Self::Cone { frame, .. }
-            | Self::Torus { frame, .. } => frame,
+            | Self::Torus { frame, .. }
+            | Self::Conoid { frame, .. } => frame,
             Self::Wrapped { wrap, .. } => &wrap.frame,
         }
     }
@@ -117,6 +127,7 @@ impl SurfaceGeometry {
                     && major_radius > minor_radius
             }
             Self::Wrapped { wrap, surface } => return wrapped_validate(wrap, surface),
+            Self::Conoid { c, .. } => return conoid::validate(c),
         };
         if !valid {
             return Err(GeometryError::InvalidGeometry(
@@ -224,6 +235,7 @@ impl Surface for SurfaceGeometry {
                 )
             }
             Self::Wrapped { wrap, surface } => return wrapped_derivatives(wrap, surface, uv),
+            Self::Conoid { c, .. } => conoid::local_jet(c, uv),
         };
         let f = self.frame();
         Ok(SurfaceJet2 {
@@ -255,6 +267,7 @@ impl Surface for SurfaceGeometry {
                 ]
             }
             Self::Wrapped { wrap, surface } => return wrapped_normal(wrap, surface, uv),
+            Self::Conoid { c, .. } => conoid::local_normal(c, uv)?,
         };
         checked(self.frame().vector(n))
     }
@@ -302,6 +315,12 @@ impl Surface for SurfaceGeometry {
                 ]
             }
             Self::Wrapped { wrap, surface } => return wrapped_project(wrap, surface, world, hint),
+            Self::Conoid { c, .. } => {
+                if radial == 0.0 {
+                    return Err(GeometryError::SingularParameterization);
+                }
+                conoid::closest(c, p, [u, radial])?
+            }
         };
         for x in result {
             finite(x)?;
@@ -317,6 +336,7 @@ impl Surface for SurfaceGeometry {
             Self::Cone { .. } => &CONE_CHART,
             Self::Torus { .. } => &TORUS_CHART,
             Self::Wrapped { surface, .. } => surface.charts(),
+            Self::Conoid { .. } => &CONOID_CHART,
         }
     }
 
@@ -365,6 +385,7 @@ impl Surface for SurfaceGeometry {
                 ]
             }
             Self::Wrapped { wrap, surface } => return wrap.enclose(surface.enclose(domain)?),
+            Self::Conoid { c, .. } => conoid::local_bounds(c, domain)?,
         };
         let bounds = self.frame().bounds(local)?;
         self.tightened(bounds, domain)

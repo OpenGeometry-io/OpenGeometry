@@ -228,6 +228,10 @@ fn surface_numbers(surface: &SurfaceGeometry, numbers: &mut Vec<f64>) {
             numbers.push(wrap.radius);
             surface_numbers(surface, numbers);
         }
+        SurfaceGeometry::Conoid { frame, c } => {
+            frame_numbers(*frame, numbers);
+            numbers.extend(c);
+        }
     }
 }
 

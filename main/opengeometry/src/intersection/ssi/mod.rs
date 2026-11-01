@@ -7,8 +7,8 @@ mod tests;
 
 use super::ssi_result::{GeometryResult, SsiCurve, SsiResult};
 use crate::brep::{
-    unsupported_wrapped, Accuracy, CurveGeometry, Frame3, GeometryError, GeometryStore,
-    PcurveGeometry, Surface, SurfaceGeometry,
+    unsupported_conoid, unsupported_wrapped, Accuracy, CurveGeometry, Frame3, GeometryError,
+    GeometryStore, PcurveGeometry, Surface, SurfaceGeometry,
 };
 use crate::math::{dot, norm, sub, Interval, Point3};
 use coaxial::{
@@ -105,6 +105,7 @@ fn analytic_intersection(
             minor_radius,
         } => torus_pairs(*frame, *major_radius, *minor_radius, sb),
         SurfaceGeometry::Wrapped { .. } => Err(unsupported_wrapped("intersection")),
+        SurfaceGeometry::Conoid { .. } => Err(unsupported_conoid("intersection")),
     }
 }
 
@@ -133,6 +134,7 @@ fn plane_pairs(
             minor_radius,
         } => plane_torus(plane, *torus, *major_radius, *minor_radius)?,
         SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
+        SurfaceGeometry::Conoid { .. } => return Err(unsupported_conoid("intersection")),
     })
 }
 
@@ -161,6 +163,7 @@ fn sphere_pairs(
             minor_radius,
         } => coaxial_sphere_torus(sphere, sphere_radius, *torus, *major_radius, *minor_radius)?,
         SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
+        SurfaceGeometry::Conoid { .. } => return Err(unsupported_conoid("intersection")),
     })
 }
 
@@ -197,6 +200,7 @@ fn cylinder_pairs(
             *minor_radius,
         )?,
         SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
+        SurfaceGeometry::Conoid { .. } => return Err(unsupported_conoid("intersection")),
     })
 }
 
@@ -225,6 +229,7 @@ fn cone_pairs(
             minor_radius,
         } => coaxial_cone_torus(cone, semi_angle, *torus, *major_radius, *minor_radius)?,
         SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
+        SurfaceGeometry::Conoid { .. } => return Err(unsupported_conoid("intersection")),
     })
 }
 
@@ -269,6 +274,7 @@ fn torus_pairs(
             *other_minor,
         )?,
         SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
+        SurfaceGeometry::Conoid { .. } => return Err(unsupported_conoid("intersection")),
     })
 }
 
