@@ -1,6 +1,7 @@
 use super::*;
 use crate::brep::geometry::{Curve, Surface};
 use crate::brep::topology::coarse_accuracy;
+use crate::brep::wrapped_sector;
 use crate::math::sub;
 use crate::primitives;
 
@@ -123,5 +124,33 @@ fn invalid_scale_revision_overflow_and_precision_are_structured_errors() {
             1.0
         ),
         Err(GeometryError::LimitExceeded(_))
+    ));
+}
+
+#[test]
+fn wrapped_geometry_moves_rigidly_and_refuses_scaling_and_mirroring() {
+    let brep = wrapped_sector();
+    let placement = Frame3::from_axis([10.0, -3.0, 5.0], [1.0, 2.0, 3.0], [0.0, 1.0, 0.0]).unwrap();
+    let moved = placed(&brep, placement, 1.0).unwrap();
+    let slant = brep.topology.faces.len() - 1;
+    let surface = |b: &BrepEnvelope| {
+        b.geometry
+            .surface(b.topology.faces[slant].surface)
+            .unwrap()
+            .clone()
+    };
+    let uv = [1.7, 2.9];
+    let expected = placement.point(surface(&brep).point_at(uv).unwrap());
+    assert!(norm(sub(surface(&moved).point_at(uv).unwrap(), expected)) < 1e-12);
+    for (before, after) in brep.topology.vertices.iter().zip(&moved.topology.vertices) {
+        assert!(norm(sub(placement.point(before.position), after.position)) < 1e-12);
+    }
+    assert!(matches!(
+        placed(&brep, placement, 2.0),
+        Err(GeometryError::UnsupportedGeometry(_))
+    ));
+    assert!(matches!(
+        mirror::mirrored(&brep, [0.0; 3], [1.0, 0.0, 0.0]),
+        Err(GeometryError::UnsupportedGeometry(_))
     ));
 }

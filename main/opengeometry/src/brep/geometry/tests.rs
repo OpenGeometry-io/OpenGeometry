@@ -1,5 +1,6 @@
 use super::curve::CurveGeometry;
 use super::surface::{Surface, SurfaceGeometry};
+use super::wrap::Wrap;
 use crate::brep::error::GeometryError;
 use crate::brep::frame::Frame3;
 use crate::math::{dot, norm, scale, sub, Interval};
@@ -19,7 +20,105 @@ fn surfaces() -> Vec<SurfaceGeometry> {
             major_radius: 3.0,
             minor_radius: 1.0,
         },
+        SurfaceGeometry::Wrapped {
+            wrap: wrap(),
+            surface: Box::new(SurfaceGeometry::Cylinder {
+                frame: Frame3 {
+                    origin: [1.0, 0.5, 3.0],
+                    ..Frame3::IDENTITY
+                },
+                radius: 0.8,
+            }),
+        },
+        SurfaceGeometry::Wrapped {
+            wrap: wrap(),
+            surface: Box::new(SurfaceGeometry::Plane {
+                frame: Frame3::from_axis([0.3, -0.2, 2.5], [1.0, 2.0, 0.3], [0.0, 0.0, 1.0])
+                    .unwrap(),
+            }),
+        },
     ]
+}
+
+fn wrap() -> Wrap {
+    Wrap {
+        frame: Frame3::from_axis([3.0, -2.0, 7.0], [1.0, 2.0, 3.0], [0.0, 1.0, 0.0]).unwrap(),
+        radius: 2.6,
+    }
+}
+
+#[test]
+fn a_wrap_keeps_arc_length_on_its_radius_and_round_trips() {
+    let w = wrap();
+    let p = [1.3, -0.4, 2.6];
+    let chord = norm(sub(w.point(p), w.point([0.0, -0.4, 2.6])));
+    assert!((chord - 2.0 * 2.6 * (1.3_f64 / 5.2).sin()).abs() < 1e-12);
+    let back = w.flatten(w.point(p), None).unwrap();
+    assert!(norm(sub(back, p)) < 1e-12);
+    let far = [2.6 * 4.0, 0.0, 3.0];
+    assert!(norm(sub(w.flatten(w.point(far), Some(far[0])).unwrap(), far)) < 1e-12);
+    let curve = CurveGeometry::Wrapped {
+        wrap: w,
+        curve: Box::new(CurveGeometry::Line {
+            origin: [0.0, 0.0, 2.0],
+            direction: [0.6, 0.8, 0.0],
+        }),
+    };
+    let speed = |t: f64| norm(curve.elementary_tangent(t).unwrap());
+    assert!((speed(0.1) - speed(3.0)).abs() < 1e-12);
+    let h = 1e-6;
+    let fd = scale(
+        sub(
+            curve.elementary_point(1.0 + h).unwrap(),
+            curve.elementary_point(1.0 - h).unwrap(),
+        ),
+        0.5 / h,
+    );
+    assert!(norm(sub(fd, curve.elementary_tangent(1.0).unwrap())) < 1e-8);
+    let bounds = curve
+        .elementary_bounds(Interval::new(0.0, 4.0).unwrap())
+        .unwrap();
+    for i in 0..=40 {
+        assert!(bounds.contains(curve.elementary_point(i as f64 / 10.0).unwrap()));
+    }
+    let nested = CurveGeometry::Wrapped {
+        wrap: w,
+        curve: Box::new(curve),
+    };
+    assert!(nested.validate().is_err());
+    let nested_surface = SurfaceGeometry::Wrapped {
+        wrap: w,
+        surface: Box::new(surfaces().pop().unwrap()),
+    };
+    assert!(nested_surface.validate().is_err());
+}
+
+#[test]
+fn wrapped_circle_samples_meet_their_chord_error() {
+    let curve = CurveGeometry::Wrapped {
+        wrap: wrap(),
+        curve: Box::new(CurveGeometry::Circle {
+            frame: Frame3 {
+                origin: [1.0, 0.5, 3.0],
+                ..Frame3::IDENTITY
+            },
+            radius: 0.8,
+        }),
+    };
+    let range = Interval::new(0.0, std::f64::consts::TAU).unwrap();
+    let samples = curve.sample_elementary(range, 1e-3, 100_000).unwrap();
+    let n = samples.len() - 1;
+    for i in 0..n {
+        for k in 1..8 {
+            let t = range.width() * (i as f64 + k as f64 / 8.0) / n as f64;
+            let p = curve.elementary_point(t).unwrap();
+            let (a, b) = (samples[i], samples[i + 1]);
+            let ab = sub(b, a);
+            let along = dot(sub(p, a), ab) / dot(ab, ab);
+            let foot = [0, 1, 2].map(|j| a[j] + along * ab[j]);
+            assert!(norm(sub(p, foot)) <= 1e-3);
+        }
+    }
 }
 
 #[test]

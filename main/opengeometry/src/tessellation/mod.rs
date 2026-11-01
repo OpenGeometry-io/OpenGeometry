@@ -16,6 +16,7 @@ mod tessellate;
 mod tests;
 mod trim;
 mod trimmed_face;
+mod wrapped;
 
 pub use measure::{measure, Measure};
 pub use mesh::Tessellation;
