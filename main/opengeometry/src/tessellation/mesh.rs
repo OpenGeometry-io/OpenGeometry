@@ -69,9 +69,9 @@ impl Tessellation {
         }
         let orientation = dot(direction, normal);
         if !orientation.is_finite() || orientation == 0.0 {
-            return Err(GeometryError::UnresolvedTessellation(
-                "triangle orientation could not be resolved".into(),
-            ));
+            return Err(GeometryError::UnresolvedTessellation(format!(
+                "triangle orientation could not be resolved on face {face}"
+            )));
         }
         if orientation < 0.0 {
             ids.swap(1, 2);

@@ -1,3 +1,4 @@
+mod curved_trims;
 mod display;
 mod seams;
 mod short_loops;
