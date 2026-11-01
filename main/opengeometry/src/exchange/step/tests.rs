@@ -224,3 +224,106 @@ fn two_million_entity_export_is_limit_exceeded() {
         matches!(&failure.error, GeometryError::LimitExceeded(message) if message.contains("2,000,000"))
     );
 }
+
+type Entities = std::collections::HashMap<u32, (String, String)>;
+
+fn entities(step: &str) -> Entities {
+    step.lines()
+        .filter_map(|line| {
+            let (id, rest) = line.strip_prefix('#')?.split_once('=')?;
+            let (name, args) = rest.split_once('(')?;
+            Some((id.parse().ok()?, (name.to_string(), args.to_string())))
+        })
+        .collect()
+}
+
+fn refs(args: &str) -> Vec<u32> {
+    args.split('#')
+        .skip(1)
+        .map(|s| s.split(|c: char| !c.is_ascii_digit()).next().unwrap())
+        .map(|s| s.parse().unwrap())
+        .collect()
+}
+
+fn flag(args: &str) -> f64 {
+    if args.trim_end_matches([')', ';']).ends_with(".T.") {
+        1.0
+    } else {
+        -1.0
+    }
+}
+
+fn axis(entities: &Entities, placement: u32) -> [f64; 3] {
+    let direction = &entities[&refs(&entities[&placement].1)[1]].1;
+    let inner = direction
+        .split_once("(")
+        .unwrap()
+        .1
+        .split(')')
+        .next()
+        .unwrap();
+    let v: Vec<f64> = inner.split(',').map(|s| s.parse().unwrap()).collect();
+    [v[0], v[1], v[2]]
+}
+
+fn circular_bound_turns(step: &str) -> Vec<(String, f64)> {
+    let e = entities(step);
+    let mut turns = Vec::new();
+    for (name, args) in e.values().filter(|(n, _)| n == "ADVANCED_FACE") {
+        assert_eq!(name, "ADVANCED_FACE");
+        let face_refs = refs(args);
+        let (surface, bounds) = face_refs.split_last().unwrap();
+        if e[surface].0 != "PLANE" {
+            continue;
+        }
+        let normal = axis(&e, refs(&e[surface].1)[0]).map(|v| v * flag(args));
+        for bound in bounds {
+            let (kind, bound_args) = &e[bound];
+            let edges = refs(&e[&refs(bound_args)[0]].1);
+            let [oriented] = edges[..] else { continue };
+            let oriented_args = &e[&oriented].1;
+            let edge_args = &e[&refs(oriented_args)[0]].1;
+            let mut curve = &e[&refs(edge_args)[2]];
+            if curve.0 == "SURFACE_CURVE" || curve.0 == "SEAM_CURVE" {
+                curve = &e[&refs(&curve.1)[0]];
+            }
+            if curve.0 != "CIRCLE" {
+                continue;
+            }
+            let circle_axis = axis(&e, refs(&curve.1)[0]);
+            let along: f64 = (0..3).map(|i| circle_axis[i] * normal[i]).sum();
+            let sense = flag(bound_args) * flag(oriented_args) * flag(edge_args);
+            turns.push((kind.clone(), along.signum() * sense));
+        }
+    }
+    turns
+}
+
+#[test]
+fn hole_bounds_run_clockwise_about_the_face_normal() {
+    let bodies = [
+        primitives::annular_cylinder("a".into(), frame(), 0.4, 1.0, 2.0, coarse_accuracy(1e-6)),
+        primitives::cylinder_with_circular_hole(
+            "w".into(),
+            frame(),
+            frame(),
+            0.3,
+            1.5,
+            2.0,
+            coarse_accuracy(1e-6),
+        ),
+    ];
+    for brep in bodies {
+        let (step, _) = export_step(&brep.unwrap(), "metre").unwrap();
+        let turns = circular_bound_turns(&step);
+        assert_eq!(turns.len(), 4, "{turns:?}");
+        for (kind, turn) in turns {
+            let expected = if kind == "FACE_OUTER_BOUND" {
+                1.0
+            } else {
+                -1.0
+            };
+            assert_eq!(turn, expected, "{kind} runs the wrong way");
+        }
+    }
+}
