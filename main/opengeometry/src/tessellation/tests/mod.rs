@@ -2,6 +2,7 @@ mod display;
 mod seams;
 mod short_loops;
 mod support;
+mod wrapped;
 
 use super::cache::TessellationCache;
 use super::tessellate::tessellate;

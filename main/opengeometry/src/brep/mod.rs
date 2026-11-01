@@ -20,8 +20,10 @@ pub use body_type::BodyType;
 pub use bounds::PatchBounds;
 pub use builder::{boundary, plane_boundary, uv_line, Builder, Use};
 pub(super) use builder::{dimensions, padded_uv_bounds, WireUse};
-pub(super) use error::coverage_gap;
+#[cfg(test)]
+pub(super) use builder::{wrapped_sector, SECTOR};
 pub use error::GeometryError;
+pub(super) use error::{coverage_gap, unsupported_wrapped};
 pub use frame::Frame3;
 pub(super) use frame::{checked, unit, UVBox, GROUND, UV};
 pub(super) use geometry::{
@@ -30,7 +32,7 @@ pub(super) use geometry::{
 };
 pub use geometry::{
     CurveGeometry, GeometryStore, IntersectionPoint, Surface, SurfaceChart, SurfaceGeometry,
-    SurfaceJet2,
+    SurfaceJet2, Wrap,
 };
 pub(super) use pcurve::period_lifted_uv;
 pub use pcurve::{IntersectionSide, PcurveGeometry};
