@@ -5,6 +5,7 @@ mod cylinder_faces;
 mod loop_pcurves;
 mod provenance;
 mod shell_components;
+mod sphere_loop_chart;
 mod sphere_patch;
 mod welded_vertex;
 
@@ -13,9 +14,9 @@ pub(super) use append::{
 };
 pub(super) use box_faces::add_box_faces;
 pub(super) use closed_loop::{
-    add_closed_intersection_loop, add_complement_input, add_hole_loop, add_patch_face,
-    add_patch_loop, append_closed_branch_geometry, intersection_definition, loop_containment,
-    loop_regions, loop_selection, loop_sense, merge_selected_shells, reframe_sphere_intersection,
+    add_closed_intersection_loop, add_complement_input, add_hole_lifted_into_face, add_hole_loop,
+    add_patch_face, add_patch_loop, append_closed_branch_geometry, intersection_definition,
+    loop_containment, loop_regions, loop_selection, loop_sense, merge_selected_shells,
     retained_definition, widen_trim_bounds, ClosedBranchEdge, LoopRegion, LoopSides,
 };
 pub(super) use cylinder_faces::{
@@ -31,5 +32,8 @@ pub(super) use provenance::{
     reverse_face, source,
 };
 pub(super) use shell_components::{assign_shell_faces, enclosing_solid};
+pub(super) use sphere_loop_chart::{
+    reframe_sphere_intersection, sphere_loop_chart, SphereLoopChart,
+};
 pub(super) use sphere_patch::{append_sphere, patch, SpherePatch};
 pub(super) use welded_vertex::add_welded_vertex;
