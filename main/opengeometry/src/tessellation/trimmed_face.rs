@@ -216,6 +216,7 @@ fn general_curved_trimmed_face(
             uv.push(coordinate);
             points.push(point);
         }
+        snap_rounding_noise(&mut uv[start..]);
         for offset in 0..ring.len() {
             let a = start + offset;
             let b = start + (offset + 1) % ring.len();
@@ -235,9 +236,10 @@ fn general_curved_trimmed_face(
             .checked_mul(4)
             .is_none_or(|count| count > max_triangles)
         {
-            return Err(GeometryError::LimitExceeded(
-                "curved trim refinement triangles".into(),
-            ));
+            return Err(GeometryError::LimitExceeded(format!(
+                "curved trim refinement triangles on face {} ('{}')",
+                face.id, face.key
+            )));
         }
         let midpoints =
             add_edge_midpoints(&split_edges, surface, &mut uv, &mut points, boundary_count)?;
@@ -265,6 +267,24 @@ fn general_curved_trimmed_face(
         )?;
     }
     Ok(())
+}
+
+fn snap_rounding_noise(ring: &mut [[f64; 2]]) {
+    let magnitude = ring
+        .iter()
+        .flatten()
+        .fold(1.0_f64, |maximum, value| maximum.max(value.abs()));
+    let tolerance = 64.0 * f64::EPSILON * magnitude;
+    let count = ring.len();
+    for index in 0..count {
+        let previous = ring[(index + count - 1) % count];
+        for axis in 0..2 {
+            let difference = (ring[index][axis] - previous[axis]).abs();
+            if difference != 0.0 && difference <= tolerance {
+                ring[index][axis] = previous[axis];
+            }
+        }
+    }
 }
 
 fn earcut_triangles(uv: &[[f64; 2]], holes: &[usize]) -> Result<Vec<[usize; 3]>, GeometryError> {
