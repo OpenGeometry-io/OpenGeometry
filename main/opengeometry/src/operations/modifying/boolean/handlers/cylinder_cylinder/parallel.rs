@@ -410,7 +410,8 @@ fn add_parallel_caps(
         SurfaceGeometry::Plane { frame: upper_frame },
         planar_bounds,
         upper_uses,
-    )
+    )?;
+    Ok(())
 }
 
 fn parallel_cap_bounds(

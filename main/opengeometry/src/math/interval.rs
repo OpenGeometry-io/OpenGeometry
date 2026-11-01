@@ -27,7 +27,7 @@ fn next_down(x: f64) -> f64 {
 }
 
 impl Interval {
-    pub(crate) fn new(lo: f64, hi: f64) -> Result<Self, MathError> {
+    pub fn new(lo: f64, hi: f64) -> Result<Self, MathError> {
         finite(lo)?;
         finite(hi)?;
         if lo > hi {

@@ -120,7 +120,8 @@ pub(super) fn add_host_lateral_face(
             ),
         ],
         host_holes,
-    )
+    )?;
+    Ok(())
 }
 
 pub(super) fn add_host_caps(
@@ -167,5 +168,6 @@ pub(super) fn add_host_caps(
                 axis_b: [0.0, host.radius],
             },
         )],
-    )
+    )?;
+    Ok(())
 }
