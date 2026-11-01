@@ -4,6 +4,7 @@ mod brep_builder;
 mod tests;
 mod wire;
 
-pub(crate) use boundary::{boundary, dimensions, padded_uv_bounds, plane_boundary, uv_line};
-pub(crate) use brep_builder::{Builder, Use};
+pub use boundary::{boundary, plane_boundary, uv_line};
+pub(crate) use boundary::{dimensions, padded_uv_bounds};
+pub use brep_builder::{Builder, Use};
 pub(crate) use wire::WireUse;

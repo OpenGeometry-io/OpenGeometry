@@ -282,5 +282,6 @@ fn add_annulus_caps(
         [[-outer_radius, outer_radius]; 2],
         outer_upper,
         vec![inner_upper],
-    )
+    )?;
+    Ok(())
 }
