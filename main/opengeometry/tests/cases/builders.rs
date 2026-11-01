@@ -1,5 +1,6 @@
 use opengeometry::brep::{Accuracy, BodyType, CurveGeometry, Frame3};
 use opengeometry::primitives;
+use opengeometry::query::validate_orientation;
 use opengeometry_test_support::stored;
 use serde_json::json;
 
@@ -91,6 +92,7 @@ fn primitive_builders_match_stored_json() {
         ),
     ];
     for (name, body) in bodies {
+        validate_orientation(&body).unwrap();
         assert_eq!(
             body.body_type().unwrap(),
             if name == "circle" {
@@ -184,6 +186,7 @@ fn extrusions_match_stored_json() {
         ),
     ];
     for (name, body) in bodies {
+        validate_orientation(&body).unwrap();
         assert_eq!(body.body_type().unwrap(), BodyType::Solid);
         if stored::compared() {
             let expected = match name {

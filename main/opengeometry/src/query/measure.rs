@@ -1,3 +1,4 @@
+use super::orientation::validate_orientation_validated;
 use crate::brep::{BodyType, BrepEnvelope, GeometryError};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -9,7 +10,10 @@ pub struct Validity {
 }
 
 pub fn validity(body: &BrepEnvelope) -> Validity {
-    match body.body_type() {
+    let checked = body
+        .body_type()
+        .and_then(|body_type| validate_orientation_validated(body).map(|()| body_type));
+    match checked {
         Ok(body_type) => Validity {
             valid: true,
             closed: closed(body, body_type),
