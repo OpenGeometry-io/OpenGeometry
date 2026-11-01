@@ -1,4 +1,4 @@
-use super::{export_bodies, export_step, StepBodyInput};
+use super::{export_bodies, export_step, export_step_in, StepBodyInput};
 use crate::brep::{
     coarse_accuracy, BrepEnvelope, Curve, CurveGeometry, EdgeGeometry, Frame3, GeometryError,
     IntersectionDefinition, IntersectionSide, PcurveGeometry, Surface, TraceAnchor,
@@ -195,6 +195,39 @@ fn rejects_unrepresentable_exchange_and_preserves_large_revisions() {
 }
 
 #[test]
+fn a_body_in_millimetres_exports_unscaled_in_millimetres() {
+    let brep = primitives::cuboid(
+        "plate".into(),
+        Frame3::IDENTITY,
+        [100.0, 50.0, 2.0],
+        coarse_accuracy(1e-3),
+    )
+    .unwrap();
+    let (metres, _) = export_step(&brep, "metre").unwrap();
+    let (mm, report) = export_step_in(&brep, "millimetre", "millimetre").unwrap();
+    assert_eq!(report.length_unit, "millimetre");
+    assert_eq!(
+        mm.replace("SI_UNIT(.MILLI.,.METRE.)", "SI_UNIT($,.METRE.)"),
+        metres
+    );
+    let (scaled, _) = export_step(&brep, "millimetre").unwrap();
+    assert_ne!(scaled, mm);
+    let (_, to_metres) = export_step_in(&brep, "millimetre", "metre").unwrap();
+    assert_eq!(
+        to_metres.exchange_error_bound,
+        report.exchange_error_bound * 1e-3
+    );
+    assert!(matches!(
+        export_step_in(&brep, "millimetre", "inch"),
+        Err(GeometryError::InvalidGeometry(_))
+    ));
+    assert!(matches!(
+        export_step_in(&brep, "inch", "millimetre"),
+        Err(GeometryError::InvalidGeometry(_))
+    ));
+}
+
+#[test]
 fn two_million_entity_export_is_limit_exceeded() {
     let brep = primitives::cuboid(
         "cap".into(),
@@ -213,6 +246,7 @@ fn two_million_entity_export_is_limit_exceeded() {
         .collect::<Vec<_>>();
     let failure = export_bodies(
         &inputs,
+        "metre",
         "metre",
         "Y",
         "cap",

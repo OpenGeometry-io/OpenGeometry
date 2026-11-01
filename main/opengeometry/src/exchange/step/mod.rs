@@ -15,6 +15,14 @@ use body::{emit_body, BodyEmission};
 use product::{emit_context, emit_products, emit_representations};
 
 pub fn export_step(brep: &BrepEnvelope, unit: &str) -> Result<(String, StepReport), GeometryError> {
+    export_step_in(brep, "metre", unit)
+}
+
+pub fn export_step_in(
+    brep: &BrepEnvelope,
+    model_unit: &str,
+    unit: &str,
+) -> Result<(String, StepReport), GeometryError> {
     let (text, report) = export_bodies(
         &[StepBodyInput {
             og_id: &brep.id,
@@ -22,6 +30,7 @@ pub fn export_step(brep: &BrepEnvelope, unit: &str) -> Result<(String, StepRepor
             shape_revision: brep.revision,
             brep,
         }],
+        model_unit,
         unit,
         "Y",
         &brep.id,
@@ -50,22 +59,14 @@ pub fn export_step(brep: &BrepEnvelope, unit: &str) -> Result<(String, StepRepor
 
 pub(crate) fn export_bodies(
     bodies: &[StepBodyInput<'_>],
+    model_unit: &str,
     unit: &str,
     up_axis: &str,
     name: &str,
     timestamp: &str,
     skipped: Vec<StepSkipped>,
 ) -> Result<(String, StepExportReport), StepExportFailure> {
-    let scale = match unit {
-        "metre" => 1.0,
-        "millimetre" => 1000.0,
-        _ => {
-            return Err(GeometryError::InvalidGeometry(
-                "STEP length unit must be metre or millimetre".into(),
-            )
-            .into())
-        }
-    };
+    let scale = unit_scale(model_unit, unit)?;
     if bodies.is_empty() {
         return Err(
             GeometryError::InvalidGeometry("STEP export has no solid bodies".into()).into(),
@@ -119,6 +120,22 @@ pub(crate) fn export_bodies(
         skipped,
     };
     Ok((text, report))
+}
+
+fn unit_scale(model_unit: &str, unit: &str) -> Result<f64, GeometryError> {
+    if !matches!(unit, "metre" | "millimetre") {
+        return Err(GeometryError::InvalidGeometry(
+            "STEP length unit must be metre or millimetre".into(),
+        ));
+    }
+    match (model_unit, unit) {
+        ("metre", "millimetre") => Ok(1000.0),
+        ("millimetre", "metre") => Ok(1e-3),
+        ("metre" | "millimetre", _) => Ok(1.0),
+        _ => Err(GeometryError::InvalidGeometry(
+            "STEP model length unit must be metre or millimetre".into(),
+        )),
+    }
 }
 
 fn add_bodies(
