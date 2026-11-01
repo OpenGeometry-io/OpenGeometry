@@ -5,7 +5,9 @@ use super::operands::{
     full_planar_extrusion, full_sphere, full_torus, prismatic_gap, unique_sources, BoxInput,
 };
 use super::types::{BooleanOp, BooleanResult, FaceMapping};
-use crate::brep::{BrepEnvelope, EdgeGeometry, Frame3, GeometryError, SurfaceGeometry};
+use crate::brep::{
+    unsupported_wrapped, BrepEnvelope, EdgeGeometry, Frame3, GeometryError, SurfaceGeometry,
+};
 use crate::geom2d::{
     inset_curved_region, inset_tolerance, offset_from, oriented_ring, pinched, self_intersects2,
     signed_area2, CurveEdge2, CurveRegion2, Pt2,
@@ -84,6 +86,7 @@ fn offset_cavity(
     inner_id: String,
 ) -> Result<Cavity, GeometryError> {
     let body = match input.geometry.surfaces.first() {
+        Some(_) if input.geometry.has_wrapped() => Err(unsupported_wrapped("shelling")),
         Some(SurfaceGeometry::Sphere { .. }) => sphere_cavity(input, thickness, inner_id),
         Some(SurfaceGeometry::Cylinder { .. }) => cylinder_cavity(input, thickness, inner_id),
         Some(SurfaceGeometry::Torus { .. }) => torus_cavity(input, thickness, inner_id),
@@ -96,6 +99,7 @@ fn offset_cavity(
             Err(error) => Err(error),
         },
         Some(SurfaceGeometry::Cone { .. }) => cone_cavity(input, thickness, inner_id),
+        Some(SurfaceGeometry::Wrapped { .. }) => Err(unsupported_wrapped("shelling")),
         None => Err(GeometryError::CoverageGap {
             families: ["restricted analytic shell".into(), "input solid".into()],
         }),
@@ -472,6 +476,7 @@ fn revolved(input: &BrepEnvelope) -> bool {
         | SurfaceGeometry::Cylinder { frame, .. }
         | SurfaceGeometry::Cone { frame, .. }
         | SurfaceGeometry::Torus { frame, .. } => frame,
+        SurfaceGeometry::Wrapped { wrap, .. } => wrap.frame,
     };
     let curved = |surface: &&SurfaceGeometry| !matches!(surface, SurfaceGeometry::Plane { .. });
     let surfaces = &input.geometry.surfaces;

@@ -31,6 +31,15 @@ impl GeometryStore {
             intersections: Vec::new(),
         }
     }
+    pub(crate) fn has_wrapped(&self) -> bool {
+        self.surfaces
+            .iter()
+            .any(|s| matches!(s, SurfaceGeometry::Wrapped { .. }))
+            || self
+                .curves
+                .iter()
+                .any(|c| matches!(c, CurveGeometry::Wrapped { .. }))
+    }
     pub fn surface(&self, id: u32) -> Result<&SurfaceGeometry, GeometryError> {
         self.surfaces
             .get(id as usize)

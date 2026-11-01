@@ -1,7 +1,7 @@
 use super::{export_bodies, export_step, StepBodyInput};
 use crate::brep::{
-    coarse_accuracy, BrepEnvelope, Curve, CurveGeometry, EdgeGeometry, Frame3, GeometryError,
-    IntersectionDefinition, IntersectionSide, PcurveGeometry, Surface, TraceAnchor,
+    coarse_accuracy, wrapped_sector, BrepEnvelope, Curve, CurveGeometry, EdgeGeometry, Frame3,
+    GeometryError, IntersectionDefinition, IntersectionSide, PcurveGeometry, Surface, TraceAnchor,
 };
 use crate::math::Interval;
 use crate::operations::modifying::boolean::{boolean_spheres, BooleanOp};
@@ -223,4 +223,15 @@ fn two_million_entity_export_is_limit_exceeded() {
     assert!(
         matches!(&failure.error, GeometryError::LimitExceeded(message) if message.contains("2,000,000"))
     );
+}
+
+#[test]
+fn a_wrapped_side_exports_as_b_splines_within_the_exchange_budget() {
+    let brep = wrapped_sector();
+    let (step, report) = export_step(&brep, "metre").unwrap();
+    assert_eq!(report.faces, 6);
+    assert_eq!(step.matches("B_SPLINE_SURFACE_WITH_KNOTS").count(), 1);
+    assert_eq!(step.matches("B_SPLINE_CURVE_WITH_KNOTS").count(), 2);
+    assert_eq!(step.matches("=PCURVE(").count(), 2 * report.edges);
+    assert!(report.exchange_error_bound <= brep.accuracy.exchange);
 }

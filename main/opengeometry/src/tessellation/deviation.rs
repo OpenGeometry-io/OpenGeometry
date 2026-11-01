@@ -184,6 +184,18 @@ pub(super) fn edge_count(
             CurveGeometry::Intersection { definition } => {
                 bounded_intersection_count(brep, *definition, curve, range, error, max_triangles)
             }
+            geometry @ CurveGeometry::Wrapped { curve: flat, .. } => {
+                let arc = matches!(
+                    **flat,
+                    CurveGeometry::Circle { .. } | CurveGeometry::Ellipse { .. }
+                );
+                turn_count(
+                    range.width() * (geometry.derivative_bounds(range)?.1 / (8.0 * error)).sqrt(),
+                    if arc { range.width() } else { 0.0 },
+                    1,
+                    max_triangles,
+                )
+            }
         },
     }
 }

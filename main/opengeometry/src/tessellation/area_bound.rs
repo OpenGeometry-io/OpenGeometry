@@ -132,6 +132,7 @@ fn deviation(
             sense,
             deflection,
         ),
+        SurfaceGeometry::Wrapped { .. } => None,
     }
 }
 
