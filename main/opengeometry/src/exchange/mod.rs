@@ -1,3 +1,4 @@
+mod fit_bezier;
 mod fit_curve;
 pub mod ifc_body;
 mod part21;

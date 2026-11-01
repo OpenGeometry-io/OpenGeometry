@@ -2,7 +2,7 @@ pub(super) mod mirror;
 #[cfg(test)]
 mod tests;
 
-use super::error::GeometryError;
+use super::error::{unsupported_wrapped, GeometryError};
 use super::frame::Frame3;
 use super::geometry::{CurveGeometry, IntersectionDefinition, SurfaceGeometry};
 use super::pcurve::PcurveGeometry;
@@ -20,6 +20,9 @@ pub fn placed(
         return Err(GeometryError::InvalidGeometry(
             "placement scale must be positive and finite".into(),
         ));
+    }
+    if scale != 1.0 && input.geometry.has_wrapped() {
+        return Err(unsupported_wrapped("scaling"));
     }
     let mut output = input.clone();
     output.revision = input
@@ -82,7 +85,9 @@ pub fn placed(
 fn metric(surface: &SurfaceGeometry, scale: f64) -> [f64; 2] {
     match surface {
         SurfaceGeometry::Plane { .. } => [scale; 2],
-        SurfaceGeometry::Cylinder { .. } | SurfaceGeometry::Cone { .. } => [1.0, scale],
+        SurfaceGeometry::Cylinder { .. }
+        | SurfaceGeometry::Cone { .. }
+        | SurfaceGeometry::Conoid { .. } => [1.0, scale],
         _ => [1.0; 2],
     }
 }
@@ -106,6 +111,13 @@ fn place_surfaces(surfaces: &mut [SurfaceGeometry], placement: Frame3, scale: f6
                 transform_frame(frame, placement, scale);
                 *major_radius *= scale;
                 *minor_radius *= scale;
+            }
+            SurfaceGeometry::Wrapped { wrap, .. } => {
+                transform_frame(&mut wrap.frame, placement, 1.0)
+            }
+            SurfaceGeometry::Conoid { frame, c } => {
+                transform_frame(frame, placement, scale);
+                *c = c.map(|value| value * scale);
             }
         }
     }
@@ -139,6 +151,7 @@ fn place_curves(curves: &mut [CurveGeometry], placement: Frame3, scale: f64) {
                 *minor_radius *= scale;
             }
             CurveGeometry::Intersection { .. } => {}
+            CurveGeometry::Wrapped { wrap, .. } => transform_frame(&mut wrap.frame, placement, 1.0),
         }
     }
 }

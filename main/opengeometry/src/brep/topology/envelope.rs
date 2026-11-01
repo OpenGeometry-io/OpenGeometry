@@ -61,8 +61,10 @@ impl BrepEnvelope {
                 "BRep JSON exceeds 64 MiB".into(),
             ));
         }
-        let brep: Self = serde_json::from_str(json)
+        let mut brep: Self = serde_json::from_str(json)
             .map_err(|e| GeometryError::InvalidGeometry(format!("invalid BRep JSON: {e}")))?;
+        brep.validate_structure()?;
+        brep.orient_loops()?;
         brep.validate()?;
         Ok(brep)
     }

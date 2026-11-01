@@ -324,6 +324,7 @@ fn finish_planar_result(
         a.revision.max(b.revision).checked_add(1).ok_or_else(|| {
             GeometryError::LimitExceeded("planar Boolean revision overflow".into())
         })?;
+    out.orient_loops()?;
     out.validate()?;
     let face_mappings = analytic_face_mappings(&out, [a, b]);
     Ok(BooleanResult {

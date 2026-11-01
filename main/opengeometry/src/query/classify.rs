@@ -1,6 +1,7 @@
 use super::classification::PointClassification;
 use super::face_trim::face_contains_uv;
 use super::ray_roots::{ray_box_domain, support_roots};
+use super::wrapped_roots::{wrapped_ray_roots, Ray};
 use crate::brep::{
     unit, BrepEnvelope, Face, GeometryError, SolidRegion, Surface, SurfaceGeometry, UV,
 };
@@ -16,16 +17,21 @@ fn classify_with_ray<'a>(
         return Ok(PointClassification::Outside);
     };
     let mut hits: Vec<(f64, Point3)> = Vec::new();
+    let ray = Ray {
+        origin: point,
+        direction,
+        domain,
+        tolerance: brep.accuracy.intersection,
+    };
     for face in faces {
         let surface = brep.geometry.surface(face.surface)?;
-        let Some(roots) = support_roots(
-            surface,
-            point,
-            direction,
-            domain,
-            brep.accuracy.intersection,
-        )?
-        else {
+        let roots = match surface {
+            SurfaceGeometry::Wrapped { .. } => {
+                wrapped_ray_roots(surface, face.trim.uv_bounds, &ray)?
+            }
+            _ => support_roots(surface, point, direction, domain, ray.tolerance)?,
+        };
+        let Some(roots) = roots else {
             return Ok(PointClassification::Unknown);
         };
         for parameter in roots {

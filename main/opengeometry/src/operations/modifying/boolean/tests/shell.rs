@@ -1,6 +1,7 @@
 use super::support::{extrusion, sphere};
-use crate::brep::{FaceRole, Frame3, GeometryError};
+use crate::brep::{wrapped_sector, FaceRole, Frame3, GeometryError};
 use crate::operations::modifying::boolean::shell::shell_brep;
+use crate::operations::modifying::boolean::{boolean_brep, BooleanOp};
 use crate::primitives;
 use crate::tessellation::tessellate;
 
@@ -66,5 +67,29 @@ fn restricted_shell_offsets_supported_closed_families() {
     assert!(matches!(
         shell_brep(&inputs[2].0, 1.0, "invalid".into()),
         Err(GeometryError::UnresolvedIntersection(_))
+    ));
+}
+
+#[test]
+fn booleans_and_shells_refuse_wrapped_geometry() {
+    let sector = wrapped_sector();
+    let cube = primitives::cuboid(
+        "cube".into(),
+        Frame3::IDENTITY,
+        [1.0, 1.0, 1.0],
+        sector.accuracy,
+    )
+    .unwrap();
+    let refused = |result: Result<_, GeometryError>| {
+        matches!(result, Err(GeometryError::UnsupportedGeometry(_)))
+    };
+    assert!(refused(
+        boolean_brep(&sector, &cube, BooleanOp::Union, "u".into()).map(|_| ())
+    ));
+    assert!(refused(
+        boolean_brep(&cube, &sector, BooleanOp::Subtraction, "s".into()).map(|_| ())
+    ));
+    assert!(refused(
+        shell_brep(&sector, 0.1, "shell".into()).map(|_| ())
     ));
 }

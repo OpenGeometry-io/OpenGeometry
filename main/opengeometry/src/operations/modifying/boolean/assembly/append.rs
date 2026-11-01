@@ -228,6 +228,7 @@ pub(crate) fn finish_analytic_result(
         .max(second.revision)
         .checked_add(1)
         .ok_or_else(|| GeometryError::LimitExceeded("boolean revision overflow".into()))?;
+    out.orient_loops()?;
     out.validate()?;
     let inputs = if first_is_a {
         [first, second]
@@ -296,6 +297,7 @@ pub(crate) fn finish_cylinder_result(
         .max(b.brep.revision)
         .checked_add(1)
         .ok_or_else(|| GeometryError::LimitExceeded("boolean revision overflow".into()))?;
+    out.orient_loops()?;
     out.validate()?;
     let face_mappings = cylinder_face_mappings(&out, [a, b]);
     Ok(BooleanResult {

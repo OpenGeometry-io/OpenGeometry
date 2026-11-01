@@ -18,11 +18,12 @@ mod validate;
 pub use accuracy::Accuracy;
 pub use body_type::BodyType;
 pub use bounds::PatchBounds;
-pub(super) use builder::{
-    boundary, dimensions, padded_uv_bounds, plane_boundary, uv_line, Builder, Use, WireUse,
-};
-pub(super) use error::coverage_gap;
+pub use builder::{boundary, plane_boundary, projected_boundary, uv_line, Builder, Use};
+pub(super) use builder::{dimensions, padded_uv_bounds, WireUse};
+#[cfg(test)]
+pub(super) use builder::{wrapped_sector, SECTOR};
 pub use error::GeometryError;
+pub(super) use error::{coverage_gap, unsupported_conoid, unsupported_wrapped};
 pub use frame::Frame3;
 pub(super) use frame::{checked, unit, UVBox, GROUND, UV};
 pub(super) use geometry::{
@@ -30,18 +31,19 @@ pub(super) use geometry::{
     TraceAnchor,
 };
 pub use geometry::{
-    CurveGeometry, GeometryStore, IntersectionPoint, Surface, SurfaceChart, SurfaceGeometry,
-    SurfaceJet2,
+    conoid_ellipse, CurveGeometry, GeometryStore, IntersectionPoint, Surface, SurfaceChart,
+    SurfaceGeometry, SurfaceJet2, Wrap,
 };
-pub(super) use pcurve::{period_lifted_uv, IntersectionSide, PcurveGeometry};
+pub(super) use pcurve::period_lifted_uv;
+pub use pcurve::{IntersectionSide, PcurveGeometry};
 pub use placement::{mirror::mirrored, placed};
 pub use similarity::Similarity3;
 #[cfg(test)]
 pub(super) use topology::{circular_face, coarse_accuracy, fine_accuracy};
 pub use topology::{
-    BrepEnvelope, Edge, Face, FaceProvenance, FaceRole, FaceSource, HalfEdge, Topology, Vertex,
+    BrepEnvelope, Edge, Face, FaceProvenance, FaceRole, FaceSource, HalfEdge, Orientation,
+    Topology, Vertex,
 };
 pub(super) use topology::{
-    EdgeGeometry, GeometryQuality, HalfEdgeGeometryUse, Loop, Orientation, Shell, SolidRegion,
-    TrimRegion, Wire,
+    EdgeGeometry, GeometryQuality, HalfEdgeGeometryUse, Loop, Shell, SolidRegion, TrimRegion, Wire,
 };

@@ -375,7 +375,8 @@ fn add_plane_face(
         [[-radius, radius]; 2],
         vec![outer],
         inner.into_iter().map(|hole| vec![hole]).collect(),
-    )
+    )?;
+    Ok(())
 }
 
 fn add_lateral_face(

@@ -54,7 +54,7 @@ pub(super) fn curved_trimmed_face(
     if rect.is_some() && !face.trim.holes.is_empty() {
         shift_periodic_holes(face, surface, periods, &mut loops)?;
     }
-    if !axis_aligned {
+    if !axis_aligned || matches!(surface, SurfaceGeometry::Conoid { .. }) {
         return general_curved_trimmed_face(brep, face, size, &loops, error, mesh, max_triangles);
     }
     let all_boundary = loops.iter().flatten().collect::<Vec<_>>();

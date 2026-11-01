@@ -1,6 +1,6 @@
 use super::classification::PointClassification;
 use super::classify::{classify_point, classify_point_validated};
-use crate::brep::{coarse_accuracy, unit, Accuracy, BrepEnvelope, Frame3};
+use crate::brep::{coarse_accuracy, unit, wrapped_sector, Accuracy, BrepEnvelope, Frame3, SECTOR};
 use crate::math::{add, cross, dot, scale, Point3};
 use crate::primitives;
 
@@ -429,5 +429,30 @@ fn cuboid_corners_edges_and_face_points_are_boundary() {
                 probe_mismatches(&body, frame, &probes, SURFACE, "cuboid")
             })
             .collect(),
+    );
+}
+
+#[test]
+fn points_on_either_side_of_a_wrapped_wall_classify_correctly() {
+    let brep = wrapped_sector();
+    let w = SECTOR.wrap();
+    let mid = SECTOR.inner + SECTOR.thickness / 2.0;
+    for x in [0.5, 2.0, 3.5] {
+        let y = x * SECTOR.rise / SECTOR.length;
+        let inside = w.point([x, y + 0.01, mid]);
+        let outside = w.point([x, y - 0.01, mid]);
+        assert_eq!(
+            classify_point(&brep, inside).unwrap(),
+            PointClassification::Inside
+        );
+        assert_eq!(
+            classify_point(&brep, outside).unwrap(),
+            PointClassification::Outside
+        );
+    }
+    let middle = w.point([SECTOR.length / 2.0, SECTOR.width / 2.0, mid]);
+    assert_eq!(
+        classify_point(&brep, middle).unwrap(),
+        PointClassification::Inside
     );
 }

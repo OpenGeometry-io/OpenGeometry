@@ -1,8 +1,10 @@
+use super::conoid::conoid_ellipse;
 use super::curve::CurveGeometry;
 use super::surface::{Surface, SurfaceGeometry};
+use super::wrap::Wrap;
 use crate::brep::error::GeometryError;
 use crate::brep::frame::Frame3;
-use crate::math::{dot, norm, scale, sub, Interval};
+use crate::math::{cross, dot, norm, scale, sub, Interval};
 
 fn surfaces() -> Vec<SurfaceGeometry> {
     let frame = Frame3::from_axis([3.0, -2.0, 7.0], [1.0, 2.0, 3.0], [0.0, 1.0, 0.0]).unwrap();
@@ -19,7 +21,113 @@ fn surfaces() -> Vec<SurfaceGeometry> {
             major_radius: 3.0,
             minor_radius: 1.0,
         },
+        conoid(),
+        SurfaceGeometry::Wrapped {
+            wrap: wrap(),
+            surface: Box::new(SurfaceGeometry::Cylinder {
+                frame: Frame3 {
+                    origin: [1.0, 0.5, 3.0],
+                    ..Frame3::IDENTITY
+                },
+                radius: 0.8,
+            }),
+        },
+        SurfaceGeometry::Wrapped {
+            wrap: wrap(),
+            surface: Box::new(SurfaceGeometry::Plane {
+                frame: Frame3::from_axis([0.3, -0.2, 2.5], [1.0, 2.0, 0.3], [0.0, 0.0, 1.0])
+                    .unwrap(),
+            }),
+        },
     ]
+}
+
+fn conoid() -> SurfaceGeometry {
+    SurfaceGeometry::Conoid {
+        frame: Frame3::from_axis([3.0, -2.0, 7.0], [1.0, 2.0, 3.0], [0.0, 1.0, 0.0]).unwrap(),
+        c: [1.5, 0.8, -0.6],
+    }
+}
+
+fn wrap() -> Wrap {
+    Wrap {
+        frame: Frame3::from_axis([3.0, -2.0, 7.0], [1.0, 2.0, 3.0], [0.0, 1.0, 0.0]).unwrap(),
+        radius: 2.6,
+    }
+}
+
+#[test]
+fn a_wrap_keeps_arc_length_on_its_radius_and_round_trips() {
+    let w = wrap();
+    let p = [1.3, -0.4, 2.6];
+    let chord = norm(sub(w.point(p), w.point([0.0, -0.4, 2.6])));
+    assert!((chord - 2.0 * 2.6 * (1.3_f64 / 5.2).sin()).abs() < 1e-12);
+    let back = w.flatten(w.point(p), None).unwrap();
+    assert!(norm(sub(back, p)) < 1e-12);
+    let far = [2.6 * 4.0, 0.0, 3.0];
+    assert!(norm(sub(w.flatten(w.point(far), Some(far[0])).unwrap(), far)) < 1e-12);
+    let curve = CurveGeometry::Wrapped {
+        wrap: w,
+        curve: Box::new(CurveGeometry::Line {
+            origin: [0.0, 0.0, 2.0],
+            direction: [0.6, 0.8, 0.0],
+        }),
+    };
+    let speed = |t: f64| norm(curve.elementary_tangent(t).unwrap());
+    assert!((speed(0.1) - speed(3.0)).abs() < 1e-12);
+    let h = 1e-6;
+    let fd = scale(
+        sub(
+            curve.elementary_point(1.0 + h).unwrap(),
+            curve.elementary_point(1.0 - h).unwrap(),
+        ),
+        0.5 / h,
+    );
+    assert!(norm(sub(fd, curve.elementary_tangent(1.0).unwrap())) < 1e-8);
+    let bounds = curve
+        .elementary_bounds(Interval::new(0.0, 4.0).unwrap())
+        .unwrap();
+    for i in 0..=40 {
+        assert!(bounds.contains(curve.elementary_point(i as f64 / 10.0).unwrap()));
+    }
+    let nested = CurveGeometry::Wrapped {
+        wrap: w,
+        curve: Box::new(curve),
+    };
+    assert!(nested.validate().is_err());
+    let nested_surface = SurfaceGeometry::Wrapped {
+        wrap: w,
+        surface: Box::new(surfaces().pop().unwrap()),
+    };
+    assert!(nested_surface.validate().is_err());
+}
+
+#[test]
+fn wrapped_circle_samples_meet_their_chord_error() {
+    let curve = CurveGeometry::Wrapped {
+        wrap: wrap(),
+        curve: Box::new(CurveGeometry::Circle {
+            frame: Frame3 {
+                origin: [1.0, 0.5, 3.0],
+                ..Frame3::IDENTITY
+            },
+            radius: 0.8,
+        }),
+    };
+    let range = Interval::new(0.0, std::f64::consts::TAU).unwrap();
+    let samples = curve.sample_elementary(range, 1e-3, 100_000).unwrap();
+    let n = samples.len() - 1;
+    for i in 0..n {
+        for k in 1..8 {
+            let t = range.width() * (i as f64 + k as f64 / 8.0) / n as f64;
+            let p = curve.elementary_point(t).unwrap();
+            let (a, b) = (samples[i], samples[i + 1]);
+            let ab = sub(b, a);
+            let along = dot(sub(p, a), ab) / dot(ab, ab);
+            let foot = [0, 1, 2].map(|j| a[j] + along * ab[j]);
+            assert!(norm(sub(p, foot)) <= 1e-3);
+        }
+    }
 }
 
 #[test]
@@ -169,4 +277,78 @@ fn partial_cylinder_and_cone_patches_on_a_skew_frame_get_their_exact_box() {
             );
         }
     }
+}
+
+#[test]
+fn conoid_rulings_are_radial_and_constant_radius_curves_are_planar() {
+    let surface = conoid();
+    let frame = *surface.frame();
+    let SurfaceGeometry::Conoid { c, .. } = surface else {
+        unreachable!()
+    };
+    for u in [0.0, 0.9, 2.5, 4.0] {
+        let a = surface.point_at([u, 1.0]).unwrap();
+        let b = surface.point_at([u, 3.0]).unwrap();
+        assert!(dot(sub(b, a), frame.z).abs() < 1e-12);
+        let mid = surface.point_at([u, 2.0]).unwrap();
+        assert!(norm(sub(mid, scale(add3(a, b), 0.5))) < 1e-12);
+        for r in [0.5, 2.0] {
+            let local = frame.local(surface.point_at([u, r]).unwrap());
+            assert!((local[0].hypot(local[1]) - r).abs() < 1e-12);
+            let plane = c[0] + c[1] / r * local[0] + c[2] / r * local[1];
+            assert!((local[2] - plane).abs() < 1e-12);
+        }
+    }
+    let jet = surface.derivatives([0.7, 2.0]).unwrap();
+    let n = surface.normal_at([0.7, 2.0]).unwrap();
+    let expected = cross(jet.du, jet.dv);
+    assert!(norm(sub(n, scale(expected, 1.0 / norm(expected)))) < 1e-12);
+}
+
+#[test]
+fn conoid_projection_finds_the_closest_point_and_respects_the_hint() {
+    let surface = conoid();
+    for (u, v, offset) in [(0.3, 1.2, 0.2), (2.0, 2.5, -0.4), (5.5, 0.8, 0.05)] {
+        let p = surface.point_at([u, v]).unwrap();
+        let off = add3(p, scale(surface.normal_at([u, v]).unwrap(), offset));
+        let uv = surface.project(off, Some([u, v])).unwrap();
+        assert!(
+            (uv[0] - u).abs() < 1e-9 && (uv[1] - v).abs() < 1e-9,
+            "{uv:?}"
+        );
+        let lifted = surface
+            .project(p, Some([u + std::f64::consts::TAU, v]))
+            .unwrap();
+        assert!((lifted[0] - u - std::f64::consts::TAU).abs() < 1e-12);
+    }
+    let bad = SurfaceGeometry::Conoid {
+        frame: Frame3::IDENTITY,
+        c: [0.0, f64::NAN, 0.0],
+    };
+    assert!(bad.validate().is_err());
+}
+
+fn add3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    std::array::from_fn(|i| a[i] + b[i])
+}
+
+#[test]
+fn conoid_ellipses_trace_the_constant_radius_curves() {
+    let surface = conoid();
+    let SurfaceGeometry::Conoid { frame, c } = surface else {
+        unreachable!()
+    };
+    for radius in [0.5, 2.0, 7.0] {
+        let (ellipse, phase) = conoid_ellipse(frame, c, radius).unwrap();
+        for t in [-1.0, 0.0, 0.4, 2.5] {
+            let on_surface = surface.point_at([t + phase, radius]).unwrap();
+            assert!(norm(sub(ellipse.elementary_point(t).unwrap(), on_surface)) < 1e-12);
+        }
+    }
+    let (circle, _) = conoid_ellipse(frame, [c[0], 0.0, 0.0], 1.0).unwrap();
+    assert!(matches!(
+        circle,
+        CurveGeometry::Ellipse { major_radius, minor_radius, .. } if major_radius == minor_radius
+    ));
+    assert!(conoid_ellipse(frame, c, 0.0).is_err());
 }
