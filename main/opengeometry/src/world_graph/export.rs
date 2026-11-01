@@ -145,6 +145,7 @@ impl WorldGraph {
             .collect::<Vec<_>>();
         export_bodies(
             &inputs,
+            "metre",
             &options.unit,
             &options.up_axis,
             &options.name,
