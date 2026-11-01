@@ -138,6 +138,7 @@ fn planar_cutters_boolean(
     for cutter in cutters {
         append_analytic_input(&mut combined, cutter)?;
     }
+    combined.orient_loops()?;
     combined.validate()?;
     let result = boolean_rectilinear(host, &combined, BooleanOp::Subtraction, id)?;
     let handlers = &mut trace.handlers;

@@ -235,6 +235,7 @@ fn finish_sphere_sphere_result(
         .max(b.brep.revision)
         .checked_add(1)
         .ok_or_else(|| GeometryError::LimitExceeded("boolean revision overflow".into()))?;
+    out.orient_loops()?;
     out.validate()?;
     let report = BooleanReport {
         operation,
