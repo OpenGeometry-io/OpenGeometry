@@ -1,6 +1,7 @@
 mod arc_extrusions_openings;
 mod arc_extrusions_splits;
 mod arched_band;
+mod closed_loop_windings;
 mod conic_torus;
 mod cuboids;
 mod cuboids_curved_cuts;
