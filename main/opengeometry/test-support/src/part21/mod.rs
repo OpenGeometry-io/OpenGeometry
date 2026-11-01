@@ -8,6 +8,7 @@ mod report;
 mod report_match;
 mod rules;
 mod solids;
+mod surfaces;
 #[cfg(test)]
 mod tests;
 mod values;

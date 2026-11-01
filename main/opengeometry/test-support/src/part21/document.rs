@@ -188,6 +188,9 @@ impl Document {
 
     pub(super) fn surface_point(&self, id: usize, uv: [f64; 2]) -> Result<[f64; 3], String> {
         let expression = self.entity(id)?;
+        if expression.starts_with("B_SPLINE_SURFACE_WITH_KNOTS(") {
+            return self.spline_surface_point(expression, uv);
+        }
         let args = fields(expression)?;
         let (origin, z, x) = self.axis(reference(&args[1])?)?;
         let y = [
