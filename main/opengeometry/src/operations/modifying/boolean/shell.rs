@@ -5,9 +5,8 @@ use super::operands::{
     full_planar_extrusion, full_sphere, full_torus, prismatic_gap, unique_sources, BoxInput,
 };
 use super::types::{BooleanOp, BooleanResult, FaceMapping};
-use crate::brep::{
-    unsupported_wrapped, BrepEnvelope, EdgeGeometry, Frame3, GeometryError, SurfaceGeometry,
-};
+use crate::brep::unsupported_wrapped;
+use crate::brep::{BrepEnvelope, EdgeGeometry, Frame3, GeometryError, SurfaceGeometry};
 use crate::geom2d::{
     inset_curved_region, inset_tolerance, offset_from, oriented_ring, pinched, self_intersects2,
     signed_area2, CurveEdge2, CurveRegion2, Pt2,
