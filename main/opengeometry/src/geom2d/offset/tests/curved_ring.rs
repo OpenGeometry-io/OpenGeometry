@@ -1,7 +1,7 @@
 use super::polyline::filled;
 use crate::geom2d::boolean2d::distance_to_segment;
 use crate::geom2d::curved_boolean2d::{CurveEdge2, CurveRegion2};
-use crate::geom2d::offset::inset_curved_region;
+use crate::geom2d::offset::{inset_curved_region, inset_tolerance};
 use crate::geom2d::poly2d::Pt2;
 use crate::geom2d::tests::{curve_ring_area, p, DEFAULT_EPS};
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
@@ -88,6 +88,13 @@ fn square_with_round_hole() -> CurveRegion2 {
             arc([2.0, 2.0], 0.5, [-PI, -PI]),
         ]],
     )
+}
+
+fn s_balcony_slab() -> CurveRegion2 {
+    serde_json::from_str(include_str!(
+        "../../../../tests/fixtures/regions/s-balcony-slab.json"
+    ))
+    .unwrap()
 }
 
 fn rings(region: &CurveRegion2) -> impl Iterator<Item = &Vec<CurveEdge2>> {
@@ -280,4 +287,25 @@ fn a_thickness_past_the_half_width_collapses_to_nothing() {
     assert!(inset_curved_region(&d_shape(), 2.5, DEFAULT_EPS)
         .unwrap()
         .is_empty());
+}
+
+#[test]
+fn the_s_balcony_slab_insets_by_1_2_m_to_the_same_seven_edges_with_exact_arcs() {
+    let source = s_balcony_slab();
+    let result = inset_curved_region(&source, 1.2, inset_tolerance(&source, DEFAULT_EPS)).unwrap();
+    assert_at_distance(&result, &source, 1.2);
+    assert_eq!(result.len(), 1);
+    assert!(result[0].holes.is_empty());
+    assert_eq!(result[0].outer.len(), source.outer.len());
+    assert_eq!(arcs(&result).len(), 2);
+    let crest = 4.0 + 2.0 * 11.0_f64.sqrt();
+    assert!(has_arc(&result, [4.0, -6.0], 4.8));
+    assert!(has_arc(&result, [crest, 4.0], 7.2));
+    let perimeter: f64 = source.outer.iter().map(CurveEdge2::length).sum();
+    let expected = area(std::slice::from_ref(&source)) - 1.2 * perimeter + 4.0 * 1.2 * 1.2;
+    assert!(
+        (area(&result) - expected).abs() <= 1e-9,
+        "{}",
+        area(&result)
+    );
 }

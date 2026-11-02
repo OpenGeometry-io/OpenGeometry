@@ -1,8 +1,8 @@
 use crate::bindings::{errors, OGWorldGraph};
 use crate::geom2d::{
-    boolean_curved_regions, boolean_oriented_regions, offset_path, offset_polyline_regions,
-    offset_ring_variable, signed_area2, CurveEdge2, CurveRegion2, OffsetError, OffsetHole,
-    OffsetOptions, PlanarBooleanOp, Pt2, RingRegion,
+    boolean_curved_regions, boolean_oriented_regions, inset_curved_region, inset_tolerance,
+    offset_path, offset_polyline_regions, offset_ring_variable, signed_area2, CurveEdge2,
+    CurveRegion2, OffsetError, OffsetHole, OffsetOptions, PlanarBooleanOp, Pt2, RingRegion,
 };
 use crate::world_graph::{ErrorCode, GraphError};
 use serde::de::DeserializeOwned;
@@ -70,6 +70,16 @@ impl OGWorldGraph {
         operation: &str,
     ) -> Result<String, JsValue> {
         let regions = curved_regions(a_json, b_json, operation).map_err(errors::json)?;
+        serde_json::to_string(&regions).map_err(errors::serialization)
+    }
+
+    #[wasm_bindgen(js_name = insetCurvedRegion2D)]
+    pub fn inset_curved_region_2d(
+        &self,
+        region_json: &str,
+        distance: f64,
+    ) -> Result<String, JsValue> {
+        let regions = curved_inset(region_json, distance).map_err(errors::json)?;
         serde_json::to_string(&regions).map_err(errors::serialization)
     }
 
@@ -264,6 +274,22 @@ fn curved_regions(
         "Boolean region edges",
     )?;
     boolean_curved_regions(&a, &b, operation, REGION_TOLERANCE).map_err(GraphError::from)
+}
+
+fn curved_inset(region_json: &str, distance: f64) -> Result<Vec<CurveRegion2>, GraphError> {
+    if !distance.is_finite() || distance <= 0.0 {
+        return Err(GraphError::code(
+            ErrorCode::InvalidParameter,
+            "inset distance must be a finite number above zero",
+        ));
+    }
+    let region: CurveRegion2 = parsed(region_json)?;
+    check_size(
+        region.outer.len() + region.holes.iter().map(Vec::len).sum::<usize>(),
+        "inset region edges",
+    )?;
+    let tolerance = inset_tolerance(&region, REGION_TOLERANCE);
+    inset_curved_region(&region, distance, tolerance).map_err(GraphError::from)
 }
 
 fn operation_of(text: &str) -> Result<PlanarBooleanOp, GraphError> {
