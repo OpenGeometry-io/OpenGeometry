@@ -44,6 +44,21 @@ pub(crate) fn intersect_breps(
     a: &BrepEnvelope,
     b: &BrepEnvelope,
 ) -> Result<BodyIntersectionGraph, GeometryError> {
+    body_intersection(a, b, false)
+}
+
+pub(crate) fn intersect_breps_until_branch(
+    a: &BrepEnvelope,
+    b: &BrepEnvelope,
+) -> Result<BodyIntersectionGraph, GeometryError> {
+    body_intersection(a, b, true)
+}
+
+fn body_intersection(
+    a: &BrepEnvelope,
+    b: &BrepEnvelope,
+    until_branch: bool,
+) -> Result<BodyIntersectionGraph, GeometryError> {
     a.validate()?;
     b.validate()?;
     let accuracy = Accuracy::combined(a.accuracy, b.accuracy);
@@ -65,7 +80,7 @@ pub(crate) fn intersect_breps(
             if !bounds_a.overlaps(*bounds_b, accuracy.intersection) {
                 continue;
             }
-            let graph = intersect_faces(
+            let graph = intersect_validated_faces(
                 FaceView {
                     brep: a,
                     face: face_a.id,
@@ -84,11 +99,15 @@ pub(crate) fn intersect_breps(
                 }
                 other => other,
             })?;
-            if graph.coincident || !graph.branches.is_empty() || !graph.contacts.is_empty() {
+            let branching = graph.coincident || !graph.branches.is_empty();
+            if branching || !graph.contacts.is_empty() {
                 pairs.push(FacePairIntersection {
                     faces: [face_a.id, face_b.id],
                     graph,
                 });
+            }
+            if until_branch && branching {
+                return Ok(BodyIntersectionGraph { pairs });
             }
         }
     }
@@ -101,6 +120,13 @@ pub(crate) fn intersect_faces(
 ) -> Result<IntersectionGraph, GeometryError> {
     a.brep.validate()?;
     b.brep.validate()?;
+    intersect_validated_faces(a, b)
+}
+
+fn intersect_validated_faces(
+    a: FaceView<'_>,
+    b: FaceView<'_>,
+) -> Result<IntersectionGraph, GeometryError> {
     let face_a = a.brep.topology.faces.get(a.face as usize).ok_or_else(|| {
         GeometryError::MissingReference {
             kind: "face".into(),

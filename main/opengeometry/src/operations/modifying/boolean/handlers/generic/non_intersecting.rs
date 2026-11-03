@@ -1,5 +1,5 @@
 use crate::brep::{BrepEnvelope, GeometryError};
-use crate::intersection::intersect_breps;
+use crate::intersection::intersect_breps_until_branch;
 use crate::math::{norm, sub};
 use crate::operations::modifying::boolean::handlers::containment::{
     analytic_containment_boolean, interior_sample,
@@ -14,7 +14,7 @@ pub(crate) fn generic_non_intersecting_boolean(
     operation: BooleanOp,
     id: String,
 ) -> Result<Option<BooleanResult>, GeometryError> {
-    let graph = match intersect_breps(a, b) {
+    let graph = match intersect_breps_until_branch(a, b) {
         Ok(graph) => graph,
         Err(GeometryError::CoverageGap { .. }) => return Ok(None),
         Err(error) => return Err(error),
