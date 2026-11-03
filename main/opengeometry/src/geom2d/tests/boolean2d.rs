@@ -2,7 +2,7 @@ use super::{area, edges_of, hole, p, rectangle, regions, union, winding_regions,
 use crate::geom2d::boolean2d::{
     boolean_oriented_regions, regions_from_edges_by, PlanarBooleanOp, RegionBooleanError,
 };
-use crate::geom2d::poly2d::{self_intersects2, signed_area2, Pt2};
+use crate::geom2d::poly2d::{crossing_margin, nearby_boxes, self_intersects2, signed_area2, Pt2};
 
 #[test]
 fn open_section_segment_partitions_a_classified_face() {
@@ -308,4 +308,62 @@ fn a_hole_that_no_region_contains_is_an_error() {
         regions_from_edges_by(&edges, DEFAULT_EPS, |point| !inside_the_unit_square(point)).err(),
         Some(RegionBooleanError::OrphanHole)
     );
+}
+
+#[test]
+fn nearby_boxes_lists_exactly_the_pairs_within_the_margin() {
+    let mut boxes = (0..30)
+        .flat_map(|row| {
+            (0..40).map(move |column| {
+                let (x, z) = (f64::from(column) * 0.25, f64::from(row) * 0.25);
+                [x, x + 0.125, z, z + 0.125]
+            })
+        })
+        .collect::<Vec<_>>();
+    boxes.push([0.0, 10.0, 0.0, 0.0625]);
+    boxes.push([3.0, 3.0625, -2.0, 8.0]);
+    let margin = 0.125;
+    let near = nearby_boxes(&boxes, margin);
+    let gap = |a: [f64; 4], b: [f64; 4]| {
+        (b[0] - a[1])
+            .max(a[0] - b[1])
+            .max(b[2] - a[3])
+            .max(a[2] - b[3])
+    };
+    for index in 0..boxes.len() {
+        let expected = (0..boxes.len())
+            .filter(|&other| other != index && gap(boxes[index], boxes[other]) <= margin)
+            .collect::<Vec<_>>();
+        assert_eq!(near.of(index).collect::<Vec<_>>(), expected, "box {index}");
+    }
+    assert_eq!(
+        (0..boxes.len())
+            .map(|index| near.of(index).count())
+            .sum::<usize>(),
+        9_386
+    );
+    assert!(near.lists.is_some());
+}
+
+#[test]
+fn a_cutter_a_thousand_units_wide_visits_every_pair_without_listing_them() {
+    let host = vec![rectangle(0.0, 0.0, 2_000.0, 2_000.0)];
+    let cutter = vec![rectangle(1_000.0, -500.0, 3_000.0, 1_000.0)];
+    let edges = edges_of(&host[0])
+        .into_iter()
+        .chain(edges_of(&cutter[0]))
+        .collect::<Vec<_>>();
+    let margin = crossing_margin(edges.iter().copied(), 1.0e-9);
+    assert_eq!(margin, f64::INFINITY);
+    assert!(nearby_boxes(&[[0.0, 1.0, 0.0, 1.0]; 3], margin)
+        .lists
+        .is_none());
+    assert!(nearby_boxes(&[[0.0, 1.0, 0.0, 1.0]; 200], 0.0)
+        .lists
+        .is_none());
+    let regions =
+        boolean_oriented_regions(&host, &cutter, PlanarBooleanOp::Subtraction, 1.0e-9).unwrap();
+    assert_eq!(regions.len(), 1);
+    assert_eq!(regions[0].outer.len(), 6);
+    assert_eq!(area(&regions), 3_000_000.0);
 }
