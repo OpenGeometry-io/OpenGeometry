@@ -11,6 +11,8 @@ export function register(body: Body): void {
 export function unregister(body: Body): void {
   const state = runtime();
   state.displayed.delete(body);
+  state.displayBounds.delete(body);
+  state.lod.stale = true;
   state.limbo.delete(body);
   state.bodies.delete(bodyKey(body.handle, body.generation));
   state.pickTargets.delete(body.surface);
