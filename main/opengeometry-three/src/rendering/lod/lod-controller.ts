@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import type { Body } from '../../bodies/body';
+import { call } from '../../kernel/kernel-session';
 import { EVALUATION_INTERVAL_MS, MOTION_WINDOW_MS, PIXELS_AT_REST, PIXELS_MOVING } from '../../limits';
 import { currentRuntime, type Runtime } from '../../runtime/runtime-state';
 import { finestLocal, localTarget, shapeBuckets, type ShapeBuckets } from './body-size';
@@ -98,7 +99,8 @@ export function evaluatePass(state: Runtime, now: number, forced: boolean): bool
   lod.lastSchedule = now;
   const moving = !forced && now - lod.lastMotion < MOTION_WINDOW_MS;
   const bodies = displayedBodies(state);
-  const inputs = { revision: state.graph.revision(), flushed: state.revision, moving, displayed: bodies.length };
+  const revision = call('OpenGeometry.flush', () => state.graph.revision());
+  const inputs = { revision, flushed: state.revision, moving, displayed: bodies.length };
   if (!forced && !stalePass(lod, inputs)) return false;
   lod.stale = false;
   lod.evaluated = inputs;
