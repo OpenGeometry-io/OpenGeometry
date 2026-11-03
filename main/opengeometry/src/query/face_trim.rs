@@ -237,7 +237,9 @@ fn in_loop(point: UV, polygon: &[UV], tolerance: f64) -> Option<bool> {
     for index in 0..polygon.len() {
         let a = polygon[index];
         let b = polygon[(index + 1) % polygon.len()];
-        if segment_distance_2d(point, a, b) <= tolerance {
+        if !clear_of_segment(point, a, b, tolerance)
+            && segment_distance_2d(point, a, b) <= tolerance
+        {
             return None;
         }
         if (a[1] > point[1]) != (b[1] > point[1]) {
@@ -248,6 +250,18 @@ fn in_loop(point: UV, polygon: &[UV], tolerance: f64) -> Option<bool> {
         }
     }
     Some(inside)
+}
+
+fn clear_of_segment(point: UV, a: UV, b: UV, tolerance: f64) -> bool {
+    let scale = [point, a, b]
+        .iter()
+        .flatten()
+        .fold(0.0_f64, |largest, value| largest.max(value.abs()));
+    let reach = 2.0 * tolerance + 1e-14 * scale;
+    (0..2).any(|axis| {
+        let gap = (a[axis].min(b[axis]) - point[axis]).max(point[axis] - a[axis].max(b[axis]));
+        gap > reach
+    })
 }
 
 fn segment_distance_2d(point: UV, a: UV, b: UV) -> f64 {
