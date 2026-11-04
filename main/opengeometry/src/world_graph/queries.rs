@@ -140,9 +140,9 @@ impl WorldGraph {
     }
 
     pub fn node_by_handle(&self, handle: u32, generation: u32) -> Result<&Node, GraphError> {
-        self.nodes
-            .values()
-            .find(|node| node.handle == handle && node.generation == generation)
+        self.handles
+            .get(&(handle, generation))
+            .and_then(|og_id| self.nodes.get(og_id))
             .ok_or_else(|| GraphError::code(ErrorCode::Disposed, "node handle is stale"))
     }
 }
