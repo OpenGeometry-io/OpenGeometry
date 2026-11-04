@@ -7,8 +7,8 @@ import type { Placement } from '../dto/placement';
 import { OGError } from '../errors';
 import { call } from '../kernel/kernel-session';
 import { enterLimbo, revive } from '../marks/limbo';
-import { flush, flushForDispose, wanted } from '../rendering/geometry/geometry-scheduler';
-import { noteDisplayed } from '../rendering/geometry/render-pass';
+import { flush, flushForDispose, notifyBody, wanted } from '../rendering/geometry/geometry-scheduler';
+import { noteDisplayed, noteDrawn } from '../rendering/geometry/render-pass';
 import { observeCamera } from '../rendering/lod/camera-observer';
 import { isDisplayed, overrideChanged } from '../rendering/lod/lod-controller';
 import {
@@ -38,7 +38,9 @@ function lineStyle(bodyType: 'Wire' | 'Sheet' | 'Solid', appearance: Appearance)
   return { color: bodyType === 'Wire' ? appearance.color : 0x243040, opacity: appearance.opacity };
 }
 
-export abstract class Body extends THREE.Group {
+export type BodyEventMap = THREE.Object3DEventMap & { geometrychanged: object; placementchanged: object };
+
+export abstract class Body extends THREE.Group<BodyEventMap> {
   readonly ogId: string;
   readonly handle: number;
   readonly generation: number;
@@ -83,8 +85,8 @@ export abstract class Body extends THREE.Group {
     this.outline.visible = Boolean(placeholder) && this.appearance.outline;
     if (!this.appearance.pickOutline) this.outline.raycast = THREE.Object3D.prototype.raycast.bind(this.outline);
     this.add(this.surface, this.outline);
-    this.surface.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); };
-    this.outline.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); };
+    this.surface.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); noteDrawn(this); };
+    this.outline.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); noteDrawn(this); };
     register(this);
     this.applyWorldMatrix(call(`${bodyType}.constructor`, () => worldGraph().worldMatrix(ogId)));
   }
@@ -129,6 +131,7 @@ export abstract class Body extends THREE.Group {
     this.outline.updateMatrixWorld();
     this.surface.visible = this.bodyType !== 'Wire';
     this.outline.visible = this.appearance.outline;
+    notifyBody(this, 'geometrychanged');
   }
 
   setAppearance(partial: Partial<Appearance>): void {

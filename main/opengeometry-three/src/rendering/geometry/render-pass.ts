@@ -1,26 +1,56 @@
 import type { Body } from '../../bodies/body';
 import { currentRuntime, runtime, type Runtime } from '../../runtime/runtime-state';
-import { displayedBodies, evaluatePass, stampDisplayed } from '../lod/lod-controller';
-import { ensureGeometry, flush } from './geometry-scheduler';
+import { displayedBodies, evaluatePass, isDisplayed, stampDisplayed } from '../lod/lod-controller';
+import { checkedBodies, ensureGeometry, flush } from './geometry-scheduler';
 
 export function noteDisplayed(body: Body): void {
   const state = runtime();
-  const starting = !state.renderPassActive;
-  if (starting) {
-    state.renderPassActive = true;
-    queueMicrotask(() => { endPass(state); });
-  }
+  const starting = beginPass(state);
   stampDisplayed(state, body);
+  state.lod.walked.set(body, state.pass);
+  state.lod.drawn.delete(body);
   if (starting || state.graphMoved) flush();
   ensureGeometry(body);
 }
 
+export function noteDrawn(body: Body): void {
+  const state = runtime();
+  if (!body.visible || (state.renderPassActive && state.lod.walked.get(body) === state.pass)) return;
+  beginPass(state);
+  stampDisplayed(state, body);
+  state.lod.drawn.add(body);
+}
+
+export function markDisplayed(bodies: readonly Body[]): void {
+  const state = runtime();
+  for (const body of checkedBodies(state, bodies, 'OpenGeometry.markDisplayed')) noteDrawn(body);
+}
+
+function beginPass(state: Runtime): boolean {
+  if (state.renderPassActive) return false;
+  state.renderPassActive = true;
+  queueMicrotask(() => { endPass(state); });
+  return true;
+}
+
 function endPass(state: Runtime): void {
   if (currentRuntime() !== state) return;
-  state.renderPassActive = false;
-  state.pass++;
+  const drawn = [...state.lod.drawn];
+  state.lod.drawn.clear();
+  try {
+    installDrawn(state, drawn);
+  } finally {
+    state.renderPassActive = false;
+    state.pass++;
+  }
   if (state.readyShapes.size > 0) flush();
   if (evaluatePass(state, Date.now(), false)) refreshDisplayed(state);
+}
+
+function installDrawn(state: Runtime, drawn: readonly Body[]): void {
+  if (drawn.length === 0) return;
+  flush();
+  for (const body of drawn) if (isDisplayed(state, body)) ensureGeometry(body);
 }
 
 export function refreshDisplayed(state: Runtime): void {

@@ -36,6 +36,10 @@ export function flush(options: FlushOptions = {}): void {
 function liveBodies(state: Runtime, bodies: readonly Body[], geometry: FlushOptions['geometry']): readonly Body[] {
   const label = 'OpenGeometry.flush';
   if (geometry !== 'sync') throw new OGError('InvalidParameter', label, "bodies needs geometry: 'sync'");
+  return checkedBodies(state, bodies, label);
+}
+
+export function checkedBodies(state: Runtime, bodies: readonly Body[], label: string): readonly Body[] {
   const list: unknown = bodies;
   if (!Array.isArray(list)) throw new OGError('InvalidParameter', label, 'bodies must be an array of bodies');
   for (const body of bodies) {
@@ -44,7 +48,7 @@ function liveBodies(state: Runtime, bodies: readonly Body[], geometry: FlushOpti
       throw new OGError('InvalidParameter', label, 'bodies must hold only Wire, Sheet or Solid bodies');
     }
     if (state.bodies.get(bodyKey(body.handle, body.generation)) !== body) {
-      throw new OGError('Disposed', 'OpenGeometry.flush', `${body.ogId} is disposed`);
+      throw new OGError('Disposed', label, `${body.ogId} is disposed`);
     }
   }
   return bodies;
@@ -54,22 +58,32 @@ export function flushForDispose(): void {
   applyFlush(runtime());
 }
 
+export function notifyBody(body: Body, type: 'geometrychanged' | 'placementchanged'): void {
+  try {
+    body.dispatchEvent({ type });
+  } catch (error) {
+    emit('error', error);
+  }
+}
+
 function applyFlush(state: Runtime): void {
   const revision = call('OpenGeometry.flush', () => state.graph.revision());
   state.graphMoved = false;
   if (!state.flushing && (revision !== state.revision || (!state.renderPassActive && state.readyShapes.size > 0))) {
     state.flushing = true;
+    const moved: Body[] = [];
     try {
       const packet = call('OpenGeometry.flush', (): unknown => state.graph.changesSince(state.revision));
       const { changes, matrices } = decodeChangeSet(packet, 'OpenGeometry.flush');
       state.revision = revision;
-      applyChanges(state, changes, matrices);
+      moved.push(...applyChanges(state, changes, matrices));
       for (const body of swapTargets(state, changes)) body.swapReadyRecord();
       purgeChanged(state, changes);
       state.flushes++;
     } finally {
       state.flushing = false;
     }
+    for (const body of moved) notifyBody(body, 'placementchanged');
   }
 }
 
@@ -84,7 +98,8 @@ function swapTargets(state: Runtime, changes: ChangeSet): Body[] {
   return [...targets].filter((body) => isDisplayed(state, body));
 }
 
-function applyChanges(state: Runtime, changes: ChangeSet, matrices: Float64Array): void {
+function applyChanges(state: Runtime, changes: ChangeSet, matrices: Float64Array): Body[] {
+  const moved: Body[] = [];
   let offset = 0;
   for (const change of [...changes.added, ...changes.changed]) {
     const body = state.bodies.get(bodyKey(change.handle, change.generation));
@@ -92,11 +107,14 @@ function applyChanges(state: Runtime, changes: ChangeSet, matrices: Float64Array
       const previous = body.lastInfo.shapeId;
       body.lastInfo = { ...body.lastInfo, shapeId: change.shapeId, shapeRevision: change.shapeRevision };
       reindexShape(state, body, previous);
-      body.applyWorldMatrix(matrices.subarray(offset, offset + 16));
+      const matrix = matrices.subarray(offset, offset + 16);
+      if (body.matrixWorld.elements.some((value, index) => value !== matrix[index])) moved.push(body);
+      body.applyWorldMatrix(matrix);
     }
     offset += 16;
   }
   for (const change of changes.removed) state.bodies.get(bodyKey(change.handle, change.generation))?.hideForDispose();
+  return moved;
 }
 
 function purgeChanged(state: Runtime, changes: ChangeSet): void {

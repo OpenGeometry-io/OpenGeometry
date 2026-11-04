@@ -38,13 +38,16 @@ export type LodState = {
   temporaries: TemporaryTarget[];
   stale: boolean;
   evaluated?: PassInputs;
+  drawn: Set<Body>;
+  walked: WeakMap<Body, number>;
   refresh: () => void;
 };
 
 export function createLodState(refresh: () => void): LodState {
   return {
     shapes: new Map(), camera: new Float64Array(33), frames: new WeakMap(), bufferSize: new THREE.Vector2(),
-    initialised: false, lastMotion: -Infinity, lastSchedule: -Infinity, temporaries: [], stale: true, refresh,
+    initialised: false, lastMotion: -Infinity, lastSchedule: -Infinity, temporaries: [], stale: true, drawn: new Set(),
+    walked: new WeakMap(), refresh,
   };
 }
 
