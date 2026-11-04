@@ -6,7 +6,7 @@ use crate::brep::{
 };
 use crate::intersection::ssi_result::SsiCurve;
 use crate::math::Interval;
-use crate::query::face_contains_uv;
+use crate::query::FaceTrim;
 
 struct BranchMembership<'a> {
     geometry: &'a GeometryStore,
@@ -14,6 +14,7 @@ struct BranchMembership<'a> {
     faces: [(FaceView<'a>, &'a Face); 2],
     boxes_only: bool,
     tolerance: f64,
+    trims: [FaceTrim; 2],
 }
 
 pub(super) fn clip_face_branch(
@@ -52,6 +53,10 @@ pub(super) fn clip_face_branch(
         faces,
         boxes_only,
         tolerance: accuracy.intersection,
+        trims: [
+            FaceTrim::new(faces[0].0.brep, faces[0].1)?,
+            FaceTrim::new(faces[1].0.brep, faces[1].1)?,
+        ],
     };
     let mut intervals: Vec<Interval> = Vec::new();
     for (segment, pair) in anchors.windows(2).enumerate() {
@@ -85,17 +90,12 @@ fn clipped_span(
     hi: f64,
 ) -> Result<Option<(f64, f64)>, GeometryError> {
     let BranchMembership {
-        geometry,
-        branch,
-        faces,
-        boxes_only,
-        tolerance,
+        geometry, branch, ..
     } = *membership;
     let middle = 0.5 * (lo + hi);
-    let lo_inside = branch_inside_faces(geometry, branch, faces, boxes_only, tolerance, lo)?;
-    let middle_inside =
-        branch_inside_faces(geometry, branch, faces, boxes_only, tolerance, middle)?;
-    let hi_inside = branch_inside_faces(geometry, branch, faces, boxes_only, tolerance, hi)?;
+    let lo_inside = branch_inside_faces(membership, lo)?;
+    let middle_inside = branch_inside_faces(membership, middle)?;
+    let hi_inside = branch_inside_faces(membership, hi)?;
     if !lo_inside && !middle_inside && !hi_inside {
         if matches!(
             geometry.curves[branch.curve as usize],
@@ -113,16 +113,16 @@ fn clipped_span(
     let start = if lo_inside {
         lo
     } else if middle_inside {
-        transition_parameter(geometry, branch, faces, boxes_only, lo, middle, tolerance)?
+        transition_parameter(membership, lo, middle)?
     } else {
-        transition_parameter(geometry, branch, faces, boxes_only, middle, hi, tolerance)?
+        transition_parameter(membership, middle, hi)?
     };
     let end = if hi_inside {
         hi
     } else if middle_inside {
-        transition_parameter(geometry, branch, faces, boxes_only, hi, middle, tolerance)?
+        transition_parameter(membership, hi, middle)?
     } else {
-        transition_parameter(geometry, branch, faces, boxes_only, middle, lo, tolerance)?
+        transition_parameter(membership, middle, lo)?
     };
     let (start, end) = if start <= end {
         (start, end)
@@ -147,7 +147,7 @@ fn span_ends_on_boundary(
                 .geometry
                 .pcurve_at(membership.branch.pcurves[side], parameter)?;
             let (view, face) = membership.faces[side];
-            touching &= face_contains_uv(view.brep, face, uv)? != Some(false);
+            touching &= membership.trims[side].contains(view.brep, face, uv)? != Some(false);
         }
         if touching {
             return Ok(true);
@@ -157,25 +157,24 @@ fn span_ends_on_boundary(
 }
 
 fn branch_inside_faces(
-    geometry: &GeometryStore,
-    branch: &SsiCurve,
-    faces: [(FaceView<'_>, &Face); 2],
-    boxes_only: bool,
-    tolerance: f64,
+    membership: &BranchMembership,
     parameter: f64,
 ) -> Result<bool, GeometryError> {
+    let BranchMembership {
+        geometry,
+        branch,
+        faces,
+        boxes_only,
+        tolerance,
+        ..
+    } = *membership;
     for side in 0..2 {
         let uv = geometry.pcurve_at(branch.pcurves[side], parameter)?;
+        let (view, face) = faces[side];
         let inside = if boxes_only {
-            uv_in_bounds(
-                geometry,
-                side as u32,
-                faces[side].1.trim.uv_bounds,
-                uv,
-                tolerance,
-            )?
+            uv_in_bounds(geometry, side as u32, face.trim.uv_bounds, uv, tolerance)?
         } else {
-            face_contains_uv(faces[side].0.brep, faces[side].1, uv)? == Some(true)
+            membership.trims[side].contains(view.brep, face, uv)? == Some(true)
         };
         if !inside {
             return Ok(false);
@@ -214,9 +213,8 @@ fn span_clears_boxes(
     let BranchMembership {
         geometry,
         branch,
-        faces,
-        boxes_only,
         tolerance,
+        ..
     } = *membership;
     let CurveGeometry::Intersection { definition } = geometry.curves[branch.curve as usize] else {
         return Ok(false);
@@ -234,9 +232,7 @@ fn span_clears_boxes(
             continue;
         }
         let middle = 0.5 * (lo + hi);
-        if depth == 0
-            || branch_inside_faces(geometry, branch, faces, boxes_only, tolerance, middle)?
-        {
+        if depth == 0 || branch_inside_faces(membership, middle)? {
             return Ok(false);
         }
         spans.push((lo, middle, depth - 1));
@@ -319,17 +315,13 @@ fn box_may_overlap(periods: [Option<f64>; 2], tube: [Interval; 2], face_bounds: 
 }
 
 fn transition_parameter(
-    geometry: &GeometryStore,
-    branch: &SsiCurve,
-    faces: [(FaceView<'_>, &Face); 2],
-    boxes_only: bool,
+    membership: &BranchMembership,
     mut outside: f64,
     mut inside: f64,
-    tolerance: f64,
 ) -> Result<f64, GeometryError> {
     for _ in 0..64 {
         let middle = 0.5 * (outside + inside);
-        if branch_inside_faces(geometry, branch, faces, boxes_only, tolerance, middle)? {
+        if branch_inside_faces(membership, middle)? {
             inside = middle;
         } else {
             outside = middle;

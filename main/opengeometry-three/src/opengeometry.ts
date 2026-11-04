@@ -48,6 +48,8 @@ export class OpenGeometry {
     overrideChanged(runtime());
   }
 
+  static releaseIdleGeometry(): { records: number; bytes: number } { return runtime().records.releaseIdle(); }
+
   static setCameraMotion(moving: boolean): void {
     const state = runtime();
     if (moving) motionHint(state, Date.now());

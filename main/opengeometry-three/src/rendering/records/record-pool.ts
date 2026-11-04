@@ -64,6 +64,13 @@ export class RecordPool {
     }
   }
 
+  releaseIdle(): { records: number; bytes: number } {
+    const idle = [...this.idle];
+    const bytes = this.idleBytes;
+    for (const record of idle) this.drop(record);
+    return { records: idle.length, bytes };
+  }
+
   placeholder(shapeId: string, revision: number, bounds: () => Bounds | null): THREE.BufferGeometry {
     const key = `${shapeId}@${String(revision)}`;
     let entry = this.placeholders.get(key);

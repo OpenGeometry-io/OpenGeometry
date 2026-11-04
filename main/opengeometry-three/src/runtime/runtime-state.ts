@@ -1,4 +1,5 @@
 import type { Body } from '../bodies/body';
+import type { Bounds } from '../dto/bounds';
 import type { Events, Listener } from '../dto/events';
 import { OGError } from '../errors';
 import type { OGWorldGraph } from '../kernel/kernel-loader';
@@ -29,6 +30,7 @@ export type Runtime = {
   pending: Map<string, Promise<void>>;
   generations: Map<string, number>;
   shapeBuckets: Map<string, { revision: number; floor: number; static: number; error?: unknown }>;
+  displayBounds: Map<Body, { revision: bigint; bounds: Bounds | null }>;
   lod: LodState;
   module: WebAssembly.Module;
   createOptions: CreateOptions;

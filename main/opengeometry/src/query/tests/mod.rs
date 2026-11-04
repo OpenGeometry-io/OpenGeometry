@@ -4,6 +4,8 @@ use crate::brep::{coarse_accuracy, unit, Accuracy, BrepEnvelope, Frame3};
 use crate::math::{add, cross, dot, scale, Point3};
 use crate::primitives;
 
+mod face_trim;
+
 const STEP: f64 = 10.0 * Accuracy::STANDARD.geometric;
 const SURFACE: [PointClassification; 3] = [
     PointClassification::Boundary,

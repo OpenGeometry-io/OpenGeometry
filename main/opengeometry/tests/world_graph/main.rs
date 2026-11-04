@@ -1,6 +1,7 @@
 mod bounds;
 mod brep_reads;
 mod contract;
+mod display_bounds;
 mod hierarchy;
 mod marks;
 mod measure;

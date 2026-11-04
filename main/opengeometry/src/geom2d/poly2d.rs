@@ -127,7 +127,7 @@ pub(super) fn segment_cross_t2(
     let r = Pt2::new(a2.x - a1.x, a2.z - a1.z);
     let s = Pt2::new(b2.x - b1.x, b2.z - b1.z);
     let denom = cross2(r, s);
-    if denom.abs() < eps {
+    if denom.abs() <= eps * r.x.hypot(r.z).min(s.x.hypot(s.z)) {
         return None;
     }
     let qp = Pt2::new(b1.x - a1.x, b1.z - a1.z);
