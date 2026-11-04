@@ -145,7 +145,7 @@ test('a graph change between two passes is applied before the next pass installs
       return Reflect.apply(Object.getPrototypeOf(edited).install, edited, [record]);
     };
     scene.updateMatrixWorld(true);
-    delete edited.install;
+    Reflect.deleteProperty(edited, 'install');
     assert.equal(flushCount(), flushes + 1);
     assert.equal(installs[0]?.flushes, flushes + 1);
     assert.equal(installs[0]?.revision, installs[0]?.current);

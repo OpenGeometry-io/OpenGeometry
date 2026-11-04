@@ -40,7 +40,7 @@ async function frame(scene, camera) {
 async function hostFrame(scene, camera) {
   scene.updateMatrixWorld(true);
   RENDERER.info.render.frame++;
-  OpenGeometry.observeCamera(RENDERER, camera);
+  Reflect.apply(OpenGeometry.observeCamera, OpenGeometry, [RENDERER, camera]);
   await Promise.resolve();
 }
 
@@ -359,10 +359,10 @@ test('a host call with no body hooks moves the LOD target', async () => {
 test('a new runtime observes a frame its reset predecessor already saw', async () => {
   await fresh();
   const renderer = countingRenderer();
-  OpenGeometry.observeCamera(renderer, ortho(P));
+  Reflect.apply(OpenGeometry.observeCamera, OpenGeometry, [renderer, ortho(P)]);
   OpenGeometry.reset();
   assert.equal(TESTING.runtime().lod.lastSeen, undefined);
-  OpenGeometry.observeCamera(renderer, ortho(P));
+  Reflect.apply(OpenGeometry.observeCamera, OpenGeometry, [renderer, ortho(P)]);
   assert.equal(renderer.reads, 2);
   assert.notEqual(TESTING.runtime().lod.lastSeen, undefined);
 });

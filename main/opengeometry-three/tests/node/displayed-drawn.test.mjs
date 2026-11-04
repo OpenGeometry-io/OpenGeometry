@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import * as THREE from 'three';
 import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, OG_TRANSFORM_TRANSLATE } from '../../../dist/index.js';
 import { graph, runtime } from '../../../dist/testing.js';
-import { boot, cuboid, listen, nextTask } from './support.mjs';
+import { boot, cuboid, failsWith, listen, nextTask } from './support.mjs';
 
 const RENDERER = { info: { render: { frame: 0 } }, getDrawingBufferSize: (target) => target.set(1000, 1000) };
 const CAMERA = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
@@ -103,10 +103,10 @@ test('markDisplayed rejects what flush({ bodies }) rejects and skips a hidden bo
   hidden.visible = false;
   disposed.dispose();
   try {
-    const invalid = (error) => error?.code === 'InvalidParameter';
-    assert.throws(() => OpenGeometry.markDisplayed(hidden), invalid);
-    assert.throws(() => OpenGeometry.markDisplayed([new THREE.Mesh()]), invalid);
-    assert.throws(() => OpenGeometry.markDisplayed([disposed]), (error) => error?.code === 'Disposed');
+    const invalid = failsWith('InvalidParameter');
+    assert.throws(() => Reflect.apply(OpenGeometry.markDisplayed, OpenGeometry, [hidden]), invalid);
+    assert.throws(() => Reflect.apply(OpenGeometry.markDisplayed, OpenGeometry, [[new THREE.Mesh()]]), invalid);
+    assert.throws(() => OpenGeometry.markDisplayed([disposed]), failsWith('Disposed'));
     OpenGeometry.markDisplayed([hidden]);
     assert.equal(runtime().displayed.has(hidden), false);
     await nextTask();
