@@ -8,12 +8,10 @@ import type { Body } from '../../bodies/body';
 import { emit } from '../../runtime/event-bus';
 import { bodyKey, currentRuntime, reindexShape, runtime, type Runtime } from '../../runtime/runtime-state';
 import { decodeChangeSet } from '../../world-graph/codec';
+import { displayedBodies, isDisplayed, stampDisplayed } from '../lod/displayed';
 import { shown } from '../lod/host-drawn';
 import { queueGrouped } from '../lod/host-groups';
-import {
-  clearError, displayedBodies, isDisplayed, markFailed, recordError, retryBucket, shapePriority, stampDisplayed,
-  wantedKey,
-} from '../lod/lod-controller';
+import { clearError, markFailed, recordError, retryBucket, shapePriority, wantedKey } from '../lod/lod-controller';
 import type { TessellationRequest } from '../provider';
 import { GeometryRecord } from '../records/geometry-record';
 import { validateDisplayBuffers } from '../records/validate-display-buffers';

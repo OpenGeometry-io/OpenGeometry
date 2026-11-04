@@ -1,6 +1,7 @@
 import { OGError } from '../errors';
 import type { Body } from '../bodies/body';
-import { forceNextBucket, isDisplayed } from '../rendering/lod/lod-controller';
+import { isDisplayed } from '../rendering/lod/displayed';
+import { forceNextBucket } from '../rendering/lod/lod-controller';
 import { WorkerBackend, type WorkerSend } from '../rendering/worker-backend';
 import { runtime } from '../runtime/runtime-state';
 

@@ -6,15 +6,15 @@ import { currentRuntime, type Runtime } from '../../runtime/runtime-state';
 import { finestLocal, localTarget, shapeBuckets, type ShapeBuckets } from './body-size';
 import { deflectionBucket, wantedBucket } from './deflection';
 import { displayBounds } from './display-bounds';
-import { groupDisplayed, groupedBodies } from './host-groups';
-import { shown } from './host-drawn';
+import { displayedBodies, isDisplayed, stampedCount } from './displayed';
+import { groupsKey, queueShapes } from './host-groups';
 import { worldUnitsPerPixel } from './screen-metrics';
 
 type Tiers = { temporary: number | undefined; own: number | undefined; global: number | undefined };
 type SeenCamera = { camera: THREE.Camera; height: number };
 type ShapeTarget = { target: number; body: Body };
 type TemporaryTarget = { deflection: number };
-type PassInputs = { revision: bigint; flushed: bigint; moving: boolean; displayed: number };
+type PassInputs = { revision: bigint; flushed: bigint; moving: boolean; displayed: number; groups: number[] };
 
 type ShapeLod = {
   shapeId: string;
@@ -51,26 +51,6 @@ export function createLodState(refresh: () => void): LodState {
     initialised: false, lastMotion: -Infinity, lastSchedule: -Infinity, temporaries: [], stale: true, drawn: new Set(),
     walked: new WeakMap(), refresh,
   };
-}
-
-export function isDisplayed(state: Runtime, body: Body): boolean {
-  if (!shown(state, body)) return false;
-  return (state.displayed.get(body) ?? -Infinity) >= state.pass - 1 || groupDisplayed(state, body);
-}
-
-export function displayedBodies(state: Runtime): Body[] {
-  return [...new Set([...state.displayed.keys(), ...groupedBodies(state)])].filter((body) => isDisplayed(state, body));
-}
-
-export function stampDisplayed(state: Runtime, body: Body): void {
-  if (!isDisplayed(state, body)) wakeDisplayed(state, body);
-  state.displayed.set(body, state.pass);
-}
-
-export function wakeDisplayed(state: Runtime, body: Body): void {
-  const shapeId = body.lastInfo.shapeId;
-  state.lod.stale = true;
-  if (shapeId) delete state.lod.shapes.get(shapeId)?.overrides;
 }
 
 export function observe(state: Runtime, camera: THREE.Camera, height: number, now: number): void {
@@ -116,10 +96,11 @@ export function evaluatePass(state: Runtime, now: number, forced: boolean): bool
   if (!seen || state.poisoned || (!forced && now - lod.lastSchedule < EVALUATION_INTERVAL_MS)) return false;
   lod.lastSchedule = now;
   const moving = !forced && now - lod.lastMotion < MOTION_WINDOW_MS;
-  const bodies = displayedBodies(state);
   const revision = call('OpenGeometry.flush', () => state.graph.revision());
-  const inputs = { revision, flushed: state.revision, moving, displayed: bodies.length };
+  const groups = [state.groups.revision, groupsKey(state)];
+  const inputs = { revision, flushed: state.revision, moving, displayed: stampedCount(state), groups };
   if (!forced && !stalePass(lod, inputs)) return false;
+  const bodies = displayedBodies(state);
   lod.stale = false;
   lod.evaluated = inputs;
   let changed = false;
@@ -139,7 +120,8 @@ export function evaluatePass(state: Runtime, now: number, forced: boolean): bool
 function stalePass(lod: LodState, inputs: PassInputs): boolean {
   const last = lod.evaluated;
   return lod.stale || !last || last.revision !== inputs.revision || last.flushed !== inputs.flushed
-    || last.moving !== inputs.moving || last.displayed !== inputs.displayed;
+    || last.moving !== inputs.moving || last.displayed !== inputs.displayed
+    || last.groups.some((value, index) => value !== inputs.groups[index]);
 }
 
 function shapeTargets(
@@ -220,6 +202,7 @@ function failedKey(revision: number, bucket: number): string {
 
 export function overrideChanged(state: Runtime, shapeId?: string): void {
   state.lod.stale = true;
+  queueShapes(state, shapeId);
   const entries = shapeId === undefined ? [...state.lod.shapes.values()] : [state.lod.shapes.get(shapeId)];
   for (const entry of entries) {
     if (!entry) continue;
@@ -243,6 +226,7 @@ export function popTemporaryTarget(state: Runtime, token: TemporaryTarget): void
 
 function clearAllMarks(state: Runtime): void {
   state.lod.stale = true;
+  queueShapes(state);
   for (const entry of state.lod.shapes.values()) clearMarks(entry);
 }
 
@@ -291,4 +275,5 @@ export function capturedError(state: Runtime, body: Body): unknown {
 export function forceNextBucket(state: Runtime, shapeId: string, bucket: number): void {
   shapeLod(state, shapeId).forced = bucket;
   state.lod.stale = true;
+  queueShapes(state, shapeId);
 }

@@ -11,12 +11,13 @@ function members(state: Runtime, bodies: readonly Body[], label: string): Body[]
 
 export class HostGroup {
   private readonly state: Runtime = runtime();
-  private readonly group: GroupState = { pass: -Infinity, members: [] };
+  private readonly group: GroupState = { pass: -Infinity, members: new Set() };
   private disposed = false;
 
   constructor(bodies: readonly Body[]) {
     setMembers(this.state, this.group, members(this.state, bodies, 'OpenGeometry.hostGroup'));
     this.state.groups.live.add(this.group);
+    this.state.groups.dropped.register(this, this.group, this);
   }
 
   drawn(): void {
@@ -35,6 +36,7 @@ export class HostGroup {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.state.groups.dropped.unregister(this);
     if (currentRuntime() === this.state) dropGroup(this.state, this.group);
   }
 }

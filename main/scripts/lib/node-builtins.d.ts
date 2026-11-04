@@ -92,6 +92,14 @@ declare module 'node:perf_hooks' {
   export const performance: { now(): number };
 }
 
+declare module 'node:v8' {
+  export function setFlagsFromString(flags: string): void;
+}
+
+declare module 'node:vm' {
+  export function runInNewContext(code: string): unknown;
+}
+
 declare const process: {
   argv: string[];
   arch: string;

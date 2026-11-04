@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import * as THREE from 'three';
 import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID } from '../../../dist/index.js';
 import { displayed, runtime } from '../../../dist/testing.js';
@@ -8,12 +10,28 @@ import { boot, cuboid, failsWith, nextTask } from './support.mjs';
 const RENDERER = { info: { render: { frame: 0 } }, getDrawingBufferSize: (target) => target.set(1000, 1000) };
 const CAMERA = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
 const BODY = Object.getPrototypeOf(Solid.prototype);
+setFlagsFromString('--expose-gc');
+const COLLECT = runInNewContext('gc');
 
 async function fresh() {
   await boot();
   OpenGeometry.reset();
   CAMERA.position.set(0, 0, 10);
   CAMERA.updateMatrixWorld();
+}
+
+function ortho(target) {
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+  camera.position.set(0, 0, 10);
+  camera.zoom = 1 / (1000 * target);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
+  return camera;
+}
+
+function observe(camera) {
+  RENDERER.info.render.frame++;
+  Reflect.apply(OpenGeometry.observeCamera, OpenGeometry, [RENDERER, camera]);
 }
 
 function current(body) {
@@ -56,7 +74,7 @@ function asyncProvider() {
 }
 
 function memberIds() {
-  return [...runtime().groups.live].flatMap((group) => group.members.map((body) => body.ogId));
+  return [...runtime().groups.live].flatMap((group) => [...group.members].map((body) => body.ogId));
 }
 
 async function steadyPassWork(size) {
@@ -64,10 +82,14 @@ async function steadyPassWork(size) {
   const bodies = Array.from({ length: size }, (_, index) => cuboid(`work-${String(size)}-${String(index)}`));
   const group = OpenGeometry.hostGroup(bodies);
   try {
-    await drawFrame([group]);
+    for (let index = 0; index < 2; index++) {
+      observe(CAMERA);
+      await drawFrame([group]);
+    }
     assert.equal(bodies.every((body) => displayed(body) && current(body)), true, 'every member is drawn');
     const state = runtime();
-    state.lod.lastSchedule = Date.now();
+    state.lod.lastSchedule = 0;
+    observe(CAMERA);
     const logs = [counted(state.groups.of, 'get'), counted(state.records, 'get'), counted(state.bodies, 'get')];
     let installs = 0;
     try {
@@ -76,7 +98,8 @@ async function steadyPassWork(size) {
     } finally {
       for (const log of logs) log.stop();
     }
-    return { lookups: logs.map((log) => log.calls), installs, active: state.renderPassActive };
+    const evaluated = state.lod.lastSchedule > 0;
+    return { lookups: logs.map((log) => log.calls), installs, active: state.renderPassActive, evaluated };
   } finally {
     OpenGeometry.reset();
   }
@@ -89,6 +112,7 @@ test('drawn() displays every member of a 1,000-body group and a later pass does 
   assert.deepEqual(large.lookups, [0, 0, 0]);
   assert.equal(large.installs, 0);
   assert.equal(large.active, false, 'the pass ends');
+  assert.equal(large.evaluated, true, 'the level-of-detail evaluation runs in the measured pass');
 });
 
 test('a group not drawn for two passes leaves its members undisplayed and they get no swap', async () => {
@@ -263,6 +287,83 @@ test('a host-drawn member of a drawn group keeps its own visibility', async () =
     assert.equal(current(hosted), true);
     assert.equal(displayed(hidden), false);
     assert.equal(hidden.record, undefined);
+  } finally {
+    OpenGeometry.reset();
+  }
+});
+
+test('a member of a drawn group returns to its own bucket after settled with a deflection', async () => {
+  await fresh();
+  const camera = ortho(2 ** -10);
+  const [stamped, member] = [cuboid('settle-stamped'), cuboid('settle-member')];
+  const group = OpenGeometry.hostGroup([member]);
+  const frames = async () => {
+    for (let index = 0; index < 4; index++) {
+      runtime().lod.lastSchedule = 0;
+      observe(camera);
+      OpenGeometry.markDisplayed([stamped]);
+      await drawFrame([group]);
+    }
+  };
+  try {
+    await frames();
+    const resting = stamped.record?.bucket;
+    assert.equal(member.record?.bucket, resting);
+    await OpenGeometry.settled({ deflection: 0.05 });
+    assert.notEqual(member.record?.bucket, resting, 'settled meshes at its deflection');
+    await frames();
+    assert.equal(stamped.record?.bucket, resting);
+    assert.equal(member.record?.bucket, resting);
+  } finally {
+    OpenGeometry.reset();
+  }
+});
+
+test('a host-drawn member shown again while its group is drawn gets its geometry', async () => {
+  await fresh();
+  const member = cuboid('shown-later');
+  member.visible = false;
+  OpenGeometry.setHostDrawn([member], true);
+  const group = OpenGeometry.hostGroup([member]);
+  try {
+    await drawFrame([group]);
+    await drawFrame([group]);
+    assert.equal(member.record, undefined);
+    OpenGeometry.setHostDrawn([member], false);
+    member.visible = true;
+    OpenGeometry.setHostDrawn([member], true);
+    await drawFrame([group]);
+    assert.equal(displayed(member), true);
+    assert.equal(current(member), true);
+  } finally {
+    OpenGeometry.reset();
+  }
+});
+
+test('a disposed member leaves an undrawn group at once', async () => {
+  await fresh();
+  const [kept, gone] = [cuboid('undrawn-kept'), cuboid('undrawn-gone', 2)];
+  OpenGeometry.hostGroup([kept, gone]);
+  try {
+    gone.dispose();
+    assert.deepEqual(memberIds(), ['undrawn-kept']);
+  } finally {
+    OpenGeometry.reset();
+  }
+});
+
+test('a host group dropped without dispose is released by the garbage collector', async () => {
+  await fresh();
+  const body = cuboid('dropped-group');
+  (() => { OpenGeometry.hostGroup([body]).drawn(); })();
+  try {
+    await nextTask();
+    for (let index = 0; index < 20 && runtime().groups.live.size > 0; index++) {
+      Reflect.apply(Object(COLLECT), undefined, []);
+      await nextTask();
+    }
+    assert.equal(runtime().groups.live.size, 0);
+    assert.equal(displayed(body), false);
   } finally {
     OpenGeometry.reset();
   }

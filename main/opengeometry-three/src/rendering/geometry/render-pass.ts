@@ -2,8 +2,9 @@ import type { Body } from '../../bodies/body';
 import { OGError } from '../../errors';
 import { currentRuntime, runtime, type Runtime } from '../../runtime/runtime-state';
 import { handToHost, shown } from '../lod/host-drawn';
+import { displayedBodies, isDisplayed, stampDisplayed, wakeDisplayed } from '../lod/displayed';
 import { takeWaiting } from '../lod/host-groups';
-import { displayedBodies, evaluatePass, isDisplayed, stampDisplayed, wakeDisplayed } from '../lod/lod-controller';
+import { evaluatePass } from '../lod/lod-controller';
 import { checkedBodies, ensureGeometry, flush } from './geometry-scheduler';
 
 export function noteDisplayed(body: Body): void {

@@ -1,7 +1,8 @@
 import { OGError } from '../../errors';
 import { runtime, type Runtime } from '../../runtime/runtime-state';
+import { displayedBodies } from '../lod/displayed';
 import {
-  capturedError, displayedBodies, popTemporaryTarget, pushTemporaryTarget, settleNow, wantedKey,
+  capturedError, popTemporaryTarget, pushTemporaryTarget, settleNow, wantedKey,
 } from '../lod/lod-controller';
 import { flush } from './geometry-scheduler';
 import { refreshDisplayed } from './render-pass';

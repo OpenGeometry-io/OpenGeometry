@@ -11,7 +11,8 @@ import { flush, flushForDispose, notifyBody, wanted } from '../rendering/geometr
 import { noteDisplayed, noteDrawn } from '../rendering/geometry/render-pass';
 import { observeCamera } from '../rendering/lod/camera-observer';
 import { shown } from '../rendering/lod/host-drawn';
-import { isDisplayed, overrideChanged } from '../rendering/lod/lod-controller';
+import { isDisplayed } from '../rendering/lod/displayed';
+import { overrideChanged } from '../rendering/lod/lod-controller';
 import {
   lineMaterial, releaseLine, releaseSurface, surfaceMaterial, type MaterialAppearance,
 } from '../rendering/materials/material-pool';
