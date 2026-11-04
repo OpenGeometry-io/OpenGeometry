@@ -25,6 +25,7 @@ export type Runtime = {
   revision: bigint;
   readyShapes: Set<string>;
   renderPassActive: boolean;
+  graphMoved: boolean;
   pass: number;
   displayed: Map<Body, number>;
   pending: Map<string, Promise<void>>;

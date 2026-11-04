@@ -6,7 +6,7 @@ import { encode } from '../world-graph/codec';
 import { creation, node, worldGraph } from '../world-graph/world-graph-client';
 import type { Body } from './body';
 import {
-  addChild, checkNode, getBounds, getChildren, getParent, getPlacement, getWorldPlacement, removeChild,
+  addChild, checkNode, getBounds, getChildren, getParent, getPlacement, getWorldPlacement, removeChild, transformNode,
 } from './node-methods';
 
 export class SystemAssembly {
@@ -28,7 +28,7 @@ export class SystemAssembly {
 
   transform(kind: string, params: Record<string, unknown>): void {
     this.check('SystemAssembly.transform');
-    call('SystemAssembly.transform', () => worldGraph().transform(this.ogId, encode({ kind, ...params })));
+    transformNode('SystemAssembly', this.ogId, kind, params);
   }
 
   getPlacement(): Placement {

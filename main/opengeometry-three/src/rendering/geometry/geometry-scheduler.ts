@@ -56,6 +56,7 @@ export function flushForDispose(): void {
 
 function applyFlush(state: Runtime): void {
   const revision = call('OpenGeometry.flush', () => state.graph.revision());
+  state.graphMoved = false;
   if (!state.flushing && (revision !== state.revision || (!state.renderPassActive && state.readyShapes.size > 0))) {
     state.flushing = true;
     try {

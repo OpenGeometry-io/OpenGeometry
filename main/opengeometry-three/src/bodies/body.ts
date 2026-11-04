@@ -24,7 +24,7 @@ import { register, unregister } from './body-registry';
 import { DisplayClone } from './display-clone';
 import {
   addChild, checkNode, classifyPoint, faceNormalAt, getBounds, getBrep, getChildren, getInstanceCount, getParent,
-  getPlacement, getWorldBrep, getWorldPlacement, localBounds, measure, mirror, removeChild, validity,
+  getPlacement, getWorldBrep, getWorldPlacement, localBounds, measure, mirror, removeChild, transformNode, validity,
 } from './node-methods';
 import type { PointClassification } from './node-methods';
 import type { SystemAssembly } from './system-assembly';
@@ -157,7 +157,7 @@ export abstract class Body extends THREE.Group {
 
   transform(kind: string, params: Record<string, unknown>): void {
     this.check(`${this.bodyType}.transform`);
-    call(`${this.bodyType}.transform`, () => worldGraph().transform(this.ogId, encode({ kind, ...params })));
+    transformNode(this.bodyType, this.ogId, kind, params);
   }
 
   getPlacement(): Placement {

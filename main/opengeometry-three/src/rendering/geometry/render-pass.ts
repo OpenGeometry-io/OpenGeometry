@@ -5,12 +5,13 @@ import { ensureGeometry, flush } from './geometry-scheduler';
 
 export function noteDisplayed(body: Body): void {
   const state = runtime();
-  if (!state.renderPassActive) {
+  const starting = !state.renderPassActive;
+  if (starting) {
     state.renderPassActive = true;
     queueMicrotask(() => { endPass(state); });
   }
   stampDisplayed(state, body);
-  flush();
+  if (starting || state.graphMoved) flush();
   ensureGeometry(body);
 }
 
