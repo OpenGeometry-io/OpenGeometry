@@ -15,5 +15,6 @@ pub(super) use offset::{
     offset_ring_variable, oriented_ring, pinched, OffsetError, OffsetHole, OffsetOptions,
 };
 pub(super) use poly2d::{
-    point_in_ring2, segments_cross2, self_intersects2, signed_area2, winding_number2, Pt2,
+    crossing_margin, nearby_boxes, point_in_ring2, segments_cross2, self_intersects2, signed_area2,
+    winding_number2, Nearby, Pt2,
 };

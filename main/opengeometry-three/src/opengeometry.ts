@@ -14,7 +14,7 @@ import { exportIfcBody } from './export/ifc-body';
 import { createMark, markStats, type OGMark } from './marks/og-mark';
 import { transaction } from './marks/transaction';
 import { offsetPolyline, offsetPolylineRegions, offsetRingVariable } from './operations/offsets';
-import { booleanCurvedRegions2D, booleanRegions2D } from './operations/regions';
+import { booleanCurvedRegions2D, booleanRegions2D, insetCurvedRegion2D } from './operations/regions';
 import { resolveHit } from './picking/resolve-hit';
 import { flush } from './rendering/geometry/geometry-scheduler';
 import { settled } from './rendering/geometry/settle';
@@ -82,6 +82,10 @@ export class OpenGeometry {
     b: readonly CurvedRegion2D[],
     operation: RegionOperation,
   ): CurvedRegion2D[] { return booleanCurvedRegions2D(a, b, operation); }
+
+  static insetCurvedRegion2D(region: CurvedRegion2D, distance: number): CurvedRegion2D[] {
+    return insetCurvedRegion2D(region, distance);
+  }
 
   static offsetRingVariable(
     ring: readonly number[] | Float64Array,
