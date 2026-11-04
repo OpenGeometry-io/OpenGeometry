@@ -12,6 +12,12 @@ It is written for people and for coding assistants alike: each section says what
 4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
 5. Finish with its "Check your result" steps.
 
+## Unreleased
+
+### Different behaviour
+
+- A body's `surface` and `outline` meshes are static: their `matrixAutoUpdate` is `false`, so a world matrix update no longer recomputes their local matrix. Code that writes their `position`, `rotation`, `quaternion` or `scale` must call `updateMatrix()` on that mesh after the write.
+
 ## 2.5 to 3.0
 
 2.5 was not published. From 2.0, follow 2.0 to 2.5, then 2.5 to 3.0.

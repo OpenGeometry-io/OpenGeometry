@@ -74,10 +74,12 @@ export abstract class Body extends THREE.Group {
     const surfaceStyle = surfaceMaterial(this.appearance);
     this.surfaceKey = surfaceStyle.key;
     this.surface = new THREE.Mesh(placeholder ?? new THREE.BufferGeometry(), surfaceStyle.material);
+    this.surface.matrixAutoUpdate = false;
     this.surface.visible = Boolean(placeholder) && bodyType !== 'Wire';
     const outlineStyle = lineMaterial(lineStyle(bodyType, this.appearance));
     this.lineKey = outlineStyle.key;
     this.outline = new THREE.LineSegments(placeholder ?? new THREE.BufferGeometry(), outlineStyle.material);
+    this.outline.matrixAutoUpdate = false;
     this.outline.visible = Boolean(placeholder) && this.appearance.outline;
     if (!this.appearance.pickOutline) this.outline.raycast = THREE.Object3D.prototype.raycast.bind(this.outline);
     this.add(this.surface, this.outline);
@@ -121,6 +123,8 @@ export abstract class Body extends THREE.Group {
     this.outline.geometry = record.outline;
     this.surface.position.copy(record.origin);
     this.outline.position.copy(record.origin);
+    this.surface.updateMatrix();
+    this.outline.updateMatrix();
     this.surface.updateMatrixWorld();
     this.outline.updateMatrixWorld();
     this.surface.visible = this.bodyType !== 'Wire';
