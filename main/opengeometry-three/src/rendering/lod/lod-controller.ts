@@ -6,6 +6,7 @@ import { currentRuntime, type Runtime } from '../../runtime/runtime-state';
 import { finestLocal, localTarget, shapeBuckets, type ShapeBuckets } from './body-size';
 import { deflectionBucket, wantedBucket } from './deflection';
 import { displayBounds } from './display-bounds';
+import { groupDisplayed, groupedBodies } from './host-groups';
 import { shown } from './host-drawn';
 import { worldUnitsPerPixel } from './screen-metrics';
 
@@ -53,19 +54,23 @@ export function createLodState(refresh: () => void): LodState {
 }
 
 export function isDisplayed(state: Runtime, body: Body): boolean {
-  return shown(state, body) && (state.displayed.get(body) ?? -Infinity) >= state.pass - 1;
+  if (!shown(state, body)) return false;
+  return (state.displayed.get(body) ?? -Infinity) >= state.pass - 1 || groupDisplayed(state, body);
 }
 
 export function displayedBodies(state: Runtime): Body[] {
-  return [...state.displayed.keys()].filter((body) => isDisplayed(state, body));
+  return [...new Set([...state.displayed.keys(), ...groupedBodies(state)])].filter((body) => isDisplayed(state, body));
 }
 
 export function stampDisplayed(state: Runtime, body: Body): void {
-  const shapeId = body.lastInfo.shapeId;
-  const anew = !isDisplayed(state, body);
-  if (anew) state.lod.stale = true;
-  if (shapeId && anew) delete state.lod.shapes.get(shapeId)?.overrides;
+  if (!isDisplayed(state, body)) wakeDisplayed(state, body);
   state.displayed.set(body, state.pass);
+}
+
+export function wakeDisplayed(state: Runtime, body: Body): void {
+  const shapeId = body.lastInfo.shapeId;
+  state.lod.stale = true;
+  if (shapeId) delete state.lod.shapes.get(shapeId)?.overrides;
 }
 
 export function observe(state: Runtime, camera: THREE.Camera, height: number, now: number): void {

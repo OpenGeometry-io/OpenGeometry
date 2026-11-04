@@ -9,6 +9,7 @@ import { emit } from '../../runtime/event-bus';
 import { bodyKey, currentRuntime, reindexShape, runtime, type Runtime } from '../../runtime/runtime-state';
 import { decodeChangeSet } from '../../world-graph/codec';
 import { shown } from '../lod/host-drawn';
+import { queueGrouped } from '../lod/host-groups';
 import {
   clearError, displayedBodies, isDisplayed, markFailed, recordError, retryBucket, shapePriority, stampDisplayed,
   wantedKey,
@@ -113,6 +114,7 @@ function applyChanges(state: Runtime, changes: ChangeSet, matrices: Float64Array
       const matrix = matrices.subarray(offset, offset + 16);
       if (body.matrixWorld.elements.some((value, index) => value !== matrix[index])) moved.push(body);
       body.applyWorldMatrix(matrix);
+      queueGrouped(state, body);
     }
     offset += 16;
   }

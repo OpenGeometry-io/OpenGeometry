@@ -4,6 +4,7 @@ import { compileKernel, initKernel, OGWorldGraph } from '../kernel/kernel-loader
 import { ACCURACY } from '../limits';
 import { refreshDisplayed } from '../rendering/geometry/render-pass';
 import { InlineBackend } from '../rendering/inline-backend';
+import { createHostGroups } from '../rendering/lod/host-groups';
 import { createLodState } from '../rendering/lod/lod-controller';
 import { RecordPool } from '../rendering/records/record-pool';
 import { WorkerBackend } from '../rendering/worker-backend';
@@ -47,7 +48,7 @@ export function createRuntime(module: WebAssembly.Module, options: CreateOptions
     graph, provider, records: new RecordPool(), bodies: new Map(), pickTargets: new WeakMap(), byShape: new Map(),
     limbo: new Map(), listeners,
     revision: 0n, readyShapes: new Set(), renderPassActive: false, graphMoved: false, pass: 0, displayed: new Map(),
-    hostDrawn: new WeakMap(),
+    hostDrawn: new WeakMap(), groups: createHostGroups(),
     pending: new Map(), generations: new Map(), shapeBuckets: new Map(), displayBounds: new Map(),
     lod: createLodState(() => { refreshDisplayed(state); }), module, createOptions: options, poisoned: false,
     flushes: 0, marks: new Map(), flushing: false, surfacePool: new Map(), linePool: new Map(), epoch: nextEpoch(),

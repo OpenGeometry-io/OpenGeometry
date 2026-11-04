@@ -17,6 +17,7 @@ import { offsetPolyline, offsetPolylineRegions, offsetRingVariable } from './ope
 import { booleanCurvedRegions2D, booleanRegions2D, insetCurvedRegion2D } from './operations/regions';
 import { resolveHit } from './picking/resolve-hit';
 import { flush } from './rendering/geometry/geometry-scheduler';
+import { HostGroup } from './rendering/geometry/host-group';
 import { markDisplayed, setHostDrawn } from './rendering/geometry/render-pass';
 import { settled } from './rendering/geometry/settle';
 import { observeCamera } from './rendering/lod/camera-observer';
@@ -40,6 +41,7 @@ export class OpenGeometry {
   static flush(options: { geometry?: 'sync'; bodies?: readonly Body[] } = {}): void { flush(options); }
   static markDisplayed(bodies: readonly Body[]): void { markDisplayed(bodies); }
   static setHostDrawn(bodies: readonly Body[], hostDrawn: boolean): void { setHostDrawn(bodies, hostDrawn); }
+  static hostGroup(bodies: readonly Body[]): HostGroup { return new HostGroup(bodies); }
   static settled(options: { deflection?: number } = {}): Promise<{ failed: { ogId: string; error: unknown }[] }> {
     return settled(options);
   }

@@ -2,7 +2,8 @@ import type { Body } from '../../bodies/body';
 import { OGError } from '../../errors';
 import { currentRuntime, runtime, type Runtime } from '../../runtime/runtime-state';
 import { handToHost, shown } from '../lod/host-drawn';
-import { displayedBodies, evaluatePass, isDisplayed, stampDisplayed } from '../lod/lod-controller';
+import { takeWaiting } from '../lod/host-groups';
+import { displayedBodies, evaluatePass, isDisplayed, stampDisplayed, wakeDisplayed } from '../lod/lod-controller';
 import { checkedBodies, ensureGeometry, flush } from './geometry-scheduler';
 
 export function noteDisplayed(body: Body): void {
@@ -36,7 +37,7 @@ export function setHostDrawn(bodies: readonly Body[], hostDrawn: boolean): void 
   for (const body of checkedBodies(state, bodies, label, !hostDrawn)) handToHost(state, body, hostDrawn);
 }
 
-function beginPass(state: Runtime): boolean {
+export function beginPass(state: Runtime): boolean {
   if (state.renderPassActive) return false;
   state.renderPassActive = true;
   queueMicrotask(() => { endPass(state); });
@@ -45,7 +46,7 @@ function beginPass(state: Runtime): boolean {
 
 function endPass(state: Runtime): void {
   if (currentRuntime() !== state) return;
-  const drawn = [...state.lod.drawn];
+  const drawn = new Set(state.lod.drawn);
   state.lod.drawn.clear();
   try {
     installDrawn(state, drawn);
@@ -57,9 +58,15 @@ function endPass(state: Runtime): void {
   if (evaluatePass(state, Date.now(), false)) refreshDisplayed(state);
 }
 
-function installDrawn(state: Runtime, drawn: readonly Body[]): void {
-  if (drawn.length === 0) return;
+function installDrawn(state: Runtime, drawn: ReadonlySet<Body>): void {
+  const groups = state.groups;
+  if (drawn.size === 0 && !groups.drawn && groups.pending.size === 0 && groups.woken.size === 0) return;
   flush();
+  for (const body of takeWaiting(state)) {
+    if (drawn.has(body) || !isDisplayed(state, body)) continue;
+    wakeDisplayed(state, body);
+    ensureGeometry(body);
+  }
   for (const body of drawn) if (isDisplayed(state, body)) ensureGeometry(body);
 }
 

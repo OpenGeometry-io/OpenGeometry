@@ -4,6 +4,7 @@ import type { Events, Listener } from '../dto/events';
 import { OGError } from '../errors';
 import type { OGWorldGraph } from '../kernel/kernel-loader';
 import type { OGMark } from '../marks/og-mark';
+import type { HostGroups } from '../rendering/lod/host-groups';
 import type { LodState } from '../rendering/lod/lod-controller';
 import type { LineEntry, SurfaceEntry } from '../rendering/materials/material-pool';
 import type { TessellationProvider } from '../rendering/provider';
@@ -29,6 +30,7 @@ export type Runtime = {
   pass: number;
   displayed: Map<Body, number>;
   hostDrawn: WeakMap<Body, boolean>;
+  groups: HostGroups;
   pending: Map<string, Promise<void>>;
   generations: Map<string, number>;
   shapeBuckets: Map<string, { revision: number; floor: number; static: number; error?: unknown }>;
