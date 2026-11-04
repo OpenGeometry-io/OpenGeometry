@@ -1,3 +1,4 @@
+import { setShown } from '../rendering/lod/host-drawn';
 import { createRuntime } from './create-runtime';
 import { currentRuntime, setRuntime } from './runtime-state';
 
@@ -5,7 +6,7 @@ export function reset(): void {
   const state = currentRuntime();
   if (!state) return;
   for (const body of [...state.bodies.values()]) {
-    body.visible = false;
+    setShown(state, body, false);
     body.finalize();
   }
   state.provider.dispose();

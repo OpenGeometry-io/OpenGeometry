@@ -8,6 +8,7 @@ import type { Body } from '../../bodies/body';
 import { emit } from '../../runtime/event-bus';
 import { bodyKey, currentRuntime, reindexShape, runtime, type Runtime } from '../../runtime/runtime-state';
 import { decodeChangeSet } from '../../world-graph/codec';
+import { shown } from '../lod/host-drawn';
 import {
   clearError, displayedBodies, isDisplayed, markFailed, recordError, retryBucket, shapePriority, stampDisplayed,
   wantedKey,
@@ -26,7 +27,7 @@ export function flush(options: FlushOptions = {}): void {
   applyFlush(state);
   if (options.geometry !== 'sync') return;
   for (const body of given ?? displayedBodies(state)) {
-    if (given && (!body.visible || !body.lastInfo.shapeId || body.lastInfo.shapeRevision === null)) continue;
+    if (given && (!shown(state, body) || !body.lastInfo.shapeId || body.lastInfo.shapeRevision === null)) continue;
     if (given) stampDisplayed(state, body);
     ensureGeometry(body, true);
   }
@@ -39,19 +40,21 @@ function liveBodies(state: Runtime, bodies: readonly Body[], geometry: FlushOpti
   return checkedBodies(state, bodies, label);
 }
 
-export function checkedBodies(state: Runtime, bodies: readonly Body[], label: string): readonly Body[] {
+export function checkedBodies(
+  state: Runtime, bodies: readonly Body[], label: string, skipDisposed = false,
+): readonly Body[] {
   const list: unknown = bodies;
   if (!Array.isArray(list)) throw new OGError('InvalidParameter', label, 'bodies must be an array of bodies');
+  const live: Body[] = [];
   for (const body of bodies) {
     const item: unknown = body;
     if (!(item instanceof THREE.Object3D) || !('swapReadyRecord' in item)) {
       throw new OGError('InvalidParameter', label, 'bodies must hold only Wire, Sheet or Solid bodies');
     }
-    if (state.bodies.get(bodyKey(body.handle, body.generation)) !== body) {
-      throw new OGError('Disposed', label, `${body.ogId} is disposed`);
-    }
+    if (state.bodies.get(bodyKey(body.handle, body.generation)) === body) live.push(body);
+    else if (!skipDisposed) throw new OGError('Disposed', label, `${body.ogId} is disposed`);
   }
-  return bodies;
+  return live;
 }
 
 export function flushForDispose(): void {
@@ -150,7 +153,7 @@ export function ensureGeometry(body: Body, sync = false): void {
 
 function geometryTarget(state: Runtime, body: Body): GeometryTarget | undefined {
   const { shapeId, shapeRevision: revision } = body.lastInfo;
-  if (!shapeId || revision === null || !body.visible) return undefined;
+  if (!shapeId || revision === null || !shown(state, body)) return undefined;
   const bucket = wantedKey(state, body);
   if (bucket === undefined) return undefined;
   return { body, shapeId, revision, bucket, key: pendingKey(shapeId, revision, bucket) };
@@ -250,7 +253,7 @@ function receive(state: Runtime, target: GeometryTarget, buffers: DisplayBuffers
   clearError(state, shapeId, revision);
   if (state.renderPassActive) {
     for (const body of current) if (isDisplayed(state, body)) body.install(record);
-  } else if (target.body.visible && current.includes(target.body)) target.body.install(record);
+  } else if (shown(state, target.body) && current.includes(target.body)) target.body.install(record);
   const ogIds = holders.map((body) => body.ogId);
   emit('geometry', { shapeId, revision, bucket: buffers.bucket, ogIds, stats: { triangles: record.triangles } });
   if (!state.renderPassActive) flush();

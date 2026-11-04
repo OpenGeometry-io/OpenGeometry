@@ -1,5 +1,7 @@
 import type { Body } from '../../bodies/body';
+import { OGError } from '../../errors';
 import { currentRuntime, runtime, type Runtime } from '../../runtime/runtime-state';
+import { handToHost, shown } from '../lod/host-drawn';
 import { displayedBodies, evaluatePass, isDisplayed, stampDisplayed } from '../lod/lod-controller';
 import { checkedBodies, ensureGeometry, flush } from './geometry-scheduler';
 
@@ -15,7 +17,7 @@ export function noteDisplayed(body: Body): void {
 
 export function noteDrawn(body: Body): void {
   const state = runtime();
-  if (!body.visible || (state.renderPassActive && state.lod.walked.get(body) === state.pass)) return;
+  if (!shown(state, body) || (state.renderPassActive && state.lod.walked.get(body) === state.pass)) return;
   beginPass(state);
   stampDisplayed(state, body);
   state.lod.drawn.add(body);
@@ -24,6 +26,14 @@ export function noteDrawn(body: Body): void {
 export function markDisplayed(bodies: readonly Body[]): void {
   const state = runtime();
   for (const body of checkedBodies(state, bodies, 'OpenGeometry.markDisplayed')) noteDrawn(body);
+}
+
+export function setHostDrawn(bodies: readonly Body[], hostDrawn: boolean): void {
+  const state = runtime();
+  const label = 'OpenGeometry.setHostDrawn';
+  const flag: unknown = hostDrawn;
+  if (typeof flag !== 'boolean') throw new OGError('InvalidParameter', label, 'hostDrawn must be a boolean');
+  for (const body of checkedBodies(state, bodies, label, !hostDrawn)) handToHost(state, body, hostDrawn);
 }
 
 function beginPass(state: Runtime): boolean {

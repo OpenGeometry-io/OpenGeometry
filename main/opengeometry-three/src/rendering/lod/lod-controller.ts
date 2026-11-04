@@ -6,6 +6,7 @@ import { currentRuntime, type Runtime } from '../../runtime/runtime-state';
 import { finestLocal, localTarget, shapeBuckets, type ShapeBuckets } from './body-size';
 import { deflectionBucket, wantedBucket } from './deflection';
 import { displayBounds } from './display-bounds';
+import { shown } from './host-drawn';
 import { worldUnitsPerPixel } from './screen-metrics';
 
 type Tiers = { temporary: number | undefined; own: number | undefined; global: number | undefined };
@@ -52,7 +53,7 @@ export function createLodState(refresh: () => void): LodState {
 }
 
 export function isDisplayed(state: Runtime, body: Body): boolean {
-  return body.visible && (state.displayed.get(body) ?? -Infinity) >= state.pass - 1;
+  return shown(state, body) && (state.displayed.get(body) ?? -Infinity) >= state.pass - 1;
 }
 
 export function displayedBodies(state: Runtime): Body[] {

@@ -10,6 +10,7 @@ import { enterLimbo, revive } from '../marks/limbo';
 import { flush, flushForDispose, notifyBody, wanted } from '../rendering/geometry/geometry-scheduler';
 import { noteDisplayed, noteDrawn } from '../rendering/geometry/render-pass';
 import { observeCamera } from '../rendering/lod/camera-observer';
+import { shown } from '../rendering/lod/host-drawn';
 import { isDisplayed, overrideChanged } from '../rendering/lod/lod-controller';
 import {
   lineMaterial, releaseLine, releaseSurface, surfaceMaterial, type MaterialAppearance,
@@ -101,7 +102,7 @@ export abstract class Body extends THREE.Group<BodyEventMap> {
 
   override updateMatrixWorld(force?: boolean): void {
     keepPose(this.pose, this, this.ogId);
-    if (this.visible) noteDisplayed(this);
+    if (shown(runtime(), this)) noteDisplayed(this);
     super.updateMatrixWorld(force);
   }
 

@@ -28,6 +28,7 @@ export type Runtime = {
   graphMoved: boolean;
   pass: number;
   displayed: Map<Body, number>;
+  hostDrawn: WeakMap<Body, boolean>;
   pending: Map<string, Promise<void>>;
   generations: Map<string, number>;
   shapeBuckets: Map<string, { revision: number; floor: number; static: number; error?: unknown }>;
