@@ -18,6 +18,7 @@ import { booleanCurvedRegions2D, booleanRegions2D, insetCurvedRegion2D } from '.
 import { resolveHit } from './picking/resolve-hit';
 import { flush } from './rendering/geometry/geometry-scheduler';
 import { settled } from './rendering/geometry/settle';
+import { observeCamera } from './rendering/lod/camera-observer';
 import { motionHint, overrideChanged } from './rendering/lod/lod-controller';
 import { createRuntimeOnce } from './runtime/create-runtime';
 import { on } from './runtime/event-bus';
@@ -54,6 +55,8 @@ export class OpenGeometry {
     const state = runtime();
     if (moving) motionHint(state, Date.now());
   }
+
+  static observeCamera(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void { observeCamera(renderer, camera); }
 
   static resolveHit(
     hit: THREE.Intersection,

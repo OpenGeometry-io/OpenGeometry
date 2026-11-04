@@ -6,7 +6,7 @@ import { OpenGeometry, OG_TRANSFORM_TRANSLATE } from '../../../dist/index.js';
 import * as TESTING from '../../../dist/testing.js';
 import { boot, cuboid } from './support.mjs';
 
-const RENDERER = { getDrawingBufferSize: (target) => target.set(1000, 1000) };
+const RENDERER = { info: { render: { frame: 0 } }, getDrawingBufferSize: (target) => target.set(1000, 1000) };
 const TIMERS = Reflect.get(NODE_TEST, 'mock').timers;
 const BODIES = 6;
 const FRAMES = 8;
@@ -52,6 +52,7 @@ function orbit(camera, step) {
 async function frame(scene, camera) {
   TIMERS.tick(100);
   scene.updateMatrixWorld(true);
+  RENDERER.info.render.frame++;
   scene.traverseVisible((object) => {
     if (object instanceof THREE.Mesh) Reflect.apply(object.onBeforeRender, object, [RENDERER, scene, camera]);
   });

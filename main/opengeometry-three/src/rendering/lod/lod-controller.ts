@@ -1,4 +1,4 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import type { Body } from '../../bodies/body';
 import { call } from '../../kernel/kernel-session';
 import { EVALUATION_INTERVAL_MS, MOTION_WINDOW_MS, PIXELS_AT_REST, PIXELS_MOVING } from '../../limits';
@@ -28,6 +28,8 @@ type ShapeLod = {
 export type LodState = {
   shapes: Map<string, ShapeLod>;
   camera: Float64Array;
+  frames: WeakMap<THREE.WebGLRenderer, number>;
+  bufferSize: THREE.Vector2;
   initialised: boolean;
   lastMotion: number;
   lastSchedule: number;
@@ -41,8 +43,8 @@ export type LodState = {
 
 export function createLodState(refresh: () => void): LodState {
   return {
-    shapes: new Map(), camera: new Float64Array(33), initialised: false, lastMotion: -Infinity,
-    lastSchedule: -Infinity, temporaries: [], stale: true, refresh,
+    shapes: new Map(), camera: new Float64Array(33), frames: new WeakMap(), bufferSize: new THREE.Vector2(),
+    initialised: false, lastMotion: -Infinity, lastSchedule: -Infinity, temporaries: [], stale: true, refresh,
   };
 }
 
@@ -64,12 +66,19 @@ export function stampDisplayed(state: Runtime, body: Body): void {
 
 export function observe(state: Runtime, camera: THREE.Camera, height: number, now: number): void {
   const lod = state.lod;
-  const values = [...camera.matrixWorld.elements, ...camera.projectionMatrix.elements, height];
-  const changed = values.some((value, index) => value !== lod.camera[index]);
-  lod.camera.set(values);
-  if (lod.initialised && changed) motionHint(state, now);
+  const moved = storeChanged(lod.camera, camera.matrixWorld.elements, 0);
+  const projected = storeChanged(lod.camera, camera.projectionMatrix.elements, 16);
+  const resized = lod.camera[32] !== height;
+  lod.camera[32] = height;
+  if (lod.initialised && (moved || projected || resized)) motionHint(state, now);
   lod.initialised = true;
   lod.lastSeen = { camera, height };
+}
+
+function storeChanged(target: Float64Array, values: readonly number[], offset: number): boolean {
+  const same = values.every((value, index) => target[offset + index] === value);
+  if (!same) target.set(values, offset);
+  return !same;
 }
 
 export function motionHint(state: Runtime, now: number): void {

@@ -85,7 +85,7 @@ test('display buckets are read once per shape and revision', () => {
   camera.position.set(3, 3, 3);
   camera.lookAt(0, 0, 0);
   camera.updateMatrixWorld();
-  const renderer = { getDrawingBufferSize: (size) => size.set(800, 600) };
+  const renderer = { info: { render: { frame: 1 } }, getDrawingBufferSize: (size) => size.set(800, 600) };
   try {
     for (let index = 0; index < 100; index++) wanted(sized);
     assert.equal(reads, 1);
