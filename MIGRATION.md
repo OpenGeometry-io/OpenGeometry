@@ -12,6 +12,13 @@ It is written for people and for coding assistants alike: each section says what
 4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
 5. Finish with its "Check your result" steps.
 
+## Unreleased
+
+### Different behaviour
+
+- A body counts as displayed when it is drawn, not only when `updateMatrixWorld` walks it: its surface or outline `onBeforeRender`, or `OpenGeometry.markDisplayed(bodies)`, stamps it for the current render pass, and its new display geometry is installed after that render, so the next frame shows it. A body that is neither drawn nor walked for a full pass is no longer displayed and gets no level-of-detail target or record swap. A walk still stamps and installs at once, so code that walks, then calls `OpenGeometry.flush({ geometry: 'sync' })`, gets the same meshes as before.
+- A body's `surface` and `outline` meshes are static: their `matrixAutoUpdate` is `false`, so a world matrix update no longer recomputes their local matrix. Code that writes their `position`, `rotation`, `quaternion` or `scale` must call `updateMatrix()` on that mesh after the write.
+
 ## 2.5 to 3.0
 
 2.5 was not published. From 2.0, follow 2.0 to 2.5, then 2.5 to 3.0.

@@ -1,4 +1,4 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import type { Body } from '../../bodies/body';
 import { call } from '../../kernel/kernel-session';
 import { EVALUATION_INTERVAL_MS, MOTION_WINDOW_MS, PIXELS_AT_REST, PIXELS_MOVING } from '../../limits';
@@ -6,13 +6,15 @@ import { currentRuntime, type Runtime } from '../../runtime/runtime-state';
 import { finestLocal, localTarget, shapeBuckets, type ShapeBuckets } from './body-size';
 import { deflectionBucket, wantedBucket } from './deflection';
 import { displayBounds } from './display-bounds';
+import { displayedBodies, isDisplayed, stampedCount } from './displayed';
+import { groupsKey, queueShapes } from './host-groups';
 import { worldUnitsPerPixel } from './screen-metrics';
 
 type Tiers = { temporary: number | undefined; own: number | undefined; global: number | undefined };
 type SeenCamera = { camera: THREE.Camera; height: number };
 type ShapeTarget = { target: number; body: Body };
 type TemporaryTarget = { deflection: number };
-type PassInputs = { revision: bigint; flushed: bigint; moving: boolean; displayed: number };
+type PassInputs = { revision: bigint; flushed: bigint; moving: boolean; displayed: number; groups: number[] };
 
 type ShapeLod = {
   shapeId: string;
@@ -28,6 +30,8 @@ type ShapeLod = {
 export type LodState = {
   shapes: Map<string, ShapeLod>;
   camera: Float64Array;
+  frames: WeakMap<THREE.WebGLRenderer, number>;
+  bufferSize: THREE.Vector2;
   initialised: boolean;
   lastMotion: number;
   lastSchedule: number;
@@ -36,40 +40,34 @@ export type LodState = {
   temporaries: TemporaryTarget[];
   stale: boolean;
   evaluated?: PassInputs;
+  drawn: Set<Body>;
+  walked: WeakMap<Body, number>;
   refresh: () => void;
 };
 
 export function createLodState(refresh: () => void): LodState {
   return {
-    shapes: new Map(), camera: new Float64Array(33), initialised: false, lastMotion: -Infinity,
-    lastSchedule: -Infinity, temporaries: [], stale: true, refresh,
+    shapes: new Map(), camera: new Float64Array(33), frames: new WeakMap(), bufferSize: new THREE.Vector2(),
+    initialised: false, lastMotion: -Infinity, lastSchedule: -Infinity, temporaries: [], stale: true, drawn: new Set(),
+    walked: new WeakMap(), refresh,
   };
-}
-
-export function isDisplayed(state: Runtime, body: Body): boolean {
-  return body.visible && (state.displayed.get(body) ?? -Infinity) >= state.pass - 1;
-}
-
-export function displayedBodies(state: Runtime): Body[] {
-  return [...state.displayed.keys()].filter((body) => isDisplayed(state, body));
-}
-
-export function stampDisplayed(state: Runtime, body: Body): void {
-  const shapeId = body.lastInfo.shapeId;
-  const anew = !isDisplayed(state, body);
-  if (anew) state.lod.stale = true;
-  if (shapeId && anew) delete state.lod.shapes.get(shapeId)?.overrides;
-  state.displayed.set(body, state.pass);
 }
 
 export function observe(state: Runtime, camera: THREE.Camera, height: number, now: number): void {
   const lod = state.lod;
-  const values = [...camera.matrixWorld.elements, ...camera.projectionMatrix.elements, height];
-  const changed = values.some((value, index) => value !== lod.camera[index]);
-  lod.camera.set(values);
-  if (lod.initialised && changed) motionHint(state, now);
+  const moved = storeChanged(lod.camera, camera.matrixWorld.elements, 0);
+  const projected = storeChanged(lod.camera, camera.projectionMatrix.elements, 16);
+  const resized = lod.camera[32] !== height;
+  lod.camera[32] = height;
+  if (lod.initialised && (moved || projected || resized)) motionHint(state, now);
   lod.initialised = true;
   lod.lastSeen = { camera, height };
+}
+
+function storeChanged(target: Float64Array, values: readonly number[], offset: number): boolean {
+  const same = values.every((value, index) => target[offset + index] === value);
+  if (!same) target.set(values, offset);
+  return !same;
 }
 
 export function motionHint(state: Runtime, now: number): void {
@@ -98,10 +96,11 @@ export function evaluatePass(state: Runtime, now: number, forced: boolean): bool
   if (!seen || state.poisoned || (!forced && now - lod.lastSchedule < EVALUATION_INTERVAL_MS)) return false;
   lod.lastSchedule = now;
   const moving = !forced && now - lod.lastMotion < MOTION_WINDOW_MS;
-  const bodies = displayedBodies(state);
   const revision = call('OpenGeometry.flush', () => state.graph.revision());
-  const inputs = { revision, flushed: state.revision, moving, displayed: bodies.length };
+  const groups = [state.groups.revision, groupsKey(state)];
+  const inputs = { revision, flushed: state.revision, moving, displayed: stampedCount(state), groups };
   if (!forced && !stalePass(lod, inputs)) return false;
+  const bodies = displayedBodies(state);
   lod.stale = false;
   lod.evaluated = inputs;
   let changed = false;
@@ -121,7 +120,8 @@ export function evaluatePass(state: Runtime, now: number, forced: boolean): bool
 function stalePass(lod: LodState, inputs: PassInputs): boolean {
   const last = lod.evaluated;
   return lod.stale || !last || last.revision !== inputs.revision || last.flushed !== inputs.flushed
-    || last.moving !== inputs.moving || last.displayed !== inputs.displayed;
+    || last.moving !== inputs.moving || last.displayed !== inputs.displayed
+    || last.groups.some((value, index) => value !== inputs.groups[index]);
 }
 
 function shapeTargets(
@@ -202,6 +202,7 @@ function failedKey(revision: number, bucket: number): string {
 
 export function overrideChanged(state: Runtime, shapeId?: string): void {
   state.lod.stale = true;
+  queueShapes(state, shapeId);
   const entries = shapeId === undefined ? [...state.lod.shapes.values()] : [state.lod.shapes.get(shapeId)];
   for (const entry of entries) {
     if (!entry) continue;
@@ -225,6 +226,7 @@ export function popTemporaryTarget(state: Runtime, token: TemporaryTarget): void
 
 function clearAllMarks(state: Runtime): void {
   state.lod.stale = true;
+  queueShapes(state);
   for (const entry of state.lod.shapes.values()) clearMarks(entry);
 }
 
@@ -273,4 +275,5 @@ export function capturedError(state: Runtime, body: Body): unknown {
 export function forceNextBucket(state: Runtime, shapeId: string, bucket: number): void {
   shapeLod(state, shapeId).forced = bucket;
   state.lod.stale = true;
+  queueShapes(state, shapeId);
 }

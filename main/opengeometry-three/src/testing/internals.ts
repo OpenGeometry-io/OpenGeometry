@@ -1,4 +1,6 @@
 import { OGError } from '../errors';
+import type { Body } from '../bodies/body';
+import { isDisplayed } from '../rendering/lod/displayed';
 import { forceNextBucket } from '../rendering/lod/lod-controller';
 import { WorkerBackend, type WorkerSend } from '../rendering/worker-backend';
 import { runtime } from '../runtime/runtime-state';
@@ -15,6 +17,8 @@ export { worldGraph as graph } from '../world-graph/world-graph-client';
 export function activeBackend(): 'worker' | 'inline' { return runtime().provider.activeBackend; }
 
 export function flushCount(): number { return runtime().flushes; }
+
+export function displayed(body: Body): boolean { return isDisplayed(runtime(), body); }
 
 export function pinWantedBucket(shapeId: string, bucket: number): void { forceNextBucket(runtime(), shapeId, bucket); }
 
