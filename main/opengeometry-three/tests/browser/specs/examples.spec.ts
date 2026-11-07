@@ -116,6 +116,7 @@ test('curved meets straight example reports a valid union with the summed volume
 
   await page.locator('#reach').fill('0.9');
   await page.locator('#reach').dispatchEvent('change');
+  await expect(status).toContainText(`volume ${expected(0.9).toFixed(6)} m³`);
   await expect(status).toContainText('valid true · closed true');
   expect(Math.abs(await volume() / expected(0.9) - 1)).toBeLessThan(1e-3);
   await expect(page.locator('#error')).toBeEmpty();

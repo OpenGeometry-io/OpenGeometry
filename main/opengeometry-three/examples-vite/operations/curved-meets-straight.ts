@@ -24,6 +24,7 @@ const RUN = 2;
 const SIDE_REACH = 0.05;
 const SIDE_BACK = 0.2;
 const SPREAD = 7;
+const DEFLECTION = 1e-4;
 const COLOR = 0x329ac7;
 const INPUT_COLOR = 0xf97316;
 
@@ -126,7 +127,7 @@ function showStatus(reach: number): void {
   if (!united) throw new Error('The union was not built');
   const faces = united.getBrep().topology.faces.length;
   const segments = united.outline.geometry.getAttribute('position').count / 2;
-  const measured = united.measure();
+  const measured = united.measure({ deflection: DEFLECTION });
   const { valid, closed } = united.validity();
   STATUS.textContent = `Ready · ${String(faces)} faces · ${String(segments)} outline segments (whole body)`
     + ` · volume ${expectedVolume(reach).toFixed(6)} m³ (sum − overlap) · kernel ${measured.volume.toFixed(6)} m³`
