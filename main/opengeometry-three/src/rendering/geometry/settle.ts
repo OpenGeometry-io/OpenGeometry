@@ -15,7 +15,7 @@ export async function settled(options: { deflection?: number } = {}): Promise<{ 
   try {
     settleNow(state);
     refreshDisplayed(state);
-    await Promise.all([...state.pending.values()]);
+    while (state.pending.size > 0) await Promise.all([...state.pending.values()]);
     flush();
     return { failed: failures(state) };
   } finally {

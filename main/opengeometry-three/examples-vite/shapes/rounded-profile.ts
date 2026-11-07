@@ -19,6 +19,7 @@ await bootExample('../');
 const HALF_WIDTH = 2;
 const HALF_HEIGHT = 1;
 const DISTANCE = 3;
+const DEFLECTION = 2.5e-7;
 const COLOR = 0x329ac7;
 
 const SCENE = new THREE.Scene();
@@ -40,8 +41,8 @@ CONTROLS.update();
 type Point = [number, number];
 type Segment = { to: Point; arc?: { center: Point; counterClockwise: boolean } };
 
-function corner(to: Point, center: Point, radius: number): Segment {
-  return radius > 0 ? { to, arc: { center, counterClockwise: true } } : { to };
+function corner(to: Point, center: Point, radius: number): Segment[] {
+  return radius > 0 ? [{ to, arc: { center, counterClockwise: true } }] : [];
 }
 
 function roundedProfile(radius: number): { start: Point; segments: Segment[]; closed: true } {
@@ -50,13 +51,13 @@ function roundedProfile(radius: number): { start: Point; segments: Segment[]; cl
     start: [-w + r, -h],
     segments: [
       { to: [w - r, -h] },
-      corner([w, -h + r], [w - r, -h + r], r),
+      ...corner([w, -h + r], [w - r, -h + r], r),
       ...(r < h ? [{ to: [w, h - r] as Point }] : []),
-      corner([w - r, h], [w - r, h - r], r),
+      ...corner([w - r, h], [w - r, h - r], r),
       { to: [-w + r, h] },
-      corner([-w, h - r], [-w + r, h - r], r),
+      ...corner([-w, h - r], [-w + r, h - r], r),
       ...(r < h ? [{ to: [-w, -h + r] as Point }] : []),
-      corner([-w + r, -h], [-w + r, -h + r], r),
+      ...corner([-w + r, -h], [-w + r, -h + r], r),
     ],
     closed: true,
   };
@@ -94,7 +95,7 @@ function showStatus(prefix: string): void {
   if (!prism) throw new Error('The prism was not built');
   const radius = Number(RADIUS_INPUT.value);
   const faces = prism.getBrep().topology.faces.length;
-  const kernel = prism.measure().volume;
+  const kernel = prism.measure({ deflection: DEFLECTION }).volume;
   const analytic = analyticVolume(radius).toFixed(6);
   const measured = kernel.toFixed(6);
   STATUS.textContent = `${prefix} · ${String(faces)} faces · volume ${analytic} m³ (analytic) · kernel ${measured} m³`;
