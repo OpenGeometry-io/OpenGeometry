@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Bounds } from '../../dto/bounds';
-import type { GeometryRecord } from './geometry-record';
+import { recordKey, type GeometryRecord } from './geometry-record';
 
 const IDLE_BYTES = 256 * 1024 * 1024;
 const IDLE_PER_SHAPE = 2;
@@ -24,8 +24,8 @@ export class RecordPool {
   private placeholderOf = new Map<THREE.BufferGeometry, Placeholder>();
   private clock = 0;
 
-  get(shapeId: string, revision: number, bucket: number): GeometryRecord | undefined {
-    const record = this.records.get(`${shapeId}@${String(revision)}#${String(Math.log2(bucket))}`);
+  get(shapeId: string, revision: number, bucket: number, smoothAngle?: number): GeometryRecord | undefined {
+    const record = this.records.get(recordKey(shapeId, revision, bucket, smoothAngle));
     if (record) this.touch(record);
     return record;
   }

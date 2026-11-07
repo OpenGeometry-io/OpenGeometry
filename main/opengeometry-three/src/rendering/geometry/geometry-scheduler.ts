@@ -16,7 +16,9 @@ import type { TessellationRequest } from '../provider';
 import { GeometryRecord } from '../records/geometry-record';
 import { validateDisplayBuffers } from '../records/validate-display-buffers';
 
-type GeometryTarget = { body: Body; shapeId: string; revision: number; bucket: number; key: string };
+type GeometryTarget = {
+  body: Body; shapeId: string; revision: number; bucket: number; smoothAngle: number | undefined; key: string;
+};
 
 export type FlushOptions = { geometry?: 'sync'; bodies?: readonly Body[] };
 
@@ -138,7 +140,7 @@ export function ensureGeometry(body: Body, sync = false): void {
   const state = runtime();
   const target = geometryTarget(state, body);
   if (!target) return;
-  const record = state.records.get(target.shapeId, target.revision, target.bucket);
+  const record = state.records.get(target.shapeId, target.revision, target.bucket, target.smoothAngle);
   if (record) {
     body.install(record);
     return;
@@ -156,11 +158,12 @@ function geometryTarget(state: Runtime, body: Body): GeometryTarget | undefined 
   if (!shapeId || revision === null || !shown(state, body)) return undefined;
   const bucket = wantedKey(state, body);
   if (bucket === undefined) return undefined;
-  return { body, shapeId, revision, bucket, key: pendingKey(shapeId, revision, bucket) };
+  const { smoothAngle } = body.appearance;
+  return { body, shapeId, revision, bucket, smoothAngle, key: pendingKey(shapeId, revision, bucket, smoothAngle) };
 }
 
-function pendingKey(shapeId: string, revision: number, bucket: number): string {
-  return `${shapeId}@${String(revision)}#${String(bucket)}`;
+function pendingKey(shapeId: string, revision: number, bucket: number, smoothAngle?: number): string {
+  return `${shapeId}@${String(revision)}#${String(bucket)}~${String(smoothAngle)}`;
 }
 
 function computeNow(state: Runtime, target: GeometryTarget, sync: boolean): void {
@@ -184,12 +187,12 @@ function computeFailure(state: Runtime, target: GeometryTarget, sync: boolean): 
 }
 
 function coarserRetry(state: Runtime, target: GeometryTarget, error: unknown): GeometryTarget | undefined {
-  const { shapeId, revision, bucket } = target;
+  const { shapeId, revision, bucket, smoothAngle } = target;
   if (!(error instanceof OGError && error.code === 'LimitExceeded') || !markFailed(state, shapeId, revision, bucket)) {
     return undefined;
   }
   emit('warning', { code: 'LimitExceeded', shapeId, revision, bucket, retryBucket: bucket * 2 });
-  return { ...target, bucket: bucket * 2, key: pendingKey(shapeId, revision, bucket * 2) };
+  return { ...target, bucket: bucket * 2, key: pendingKey(shapeId, revision, bucket * 2, smoothAngle) };
 }
 
 function reportFailure(state: Runtime, target: GeometryTarget, error: unknown): void {
@@ -200,7 +203,7 @@ function reportFailure(state: Runtime, target: GeometryTarget, error: unknown): 
 function computed(state: Runtime, request: TessellationRequest): DisplayBuffers {
   if (state.provider.compute) return state.provider.compute(request);
   return validateDisplayBuffers(call('OpenGeometry.flush', (): unknown =>
-    state.graph.buffers(request.shapeId, request.bucket, request.maxTriangles)));
+    state.graph.buffers(request.shapeId, request.bucket, request.maxTriangles, request.smoothAngle)));
 }
 
 function fatal(state: Runtime, error: unknown): boolean {
@@ -236,11 +239,11 @@ function accepted(state: Runtime, target: GeometryTarget, buffers: DisplayBuffer
 }
 
 function requestFor(state: Runtime, target: GeometryTarget): TessellationRequest {
-  const { shapeId, revision, bucket } = target;
+  const { shapeId, revision, bucket, smoothAngle } = target;
   const generation = (state.generations.get(shapeId) ?? 0) + 1;
   state.generations.set(shapeId, generation);
   const priority = shapePriority(state, shapeId);
-  return { shapeId, revision, bucket, priority, maxTriangles: MAX_TRIANGLES, generation };
+  return { shapeId, revision, bucket, priority, maxTriangles: MAX_TRIANGLES, smoothAngle, generation };
 }
 
 function receive(state: Runtime, target: GeometryTarget, buffers: DisplayBuffers): void {
@@ -248,7 +251,7 @@ function receive(state: Runtime, target: GeometryTarget, buffers: DisplayBuffers
   const holders = [...(state.byShape.get(shapeId) ?? [])];
   const current = holders.filter((body) => body.lastInfo.shapeRevision === revision);
   if (current.length === 0) return;
-  const record = state.records.put(new GeometryRecord(shapeId, buffers));
+  const record = state.records.put(new GeometryRecord(shapeId, buffers, target.smoothAngle));
   state.readyShapes.add(shapeId);
   clearError(state, shapeId, revision);
   if (state.renderPassActive) {

@@ -1,8 +1,9 @@
 use crate::bindings::{errors, OGWorldGraph};
 use crate::geom2d::{
     boolean_curved_regions, boolean_oriented_regions, inset_curved_region, inset_tolerance,
-    offset_path, offset_polyline_regions, offset_ring_variable, signed_area2, CurveEdge2,
-    CurveRegion2, OffsetError, OffsetHole, OffsetOptions, PlanarBooleanOp, Pt2, RingRegion,
+    offset_curved_ring_variable, offset_path, offset_polyline_regions, offset_ring_variable,
+    signed_area2, CurveEdge2, CurveRegion2, OffsetError, OffsetHole, OffsetOptions,
+    PlanarBooleanOp, Pt2, RingRegion,
 };
 use crate::world_graph::{ErrorCode, GraphError};
 use serde::de::DeserializeOwned;
@@ -91,6 +92,18 @@ impl OGWorldGraph {
         holes_json: &str,
     ) -> Result<String, JsValue> {
         let regions = offset_ring(&ring, &distances, holes_json).map_err(errors::json)?;
+        serde_json::to_string(&regions).map_err(errors::serialization)
+    }
+
+    #[wasm_bindgen(js_name = offsetCurvedRingVariable)]
+    pub fn offset_curved_ring_variable(
+        &self,
+        region_json: &str,
+        distances: Vec<f64>,
+        hole_distances_json: &str,
+    ) -> Result<String, JsValue> {
+        let regions =
+            curved_ring(region_json, &distances, hole_distances_json).map_err(errors::json)?;
         serde_json::to_string(&regions).map_err(errors::serialization)
     }
 
@@ -214,6 +227,22 @@ fn offset_ring(
         REGION_TOLERANCE,
     )
     .map_err(offset_error)
+}
+
+fn curved_ring(
+    region_json: &str,
+    distances: &[f64],
+    hole_distances_json: &str,
+) -> Result<Vec<CurveRegion2>, GraphError> {
+    let region: CurveRegion2 = parsed(region_json)?;
+    let hole_distances: Vec<Vec<f64>> = parsed(hole_distances_json)?;
+    check_size(
+        region.outer.len() + region.holes.iter().map(Vec::len).sum::<usize>(),
+        "offset region edges",
+    )?;
+    let tolerance = inset_tolerance(&region, REGION_TOLERANCE);
+    offset_curved_ring_variable(&region, distances, &hole_distances, tolerance)
+        .map_err(offset_error)
 }
 
 fn flat_ring(flat: &[f64], label: &str) -> Result<Vec<Pt2>, GraphError> {

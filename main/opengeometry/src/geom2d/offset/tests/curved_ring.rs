@@ -1,7 +1,9 @@
 use super::polyline::filled;
 use crate::geom2d::boolean2d::distance_to_segment;
 use crate::geom2d::curved_boolean2d::{CurveEdge2, CurveRegion2};
-use crate::geom2d::offset::{inset_curved_region, inset_tolerance};
+use crate::geom2d::offset::{
+    inset_curved_region, inset_tolerance, offset_curved_ring_variable, OffsetError,
+};
 use crate::geom2d::poly2d::Pt2;
 use crate::geom2d::tests::{curve_ring_area, p, DEFAULT_EPS};
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
@@ -308,4 +310,91 @@ fn the_s_balcony_slab_insets_by_1_2_m_to_the_same_seven_edges_with_exact_arcs() 
         "{}",
         area(&result)
     );
+}
+
+fn assert_per_edge(result: &[CurveRegion2], source: &CurveRegion2, distances: &[f64]) {
+    let edges: Vec<(&CurveEdge2, f64)> = rings(source)
+        .flatten()
+        .zip(distances.iter().copied())
+        .collect();
+    let steps = 60;
+    for i in 0..=steps {
+        for j in 0..=steps {
+            let point = p(
+                -2.5 + 7.0 * i as f64 / steps as f64,
+                -2.5 + 7.5 * j as f64 / steps as f64,
+            );
+            let margins = edges
+                .iter()
+                .map(|(edge, distance)| edge_distance(edge, point) - distance);
+            let margin = margins.fold(f64::INFINITY, f64::min);
+            if !filled(std::slice::from_ref(source), point) || margin.abs() <= 1e-6 {
+                continue;
+            }
+            assert_eq!(
+                filled(result, point),
+                margin > 0.0,
+                "({}, {}) is {margin} past its nearest border",
+                point.x,
+                point.z
+            );
+        }
+    }
+}
+
+fn turned_d_shape() -> CurveRegion2 {
+    let mut source = d_shape();
+    source.outer.rotate_left(2);
+    source
+}
+
+#[test]
+fn a_d_shape_with_a_border_per_edge_keeps_its_arc_concentric_at_its_own_distance() {
+    let source = turned_d_shape();
+    let distances = [0.1, 0.2, 0.1, 0.3];
+    let result = offset_curved_ring_variable(&source, &distances, &[], DEFAULT_EPS).unwrap();
+    assert_per_edge(&result, &source, &distances);
+    assert_eq!(result.len(), 1);
+    assert!(has_arc(&result, [2.0, 0.0], 1.7));
+    assert!(has_arc(&result, [2.0, 2.0], 0.3));
+    assert!(has_arc(&result, [2.0, -2.0], 0.3));
+    let cap = 0.045 * FRAC_PI_2 - 0.05 * 0.08_f64.sqrt() - 0.045 * (1.0_f64 / 3.0).asin();
+    let expected = 3.8 * 3.8 + PI * 1.7 * 1.7 / 2.0 - 2.0 * cap;
+    assert!(
+        (area(&result) - expected).abs() <= 1e-9,
+        "{}",
+        area(&result)
+    );
+}
+
+#[test]
+fn a_zero_border_keeps_its_edge_and_a_round_hole_grows_by_its_own_distance() {
+    let source = square_with_round_hole();
+    let distances = [0.0, 0.2, 0.2, 0.2];
+    let result =
+        offset_curved_ring_variable(&source, &distances, &[vec![0.3, 0.3]], DEFAULT_EPS).unwrap();
+    assert_per_edge(&result, &source, &[0.0, 0.2, 0.2, 0.2, 0.3, 0.3]);
+    assert_eq!(result.len(), 1);
+    assert!(has_arc(&result, [2.0, 2.0], 0.8));
+    let expected = 3.6 * 3.8 - PI * 0.8 * 0.8;
+    assert!(
+        (area(&result) - expected).abs() <= 1e-9,
+        "{}",
+        area(&result)
+    );
+}
+
+#[test]
+fn a_border_past_an_arc_centre_or_a_bad_distance_list_is_refused() {
+    let source = turned_d_shape();
+    let refused = |distances: &[f64], holes: &[Vec<f64>]| {
+        matches!(
+            offset_curved_ring_variable(&source, distances, holes, DEFAULT_EPS),
+            Err(OffsetError::InvalidParameter(_))
+        )
+    };
+    assert!(refused(&[0.1, 0.2, 0.1, 2.5], &[]));
+    assert!(refused(&[0.1, 0.2, 0.1], &[]));
+    assert!(refused(&[0.1, -0.2, 0.1, 0.3], &[]));
+    assert!(refused(&[0.1, 0.2, 0.1, 0.3], &[vec![0.1]]));
 }

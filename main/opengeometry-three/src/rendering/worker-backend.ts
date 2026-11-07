@@ -201,6 +201,6 @@ export class WorkerBackend implements TessellationProvider {
 }
 
 function tessellate(value: TessellationRequest): Omit<TessellateMessage, 'request'> {
-  const { shapeId, revision, bucket, priority, maxTriangles, generation } = value;
-  return { kind: 'tessellate', shapeId, revision, bucket, priority, maxTriangles, generation };
+  const { shapeId, revision, bucket, priority, maxTriangles, smoothAngle, generation } = value;
+  return { kind: 'tessellate', shapeId, revision, bucket, priority, maxTriangles, smoothAngle, generation };
 }
