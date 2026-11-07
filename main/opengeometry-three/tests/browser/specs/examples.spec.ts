@@ -96,3 +96,27 @@ test('arc path sweep example reports its faces and the kernel volume', async ({ 
   await expect(status).toContainText('Sweep refused');
   await expect(page.locator('#error')).toContainText('bend radius is within the profile reach');
 });
+
+test('curved meets straight example reports a valid union with the summed volume', async ({ page }) => {
+  await page.goto(`${EXAMPLES_URL}/operations/curved-meets-straight.html`);
+  const status = page.locator('#status');
+  await expect(status).toContainText('Ready');
+  await expect(page.locator('#error')).toBeEmpty();
+  await expect(status).toContainText('valid true · closed true');
+  const volume = async (): Promise<number> => Number(/kernel ([\d.]+) m³/.exec(await status.innerText())?.[1]);
+  const text = async (): Promise<string> => status.innerText();
+  const segments = async (): Promise<number> => Number(/(\d+) outline segments/.exec(await text())?.[1]);
+  const quarter = Math.PI / 4 * (3.1 ** 2 - 2.9 ** 2);
+  const overlap = (reach: number): number =>
+    (reach * Math.sqrt(3.1 ** 2 - reach ** 2) + 3.1 ** 2 * Math.asin(reach / 3.1)) / 2 - 2.9 * reach;
+  const expected = (reach: number): number =>
+    3 * (quarter + 0.2 * (2 + reach) + 0.25 * 2 - overlap(reach) - overlap(0.05));
+  expect(Math.abs(await volume() / expected(0.5) - 1)).toBeLessThan(1e-3);
+  expect(await segments()).toBeGreaterThan(0);
+
+  await page.locator('#reach').fill('0.9');
+  await page.locator('#reach').dispatchEvent('change');
+  await expect(status).toContainText('valid true · closed true');
+  expect(Math.abs(await volume() / expected(0.9) - 1)).toBeLessThan(1e-3);
+  await expect(page.locator('#error')).toBeEmpty();
+});

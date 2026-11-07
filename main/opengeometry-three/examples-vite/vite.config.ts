@@ -22,6 +22,7 @@ export default defineConfig({
         cylinder: `${ROOT}/shapes/cylinder.html`,
         roundedProfile: `${ROOT}/shapes/rounded-profile.html`,
         arcPathSweep: `${ROOT}/operations/sweep-arc-path.html`,
+        curvedMeetsStraight: `${ROOT}/operations/curved-meets-straight.html`,
         stepExport: `${ROOT}/operations/step-export.html`,
       },
     },
