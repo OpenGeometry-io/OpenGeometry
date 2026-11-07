@@ -1,10 +1,13 @@
 import type { CurvedRegion2D, OffsetHole, OffsetPath2D, OffsetPolylineOptions } from '../dto/regions';
 import { OGError } from '../errors';
 import { call } from '../kernel/kernel-session';
-import { decodeCurvedRegions, decodeOffsetPath, numberList, offsetHolesJson } from '../world-graph/codec';
+import {
+  decodeCurvedRegions, decodeOffsetPath, encode, numberList, offsetHolesJson,
+} from '../world-graph/codec';
 import { worldGraph } from '../world-graph/world-graph-client';
 
 const RING = 'OpenGeometry.offsetRingVariable';
+const CURVED_RING = 'OpenGeometry.offsetCurvedRingVariable';
 const STROKE = 'OpenGeometry.offsetPolylineRegions';
 const SIDE = 'OpenGeometry.offsetPolyline';
 const OPTIONS = ['acuteThresholdDegrees', 'bevel', 'closed'] as const;
@@ -22,6 +25,22 @@ export function offsetRingVariable(
   const insets = numberList(distances, RING, 'distances');
   const holesJson = offsetHolesJson(holes, RING);
   return decodeCurvedRegions(call(RING, () => worldGraph().offsetRingVariable(points, insets, holesJson)), RING);
+}
+
+export function offsetCurvedRingVariable(
+  region: CurvedRegion2D,
+  distances: readonly number[] | Float64Array,
+  holeDistances: readonly (readonly number[] | Float64Array)[] = [],
+): CurvedRegion2D[] {
+  const given: unknown = region;
+  checked(typeof given === 'object' && given !== null && !Array.isArray(given), CURVED_RING,
+    'region must be one { outer, holes } of line and arc edges');
+  checked(Array.isArray(holeDistances), CURVED_RING, 'holeDistances must be a list of distance lists');
+  const insets = numberList(distances, CURVED_RING, 'distances');
+  const holesJson = encode(holeDistances.map((list) => Array.from(numberList(list, CURVED_RING, 'holeDistances'))));
+  const regionJson = encode(region);
+  const text = call(CURVED_RING, () => worldGraph().offsetCurvedRingVariable(regionJson, insets, holesJson));
+  return decodeCurvedRegions(text, CURVED_RING);
 }
 
 export function offsetPolylineRegions(

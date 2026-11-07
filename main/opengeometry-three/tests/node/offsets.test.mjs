@@ -120,6 +120,32 @@ test('a curved inset past the half width is empty, and a bad region or distance 
   assert.throws(() => OpenGeometry.insetCurvedRegion2D(open, 1.2), failsWith('UnresolvedIntersection'));
 });
 
+test('a ring with an arc offsets by its own distance per edge, the arc staying on its centre', () => {
+  const ring = wire({
+    outer: [
+      { kind: 'line', from: [2, 2], to: [-2, 2] },
+      { kind: 'line', from: [-2, 2], to: [-2, -2] },
+      { kind: 'line', from: [-2, -2], to: [2, -2] },
+      { kind: 'arc', center: [2, 0], radius: 2, start_angle: -Math.PI / 2, sweep_angle: Math.PI },
+    ],
+    holes: [],
+  });
+  const regions = OpenGeometry.offsetCurvedRingVariable(ring, [0.1, 0.2, 0.1, 0.3]);
+  assert.equal(regions.length, 1);
+  assert(arcs(regions).some((arc) => near(arc.radius, 1.7) && near(arc.center[0], 2) && near(arc.center[1], 0)));
+  const cap = 0.045 * Math.PI / 2 - 0.05 * Math.sqrt(0.08) - 0.045 * Math.asin(1 / 3);
+  assert(near(area(regions), 3.8 * 3.8 + Math.PI * 1.7 * 1.7 / 2 - 2 * cap));
+  for (const [distances, holeDistances] of [
+    [[0.1, 0.2, 0.1, 2.5], []], [[0.1, 0.2, 0.1], []], [[0.1, 0.2, 0.1, 0.3], [[1]]],
+    [wire('0.1'), []], [[0.1, 0.2, 0.1, 0.3], wire([['x']])],
+  ]) {
+    assert.throws(
+      () => OpenGeometry.offsetCurvedRingVariable(ring, distances, holeDistances), failsWith('InvalidParameter'),
+    );
+  }
+  assert.throws(() => OpenGeometry.offsetCurvedRingVariable(wire(null), [1]), failsWith('InvalidParameter'));
+});
+
 test('a routed duct run strokes to width times length, mitred at the default limit of 4 and bevelled at 1', () => {
   const run = flat([[0, 0], [4, 0], [4, 3], [8, 3]]);
   const regions = OpenGeometry.offsetPolylineRegions(run, 0.3, false, 4);

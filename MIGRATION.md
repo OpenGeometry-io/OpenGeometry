@@ -14,6 +14,10 @@ It is written for people and for coding assistants alike: each section says what
 
 ## Unreleased
 
+### Added
+
+- `OpenGeometry.offsetCurvedRingVariable(region, distances, holeDistances = [])` insets one `CurvedRegion2D` of lines and arcs by one distance (finite, >= 0) per edge, with one list per hole ring, and returns `CurvedRegion2D[]`. An arc edge stays on its centre: a convex arc moves to `r - d`, a concave arc or a hole's arc to `r + d`. A distance of 0 keeps its edge. A distance larger than an arc's radius, a wrong count, or a negative or non-finite distance is `InvalidParameter`. A collapsed result is an empty list. `offsetRingVariable` is unchanged.
+
 ### Different behaviour
 
 - A body counts as displayed when it is drawn, not only when `updateMatrixWorld` walks it: its surface or outline `onBeforeRender`, or `OpenGeometry.markDisplayed(bodies)`, stamps it for the current render pass, and its new display geometry is installed after that render, so the next frame shows it. A body that is neither drawn nor walked for a full pass is no longer displayed and gets no level-of-detail target or record swap. A walk still stamps and installs at once, so code that walks, then calls `OpenGeometry.flush({ geometry: 'sync' })`, gets the same meshes as before.
