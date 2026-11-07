@@ -111,7 +111,8 @@ export abstract class Body extends THREE.Group<BodyEventMap> {
     if (!isDisplayed(runtime(), this) || !this.lastInfo.shapeId || this.lastInfo.shapeRevision === null) return;
     const bucket = wanted(this);
     if (bucket === undefined) return;
-    const record = runtime().records.get(this.lastInfo.shapeId, this.lastInfo.shapeRevision, bucket);
+    const { shapeId, shapeRevision } = this.lastInfo;
+    const record = runtime().records.get(shapeId, shapeRevision, bucket, this.appearance.smoothAngle);
     if (record) this.install(record);
   }
 

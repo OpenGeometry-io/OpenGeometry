@@ -1,4 +1,4 @@
-use super::display::{display_buffers, limit, DisplayBuffers};
+use super::display::{display_buffers_with_smooth_angle, limit, DisplayBuffers, SMOOTH_ANGLE};
 use crate::brep::{BrepEnvelope, GeometryError};
 use std::collections::BTreeMap;
 
@@ -35,6 +35,16 @@ impl SnapshotStore {
         bucket: f64,
         max_triangles: usize,
     ) -> Result<DisplayBuffers, GeometryError> {
+        self.buffers_with_smooth_angle(slot, bucket, max_triangles, SMOOTH_ANGLE)
+    }
+
+    pub fn buffers_with_smooth_angle(
+        &self,
+        slot: u32,
+        bucket: f64,
+        max_triangles: usize,
+        smooth_angle: f64,
+    ) -> Result<DisplayBuffers, GeometryError> {
         let brep = self
             .snapshots
             .get(&slot)
@@ -42,7 +52,7 @@ impl SnapshotStore {
                 kind: "snapshot slot".into(),
                 index: slot,
             })?;
-        display_buffers(brep, bucket, max_triangles)
+        display_buffers_with_smooth_angle(brep, bucket, max_triangles, smooth_angle)
     }
 
     pub fn release(&mut self, slot: u32) -> bool {

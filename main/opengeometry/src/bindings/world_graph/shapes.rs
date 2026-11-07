@@ -2,7 +2,7 @@ use super::{serialise, OGWorldGraph};
 use crate::bindings::errors;
 use crate::bindings::tessellator::{buffers_to_js, field};
 use crate::query::PointClassification;
-use crate::tessellation::display::{bucket_floor, static_bucket};
+use crate::tessellation::display::{bucket_floor, static_bucket, SMOOTH_ANGLE};
 use crate::world_graph::{ErrorCode, GraphError};
 use js_sys::Object;
 use serde::Serialize;
@@ -118,10 +118,12 @@ impl OGWorldGraph {
         shape_id: &str,
         bucket: f64,
         max_triangles: u32,
+        smooth_angle: Option<f64>,
     ) -> Result<JsValue, JsValue> {
+        let angle = smooth_angle.unwrap_or(SMOOTH_ANGLE);
         buffers_to_js(
             self.inner
-                .buffers(shape_id, bucket, max_triangles as usize)
+                .buffers_with_smooth_angle(shape_id, bucket, max_triangles as usize, angle)
                 .map_err(errors::json)?,
         )
     }

@@ -1,9 +1,10 @@
 use super::mesh::Tessellation;
-use super::tessellate::{coordinate_magnitude, tessellate};
+use super::tessellate::{coordinate_magnitude, tessellate_with_smooth_angle};
 use crate::brep::{BrepEnvelope, GeometryError};
 use std::collections::BTreeSet;
 
 pub const MAX_TRIANGLES: usize = 2_000_000;
+pub const SMOOTH_ANGLE: f64 = 20.0;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DisplayBuffers {
@@ -13,6 +14,7 @@ pub struct DisplayBuffers {
     pub face_ranges: Vec<u32>,
     pub outline: Vec<f32>,
     pub edge_ids: Vec<u32>,
+    pub smooth_edges: Vec<u8>,
     pub origin: [f64; 3],
     pub revision: u64,
     pub bucket: f64,
@@ -85,13 +87,22 @@ pub fn display_buffers(
     bucket: f64,
     max_triangles: usize,
 ) -> Result<DisplayBuffers, GeometryError> {
+    display_buffers_with_smooth_angle(brep, bucket, max_triangles, SMOOTH_ANGLE)
+}
+
+pub fn display_buffers_with_smooth_angle(
+    brep: &BrepEnvelope,
+    bucket: f64,
+    max_triangles: usize,
+    smooth_angle: f64,
+) -> Result<DisplayBuffers, GeometryError> {
     if !bucket.is_finite() || bucket <= 0.0 || bucket < bucket_floor(brep)? {
         return Err(limit("display bucket is below the precision floor"));
     }
     if max_triangles == 0 || max_triangles > MAX_TRIANGLES {
         return Err(limit("display triangle budget"));
     }
-    let mesh = tessellate(brep, 0.75 * bucket, max_triangles)?;
+    let mesh = tessellate_with_smooth_angle(brep, 0.75 * bucket, max_triangles, smooth_angle)?;
     check_display_mesh(brep, &mesh)?;
     let origin = display_origin(&mesh);
     let mut encoding_error = 0.0;
@@ -111,6 +122,7 @@ pub fn display_buffers(
         face_ranges,
         outline,
         edge_ids: mesh.outline_edge_ids,
+        smooth_edges: mesh.smooth_edges,
         origin,
         revision: mesh.revision,
         bucket,
