@@ -20,6 +20,7 @@ export default defineConfig({
         opening: `${ROOT}/opening.html`,
         cuboid: `${ROOT}/shapes/cuboid.html`,
         cylinder: `${ROOT}/shapes/cylinder.html`,
+        roundedProfile: `${ROOT}/shapes/rounded-profile.html`,
         stepExport: `${ROOT}/operations/step-export.html`,
       },
     },

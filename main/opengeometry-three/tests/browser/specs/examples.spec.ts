@@ -58,3 +58,19 @@ for (const backend of ['inline', 'worker'] as const) {
     await expect(page.locator('#error')).toBeEmpty();
   });
 }
+
+test('rounded section example reports its faces and volume', async ({ page }) => {
+  await page.goto(`${EXAMPLES_URL}/shapes/rounded-profile.html`);
+  const status = page.locator('#status');
+  await expect(status).toContainText('Ready');
+  await expect(page.locator('#error')).toBeEmpty();
+  const volume = async (): Promise<number> => Number(/kernel ([\d.]+) m³/.exec(await status.innerText())?.[1]);
+  await expect(status).toContainText('10 faces');
+  expect(Math.abs(await volume() - (8 - (1 - Math.PI / 4)) * 3)).toBeLessThan(1e-6);
+
+  await page.locator('#radius').fill('0');
+  await page.locator('#radius').dispatchEvent('change');
+  await expect(status).toContainText('6 faces');
+  expect(Math.abs(await volume() - 24)).toBeLessThan(1e-6);
+  await expect(page.locator('#error')).toBeEmpty();
+});
