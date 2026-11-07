@@ -74,3 +74,25 @@ test('rounded section example reports its faces and volume', async ({ page }) =>
   expect(Math.abs(await volume() - 24)).toBeLessThan(1e-6);
   await expect(page.locator('#error')).toBeEmpty();
 });
+
+test('arc path sweep example reports its faces and the kernel volume', async ({ page }) => {
+  await page.goto(`${EXAMPLES_URL}/operations/sweep-arc-path.html`);
+  const status = page.locator('#status');
+  await expect(status).toContainText('Ready');
+  await expect(page.locator('#error')).toBeEmpty();
+  const volume = async (): Promise<number> => Number(/kernel ([\d.]+) m³/.exec(await status.innerText())?.[1]);
+  const expected = (radius: number, degrees: number): number => 0.33 * (4 + radius * degrees * Math.PI / 180);
+  await expect(status).toContainText('14 faces (2 cylinders)');
+  expect(Math.abs(await volume() / expected(1, 90) - 1)).toBeLessThan(1e-3);
+
+  await page.locator('#angle').fill('180');
+  await page.locator('#angle').dispatchEvent('change');
+  await expect(status).toContainText('path 7.141593 m');
+  await expect(status).toContainText('14 faces (2 cylinders)');
+  expect(Math.abs(await volume() / expected(1, 180) - 1)).toBeLessThan(1e-3);
+
+  await page.locator('#radius').fill('0.5');
+  await page.locator('#radius').dispatchEvent('change');
+  await expect(status).toContainText('Sweep refused');
+  await expect(page.locator('#error')).toContainText('bend radius is within the profile reach');
+});

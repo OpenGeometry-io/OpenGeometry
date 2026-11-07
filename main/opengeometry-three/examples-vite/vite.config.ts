@@ -21,6 +21,7 @@ export default defineConfig({
         cuboid: `${ROOT}/shapes/cuboid.html`,
         cylinder: `${ROOT}/shapes/cylinder.html`,
         roundedProfile: `${ROOT}/shapes/rounded-profile.html`,
+        arcPathSweep: `${ROOT}/operations/sweep-arc-path.html`,
         stepExport: `${ROOT}/operations/step-export.html`,
       },
     },
