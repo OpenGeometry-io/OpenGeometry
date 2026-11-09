@@ -1,6 +1,9 @@
 use super::{errors, panic};
-use crate::tessellation::{display::DisplayBuffers, SnapshotStore};
-use js_sys::{Float32Array, Float64Array, Object, Reflect, Uint32Array};
+use crate::tessellation::{
+    display::{DisplayBuffers, SMOOTH_ANGLE},
+    SnapshotStore,
+};
+use js_sys::{Float32Array, Float64Array, Object, Reflect, Uint32Array, Uint8Array};
 use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
 
 pub(super) fn field(object: &Object, name: &str, value: &JsValue) -> Result<(), JsValue> {
@@ -38,6 +41,11 @@ pub(super) fn buffers_to_js(buffers: DisplayBuffers) -> Result<JsValue, JsValue>
         &result,
         "edgeIds",
         &Uint32Array::from(buffers.edge_ids.as_slice()),
+    )?;
+    field(
+        &result,
+        "smoothEdges",
+        &Uint8Array::from(buffers.smooth_edges.as_slice()),
     )?;
     field(
         &result,
@@ -84,10 +92,17 @@ impl OGTessellator {
             .map_err(|error| errors::json(error.into()))
     }
 
-    pub fn buffers(&self, slot: u32, bucket: f64, max_triangles: u32) -> Result<JsValue, JsValue> {
+    pub fn buffers(
+        &self,
+        slot: u32,
+        bucket: f64,
+        max_triangles: u32,
+        smooth_angle: Option<f64>,
+    ) -> Result<JsValue, JsValue> {
+        let angle = smooth_angle.unwrap_or(SMOOTH_ANGLE);
         buffers_to_js(
             self.inner
-                .buffers(slot, bucket, max_triangles as usize)
+                .buffers_with_smooth_angle(slot, bucket, max_triangles as usize, angle)
                 .map_err(|error| errors::json(error.into()))?,
         )
     }
