@@ -15,10 +15,15 @@
       <h3>Rounded Section</h3>
       <p
         class="og-control-summary">A 4 × 2 m profile of lines and tangent quarter-circle arcs, extruded 3 m.</p>
-      <label class="og-control-row">
-        <span class="og-control-label-chip">Corner radius</span>
-        <input id="radius" type="number" min="0" max="1" step="0.05"
-          value="0.5" required />
+      <label class="og-control-row" data-control="radius">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Corner radius (m)</span>
+          <code class="og-control-value" data-value>0.5</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0" max="1" step="0.05" value="0.5" />
+          <input data-number type="number" min="0" max="1" step="0.05" value="0.5" />
+        </div>
       </label>
       <label
         class="og-control-row"><input id="outline" type="checkbox" checked /> Show feature outlines</label>

@@ -68,8 +68,7 @@ test('rounded section example reports its faces and volume', async ({ page }) =>
   await expect(status).toContainText('10 faces');
   expect(Math.abs(await volume() - (8 - (1 - Math.PI / 4)) * 3)).toBeLessThan(1e-6);
 
-  await page.locator('#radius').fill('0');
-  await page.locator('#radius').dispatchEvent('change');
+  await page.locator('[data-control="radius"] [data-number]').fill('0');
   await expect(status).toContainText('6 faces');
   expect(Math.abs(await volume() - 24)).toBeLessThan(1e-6);
   await expect(page.locator('#error')).toBeEmpty();
@@ -85,14 +84,12 @@ test('arc path sweep example reports its faces and the kernel volume', async ({ 
   await expect(status).toContainText('14 faces (2 cylinders)');
   expect(Math.abs(await volume() / expected(1, 90) - 1)).toBeLessThan(1e-3);
 
-  await page.locator('#angle').fill('180');
-  await page.locator('#angle').dispatchEvent('change');
+  await page.locator('[data-control="angle"] [data-number]').fill('180');
   await expect(status).toContainText('path 7.141593 m');
   await expect(status).toContainText('14 faces (2 cylinders)');
   expect(Math.abs(await volume() / expected(1, 180) - 1)).toBeLessThan(1e-3);
 
-  await page.locator('#radius').fill('0.5');
-  await page.locator('#radius').dispatchEvent('change');
+  await page.locator('[data-control="radius"] [data-number]').fill('0.5');
   await expect(status).toContainText('Sweep refused');
   await expect(page.locator('#error')).toContainText('bend radius is within the profile reach');
 });
@@ -114,8 +111,7 @@ test('curved meets straight example reports a valid union with the summed volume
   expect(Math.abs(await volume() / expected(0.5) - 1)).toBeLessThan(1e-3);
   expect(await segments()).toBeGreaterThan(0);
 
-  await page.locator('#reach').fill('0.9');
-  await page.locator('#reach').dispatchEvent('change');
+  await page.locator('[data-control="reach"] [data-number]').fill('0.9');
   await expect(status).toContainText(`volume ${expected(0.9).toFixed(6)} m³`);
   await expect(status).toContainText('valid true · closed true');
   expect(Math.abs(await volume() / expected(0.9) - 1)).toBeLessThan(1e-3);

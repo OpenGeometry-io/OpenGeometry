@@ -17,15 +17,25 @@
         class="og-control-summary">A 0.3 × 1.1 m rectangle swept with caps along two 2 m straight runs joined by a circular arc.</p>
       <p
         class="og-control-summary">The section itself must have straight edges: a section with arc edges is not swept yet.</p>
-      <label class="og-control-row">
-        <span class="og-control-label-chip">Bend radius</span>
-        <input id="radius" type="number" min="0.6" max="4" step="0.1"
-          value="1" required />
+      <label class="og-control-row" data-control="radius">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Bend radius (m)</span>
+          <code class="og-control-value" data-value>1</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.5" max="4" step="0.1" value="1" />
+          <input data-number type="number" min="0.5" max="4" step="0.1" value="1" />
+        </div>
       </label>
-      <label class="og-control-row">
-        <span class="og-control-label-chip">Sweep angle (°)</span>
-        <input id="angle" type="number" min="1" max="180" step="1"
-          value="90" required />
+      <label class="og-control-row" data-control="angle">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Sweep angle (°)</span>
+          <code class="og-control-value" data-value>90</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="1" max="180" step="1" value="90" />
+          <input data-number type="number" min="1" max="180" step="1" value="90" />
+        </div>
       </label>
       <label
         class="og-control-row"><input id="outline" type="checkbox" checked /> Show feature outlines</label>

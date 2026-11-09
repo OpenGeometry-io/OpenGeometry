@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { latestOnly, numberControl, onNumberInput } from '../shared/controls';
 import { requiredElement } from '../shared/dom';
 import { startFpsMeter } from '../shared/fps';
 import { bootExample } from '../shared/kernel';
@@ -12,8 +13,8 @@ import {
 const APP = requiredElement('#app', HTMLDivElement);
 const STATUS = requiredElement('#status', HTMLElement);
 const ERROR = requiredElement('#error', HTMLElement);
-const RADIUS_INPUT = requiredElement('#radius', HTMLInputElement);
-const ANGLE_INPUT = requiredElement('#angle', HTMLInputElement);
+const RADIUS = numberControl('radius');
+const ANGLE = numberControl('angle');
 const OUTLINE_INPUT = requiredElement('#outline', HTMLInputElement);
 await bootExample('../');
 
@@ -69,6 +70,15 @@ let generation = 0;
 let path: Wire | undefined;
 let profile: Wire | undefined;
 let swept: Solid | undefined;
+let retired: (Solid | Wire)[] = [];
+
+function dropRetired(): void {
+  retired.forEach((body) => {
+    body.removeFromParent();
+    body.dispose();
+  });
+  retired = [];
+}
 
 function release(): void {
   swept?.removeFromParent();
@@ -79,7 +89,8 @@ function release(): void {
 }
 
 function build(radius: number, turn: number): void {
-  release();
+  retired = [swept, path, profile].filter((body) => body !== undefined);
+  [swept, path, profile] = [undefined, undefined, undefined];
   generation += 1;
   const suffix = String(generation);
   path = new Wire(OG_PRIMITIVE_PROFILE, arcPath(radius, turn), { ogId: `arc-path-${suffix}` });
@@ -109,6 +120,7 @@ function showStatus(radius: number, turn: number): void {
 
 function refuse(error: unknown): void {
   release();
+  dropRetired();
   render();
   ERROR.textContent = String(error);
   STATUS.textContent = 'Sweep refused';
@@ -116,8 +128,8 @@ function refuse(error: unknown): void {
 
 async function update(): Promise<void> {
   ERROR.textContent = '';
-  const radius = Number(RADIUS_INPUT.value);
-  const turn = Number(ANGLE_INPUT.value) * Math.PI / 180;
+  const radius = Number(RADIUS.range.value);
+  const turn = Number(ANGLE.range.value) * Math.PI / 180;
   try {
     build(radius, turn);
     SCENE.updateMatrixWorld(true);
@@ -127,6 +139,7 @@ async function update(): Promise<void> {
       refuse(failure.error);
       return;
     }
+    dropRetired();
     render();
     showStatus(radius, turn);
   } catch (error) {
@@ -134,8 +147,9 @@ async function update(): Promise<void> {
   }
 }
 
-RADIUS_INPUT.addEventListener('change', () => { void update(); });
-ANGLE_INPUT.addEventListener('change', () => { void update(); });
+const REQUEST_UPDATE = latestOnly(update);
+onNumberInput(RADIUS, REQUEST_UPDATE);
+onNumberInput(ANGLE, REQUEST_UPDATE);
 OUTLINE_INPUT.addEventListener('change', () => {
   swept?.setAppearance({ outline: OUTLINE_INPUT.checked });
   render();

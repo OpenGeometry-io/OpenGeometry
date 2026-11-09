@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { latestOnly, numberControl, onNumberInput } from '../shared/controls';
 import { requiredElement } from '../shared/dom';
 import { startFpsMeter } from '../shared/fps';
 import { bootExample } from '../shared/kernel';
@@ -12,7 +13,7 @@ import {
 const APP = requiredElement('#app', HTMLDivElement);
 const STATUS = requiredElement('#status', HTMLElement);
 const ERROR = requiredElement('#error', HTMLElement);
-const RADIUS_INPUT = requiredElement('#radius', HTMLInputElement);
+const RADIUS = numberControl('radius');
 const OUTLINE_INPUT = requiredElement('#outline', HTMLInputElement);
 await bootExample('../');
 
@@ -70,14 +71,22 @@ function analyticVolume(radius: number): number {
 let generation = 0;
 let profile: Wire | undefined;
 let prism: Solid | undefined;
+let retired: (Solid | Wire)[] = [];
+
+function dropRetired(): void {
+  retired.forEach((body) => {
+    body.removeFromParent();
+    body.dispose();
+  });
+  retired = [];
+}
 
 function build(): void {
-  prism?.removeFromParent();
-  prism?.dispose();
-  profile?.dispose();
+  retired = [prism, profile].filter((body) => body !== undefined);
+  [prism, profile] = [undefined, undefined];
   generation += 1;
   const suffix = String(generation);
-  const section = roundedProfile(Number(RADIUS_INPUT.value));
+  const section = roundedProfile(Number(RADIUS.range.value));
   profile = new Wire(OG_PRIMITIVE_PROFILE, section, { ogId: `rounded-profile-${suffix}` });
   prism = new Solid(OG_OPERATION_EXTRUDE, { profile, distance: DISTANCE }, { ogId: `rounded-prism-${suffix}` });
   prism.setAppearance({ color: COLOR, outline: OUTLINE_INPUT.checked });
@@ -93,7 +102,7 @@ function resize(): void {
 
 function showStatus(prefix: string): void {
   if (!prism) throw new Error('The prism was not built');
-  const radius = Number(RADIUS_INPUT.value);
+  const radius = Number(RADIUS.range.value);
   const faces = prism.getBrep().topology.faces.length;
   const kernel = prism.measure({ deflection: DEFLECTION }).volume;
   const analytic = analyticVolume(radius).toFixed(6);
@@ -108,15 +117,18 @@ async function update(): Promise<void> {
     SCENE.updateMatrixWorld(true);
     const settled = await OpenGeometry.settled();
     if (settled.failed.length) throw new Error('Rounded section geometry failed');
+    dropRetired();
     render();
     showStatus('Ready');
   } catch (error) {
+    dropRetired();
     ERROR.textContent = String(error);
     STATUS.textContent = 'Rounded section error';
   }
 }
 
-RADIUS_INPUT.addEventListener('change', () => { void update(); });
+const REQUEST_UPDATE = latestOnly(update);
+onNumberInput(RADIUS, REQUEST_UPDATE);
 OUTLINE_INPUT.addEventListener('change', () => {
   prism?.setAppearance({ outline: OUTLINE_INPUT.checked });
   render();

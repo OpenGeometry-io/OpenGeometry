@@ -15,10 +15,15 @@
       <h3>Curved Meets Straight</h3>
       <p
         class="og-control-summary">A quarter-circle prism, 0.2 m thick and 3 m high, unioned with a straight prism that continues it along the tangent at one end and with another that meets it at a right angle at the other.</p>
-      <label class="og-control-row">
-        <span class="og-control-label-chip">Tangent reach (m)</span>
-        <input id="reach" type="number" min="0.05" max="1" step="0.05"
-          value="0.5" required />
+      <label class="og-control-row" data-control="reach">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Tangent reach (m)</span>
+          <code class="og-control-value" data-value>0.5</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.05" max="1" step="0.05" value="0.5" />
+          <input data-number type="number" min="0.05" max="1" step="0.05" value="0.5" />
+        </div>
       </label>
       <label
         class="og-control-row"><input id="outline" type="checkbox" checked /> Show feature outlines</label>

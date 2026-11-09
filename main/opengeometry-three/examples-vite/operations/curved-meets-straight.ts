@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { latestOnly, numberControl, onNumberInput } from '../shared/controls';
 import { requiredElement } from '../shared/dom';
 import { startFpsMeter } from '../shared/fps';
 import { bootExample } from '../shared/kernel';
@@ -13,7 +14,7 @@ import {
 const APP = requiredElement('#app', HTMLDivElement);
 const STATUS = requiredElement('#status', HTMLElement);
 const ERROR = requiredElement('#error', HTMLElement);
-const REACH_INPUT = requiredElement('#reach', HTMLInputElement);
+const REACH = numberControl('reach');
 const OUTLINE_INPUT = requiredElement('#outline', HTMLInputElement);
 await bootExample('../');
 
@@ -84,6 +85,15 @@ function expectedVolume(reach: number): number {
 let generation = 0;
 let bodies: (Solid | Wire)[] = [];
 let united: Solid | undefined;
+let retired: (Solid | Wire)[] = [];
+
+function dropRetired(): void {
+  retired.reverse().forEach((body) => {
+    body.removeFromParent();
+    body.dispose();
+  });
+  retired = [];
+}
 
 function release(): void {
   united?.removeFromParent();
@@ -103,7 +113,7 @@ function prism(section: Section, name: string): Solid {
 }
 
 function build(reach: number): void {
-  release();
+  [retired, bodies, united] = [bodies, [], undefined];
   generation += 1;
   const quarter = prism(quarterSection(), 'quarter');
   const tangent = prism(rectangleSection([INNER, -RUN], [OUTER, reach]), 'tangent');
@@ -136,24 +146,27 @@ function showStatus(reach: number): void {
 
 async function update(): Promise<void> {
   ERROR.textContent = '';
-  const reach = Number(REACH_INPUT.value);
+  const reach = Number(REACH.range.value);
   try {
     build(reach);
     SCENE.updateMatrixWorld(true);
     const settled = await OpenGeometry.settled();
     const failure = settled.failed[0];
     if (failure) throw new Error(String(failure.error));
+    dropRetired();
     render();
     showStatus(reach);
   } catch (error) {
     release();
+    dropRetired();
     render();
     ERROR.textContent = String(error);
     STATUS.textContent = 'Union failed';
   }
 }
 
-REACH_INPUT.addEventListener('change', () => { void update(); });
+const REQUEST_UPDATE = latestOnly(update);
+onNumberInput(REACH, REQUEST_UPDATE);
 OUTLINE_INPUT.addEventListener('change', () => {
   united?.setAppearance({ outline: OUTLINE_INPUT.checked });
   render();
