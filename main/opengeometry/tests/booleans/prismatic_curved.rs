@@ -150,8 +150,94 @@ fn an_intersection_of_a_stacked_leg_empty_in_every_layer_is_the_separate_empty_r
     assert_eq!(error.error_code(), ErrorCode::EmptyResult, "{error:?}");
 }
 
+const INNER: f64 = 2.9;
+const OUTER: f64 = 3.1;
+const HEIGHT: f64 = 3.0;
+
 fn line(to: [f64; 2]) -> ProfileSegment {
     ProfileSegment { to, arc: None }
+}
+
+fn quarter_ring() -> Primitive {
+    Primitive::Profile {
+        start: [INNER, 0.0],
+        segments: vec![
+            line([OUTER, 0.0]),
+            ProfileSegment {
+                to: [0.0, OUTER],
+                arc: Some(SegmentArc {
+                    center: [0.0, 0.0],
+                    counter_clockwise: true,
+                }),
+            },
+            line([0.0, INNER]),
+            ProfileSegment {
+                to: [INNER, 0.0],
+                arc: Some(SegmentArc {
+                    center: [0.0, 0.0],
+                    counter_clockwise: false,
+                }),
+            },
+        ],
+        closed: true,
+    }
+}
+
+fn rectangle(low: [f64; 2], high: [f64; 2]) -> Primitive {
+    Primitive::Profile {
+        start: low,
+        segments: vec![
+            line([high[0], low[1]]),
+            line(high),
+            line([low[0], high[1]]),
+            line(low),
+        ],
+        closed: true,
+    }
+}
+
+fn ring_overlap(reach: f64) -> f64 {
+    let square = OUTER * OUTER;
+    (reach * (square - reach * reach).sqrt() + square * (reach / OUTER).asin()) / 2.0
+        - INNER * reach
+}
+
+fn ring_area() -> f64 {
+    PI / 4.0 * (OUTER * OUTER - INNER * INNER)
+}
+
+fn ring_and(tool: Primitive) -> WorldGraph {
+    let mut world = graph();
+    extrude_profile(&mut world, "ring", quarter_ring(), [0.0, 0.0, 0.0], HEIGHT);
+    extrude_profile(&mut world, "tool", tool, [0.0, 0.0, 0.0], HEIGHT);
+    world
+}
+
+#[test]
+fn a_prism_whose_sides_run_on_along_the_tangents_at_the_arcs_ends_unions_with_the_ring() {
+    for reach in [0.5, 0.9] {
+        let mut world = ring_and(rectangle([INNER, -2.0], [OUTER, reach]));
+        let measured =
+            operate_with_prismatic_handler(&mut world, "ring", ModifyingOperation::Union, "tool");
+        let tangent = (OUTER - INNER) * (2.0 + reach);
+        assert_volume(
+            measured,
+            HEIGHT * (ring_area() + tangent - ring_overlap(reach)),
+            &format!("reach {reach}"),
+        );
+    }
+}
+
+#[test]
+fn a_prism_whose_side_runs_on_along_the_tangent_at_the_inner_arcs_end_unions_with_the_ring() {
+    let mut world = ring_and(rectangle([-0.2, INNER], [0.05, INNER + 2.0]));
+    let measured =
+        operate_with_prismatic_handler(&mut world, "ring", ModifyingOperation::Union, "tool");
+    assert_volume(
+        measured,
+        HEIGHT * (ring_area() + 0.25 * 2.0 - ring_overlap(0.05)),
+        "side",
+    );
 }
 
 fn ring_at(centre: [f64; 2], inner: f64, outer: f64) -> Primitive {
