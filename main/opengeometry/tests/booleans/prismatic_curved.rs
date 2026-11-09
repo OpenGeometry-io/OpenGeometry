@@ -239,3 +239,101 @@ fn a_prism_whose_side_runs_on_along_the_tangent_at_the_inner_arcs_end_unions_wit
         "side",
     );
 }
+
+fn ring_at(centre: [f64; 2], inner: f64, outer: f64) -> Primitive {
+    let at = |radius: f64, angle: f64| {
+        [
+            centre[0] + radius * angle.cos(),
+            centre[1] + radius * angle.sin(),
+        ]
+    };
+    let arc = |to| ProfileSegment {
+        to,
+        arc: Some(SegmentArc {
+            center: centre,
+            counter_clockwise: true,
+        }),
+    };
+    let mut segments = vec![
+        line(at(outer, 0.0)),
+        arc(at(outer, PI / 2.0)),
+        line(at(inner, PI / 2.0)),
+    ];
+    segments.push(ProfileSegment {
+        to: at(inner, 0.0),
+        arc: Some(SegmentArc {
+            center: centre,
+            counter_clockwise: false,
+        }),
+    });
+    Primitive::Profile {
+        start: at(inner, 0.0),
+        segments,
+        closed: true,
+    }
+}
+
+fn parallel_jamb_box(centre: [f64; 2], angle: f64, half: f64, near: f64, far: f64) -> Primitive {
+    let (radial, side) = ([angle.cos(), angle.sin()], [-angle.sin(), angle.cos()]);
+    let corner = |reach: f64, offset: f64| {
+        [
+            centre[0] + reach * radial[0] + offset * side[0],
+            centre[1] + reach * radial[1] + offset * side[1],
+        ]
+    };
+    let points = [
+        corner(near, -half),
+        corner(far, -half),
+        corner(far, half),
+        corner(near, half),
+    ];
+    Primitive::Profile {
+        start: points[0],
+        segments: points[1..]
+            .iter()
+            .chain(std::iter::once(&points[0]))
+            .map(|&to| line(to))
+            .collect(),
+        closed: true,
+    }
+}
+
+#[test]
+fn two_boxes_through_a_curved_wall_that_ends_on_the_cylinder_seam_cut_both_holes() {
+    let (centre, inner, outer, thickness) = ([0.0, -10.0], 3.8425, 4.1575, 0.315);
+    let hole = |angle: f64, half: f64| {
+        let near = (inner * inner - half * half).sqrt() - thickness;
+        parallel_jamb_box(centre, angle, half, near, outer + thickness)
+    };
+    let mut world = graph();
+    extrude_profile(
+        &mut world,
+        "ring",
+        ring_at(centre, inner, outer),
+        [0.0; 3],
+        3.0,
+    );
+    extrude_profile(
+        &mut world,
+        "door",
+        hole(PI / 2.0 - 0.375, 0.5),
+        [0.0; 3],
+        2.15,
+    );
+    extrude_profile(
+        &mut world,
+        "window",
+        hole(PI / 2.0 - 1.0, 0.8),
+        [0.0, 0.85, 0.0],
+        1.3,
+    );
+    world
+        .operate(
+            "ring",
+            ModifyingOperation::Subtract,
+            &["door".to_string(), "window".to_string()],
+            EditScope::Node,
+        )
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    assert_valid_closed(&world.brep("ring").unwrap(), 1, "ring");
+}
