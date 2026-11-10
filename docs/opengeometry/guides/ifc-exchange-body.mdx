@@ -1,0 +1,44 @@
+---
+title: IFC exchange body
+description: Read a solid's exact geometry as an IFC exchange body, in world metres with Z up, for your IFC writer.
+icon: building
+---
+
+OpenGeometry does not write IFC files. It gives the exact geometry of a solid in a form that an IFC writer can turn into an `IfcAdvancedBrep` or a CSG body.
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  OG_PRIMITIVE_CUBOID,
+  OG_TRANSFORM_TRANSLATE,
+  type AnalyticExchangeBodyV2,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const solid = new Solid(OG_PRIMITIVE_CUBOID, { width: 2, height: 3, depth: 0.2 });
+solid.transform(OG_TRANSFORM_TRANSLATE, { offset: [4, 0, 1] });
+const body: AnalyticExchangeBodyV2 = OpenGeometry.exportIfcBody(solid);
+console.log(body.representation_type, body.up_axis, body.solids.length, body.faces.length);
+```
+
+This prints `AdvancedBrep Z 1 6`.
+
+## What you get
+
+`AnalyticExchangeBodyV2` is a read-only object:
+
+- `schema_version`: `2`.
+- World metres, with Z up.
+- `representation_type`: `'AdvancedBrep'`, or `'CSG'` for a solid with a cavity.
+- `entities`, `solids` and `faces`: the geometry and topology for the writer. Values are of type `IfcPreparedValue`.
+
+It is the same version 2 object as `prepareIfcExchange()` gave in 2.0.18.
+
+## Rules
+
+`exportIfcBody` takes one solid. A sheet, a wire or an assembly throws.

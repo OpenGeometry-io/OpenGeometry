@@ -1,0 +1,146 @@
+---
+title: Booleans
+description: Subtract, unite and intersect solids, read the boolean report, and handle refused cuts.
+icon: object-subtract
+---
+
+`solid.operate(kind, { tools, instances? })` changes the target solid once:
+
+| Kind                     | Result                              |
+| ------------------------ | ----------------------------------- |
+| `OG_OPERATION_SUBTRACT`  | The target minus every tool         |
+| `OG_OPERATION_UNION`     | The target joined with every tool   |
+| `OG_OPERATION_INTERSECT` | What the target and the tools share |
+
+`tools` is one to a hundred solids. The tools stay separate, live solids. Moving or disposing a tool later does not change the target. A tool is drawn only if you add it to the scene.
+
+## Cut openings into a wall
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_EXTRUDE,
+  OG_OPERATION_SUBTRACT,
+  OG_PRIMITIVE_CUBOID,
+  OG_PRIMITIVE_RECTANGLE,
+  OG_TRANSFORM_TRANSLATE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const wall = new Solid(OG_OPERATION_EXTRUDE, {
+  profile: new Wire(OG_PRIMITIVE_RECTANGLE, { width: 6, breadth: 0.2 }),
+  distance: 3,
+});
+const door = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.9, height: 2.1, depth: 0.4 });
+door.transform(OG_TRANSFORM_TRANSLATE, { offset: [-1.5, 0, 0] });
+const pane = new Solid(OG_PRIMITIVE_CUBOID, { width: 1.2, height: 1.2, depth: 0.4 });
+pane.transform(OG_TRANSFORM_TRANSLATE, { offset: [1.2, 0.9, 0] });
+wall.operate(OG_OPERATION_SUBTRACT, { tools: [door, pane] });
+console.log(wall.getReport()?.report.operation, wall.validity().valid);
+```
+
+## An arched opening
+
+Make an arch as one closed profile, a straight sill, two jambs and a half-circle head, and extrude it through the wall. This works through a straight or a curved wall:
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_EXTRUDE,
+  OG_OPERATION_SUBTRACT,
+  OG_PRIMITIVE_PROFILE,
+  OG_PRIMITIVE_RECTANGLE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const wall = new Solid(OG_OPERATION_EXTRUDE, {
+  profile: new Wire(OG_PRIMITIVE_RECTANGLE, { width: 4, breadth: 0.3 }),
+  distance: 3,
+});
+const arch = new Wire(
+  OG_PRIMITIVE_PROFILE,
+  {
+    start: [-0.3, 0.4],
+    segments: [
+      { to: [0.3, 0.4] },
+      { to: [0.3, 1.5] },
+      { to: [-0.3, 1.5], arc: { center: [0, 1.5], counterClockwise: true } },
+      { to: [-0.3, 0.4] },
+    ],
+    closed: true,
+  },
+  { plane: { origin: [0, 0, -0.5], normal: [0, 0, 1], xDirection: [1, 0, 0] } },
+);
+const cutter = new Solid(OG_OPERATION_EXTRUDE, { profile: arch, distance: 1 });
+wall.operate(OG_OPERATION_SUBTRACT, { tools: [cutter] });
+console.log(wall.getReport()?.handlers);
+```
+
+Use one arch-profile prism. A rectangle prism plus a half-cylinder, whose sides touch along the cylinder, can fail through a curved wall.
+
+## The report
+
+`solid.getReport()` returns the report of the last boolean, or `null`:
+
+- `report.operation`: `'union'`, `'intersection'` or `'subtraction'`.
+- `report.face_mappings`: for each face of the inputs, the faces of the result that came from it.
+- `report.contacts` and `report.coincident`: where the inputs touch.
+- `handlers`: the kernel methods that made the result.
+- `revision`: the shape revision of the result.
+
+A `rebuild` or a `mirror` clears the report.
+
+## When a boolean is refused
+
+A refused call throws an `OGError` and leaves the target as it was. `details` says which methods were tried:
+
+```ts
+import {
+  OGError,
+  OpenGeometry,
+  Solid,
+  OG_OPERATION_SUBTRACT,
+  OG_PRIMITIVE_CONE,
+  OG_PRIMITIVE_CUBOID,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const cone = new Solid(OG_PRIMITIVE_CONE, { radiusBottom: 1, radiusTop: 0, height: 1 });
+const box = new Solid(
+  OG_PRIMITIVE_CUBOID,
+  { width: 0.5, height: 0.5, depth: 0.5 },
+  { plane: { origin: [0, 0.8, 0] } },
+);
+try {
+  cone.operate(OG_OPERATION_SUBTRACT, { tools: [box] });
+} catch (error) {
+  if (error instanceof OGError)
+    console.log(error.code, error.details.families, error.details.attempted);
+}
+```
+
+- `CoverageGap`: the kernel has no method for this pair yet. `details.families` names the pair, such as `['cone or frustum', 'cuboid']`.
+- `UnresolvedIntersection`: the kernel could not trace the intersection.
+- `toolIndex` and `ogIds` name the tool that failed.
+
+Some refused cuts are slow, because the kernel tries several methods before it refuses.
+
+## Instances
+
+If the target's shape is shared, pass `{ instances: 'all' }` to cut every instance, or call `makeUnique()` first. Otherwise the call throws `SharedShape`. A tool may not be the target or have the target's shape.
