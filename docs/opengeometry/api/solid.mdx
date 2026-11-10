@@ -49,6 +49,7 @@ console.log(base.getReport()?.report.operation);
 | `OG_PRIMITIVE_SLOT_PRISM`      | `{ length, width, height }`                                    |
 | `OG_PRIMITIVE_ROUNDED_BOX`     | `{ width, height, depth, radius }`                             |
 | `OG_PRIMITIVE_PIPE_SEGMENT`    | `{ outerRadius, innerRadius, height, startAngle, sweepAngle }` |
+| `OG_PRIMITIVE_POLYSOLID`       | `{ path, width, height, justify? }`                            |
 
 `profile`, `holes` and `path` are wires. A sweep with `caps: false` makes a sheet, so `new Solid` throws `BodyTypeMismatch` for it.
 

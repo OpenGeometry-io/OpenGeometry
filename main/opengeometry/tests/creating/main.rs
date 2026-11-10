@@ -3,6 +3,7 @@ mod holes;
 mod mesh_walls;
 mod pipe_segment;
 mod polyhedron;
+mod polysolid;
 mod profiles;
 mod rebuild;
 mod revolve;

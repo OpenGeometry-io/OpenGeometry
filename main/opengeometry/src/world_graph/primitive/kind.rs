@@ -1,6 +1,6 @@
 use crate::brep::BodyType;
 use crate::math::Point3;
-use crate::primitives::ProfileSegment;
+use crate::primitives::{PolysolidJustify, PolysolidPath, ProfileSegment};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -81,6 +81,13 @@ pub enum Primitive {
         start_angle: f64,
         sweep_angle: f64,
     },
+    Polysolid {
+        path: PolysolidPath,
+        width: f64,
+        height: f64,
+        #[serde(default)]
+        justify: PolysolidJustify,
+    },
 }
 
 impl Primitive {
@@ -95,7 +102,8 @@ impl Primitive {
             | Self::Torus { .. }
             | Self::SlotPrism { .. }
             | Self::RoundedBox { .. }
-            | Self::PipeSegment { .. } => BodyType::Solid,
+            | Self::PipeSegment { .. }
+            | Self::Polysolid { .. } => BodyType::Solid,
             Self::Rectangle { .. }
             | Self::Circle { .. }
             | Self::Polyline { .. }

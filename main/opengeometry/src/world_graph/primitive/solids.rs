@@ -2,8 +2,7 @@ use super::kind::Primitive;
 use super::sizes::{check_arc, parameter, required_size, wrong_body_type};
 use crate::brep::{Accuracy, BrepEnvelope, Frame3, GeometryError, GROUND};
 use crate::math::{scale, Point3};
-use crate::primitives;
-use crate::primitives::ProfileEdge;
+use crate::primitives::{self, PolysolidError, PolysolidJustify, PolysolidPath, ProfileEdge};
 use crate::world_graph::error::{ErrorCode, GraphError};
 
 pub(super) fn build_solid(
@@ -67,6 +66,12 @@ pub(super) fn build_solid(
             [start_angle, sweep_angle],
             accuracy,
         )?,
+        Primitive::Polysolid {
+            path,
+            width,
+            height,
+            justify,
+        } => polysolid_body(shape_id, &path, justify, [width, height], accuracy)?,
         _ => return Err(wrong_body_type("solid")),
     };
     Ok(result)
@@ -282,4 +287,21 @@ fn outline_body(
         primitives::arc_edged_extrusion(shape_id, GROUND, outline, height, accuracy)?,
         Vec::new(),
     ))
+}
+
+fn polysolid_body(
+    shape_id: String,
+    path: &PolysolidPath,
+    justify: PolysolidJustify,
+    [width, height]: [f64; 2],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    required_size(width, accuracy.geometric, "width")?;
+    required_size(height, accuracy.geometric, "height")?;
+    let brep = primitives::polysolid(shape_id, GROUND, path, justify, [width, height], accuracy)
+        .map_err(|error| match error {
+            PolysolidError::Parameter(message) => parameter(&message),
+            PolysolidError::Geometry(error) => error.into(),
+        })?;
+    Ok((brep, Vec::new()))
 }

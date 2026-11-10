@@ -11,6 +11,10 @@ All notable changes to the `opengeometry` package are in this file. The format f
 - Solid primitives `OG_PRIMITIVE_SLOT_PRISM`, `OG_PRIMITIVE_ROUNDED_BOX` and
   `OG_PRIMITIVE_PIPE_SEGMENT`, with their `OG_PRIMITIVE_PARAMS_*` helpers and the
   `SlotPrismParams`, `RoundedBoxParams` and `PipeSegmentParams` types.
+- `OG_PRIMITIVE_POLYSOLID`: a solid wall of constant width and height along a path of straight
+  legs, with `justify` `'centre'`, `'left'` or `'right'`, mitred corners and an open or closed
+  path. `OG_PRIMITIVE_PARAMS_POLYSOLID` and the type `PolysolidParams` give it a
+  type.
 
 ## [3.0.0] - 2026-11-09
 

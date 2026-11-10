@@ -145,6 +145,11 @@
     "page": "opengeometry/api/constants"
   },
   {
+    "export": "PolysolidParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
     "export": "CurvedRegion2D",
     "kind": "type",
     "page": "opengeometry/api/regions"
@@ -250,6 +255,11 @@
     "page": "opengeometry/api/constants"
   },
   {
+    "export": "OG_PRIMITIVE_POLYSOLID",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
     "export": "OG_PRIMITIVE_PARAMS_RECTANGLE",
     "kind": "value",
     "page": "opengeometry/api/constants"
@@ -321,6 +331,11 @@
   },
   {
     "export": "OG_PRIMITIVE_PARAMS_PIPE_SEGMENT",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_POLYSOLID",
     "kind": "value",
     "page": "opengeometry/api/constants"
   },

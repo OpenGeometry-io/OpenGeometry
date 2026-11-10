@@ -401,6 +401,42 @@ fn standard_outlines() -> Vec<Case> {
     ]
 }
 
+fn polysolid_path(points: &[[f64; 2]], closed: bool) -> primitives::PolysolidPath {
+    primitives::PolysolidPath {
+        start: points[0],
+        segments: points[1..]
+            .iter()
+            .map(|&to| primitives::ProfileSegment { to, arc: None })
+            .collect(),
+        closed,
+    }
+}
+
+fn polysolid(name: &str, points: &[[f64; 2]], closed: bool) -> Result<BrepEnvelope, GeometryError> {
+    let path = polysolid_path(points, closed);
+    let centre = primitives::PolysolidJustify::Centre;
+    primitives::polysolid(name.into(), ground(), &path, centre, [0.2, 1.0], standard()).map_err(
+        |error| match error {
+            primitives::PolysolidError::Parameter(message) => {
+                GeometryError::InvalidGeometry(message)
+            }
+            primitives::PolysolidError::Geometry(error) => error,
+        },
+    )
+}
+
+fn polysolids() -> Vec<Case> {
+    vec![
+        built("polysolid.l-path", || {
+            polysolid("l", &[[0.0, 0.0], [3.0, 0.0], [3.0, 2.0]], false)
+        }),
+        built("polysolid.closed-loop", || {
+            let points = [[0.0, 0.0], [3.0, 0.0], [3.0, 2.0], [0.0, 2.0], [0.0, 0.0]];
+            polysolid("loop", &points, true)
+        }),
+    ]
+}
+
 pub(crate) fn cases() -> Vec<Case> {
     [
         cuboids(),
@@ -414,6 +450,7 @@ pub(crate) fn cases() -> Vec<Case> {
         revolved_arcs(),
         vec![graph_case("graph.primitive.revolved", revolved_primitives)],
         standard_outlines(),
+        polysolids(),
     ]
     .into_iter()
     .flatten()

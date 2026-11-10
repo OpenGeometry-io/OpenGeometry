@@ -1,6 +1,6 @@
 import type {
   ArcParams, ConeParams, CylinderSectorParams, PolyhedronParams, ProfileParams, SphereParams, TorusParams,
-  SlotPrismParams, RoundedBoxParams, PipeSegmentParams,
+  SlotPrismParams, RoundedBoxParams, PipeSegmentParams, PolysolidParams,
 } from '../dto/primitives';
 
 export const OG_PRIMITIVE_RECTANGLE = 'Rectangle' as const;
@@ -18,6 +18,7 @@ export const OG_PRIMITIVE_ARC = 'Arc' as const;
 export const OG_PRIMITIVE_SLOT_PRISM = 'SlotPrism' as const;
 export const OG_PRIMITIVE_ROUNDED_BOX = 'RoundedBox' as const;
 export const OG_PRIMITIVE_PIPE_SEGMENT = 'PipeSegment' as const;
+export const OG_PRIMITIVE_POLYSOLID = 'Polysolid' as const;
 
 export const OG_PRIMITIVE_PARAMS_RECTANGLE = (
   value: { width: number; breadth: number },
@@ -42,3 +43,4 @@ export const OG_PRIMITIVE_PARAMS_TORUS = (value: TorusParams): TorusParams => va
 export const OG_PRIMITIVE_PARAMS_SLOT_PRISM = (value: SlotPrismParams): SlotPrismParams => value;
 export const OG_PRIMITIVE_PARAMS_ROUNDED_BOX = (value: RoundedBoxParams): RoundedBoxParams => value;
 export const OG_PRIMITIVE_PARAMS_PIPE_SEGMENT = (value: PipeSegmentParams): PipeSegmentParams => value;
+export const OG_PRIMITIVE_PARAMS_POLYSOLID = (value: PolysolidParams): PolysolidParams => value;

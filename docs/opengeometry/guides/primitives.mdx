@@ -70,6 +70,7 @@ A profile refuses repeated points, an arc whose end is not on its circle, segmen
 | `OG_PRIMITIVE_SLOT_PRISM`      | `{ length, width, height }`                                    | A stadium standing on the plane, centred in u and v. `length` between the arc centres along u, `width` along v |
 | `OG_PRIMITIVE_ROUNDED_BOX`     | `{ width, height, depth, radius }`                             | A cuboid with its four upright edges rounded. `radius` below half the width and half the depth                 |
 | `OG_PRIMITIVE_PIPE_SEGMENT`    | `{ outerRadius, innerRadius, height, startAngle, sweepAngle }` | A ring sector, placed and angled like the cylinder sector. The sweep is below one full turn                    |
+| `OG_PRIMITIVE_POLYSOLID`       | `{ path, width, height, justify? }`                            | A wall of constant width along a path of straight legs. See below                                              |
 
 ```ts
 import {
@@ -143,6 +144,39 @@ const bend = new Solid(
 );
 console.log(slot.ogId, plinth.ogId, bend.ogId);
 ```
+
+## Polysolid
+
+A polysolid is a wall of constant `width` and `height` along a path. The path has the fields of a profile, in plane coordinates `[u, v]`. The wall stands on the plane where the path is, and rises along the normal. It is not centred.
+
+`justify` is `'centre'` (the default), `'left'` or `'right'` of the path direction. Corners between two legs are mitred, and bevelled above a mitre limit of 4. `closed: true` makes a ring wall; an open path has square ends.
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  OG_PRIMITIVE_POLYSOLID,
+  OG_PRIMITIVE_PARAMS_POLYSOLID,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const wall = new Solid(
+  OG_PRIMITIVE_POLYSOLID,
+  OG_PRIMITIVE_PARAMS_POLYSOLID({
+    path: { start: [0, 0], segments: [{ to: [3, 0] }, { to: [3, 2] }], closed: false },
+    width: 0.2,
+    height: 1,
+    justify: 'left',
+  }),
+);
+console.log(wall.measure().volume);
+```
+
+Only straight legs are built: a segment with `arc` throws `InvalidParameter` that names the segment. A path with fewer than two points, a leg of zero length, a leg shorter than half the width, or a path that crosses itself also throws `InvalidParameter`.
 
 ## Typed parameters
 

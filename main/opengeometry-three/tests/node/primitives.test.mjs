@@ -14,9 +14,11 @@ import {
   OG_PRIMITIVE_PARAMS_CONE,
   OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR,
   OG_PRIMITIVE_PARAMS_POLYHEDRON,
+  OG_PRIMITIVE_PARAMS_POLYSOLID,
   OG_PRIMITIVE_PARAMS_SPHERE,
   OG_PRIMITIVE_PARAMS_TORUS,
   OG_PRIMITIVE_POLYHEDRON,
+  OG_PRIMITIVE_POLYSOLID,
   OG_PRIMITIVE_PROFILE,
   OG_PRIMITIVE_RECTANGLE,
   OG_PRIMITIVE_SPHERE,
@@ -214,4 +216,30 @@ test('a rounded box radius of half its width and an inverted pipe segment are In
   assert.throws(() => new Solid(OG_PRIMITIVE_ROUNDED_BOX, corner, { ogId: 'corner' }), failsWith('InvalidParameter'));
   const pipe = { outerRadius: 0.3, innerRadius: 0.5, height: 1, startAngle: 0, sweepAngle: 1 };
   assert.throws(() => new Solid(OG_PRIMITIVE_PIPE_SEGMENT, pipe, { ogId: 'pipe' }), failsWith('InvalidParameter'));
+});
+
+function lPath(arc) {
+  return { start: [0, 0], segments: [{ to: [3, 0] }, { to: [3, 2], arc }], closed: false };
+}
+
+test('an L-shaped polysolid is a Solid of volume one that exports planes only to STEP', async () => {
+  await boot();
+  const params = OG_PRIMITIVE_PARAMS_POLYSOLID({
+    path: { start: [0, 0], segments: [{ to: [3, 0] }, { to: [3, 2] }], closed: false },
+    width: 0.2,
+    height: 1,
+    justify: 'centre',
+  });
+  const wall = new Solid(OG_PRIMITIVE_POLYSOLID, params, { ogId: 'l-wall' });
+  assert.equal(wall.lastInfo.bodyType, 'Solid');
+  assert.equal(Math.abs(wall.measure().volume - 1) <= 1e-9, true);
+  const { text } = await OpenGeometry.exportStep({ nodes: [wall] });
+  assert.equal(text.match(/\bPLANE\(/g)?.length, wall.getBrep().topology.faces.length);
+  assert.equal(text.match(/CYLINDRICAL_SURFACE/g), null);
+});
+
+test('a polysolid with an arc segment is InvalidParameter', async () => {
+  await boot();
+  const params = { path: lPath({ center: [3, 1], counterClockwise: true }), width: 0.2, height: 1 };
+  assert.throws(() => new Solid(OG_PRIMITIVE_POLYSOLID, params, { ogId: 'arced' }), failsWith('InvalidParameter'));
 });

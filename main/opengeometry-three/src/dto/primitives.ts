@@ -12,3 +12,6 @@ export type RoundedBoxParams = { width: number; height: number; depth: number; r
 export type PipeSegmentParams = {
   outerRadius: number; innerRadius: number; height: number; startAngle: number; sweepAngle: number;
 };
+export type PolysolidParams = {
+  path: ProfileParams; width: number; height: number; justify?: 'centre' | 'left' | 'right';
+};

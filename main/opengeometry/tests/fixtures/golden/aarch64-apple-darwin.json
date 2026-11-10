@@ -431,6 +431,8 @@
   "builders.polyline.noncoplanar": "de106849f9cff95a618f76b860f88e797de65c30944c0a4b081b1cb62f140456",
   "builders.polyline.open": "485a0b9bebbe46e69ac2f3e44b6567aa57e430857f87c8eba1dc9652f37d5ed4",
   "builders.polyline.repeated-point": "d608bd770ef548c6c94c9bee36a322fa486575308e1521e96c1f92bf0fad7156",
+  "builders.polysolid.closed-loop": "bd28c9d24de20392f82def879c5dea7735d1e8bf6cb1e94899bdc8bbc0266938",
+  "builders.polysolid.l-path": "8e0fbb2609ab792ec775b221cb388da198500088c0b0f5761cae0a1166d029d4",
   "builders.profile-keys.ring-sector": "b2ad4caf9ab117586b3c141738bd06e07bd5047d87647566a6eece7216a9f61c",
   "builders.rectangle-keys.ground": "12e2f757757dc4f3e3fb5cd08cb103ed86f9ea393295ed2897fff72605186ed2",
   "builders.rectangle.identity": "31332072019245900457cc87ce607bc825c04cddf1589c11f1e870ba7b4a78c1",

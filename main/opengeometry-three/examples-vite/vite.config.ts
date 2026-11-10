@@ -27,6 +27,7 @@ export default defineConfig({
         slotPrism: `${ROOT}/shapes/slot-prism.html`,
         roundedBox: `${ROOT}/shapes/rounded-box.html`,
         pipeSegment: `${ROOT}/shapes/pipe-segment.html`,
+        polysolid: `${ROOT}/shapes/polysolid.html`,
       },
     },
   },
