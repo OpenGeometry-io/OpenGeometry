@@ -177,7 +177,7 @@ export type AcceptanceFixture = {
 };
 
 export type QuickStartFixture = {
-  wall: Solid;
+  plate: Solid;
   bounds: Bounds | null;
   renderer: THREE.WebGLRenderer;
   settled: Awaited<Settled>;

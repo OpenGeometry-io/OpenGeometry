@@ -5,16 +5,17 @@ function checkQuickStart(): void {
   if (!fixture) throw new Error('The quick start page published no fixture');
   if (fixture.errors.length) throw new Error(`The SDK emitted errors: ${JSON.stringify(fixture.errors)}`);
   if (fixture.backend !== 'worker') throw new Error(`Expected worker, got ${fixture.backend}`);
-  if (fixture.settled.failed.length || !fixture.wall.record) throw new Error('The wall did not settle');
+  if (fixture.settled.failed.length || !fixture.plate.record) throw new Error('The plate did not settle');
   const { products, solids, faces } = fixture.report;
-  if (products !== 1 || solids !== 1 || faces !== 22) {
+  if (products !== 1 || solids !== 1 || faces !== 14) {
     throw new Error(`STEP counts differ: ${JSON.stringify({ products, solids, faces })}`);
   }
   if (!fixture.text.startsWith('ISO-10303-21')) throw new Error('The STEP text does not start with ISO-10303-21');
   const bounds = fixture.bounds;
   const near = (actual: number, target: number): boolean => Math.abs(actual - target) <= 1e-6;
-  if (!bounds || !near(bounds[0], -3) || !near(bounds[3], 3) || !near(bounds[1], 0) || !near(bounds[4], 3)) {
-    throw new Error(`The wall bounds differ: ${JSON.stringify(bounds)}`);
+  const expected = [-0.06, 0, -0.04, 0.06, 0.01, 0.04];
+  if (!bounds || expected.some((target, index) => !near(bounds[index] ?? Number.NaN, target))) {
+    throw new Error(`The plate bounds differ: ${JSON.stringify(bounds)}`);
   }
 }
 
@@ -36,7 +37,7 @@ function countDrawnPixels(): number {
   return drawn;
 }
 
-test('the README quick start boots from URLs, draws the wall and exports it', async ({ page }) => {
+test('the README quick start boots from URLs, draws the plate and exports it', async ({ page }) => {
   const problems: string[] = [];
   page.on('pageerror', (error) => { problems.push(error.message); });
   page.on('console', (message) => { if (message.type() === 'error') problems.push(message.text()); });

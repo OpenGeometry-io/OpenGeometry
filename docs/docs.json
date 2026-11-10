@@ -19,7 +19,9 @@
     "metatags": {
       "og:site_name": "OpenGeometry Docs",
       "og:locale": "en_US",
-      "twitter:card": "summary",
+      "og:image": "https://docs.opengeometry.io/logo/og.png",
+      "twitter:card": "summary_large_image",
+      "twitter:image": "https://docs.opengeometry.io/logo/og.png",
       "twitter:site": "@openGeometry"
     }
   },
@@ -245,10 +247,10 @@
     }
   ],
   "logo": {
-    "light": "/logo/logoDark.png",
-    "dark": "/logo/logoLight.png"
+    "light": "/logo/wordmark-light.png",
+    "dark": "/logo/wordmark-dark.png"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/favicon.png",
   "navbar": {
     "links": [
       {
