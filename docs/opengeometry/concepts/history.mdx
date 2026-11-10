@@ -1,0 +1,70 @@
+---
+title: History
+description: Undo a group of edits with a mark, and run edits as a transaction that rolls back if it throws.
+icon: clock-rotate-left
+---
+
+The kernel keeps the document's history. A mark is a point in that history that you can go back to.
+
+## Marks
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, OG_TRANSFORM_TRANSLATE } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const box = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 });
+const mark = OpenGeometry.mark();
+box.transform(OG_TRANSFORM_TRANSLATE, { offset: [2, 0, 0] });
+const extra = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.5, height: 0.5, depth: 0.5 });
+mark.rollback();
+console.log(box.getWorldPlacement().origin, extra.ogId);
+mark.release();
+```
+
+After `rollback`, the box is back at the origin and `extra` is gone from the document.
+
+- `rollback()` takes the document back to the mark: shapes, placements, the tree, and bodies made or disposed after it. The mark stays live, so you can roll back to it again. Later marks are released.
+- `release()` ends the mark. Release every mark that you no longer need: a live mark keeps old revisions in memory.
+- A released mark throws `InvalidMark`.
+- `OpenGeometry.markStats()` returns `{ liveMarks, retainedRevisions }`.
+
+A body that is disposed while a mark is live is hidden, not freed, so a rollback can bring it back. It is freed when no mark can bring it back.
+
+## Transactions
+
+`OpenGeometry.transaction(fn)` runs `fn` between a mark and its release. If `fn` throws, it rolls back first, then throws again:
+
+```ts
+import {
+  OGError,
+  OpenGeometry,
+  Solid,
+  OG_OPERATION_SUBTRACT,
+  OG_PRIMITIVE_CUBOID,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const slab = new Solid(OG_PRIMITIVE_CUBOID, { width: 4, height: 0.2, depth: 4 });
+const hole = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 });
+try {
+  OpenGeometry.transaction(() => {
+    slab.operate(OG_OPERATION_SUBTRACT, { tools: [hole] });
+    slab.rebuild(OG_PRIMITIVE_CUBOID, { width: -1, height: 0.2, depth: 4 });
+  });
+} catch (error) {
+  if (error instanceof OGError) console.log(error.code, slab.getReport() === null);
+}
+```
+
+The rebuild throws `InvalidParameter`, so the subtraction is rolled back too.
+
+- `fn` must be synchronous. A function that returns a promise throws `InvalidParameter`.
+- `{ dryRun: true }` always rolls back. Use it to test whether a group of edits works, and to read values on the way.

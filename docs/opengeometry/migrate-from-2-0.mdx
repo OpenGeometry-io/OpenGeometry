@@ -1,0 +1,35 @@
+---
+title: Migrate from 2.0
+description: What changed between OpenGeometry 2.0 and 3.0, and where the full step-by-step guide is.
+icon: arrow-right-arrow-left
+---
+
+OpenGeometry 3.0 has a new API. Code written for 2.0 does not run on 3.0 without changes. Version 2.5 was not published: from 2.0, move straight to 3.0.
+
+The full guide is [MIGRATION.md](https://github.com/OpenGeometry-io/OpenGeometry/blob/main/MIGRATION.md) in the repository. It gives each change with code before and after, a table of replacements, every change of behaviour, and the checks to run at the end.
+
+## The main changes
+
+| 2.0                                                     | 3.0                                                                                                |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| One class per shape: `Cuboid`, `Cylinder`, `Polygon`, … | Three body classes: `new Wire(kind, params)`, `new Solid(kind, params)`, `new Sheet(kind, params)` |
+| `Vector3` objects                                       | `[x, y, z]` arrays                                                                                 |
+| `setPlacement`, positions on the object                 | `body.transform(kind, params)`                                                                     |
+| Free functions such as `booleanRegions2D`               | Statics: `OpenGeometry.booleanRegions2D`, `OpenGeometry.offsetRingVariable`, …                     |
+| `solid.prepareIfcExchange()`                            | `OpenGeometry.exportIfcBody(solid)`                                                                |
+| `new Sweep({ capStart: false, capEnd: false })`         | `new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false })`                                    |
+| `AnalyticSolid({ kind: 'arcEdgedExtrusion' })`          | An `OG_PRIMITIVE_PROFILE` wire, then `OG_OPERATION_EXTRUDE`                                        |
+| `solid.shell(thickness)` returned a new solid           | `solid.operate(OG_OPERATION_SHELL, { thickness })` hollows in place                                |
+
+## Removed
+
+These 2.0 features are not in 3.0, and have no replacement: IFC file text, STL and PDF export, projection, loft, triangulation as a public call, curves other than lines, circles and arcs, and wedges. Take that code out, or stay on 2.0.
+
+## How to move
+
+1. Install 3.0 and run your type check. A call to a 2.0 class or function fails at compile time.
+2. For each failure, find the call in MIGRATION.md under "Replace this with that".
+3. Read "Different behaviour", because some calls keep their name and change what they return.
+4. Run the "Check your result" steps.
+
+The [API reference](/opengeometry/api/overview) lists every 3.0 export.

@@ -1,0 +1,75 @@
+---
+title: Offsets
+description: Variable insets of point and curved rings, polyline strokes and one-sided offsets, with the types OffsetHole, OffsetPath2D and OffsetPolylineOptions.
+icon: arrows-to-dot
+---
+
+Rings and paths are flat `[x, y, z, ...]` lists or a `Float64Array`. `y` is ignored.
+
+## offsetRingVariable
+
+`static offsetRingVariable(ring, distances, holes?: readonly OffsetHole[]): CurvedRegion2D[]`
+
+Insets a closed ring by one distance per edge. Each hole grows by its own distances. Inside corners are exact arcs.
+
+An outer ring that crosses itself, such as a bowtie, throws `InvalidTopology`.
+
+## offsetCurvedRingVariable
+
+`static offsetCurvedRingVariable(region: CurvedRegion2D, distances, holeDistances?: (number[] | Float64Array)[]): CurvedRegion2D[]`
+
+Insets one region of lines and arcs by one distance per edge, with one list per hole ring.
+
+- Each distance is finite and not negative. A distance of 0 keeps its edge.
+- An arc stays on its centre: a convex arc moves to `r − d`, a concave arc or a hole's arc to `r + d`.
+- A distance larger than an arc's radius, a wrong count, or a negative or non-finite distance throws `InvalidParameter`.
+- A collapsed result is an empty list.
+
+## offsetPolylineRegions
+
+`static offsetPolylineRegions(path, width: number, closed: boolean, miterLimit?: number): CurvedRegion2D[]`
+
+Strokes a path into regions of the given width. Corners are mitred up to `miterLimit`, default 4, and bevelled past it. A width that is not finite throws `InvalidParameter`.
+
+## offsetPolyline
+
+`static offsetPolyline(path, distance: number, options?: OffsetPolylineOptions): OffsetPath2D`
+
+Offsets a path to one side.
+
+```ts
+import { OpenGeometry, type OffsetPath2D, type OffsetPolylineOptions } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const options: OffsetPolylineOptions = { acuteThresholdDegrees: 35, bevel: true };
+const kerb: OffsetPath2D = OpenGeometry.offsetPolyline([0, 0, 0, 10, 0, 0, 10, 0, 6], 0.5, options);
+console.log(kerb.edges.length, kerb.bevelled, kerb.closed);
+```
+
+## Types
+
+### OffsetHole
+
+`{ ring: number[] | Float64Array; distances: number[] | Float64Array }`
+
+### OffsetPolylineOptions
+
+| Field                   | Default                   | Meaning                                |
+| ----------------------- | ------------------------- | -------------------------------------- |
+| `acuteThresholdDegrees` | `35`                      | Corners sharper than this are bevelled |
+| `bevel`                 | `true`                    | Bevel acute corners                    |
+| `closed`                | `true` when the ends meet | Treat the path as closed               |
+
+### OffsetPath2D
+
+| Field      | Type                 | Meaning                             |
+| ---------- | -------------------- | ----------------------------------- |
+| `edges`    | `CurvedRegionEdge[]` | The offset edges                    |
+| `bevelled` | `number[]`           | The indices of the bevelled corners |
+| `closed`   | `boolean`            | Whether the result is closed        |
+
+See [Regions and offsets](/opengeometry/guides/regions-and-offsets).

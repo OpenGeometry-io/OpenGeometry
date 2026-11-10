@@ -1,0 +1,64 @@
+---
+title: Troubleshooting
+description: The common problems when you start with OpenGeometry 3.0, what causes them and how to fix them.
+icon: wrench
+---
+
+## The kernel does not load
+
+**What you see:** `OpenGeometry.create` rejects, or the network panel shows a 404 for `opengeometry_bg.wasm` or `tessellation-worker.js`.
+
+**Cause:** the page cannot fetch the two files. A bundler moved `index.js` without them.
+
+**Fix:** copy both files into the folder your site serves at its root and pass their addresses. See [Installation](/opengeometry/installation#serve-the-two-files).
+
+## A call throws `NotInitialised`
+
+**Cause:** a body was made before `OpenGeometry.create` finished.
+
+**Fix:** await `create` once, before the first body.
+
+## The body is black
+
+**Cause:** surfaces use `MeshStandardMaterial`, and the scene has no light.
+
+**Fix:** add a light, for example `new THREE.HemisphereLight(0xffffff, 0x444444, 2)`.
+
+## The body does not show
+
+- Add the body to the scene. A body is not drawn on its own, and a `SystemAssembly` is not a Three.js object.
+- Render. Rendering is what asks the kernel for the mesh. Render in a loop, or render once, `await OpenGeometry.settled()`, and render again.
+
+## A move is undone, with a `PlacementOverwritten` warning
+
+**Cause:** the code set `body.position`, `rotation` or `scale`.
+
+**Fix:** move bodies with `transform`. See [Transforms and assemblies](/opengeometry/guides/transforms-and-assemblies).
+
+## An edit throws `SharedShape`
+
+**Cause:** the body is an instance, and its shape is shared with other instances.
+
+**Fix:** pass `{ instances: 'all' }` to change every instance, or call `makeUnique()` first to change only this one.
+
+## The profile comes out mirrored
+
+**Cause:** on the default ground plane, a profile point `[u, v]` lands at world `(u, 0, −v)`. The v axis runs along −Z.
+
+**Fix:** flip the sign of v, or draw on another plane. See [Coordinates and planes](/opengeometry/concepts/coordinates-and-planes).
+
+## STEP export refuses the selection
+
+**Cause:** a wire or a sheet cannot be exported on its own. It throws `InvalidOperand`. A selection with no solid in it throws `EmptyResult`.
+
+**Fix:** export solids. An assembly may also hold wires and sheets: they are left out and listed in `report.skipped`.
+
+## Every call throws after a `fatal` event
+
+**Cause:** the kernel stopped after an internal failure.
+
+**Fix:** call `OpenGeometry.reset()`, then make the bodies again. See [Errors and limits](/opengeometry/concepts/errors).
+
+## The code uses `Cuboid` or `Vector3`
+
+That code is for 2.0. Follow [Migrate from 2.0](/opengeometry/migrate-from-2-0).

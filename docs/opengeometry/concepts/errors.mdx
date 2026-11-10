@@ -1,0 +1,86 @@
+---
+title: Errors and limits
+description: The OGError codes, the events the runtime sends, what a fatal error means, and the limits of 3.0.
+icon: triangle-exclamation
+---
+
+Every failure throws an `OGError`. Catch it and branch on `code`:
+
+```ts
+import { OGError, OpenGeometry, Solid, OG_PRIMITIVE_SPHERE } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+try {
+  new Solid(OG_PRIMITIVE_SPHERE, { radius: 0 });
+} catch (error) {
+  if (error instanceof OGError && error.code === 'InvalidParameter')
+    console.log(error.call, error.message);
+}
+```
+
+An `OGError` has:
+
+- `code`: a stable name, such as `InvalidParameter`.
+- `call`: the call that failed, such as `Solid.constructor`.
+- `message`: a text for people. Do not parse it.
+- `details`: an object with more data for some codes. For a failed `operate` it has `handlers`, `attempted`, `families`, `toolIndex` and `ogIds`.
+
+A call that throws leaves the document as it was.
+
+## Codes
+
+| Code                     | When                                                                                                                                   |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `NotInitialised`         | A call before `OpenGeometry.create` finished                                                                                           |
+| `InvalidParameter`       | A parameter is missing, has the wrong type, or is out of range                                                                         |
+| `InvalidGeometry`        | The input geometry cannot make a valid shape                                                                                           |
+| `InvalidOperand`         | The call does not apply to this body, for example `classifyPoint` on a wire, a wire in `exportStep`, or `copy()`                       |
+| `BodyTypeMismatch`       | The kind makes another body type than the class, such as `new Wire(OG_PRIMITIVE_CUBOID, ...)`, or a rebuild would change the body type |
+| `InvalidTransform`       | A transform cannot be held in a placement, for example a negative scale                                                                |
+| `SharedShape`            | An edit of a shape that instances share, without `{ instances: 'all' }`                                                                |
+| `ToolSharesTargetShape`  | A tool of `operate` is the target, or has the target's shape                                                                           |
+| `DuplicateNode`          | An `ogId` that is already used, or a tool listed twice                                                                                 |
+| `UnknownNode`            | An `ogId` that is not in the document                                                                                                  |
+| `CycleDetected`          | An `addChild` that would make a node its own ancestor                                                                                  |
+| `NotAChild`              | A `removeChild` of a node that is not a child                                                                                          |
+| `EmptyResult`            | A boolean that leaves nothing, or a STEP selection with no solid in it                                                                 |
+| `Disposed`               | A call on a disposed body or on a body from a reset runtime                                                                            |
+| `InvalidMark`            | A call on a released mark                                                                                                              |
+| `CoverageGap`            | The kernel has no method for this pair of surfaces yet. `details.families` names the pair                                              |
+| `UnresolvedIntersection` | The kernel could not trace an intersection                                                                                             |
+| `InvalidTopology`        | The result would not be a valid B-rep                                                                                                  |
+| `UnsupportedGeometry`    | The call needs exact geometry, and the body has approximate geometry                                                                   |
+| `SweepSelfIntersection`  | A sweep would cut through itself                                                                                                       |
+| `LimitExceeded`          | A size limit was reached, such as the 2 000 000 triangle cap of `measure`                                                              |
+| `UnresolvedTessellation` | The kernel could not mesh a face                                                                                                       |
+| `WorkerFailure`          | The display worker failed                                                                                                              |
+| `Cancelled`              | A display request was replaced by a newer one, or a body had no mesh when `settled` resolved                                           |
+| `RevisionConflict`       | An internal revision check failed. Report it as a bug                                                                                  |
+| `KernelPanic`            | The kernel stopped. See below                                                                                                          |
+
+## Events
+
+`OpenGeometry.on(event, handler)` subscribes to the runtime. It returns a function that unsubscribes.
+
+| Event        | When                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `'geometry'` | A display mesh was made                                                                     |
+| `'warning'`  | Something was corrected, such as a `PlacementOverwritten` when code set `position` directly |
+| `'error'`    | A background failure, such as a failed mesh or a listener that threw                        |
+| `'fatal'`    | The kernel panicked                                                                         |
+
+## A fatal error
+
+After a `KernelPanic`, the runtime sends `'fatal'` and refuses every kernel call with `KernelPanic`. Call `OpenGeometry.reset()`, then make your bodies again.
+
+## Limits
+
+- One to a hundred tool solids in one `operate` call.
+- `measure` caps its mesh at 2 000 000 triangles.
+- A 2D region boolean takes at most 100 000 points or edges across both operands.
+- Sizes must be above four times the geometric tolerance, `4e-8` m.
+- Some pairs of curved surfaces are not covered yet and throw `CoverageGap`. Some refused booleans take seconds, because the kernel tries several methods before it refuses.
