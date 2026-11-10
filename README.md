@@ -76,7 +76,7 @@ npm install opengeometry three
 ```
 
 - `three` is a peer dependency: versions `>=0.168.0 <0.185.0` are supported.
-- The package is ES modules only, and its TypeScript types are included.
+- The package is ES modules only, and its TypeScript types are included. They use the types of `three`, which `three` does not ship: in a TypeScript project, also run `npm install --save-dev @types/three`.
 - The package ships `opengeometry_bg.wasm` (the kernel) and `tessellation-worker.js` (the display worker), and your page must be able to fetch both. With no arguments, `OpenGeometry.create()` looks for them next to the package's own `index.js`. If your bundler moves or rewrites `index.js` without the two files, that lookup fails, so the dependable way is the one the quick start uses: copy both files from `node_modules/opengeometry/` into the folder your site serves at its root (in Vite, the `public/` folder by default) and pass their URLs to `create`.
 
 ## Quick start
