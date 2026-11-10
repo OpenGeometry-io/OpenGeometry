@@ -4,6 +4,14 @@ All notable changes to the `opengeometry` package are in this file. The format f
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Solid primitives `OG_PRIMITIVE_SLOT_PRISM`, `OG_PRIMITIVE_ROUNDED_BOX` and
+  `OG_PRIMITIVE_PIPE_SEGMENT`, with their `OG_PRIMITIVE_PARAMS_*` helpers and the
+  `SlotPrismParams`, `RoundedBoxParams` and `PipeSegmentParams` types.
+
 ## [3.0.0] - 2026-11-09
 
 3.0 is a new API. Code written for 2.0 does not run without changes. Version 2.5 was not

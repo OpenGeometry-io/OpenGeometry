@@ -16,7 +16,7 @@ export type { AnalyticExchangeBodyV2, IfcPreparedValue } from './src/dto/ifc-bod
 export * from './src/constants/index';
 export type {
   ArcParams, ConeParams, CylinderSectorParams, PolyhedronParams, ProfileArc, ProfileParams, ProfileSegment,
-  SphereParams, TorusParams,
+  SphereParams, TorusParams, SlotPrismParams, RoundedBoxParams, PipeSegmentParams,
 } from './src/dto/primitives';
 export type {
   CurvedRegion2D, CurvedRegionEdge, OffsetHole, OffsetPath2D, OffsetPolylineOptions, OffsetRegion,

@@ -22,6 +22,9 @@ Each kind is a string constant. Pass it as the first argument of a constructor, 
 | `OG_PRIMITIVE_SPHERE`          | `'Sphere'`         | Solid | `SphereParams`             |
 | `OG_PRIMITIVE_CONE`            | `'Cone'`           | Solid | `ConeParams`               |
 | `OG_PRIMITIVE_TORUS`           | `'Torus'`          | Solid | `TorusParams`              |
+| `OG_PRIMITIVE_SLOT_PRISM`      | `'SlotPrism'`      | Solid | `SlotPrismParams`          |
+| `OG_PRIMITIVE_ROUNDED_BOX`     | `'RoundedBox'`     | Solid | `RoundedBoxParams`         |
+| `OG_PRIMITIVE_PIPE_SEGMENT`    | `'PipeSegment'`    | Solid | `PipeSegmentParams`        |
 
 ## Operations
 
@@ -65,6 +68,9 @@ Each helper returns its argument unchanged. It only gives the object a type, so 
 | `OG_OPERATION_PARAMS_EXTRUDE`         | `{ profile, holes?, distance }` |
 | `OG_OPERATION_PARAMS_SWEEP`           | `{ profile, path, caps? }`      |
 | `OG_OPERATION_PARAMS_REVOLVE`         | `{ profile, axis? }`            |
+| `OG_PRIMITIVE_PARAMS_SLOT_PRISM`      | `SlotPrismParams`               |
+| `OG_PRIMITIVE_PARAMS_ROUNDED_BOX`     | `RoundedBoxParams`              |
+| `OG_PRIMITIVE_PARAMS_PIPE_SEGMENT`    | `PipeSegmentParams`             |
 
 ```ts
 import {
@@ -91,17 +97,20 @@ console.log(sector.validity().valid);
 
 ## Parameter types
 
-| Type                   | Fields                                                  |
-| ---------------------- | ------------------------------------------------------- |
-| `ProfileParams`        | `start: [u, v]`, `segments: ProfileSegment[]`, `closed` |
-| `ProfileSegment`       | `to: [u, v]`, `arc?: ProfileArc`                        |
-| `ProfileArc`           | `center: [u, v]`, `counterClockwise`                    |
-| `ArcParams`            | `radius`, `startAngle`, `sweepAngle`                    |
-| `CylinderSectorParams` | `radius`, `height`, `startAngle`, `sweepAngle`          |
-| `PolyhedronParams`     | `points: [x, y, z][]`, `faces: number[][]`              |
-| `SphereParams`         | `radius`                                                |
-| `ConeParams`           | `radiusBottom`, `radiusTop`, `height`                   |
-| `TorusParams`          | `majorRadius`, `minorRadius`                            |
+| Type                   | Fields                                                             |
+| ---------------------- | ------------------------------------------------------------------ |
+| `ProfileParams`        | `start: [u, v]`, `segments: ProfileSegment[]`, `closed`            |
+| `ProfileSegment`       | `to: [u, v]`, `arc?: ProfileArc`                                   |
+| `ProfileArc`           | `center: [u, v]`, `counterClockwise`                               |
+| `ArcParams`            | `radius`, `startAngle`, `sweepAngle`                               |
+| `CylinderSectorParams` | `radius`, `height`, `startAngle`, `sweepAngle`                     |
+| `PolyhedronParams`     | `points: [x, y, z][]`, `faces: number[][]`                         |
+| `SphereParams`         | `radius`                                                           |
+| `ConeParams`           | `radiusBottom`, `radiusTop`, `height`                              |
+| `TorusParams`          | `majorRadius`, `minorRadius`                                       |
+| `SlotPrismParams`      | `length`, `width`, `height`                                        |
+| `RoundedBoxParams`     | `width`, `height`, `depth`, `radius`                               |
+| `PipeSegmentParams`    | `outerRadius`, `innerRadius`, `height`, `startAngle`, `sweepAngle` |
 
 ## OG_REGION_TOLERANCE
 

@@ -62,6 +62,25 @@ pub enum Primitive {
         start_angle: f64,
         sweep_angle: f64,
     },
+    SlotPrism {
+        length: f64,
+        width: f64,
+        height: f64,
+    },
+    RoundedBox {
+        width: f64,
+        height: f64,
+        depth: f64,
+        radius: f64,
+    },
+    #[serde(rename_all = "camelCase")]
+    PipeSegment {
+        outer_radius: f64,
+        inner_radius: f64,
+        height: f64,
+        start_angle: f64,
+        sweep_angle: f64,
+    },
 }
 
 impl Primitive {
@@ -73,7 +92,10 @@ impl Primitive {
             | Self::Polyhedron { .. }
             | Self::Sphere { .. }
             | Self::Cone { .. }
-            | Self::Torus { .. } => BodyType::Solid,
+            | Self::Torus { .. }
+            | Self::SlotPrism { .. }
+            | Self::RoundedBox { .. }
+            | Self::PipeSegment { .. } => BodyType::Solid,
             Self::Rectangle { .. }
             | Self::Circle { .. }
             | Self::Polyline { .. }

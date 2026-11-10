@@ -1,12 +1,16 @@
 mod extrude;
 mod holes;
 mod mesh_walls;
+mod pipe_segment;
 mod polyhedron;
 mod profiles;
 mod rebuild;
 mod revolve;
 mod revolved;
+mod rounded_box;
 mod sectors;
+mod slot_prism;
+mod standard;
 mod support;
 mod sweep;
 mod sweep_bends;

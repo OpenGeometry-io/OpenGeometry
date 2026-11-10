@@ -3,6 +3,7 @@ use super::sizes::{check_arc, parameter, required_size, wrong_body_type};
 use crate::brep::{Accuracy, BrepEnvelope, Frame3, GeometryError, GROUND};
 use crate::math::{scale, Point3};
 use crate::primitives;
+use crate::primitives::ProfileEdge;
 use crate::world_graph::error::{ErrorCode, GraphError};
 
 pub(super) fn build_solid(
@@ -43,6 +44,29 @@ pub(super) fn build_solid(
             major_radius,
             minor_radius,
         } => torus_body(shape_id, [major_radius, minor_radius], accuracy)?,
+        Primitive::SlotPrism {
+            length,
+            width,
+            height,
+        } => slot_body(shape_id, [length, width, height], accuracy)?,
+        Primitive::RoundedBox {
+            width,
+            height,
+            depth,
+            radius,
+        } => rounded_box_body(shape_id, [width, height, depth, radius], accuracy)?,
+        Primitive::PipeSegment {
+            outer_radius,
+            inner_radius,
+            height,
+            start_angle,
+            sweep_angle,
+        } => pipe_body(
+            shape_id,
+            [outer_radius, inner_radius, height],
+            [start_angle, sweep_angle],
+            accuracy,
+        )?,
         _ => return Err(wrong_body_type("solid")),
     };
     Ok(result)
@@ -186,6 +210,76 @@ fn torus_body(
     };
     Ok((
         primitives::torus(shape_id, frame, major, minor, accuracy)?,
+        Vec::new(),
+    ))
+}
+
+fn slot_body(
+    shape_id: String,
+    [length, width, height]: [f64; 3],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    for (name, value) in [("length", length), ("width", width), ("height", height)] {
+        required_size(value, accuracy.geometric, name)?;
+    }
+    required_size(width / 2.0, accuracy.geometric, "width")?;
+    let outline = primitives::slot_outline(length, width);
+    outline_body(shape_id, outline, height, accuracy)
+}
+
+fn rounded_box_body(
+    shape_id: String,
+    [width, height, depth, radius]: [f64; 4],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    for (name, value) in [
+        ("width", width),
+        ("height", height),
+        ("depth", depth),
+        ("radius", radius),
+    ] {
+        required_size(value, accuracy.geometric, name)?;
+    }
+    if width.min(depth) - 2.0 * radius <= 4.0 * accuracy.geometric {
+        return Err(parameter(
+            "rounded box radius must be below half its width and depth",
+        ));
+    }
+    let outline = primitives::rounded_rectangle_outline(width, depth, radius);
+    outline_body(shape_id, outline, height, accuracy)
+}
+
+fn pipe_body(
+    shape_id: String,
+    [outer, inner, height]: [f64; 3],
+    angles: [f64; 2],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    for (name, value) in [
+        ("outerRadius", outer),
+        ("innerRadius", inner),
+        ("height", height),
+    ] {
+        required_size(value, accuracy.geometric, name)?;
+    }
+    check_arc("pipe segment", inner, angles, accuracy)?;
+    if outer - inner <= 4.0 * accuracy.geometric {
+        return Err(parameter(
+            "pipe segment inner radius must be below its outer radius",
+        ));
+    }
+    let outline = primitives::ring_sector_outline([outer, inner], angles);
+    outline_body(shape_id, outline, height, accuracy)
+}
+
+fn outline_body(
+    shape_id: String,
+    outline: Vec<ProfileEdge>,
+    height: f64,
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    Ok((
+        primitives::arc_edged_extrusion(shape_id, GROUND, outline, height, accuracy)?,
         Vec::new(),
     ))
 }

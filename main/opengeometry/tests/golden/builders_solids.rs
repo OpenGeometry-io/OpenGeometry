@@ -384,6 +384,23 @@ fn revolved_primitives(graph: &mut WorldGraph, record: &mut Record) -> Result<()
     Ok(())
 }
 
+fn standard_outlines() -> Vec<Case> {
+    vec![
+        built("slot-prism.ground", || {
+            let outline = primitives::slot_outline(1.0, 0.5);
+            primitives::arc_edged_extrusion("slot".into(), ground(), outline, 1.0, standard())
+        }),
+        built("rounded-box.ground", || {
+            let outline = primitives::rounded_rectangle_outline(1.2, 0.8, 0.1);
+            primitives::arc_edged_extrusion("rounded".into(), ground(), outline, 1.0, standard())
+        }),
+        built("pipe-segment.ground", || {
+            let outline = primitives::ring_sector_outline([0.5, 0.3], [0.3, FRAC_PI_2]);
+            primitives::arc_edged_extrusion("pipe".into(), ground(), outline, 1.0, standard())
+        }),
+    ]
+}
+
 pub(crate) fn cases() -> Vec<Case> {
     [
         cuboids(),
@@ -396,6 +413,7 @@ pub(crate) fn cases() -> Vec<Case> {
         revolved_lathe(),
         revolved_arcs(),
         vec![graph_case("graph.primitive.revolved", revolved_primitives)],
+        standard_outlines(),
     ]
     .into_iter()
     .flatten()

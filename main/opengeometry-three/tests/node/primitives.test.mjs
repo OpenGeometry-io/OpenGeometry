@@ -22,6 +22,12 @@ import {
   OG_PRIMITIVE_SPHERE,
   OG_PRIMITIVE_TORUS,
   OG_TRANSFORM_TRANSLATE,
+  OG_PRIMITIVE_SLOT_PRISM,
+  OG_PRIMITIVE_ROUNDED_BOX,
+  OG_PRIMITIVE_PIPE_SEGMENT,
+  OG_PRIMITIVE_PARAMS_SLOT_PRISM,
+  OG_PRIMITIVE_PARAMS_ROUNDED_BOX,
+  OG_PRIMITIVE_PARAMS_PIPE_SEGMENT,
 } from '../../../dist/index.js';
 import { boot, failsWith } from './support.mjs';
 
@@ -165,4 +171,47 @@ test('an arc-edged pan minus a blind inset is one Solid built by the prismatic c
   assert.equal(pan.getBrep().solids.length, 1);
   const { text } = await OpenGeometry.exportStep({ nodes: [pan] });
   assert.equal(text.match(/CYLINDRICAL_SURFACE/g)?.length, 2);
+});
+
+const STANDARD_SOLIDS = [
+  {
+    kind: OG_PRIMITIVE_SLOT_PRISM,
+    params: OG_PRIMITIVE_PARAMS_SLOT_PRISM({ length: 1, width: 0.5, height: 1 }),
+    cylinders: 2,
+    volume: 0.5 + Math.PI / 16,
+  },
+  {
+    kind: OG_PRIMITIVE_ROUNDED_BOX,
+    params: OG_PRIMITIVE_PARAMS_ROUNDED_BOX({ width: 1, height: 1, depth: 1, radius: 0.1 }),
+    cylinders: 4,
+    volume: 1 - (4 - Math.PI) * 0.01,
+  },
+  {
+    kind: OG_PRIMITIVE_PIPE_SEGMENT,
+    params: OG_PRIMITIVE_PARAMS_PIPE_SEGMENT({
+      outerRadius: 0.5, innerRadius: 0.3, height: 1, startAngle: 0, sweepAngle: Math.PI / 2,
+    }),
+    cylinders: 2,
+    volume: Math.PI * 0.16 / 4,
+  },
+];
+
+test('slot prism, rounded box and pipe segment Solids have exact volumes and cylindrical faces', async () => {
+  await boot();
+  for (const { kind, params, cylinders, volume } of STANDARD_SOLIDS) {
+    const solid = new Solid(kind, params, { ogId: kind });
+    assert.equal(solid.lastInfo.bodyType, 'Solid');
+    const measured = solid.measure({ deflection: 1e-4 });
+    assert.equal(Math.abs(measured.volume - volume) <= measured.errorBound, true, kind);
+    const { text } = await OpenGeometry.exportStep({ nodes: [solid] });
+    assert.equal(text.match(/CYLINDRICAL_SURFACE/g)?.length, cylinders, kind);
+  }
+});
+
+test('a rounded box radius of half its width and an inverted pipe segment are InvalidParameter', async () => {
+  await boot();
+  const corner = { width: 1, height: 1, depth: 2, radius: 0.5 };
+  assert.throws(() => new Solid(OG_PRIMITIVE_ROUNDED_BOX, corner, { ogId: 'corner' }), failsWith('InvalidParameter'));
+  const pipe = { outerRadius: 0.3, innerRadius: 0.5, height: 1, startAngle: 0, sweepAngle: 1 };
+  assert.throws(() => new Solid(OG_PRIMITIVE_PIPE_SEGMENT, pipe, { ogId: 'pipe' }), failsWith('InvalidParameter'));
 });

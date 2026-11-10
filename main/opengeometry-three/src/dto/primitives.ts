@@ -7,3 +7,8 @@ export type PolyhedronParams = { points: [number, number, number][]; faces: numb
 export type SphereParams = { radius: number };
 export type ConeParams = { radiusBottom: number; radiusTop: number; height: number };
 export type TorusParams = { majorRadius: number; minorRadius: number };
+export type SlotPrismParams = { length: number; width: number; height: number };
+export type RoundedBoxParams = { width: number; height: number; depth: number; radius: number };
+export type PipeSegmentParams = {
+  outerRadius: number; innerRadius: number; height: number; startAngle: number; sweepAngle: number;
+};
