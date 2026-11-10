@@ -1,10 +1,129 @@
-use super::sizes::{parameter, required_size};
-use crate::brep::{Accuracy, BrepEnvelope, Frame3, GROUND};
-use crate::math::scale;
+use super::kind::Primitive;
+use super::sizes::{check_arc, parameter, required_size, wrong_body_type};
+use crate::brep::{Accuracy, BrepEnvelope, Frame3, GeometryError, GROUND};
+use crate::math::{scale, Point3};
 use crate::primitives;
-use crate::world_graph::error::GraphError;
+use crate::world_graph::error::{ErrorCode, GraphError};
 
-pub(super) fn sphere_body(
+pub(super) fn build_solid(
+    shape_id: String,
+    primitive: Primitive,
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    let result = match primitive {
+        Primitive::Cuboid {
+            width,
+            height,
+            depth,
+        } => cuboid_body(shape_id, [width, height, depth], accuracy)?,
+        Primitive::Cylinder { radius, height } => {
+            cylinder_body(shape_id, [radius, height], accuracy)?
+        }
+        Primitive::CylinderSector {
+            radius,
+            height,
+            start_angle,
+            sweep_angle,
+        } => sector_body(
+            shape_id,
+            [radius, height],
+            [start_angle, sweep_angle],
+            accuracy,
+        )?,
+        Primitive::Polyhedron { points, faces } => {
+            polyhedron_body(shape_id, &points, &faces, accuracy)?
+        }
+        Primitive::Sphere { radius } => sphere_body(shape_id, radius, accuracy)?,
+        Primitive::Cone {
+            radius_bottom,
+            radius_top,
+            height,
+        } => cone_body(shape_id, [radius_bottom, radius_top], height, accuracy)?,
+        Primitive::Torus {
+            major_radius,
+            minor_radius,
+        } => torus_body(shape_id, [major_radius, minor_radius], accuracy)?,
+        _ => return Err(wrong_body_type("solid")),
+    };
+    Ok(result)
+}
+
+fn cuboid_body(
+    shape_id: String,
+    [width, height, depth]: [f64; 3],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    for (name, value) in [("width", width), ("height", height), ("depth", depth)] {
+        required_size(value, accuracy.geometric, name)?;
+    }
+    let frame = Frame3 {
+        origin: [-width / 2.0, 0.0, depth / 2.0],
+        ..GROUND
+    };
+    Ok((
+        primitives::cuboid(shape_id, frame, [width, depth, height], accuracy)?,
+        Vec::new(),
+    ))
+}
+
+fn cylinder_body(
+    shape_id: String,
+    [radius, height]: [f64; 2],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    required_size(radius, accuracy.geometric, "radius")?;
+    required_size(height, accuracy.geometric, "height")?;
+    Ok((
+        primitives::cylinder(shape_id, GROUND, radius, height, accuracy)?,
+        Vec::new(),
+    ))
+}
+
+fn polyhedron_body(
+    shape_id: String,
+    points: &[Point3],
+    faces: &[Vec<u32>],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    let brep =
+        primitives::polyhedron(shape_id, points, faces, accuracy).map_err(|error| match error {
+            GeometryError::InvalidGeometry(message)
+            | GeometryError::UnresolvedIntersection(message) => {
+                GraphError::code(ErrorCode::InvalidParameter, message)
+            }
+            GeometryError::Math(error) => GraphError::code(
+                ErrorCode::InvalidParameter,
+                format!("polyhedron points are out of range: {error:?}"),
+            ),
+            other => other.into(),
+        })?;
+    Ok((brep, Vec::new()))
+}
+
+fn sector_body(
+    shape_id: String,
+    [radius, height]: [f64; 2],
+    angles: [f64; 2],
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    check_arc("sector", radius, angles, accuracy)?;
+    required_size(height, accuracy.geometric, "height")?;
+    let [start_angle, sweep_angle] = angles;
+    Ok((
+        primitives::cylinder_sector(
+            shape_id,
+            GROUND,
+            radius,
+            height,
+            start_angle,
+            sweep_angle,
+            accuracy,
+        )?,
+        Vec::new(),
+    ))
+}
+
+fn sphere_body(
     shape_id: String,
     radius: f64,
     accuracy: Accuracy,
@@ -16,7 +135,7 @@ pub(super) fn sphere_body(
     ))
 }
 
-pub(super) fn cone_body(
+fn cone_body(
     shape_id: String,
     [bottom, top]: [f64; 2],
     height: f64,
@@ -49,7 +168,7 @@ pub(super) fn cone_body(
     Ok((brep, Vec::new()))
 }
 
-pub(super) fn torus_body(
+fn torus_body(
     shape_id: String,
     [major, minor]: [f64; 2],
     accuracy: Accuracy,

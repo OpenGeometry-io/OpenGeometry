@@ -1,0 +1,84 @@
+use crate::brep::BodyType;
+use crate::math::Point3;
+use crate::primitives::ProfileSegment;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", deny_unknown_fields)]
+pub enum Primitive {
+    Cuboid {
+        width: f64,
+        height: f64,
+        depth: f64,
+    },
+    Cylinder {
+        radius: f64,
+        height: f64,
+    },
+    #[serde(rename_all = "camelCase")]
+    CylinderSector {
+        radius: f64,
+        height: f64,
+        start_angle: f64,
+        sweep_angle: f64,
+    },
+    Polyhedron {
+        points: Vec<Point3>,
+        faces: Vec<Vec<u32>>,
+    },
+    Sphere {
+        radius: f64,
+    },
+    #[serde(rename_all = "camelCase")]
+    Cone {
+        radius_bottom: f64,
+        radius_top: f64,
+        height: f64,
+    },
+    #[serde(rename_all = "camelCase")]
+    Torus {
+        major_radius: f64,
+        minor_radius: f64,
+    },
+    Rectangle {
+        width: f64,
+        breadth: f64,
+    },
+    Circle {
+        radius: f64,
+    },
+    Polyline {
+        points: Vec<Point3>,
+        closed: bool,
+    },
+    Profile {
+        start: [f64; 2],
+        segments: Vec<ProfileSegment>,
+        closed: bool,
+    },
+    #[serde(rename_all = "camelCase")]
+    Arc {
+        radius: f64,
+        start_angle: f64,
+        sweep_angle: f64,
+    },
+}
+
+impl Primitive {
+    pub(super) fn body_type(&self) -> BodyType {
+        match self {
+            Self::Cuboid { .. }
+            | Self::Cylinder { .. }
+            | Self::CylinderSector { .. }
+            | Self::Polyhedron { .. }
+            | Self::Sphere { .. }
+            | Self::Cone { .. }
+            | Self::Torus { .. } => BodyType::Solid,
+            Self::Rectangle { .. }
+            | Self::Circle { .. }
+            | Self::Polyline { .. }
+            | Self::Profile { .. }
+            | Self::Arc { .. } => BodyType::Wire,
+        }
+    }
+}
