@@ -30,6 +30,12 @@ import {
   OG_PRIMITIVE_PARAMS_SLOT_PRISM,
   OG_PRIMITIVE_PARAMS_ROUNDED_BOX,
   OG_PRIMITIVE_PARAMS_PIPE_SEGMENT,
+  OG_PRIMITIVE_REGULAR_POLYGON,
+  OG_PRIMITIVE_SLOT,
+  OG_PRIMITIVE_ROUNDED_RECTANGLE,
+  OG_PRIMITIVE_PARAMS_REGULAR_POLYGON,
+  OG_PRIMITIVE_PARAMS_SLOT,
+  OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE,
 } from '../../../dist/index.js';
 import { boot, failsWith } from './support.mjs';
 
@@ -242,4 +248,33 @@ test('a polysolid with an arc segment is InvalidParameter', async () => {
   await boot();
   const params = { path: lPath({ center: [3, 1], counterClockwise: true }), width: 0.2, height: 1 };
   assert.throws(() => new Solid(OG_PRIMITIVE_POLYSOLID, params, { ogId: 'arced' }), failsWith('InvalidParameter'));
+});
+
+test('regular polygon, slot and rounded rectangle Wires extrude into prisms with their edges', async () => {
+  await boot();
+  const wires = [
+    {
+      kind: OG_PRIMITIVE_REGULAR_POLYGON,
+      params: OG_PRIMITIVE_PARAMS_REGULAR_POLYGON({ sides: 6, radius: 0.5 }),
+      edges: 6,
+    },
+    { kind: OG_PRIMITIVE_SLOT, params: OG_PRIMITIVE_PARAMS_SLOT({ length: 1, width: 0.5 }), edges: 4 },
+    {
+      kind: OG_PRIMITIVE_ROUNDED_RECTANGLE,
+      params: OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE({ width: 1.2, breadth: 0.8, radius: 0.1 }),
+      edges: 8,
+    },
+  ];
+  for (const { kind, params, edges } of wires) {
+    const profile = new Wire(kind, params, { ogId: kind });
+    assert.equal(profile.lastInfo.bodyType, 'Wire');
+    assert.equal(profile.getBrep().topology.edges.length, edges, kind);
+    const solid = new Solid(OG_OPERATION_EXTRUDE, { profile, distance: 1 }, { ogId: `${kind}-solid` });
+    assert.equal(solid.getBrep().topology.faces.length, edges + 2, kind);
+  }
+  for (const sides of [2, 5.5, -3]) {
+    const params = { sides, radius: 1 };
+    const options = { ogId: `sides-${sides}` };
+    assert.throws(() => new Wire(OG_PRIMITIVE_REGULAR_POLYGON, params, options), failsWith('InvalidParameter'));
+  }
 });

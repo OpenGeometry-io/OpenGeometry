@@ -8,13 +8,51 @@ A primitive is a body made from a few parameters. Pass the kind as the first arg
 
 ## Wires
 
-| Kind                     | Parameters                           | Notes                                                                   |
-| ------------------------ | ------------------------------------ | ----------------------------------------------------------------------- |
-| `OG_PRIMITIVE_RECTANGLE` | `{ width, breadth }`                 | Centred on the plane origin. `width` along u, `breadth` along v         |
-| `OG_PRIMITIVE_CIRCLE`    | `{ radius }`                         | Centred on the plane origin                                             |
-| `OG_PRIMITIVE_POLYLINE`  | `{ points, closed? }`                | `points` are `[x, y, z]` in the body's own space                        |
-| `OG_PRIMITIVE_PROFILE`   | `{ start, segments, closed }`        | Lines and arcs, points as `[u, v]` in the plane                         |
-| `OG_PRIMITIVE_ARC`       | `{ radius, startAngle, sweepAngle }` | Centred on the plane origin. The sweep is not zero and less than a turn |
+| Kind                             | Parameters                           | Notes                                                                                                           |
+| -------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `OG_PRIMITIVE_RECTANGLE`         | `{ width, breadth }`                 | Centred on the plane origin. `width` along u, `breadth` along v                                                 |
+| `OG_PRIMITIVE_CIRCLE`            | `{ radius }`                         | Centred on the plane origin                                                                                     |
+| `OG_PRIMITIVE_POLYLINE`          | `{ points, closed? }`                | `points` are `[x, y, z]` in the body's own space                                                                |
+| `OG_PRIMITIVE_PROFILE`           | `{ start, segments, closed }`        | Lines and arcs, points as `[u, v]` in the plane                                                                 |
+| `OG_PRIMITIVE_ARC`               | `{ radius, startAngle, sweepAngle }` | Centred on the plane origin. The sweep is not zero and less than a turn                                         |
+| `OG_PRIMITIVE_REGULAR_POLYGON`   | `{ sides, radius }`                  | A closed polyline through `sides` corners (3 to 1024) on a circle of `radius`, the first on +u                  |
+| `OG_PRIMITIVE_SLOT`              | `{ length, width }`                  | The outline of `OG_PRIMITIVE_SLOT_PRISM`: two lines and two arcs, centred on the plane origin                   |
+| `OG_PRIMITIVE_ROUNDED_RECTANGLE` | `{ width, breadth, radius }`         | A rectangle with rounded corners, placed like the rectangle. `radius` below half the width and half the breadth |
+
+A regular polygon, a slot and a rounded rectangle are closed wires, so each is an extrude profile or hole:
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_EXTRUDE,
+  OG_PRIMITIVE_PARAMS_REGULAR_POLYGON,
+  OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE,
+  OG_PRIMITIVE_PARAMS_SLOT,
+  OG_PRIMITIVE_REGULAR_POLYGON,
+  OG_PRIMITIVE_ROUNDED_RECTANGLE,
+  OG_PRIMITIVE_SLOT,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const hexagon = new Wire(
+  OG_PRIMITIVE_REGULAR_POLYGON,
+  OG_PRIMITIVE_PARAMS_REGULAR_POLYGON({ sides: 6, radius: 0.2 }),
+);
+const plate = new Wire(
+  OG_PRIMITIVE_ROUNDED_RECTANGLE,
+  OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE({ width: 1, breadth: 0.6, radius: 0.05 }),
+);
+const slot = new Wire(OG_PRIMITIVE_SLOT, OG_PRIMITIVE_PARAMS_SLOT({ length: 0.3, width: 0.1 }));
+const nut = new Solid(OG_OPERATION_EXTRUDE, { profile: hexagon, distance: 0.1 });
+const panel = new Solid(OG_OPERATION_EXTRUDE, { profile: plate, holes: [slot], distance: 0.02 });
+console.log(nut.ogId, panel.ogId);
+```
 
 ### Profile
 

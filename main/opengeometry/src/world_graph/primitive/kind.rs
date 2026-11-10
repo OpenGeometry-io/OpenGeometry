@@ -88,6 +88,19 @@ pub enum Primitive {
         #[serde(default)]
         justify: PolysolidJustify,
     },
+    RegularPolygon {
+        sides: u32,
+        radius: f64,
+    },
+    Slot {
+        length: f64,
+        width: f64,
+    },
+    RoundedRectangle {
+        width: f64,
+        breadth: f64,
+        radius: f64,
+    },
 }
 
 impl Primitive {
@@ -108,7 +121,10 @@ impl Primitive {
             | Self::Circle { .. }
             | Self::Polyline { .. }
             | Self::Profile { .. }
-            | Self::Arc { .. } => BodyType::Wire,
+            | Self::Arc { .. }
+            | Self::RegularPolygon { .. }
+            | Self::Slot { .. }
+            | Self::RoundedRectangle { .. } => BodyType::Wire,
         }
     }
 }

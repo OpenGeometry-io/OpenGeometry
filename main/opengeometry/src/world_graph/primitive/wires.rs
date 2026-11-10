@@ -1,8 +1,10 @@
 use super::kind::Primitive;
-use super::sizes::{check_arc, parameter, required_size, wrong_body_type};
+use super::sizes::{
+    check_arc, check_corner_radius, check_slot, parameter, required_size, wrong_body_type,
+};
 use crate::brep::{Accuracy, BrepEnvelope, CurveGeometry, GROUND};
 use crate::math::{norm, sub, Point3};
-use crate::primitives::{self, ProfileEdge, ProfileSegment};
+use crate::primitives::{self, ProfileEdge, ProfileSegment, SegmentArc};
 use crate::world_graph::error::{ErrorCode, GraphError};
 use std::f64::consts::TAU;
 
@@ -37,6 +39,18 @@ pub(super) fn build_wire(
             segments,
             closed,
         } => profile_body(shape_id, start, &segments, closed, accuracy)?,
+        Primitive::RegularPolygon { sides, radius } => {
+            polygon_body(shape_id, sides, radius, accuracy)?
+        }
+        Primitive::Slot { length, width } => {
+            check_slot(length, width, accuracy.geometric)?;
+            outline_wire(shape_id, primitives::slot_outline(length, width), accuracy)?
+        }
+        Primitive::RoundedRectangle {
+            width,
+            breadth,
+            radius,
+        } => rounded_rectangle_body(shape_id, [width, breadth], radius, accuracy)?,
         _ => return Err(wrong_body_type("wire")),
     };
     Ok(result)
@@ -179,4 +193,70 @@ fn check_profile_edge(edge: &ProfileEdge, to: [f64; 2], g: f64) -> Result<(), Gr
         }
     }
     Ok(())
+}
+
+fn polygon_body(
+    shape_id: String,
+    sides: u32,
+    radius: f64,
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    if !(3..=1024).contains(&sides) {
+        return Err(parameter(
+            "regular polygon sides must be between 3 and 1024",
+        ));
+    }
+    required_size(radius, accuracy.geometric, "radius")?;
+    let step = TAU / f64::from(sides);
+    let side = 2.0 * radius * (step / 2.0).sin();
+    required_size(side, accuracy.geometric, "regular polygon side")?;
+    let points = (0..sides)
+        .map(|index| {
+            let angle = step * f64::from(index);
+            GROUND.point([radius * angle.cos(), radius * angle.sin(), 0.0])
+        })
+        .collect::<Vec<_>>();
+    Ok(primitives::polyline_with_keys(
+        shape_id, &points, true, accuracy,
+    )?)
+}
+
+fn rounded_rectangle_body(
+    shape_id: String,
+    [width, breadth]: [f64; 2],
+    radius: f64,
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    let sides = [("width", width), ("breadth", breadth)];
+    check_corner_radius("rounded rectangle", sides, radius, accuracy.geometric)?;
+    let outline = primitives::rounded_rectangle_outline(width, breadth, radius);
+    outline_wire(shape_id, outline, accuracy)
+}
+
+fn outline_wire(
+    shape_id: String,
+    edges: Vec<ProfileEdge>,
+    accuracy: Accuracy,
+) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
+    let start = edges[0].endpoints().0;
+    let segments = edges
+        .iter()
+        .map(|edge| ProfileSegment {
+            to: edge.endpoints().1,
+            arc: match *edge {
+                ProfileEdge::Arc {
+                    center,
+                    sweep_angle,
+                    ..
+                } => Some(SegmentArc {
+                    center,
+                    counter_clockwise: sweep_angle > 0.0,
+                }),
+                ProfileEdge::Line { .. } => None,
+            },
+        })
+        .collect::<Vec<_>>();
+    Ok(primitives::profile_wire_with_keys(
+        shape_id, start, &segments, true, accuracy,
+    )?)
 }

@@ -15,6 +15,9 @@ All notable changes to the `opengeometry` package are in this file. The format f
   legs, with `justify` `'centre'`, `'left'` or `'right'`, mitred corners and an open or closed
   path. `OG_PRIMITIVE_PARAMS_POLYSOLID` and the type `PolysolidParams` give it a
   type.
+- Wire primitives `OG_PRIMITIVE_REGULAR_POLYGON`, `OG_PRIMITIVE_SLOT` and
+  `OG_PRIMITIVE_ROUNDED_RECTANGLE`, with their `OG_PRIMITIVE_PARAMS_*` helpers and the
+  `RegularPolygonParams`, `SlotParams` and `RoundedRectangleParams` types.
 
 ## [3.0.0] - 2026-11-09
 

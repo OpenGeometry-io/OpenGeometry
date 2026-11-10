@@ -28,6 +28,7 @@ export default defineConfig({
         roundedBox: `${ROOT}/shapes/rounded-box.html`,
         pipeSegment: `${ROOT}/shapes/pipe-segment.html`,
         polysolid: `${ROOT}/shapes/polysolid.html`,
+        wireKinds: `${ROOT}/shapes/wire-kinds.html`,
       },
     },
   },

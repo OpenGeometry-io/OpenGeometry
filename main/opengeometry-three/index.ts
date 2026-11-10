@@ -17,6 +17,7 @@ export * from './src/constants/index';
 export type {
   ArcParams, ConeParams, CylinderSectorParams, PolyhedronParams, ProfileArc, ProfileParams, ProfileSegment,
   SphereParams, TorusParams, SlotPrismParams, RoundedBoxParams, PipeSegmentParams, PolysolidParams,
+  RegularPolygonParams, SlotParams, RoundedRectangleParams,
 } from './src/dto/primitives';
 export type {
   CurvedRegion2D, CurvedRegionEdge, OffsetHole, OffsetPath2D, OffsetPolylineOptions, OffsetRegion,

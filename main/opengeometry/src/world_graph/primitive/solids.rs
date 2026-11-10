@@ -1,5 +1,7 @@
 use super::kind::Primitive;
-use super::sizes::{check_arc, parameter, required_size, wrong_body_type};
+use super::sizes::{
+    check_arc, check_corner_radius, check_slot, parameter, required_size, wrong_body_type,
+};
 use crate::brep::{Accuracy, BrepEnvelope, Frame3, GeometryError, GROUND};
 use crate::math::{scale, Point3};
 use crate::primitives::{self, PolysolidError, PolysolidJustify, PolysolidPath, ProfileEdge};
@@ -224,10 +226,8 @@ fn slot_body(
     [length, width, height]: [f64; 3],
     accuracy: Accuracy,
 ) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
-    for (name, value) in [("length", length), ("width", width), ("height", height)] {
-        required_size(value, accuracy.geometric, name)?;
-    }
-    required_size(width / 2.0, accuracy.geometric, "width")?;
+    check_slot(length, width, accuracy.geometric)?;
+    required_size(height, accuracy.geometric, "height")?;
     let outline = primitives::slot_outline(length, width);
     outline_body(shape_id, outline, height, accuracy)
 }
@@ -237,19 +237,9 @@ fn rounded_box_body(
     [width, height, depth, radius]: [f64; 4],
     accuracy: Accuracy,
 ) -> Result<(BrepEnvelope, Vec<String>), GraphError> {
-    for (name, value) in [
-        ("width", width),
-        ("height", height),
-        ("depth", depth),
-        ("radius", radius),
-    ] {
-        required_size(value, accuracy.geometric, name)?;
-    }
-    if width.min(depth) - 2.0 * radius <= 4.0 * accuracy.geometric {
-        return Err(parameter(
-            "rounded box radius must be below half its width and depth",
-        ));
-    }
+    required_size(height, accuracy.geometric, "height")?;
+    let sides = [("width", width), ("depth", depth)];
+    check_corner_radius("rounded box", sides, radius, accuracy.geometric)?;
     let outline = primitives::rounded_rectangle_outline(width, depth, radius);
     outline_body(shape_id, outline, height, accuracy)
 }

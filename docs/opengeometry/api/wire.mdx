@@ -28,13 +28,16 @@ console.log(path.bodyType, path.validity().closed);
 
 `new Wire(kind: string, params: Record<string, unknown>, options?: BodyOptions)`
 
-| `kind`                   | `params`                             |
-| ------------------------ | ------------------------------------ |
-| `OG_PRIMITIVE_RECTANGLE` | `{ width, breadth }`                 |
-| `OG_PRIMITIVE_CIRCLE`    | `{ radius }`                         |
-| `OG_PRIMITIVE_POLYLINE`  | `{ points, closed? }`                |
-| `OG_PRIMITIVE_PROFILE`   | `{ start, segments, closed }`        |
-| `OG_PRIMITIVE_ARC`       | `{ radius, startAngle, sweepAngle }` |
+| `kind`                           | `params`                             |
+| -------------------------------- | ------------------------------------ |
+| `OG_PRIMITIVE_RECTANGLE`         | `{ width, breadth }`                 |
+| `OG_PRIMITIVE_CIRCLE`            | `{ radius }`                         |
+| `OG_PRIMITIVE_POLYLINE`          | `{ points, closed? }`                |
+| `OG_PRIMITIVE_PROFILE`           | `{ start, segments, closed }`        |
+| `OG_PRIMITIVE_ARC`               | `{ radius, startAngle, sweepAngle }` |
+| `OG_PRIMITIVE_REGULAR_POLYGON`   | `{ sides, radius }`                  |
+| `OG_PRIMITIVE_SLOT`              | `{ length, width }`                  |
+| `OG_PRIMITIVE_ROUNDED_RECTANGLE` | `{ width, breadth, radius }`         |
 
 A kind that makes another body type throws `BodyTypeMismatch`. See [Primitives](/opengeometry/guides/primitives).
 

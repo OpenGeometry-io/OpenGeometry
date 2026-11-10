@@ -150,6 +150,21 @@
     "page": "opengeometry/api/constants"
   },
   {
+    "export": "RegularPolygonParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "SlotParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "RoundedRectangleParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
     "export": "CurvedRegion2D",
     "kind": "type",
     "page": "opengeometry/api/regions"
@@ -260,6 +275,21 @@
     "page": "opengeometry/api/constants"
   },
   {
+    "export": "OG_PRIMITIVE_REGULAR_POLYGON",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_SLOT",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_ROUNDED_RECTANGLE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
     "export": "OG_PRIMITIVE_PARAMS_RECTANGLE",
     "kind": "value",
     "page": "opengeometry/api/constants"
@@ -336,6 +366,21 @@
   },
   {
     "export": "OG_PRIMITIVE_PARAMS_POLYSOLID",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_REGULAR_POLYGON",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_SLOT",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE",
     "kind": "value",
     "page": "opengeometry/api/constants"
   },

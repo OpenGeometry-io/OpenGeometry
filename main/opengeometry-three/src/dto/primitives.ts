@@ -15,3 +15,6 @@ export type PipeSegmentParams = {
 export type PolysolidParams = {
   path: ProfileParams; width: number; height: number; justify?: 'centre' | 'left' | 'right';
 };
+export type RegularPolygonParams = { sides: number; radius: number };
+export type SlotParams = { length: number; width: number };
+export type RoundedRectangleParams = { width: number; breadth: number; radius: number };
