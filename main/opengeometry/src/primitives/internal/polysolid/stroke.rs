@@ -1,4 +1,8 @@
-use super::linear_extrusion::linear_extrusion;
+use super::super::linear_extrusion::linear_extrusion;
+use super::path::{
+    check_path_ends, distance, parameter, PolysolidError, PolysolidJustify, PolysolidPath,
+    MITER_LIMIT,
+};
 use crate::brep::{Accuracy, BrepEnvelope, Frame3, GeometryError};
 use crate::geom2d::{
     offset_path, offset_polyline_regions, CurveEdge2, OffsetError, OffsetOptions, Pt2,
@@ -6,37 +10,12 @@ use crate::geom2d::{
 use crate::primitives::profile::{
     profile_edge_intersections, profile_self_intersects, ProfileEdge,
 };
-use crate::primitives::profile_wire::{profile_segment_edges, ProfileSegment};
-use serde::{Deserialize, Serialize};
+use crate::primitives::profile_wire::profile_segment_edges;
 
-const MITER_LIMIT: f64 = 4.0;
 const STROKE_TOLERANCE: f64 = 1.0e-6;
 const BEVEL_BELOW_DEGREES: f64 = 28.955_024_371_859_85;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PolysolidPath {
-    pub start: [f64; 2],
-    pub segments: Vec<ProfileSegment>,
-    pub closed: bool,
-}
-
-#[derive(Debug)]
-pub enum PolysolidError {
-    Parameter(String),
-    Geometry(GeometryError),
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum PolysolidJustify {
-    #[default]
-    Centre,
-    Left,
-    Right,
-}
-
-pub fn polysolid(
+pub(super) fn stroked_polysolid(
     id: String,
     frame: Frame3,
     path: &PolysolidPath,
@@ -56,34 +35,12 @@ pub fn polysolid(
 }
 
 fn path_points(path: &PolysolidPath, g: f64) -> Result<Vec<[f64; 2]>, PolysolidError> {
-    if let Some(index) = path
-        .segments
-        .iter()
-        .position(|segment| segment.arc.is_some())
-    {
-        return Err(parameter(format!(
-            "polysolid path segment {index} is an arc; only straight legs are accepted"
-        )));
-    }
-    let values = path.segments.iter().flat_map(|segment| segment.to);
-    if !path.start.into_iter().chain(values).all(f64::is_finite) {
-        return Err(parameter("polysolid path points must be finite".into()));
-    }
-    if path.segments.len() < if path.closed { 3 } else { 1 } {
-        return Err(parameter(if path.closed {
-            "closed polysolid path needs at least three points".into()
-        } else {
-            "polysolid path needs at least two points".into()
-        }));
-    }
-    let last = path.segments[path.segments.len() - 1].to;
-    if path.closed != (distance(last, path.start) <= 4.0 * g) {
-        return Err(parameter(if path.closed {
-            "closed polysolid path must end at its start".into()
-        } else {
-            "open polysolid path must not end at its start".into()
-        }));
-    }
+    let (fewest, too_few) = if path.closed {
+        (3, "closed polysolid path needs at least three points")
+    } else {
+        (1, "polysolid path needs at least two points")
+    };
+    check_path_ends(path, fewest, too_few, g)?;
     let mut points = vec![path.start];
     let count = if path.closed {
         path.segments.len() - 1
@@ -222,12 +179,4 @@ fn plane_points(points: &[[f64; 2]]) -> Vec<Pt2> {
         .iter()
         .map(|point| Pt2::new(point[0], point[1]))
         .collect()
-}
-
-fn distance(a: [f64; 2], b: [f64; 2]) -> f64 {
-    (b[0] - a[0]).hypot(b[1] - a[1])
-}
-
-fn parameter(message: String) -> PolysolidError {
-    PolysolidError::Parameter(message)
 }

@@ -33,14 +33,23 @@ const CONTROLS = new OrbitControls(CAMERA, RENDERER.domElement);
 CONTROLS.target.set(1.5, 0.5, -1);
 CONTROLS.update();
 
-const CONFIG: { width: number; height: number; justify: Justify; outline: boolean } = {
-  width: 0.2, height: 1, justify: 'centre', outline: true,
+type PathName = 'legs' | 'arc';
+
+const CONFIG: { width: number; height: number; justify: Justify; path: PathName; outline: boolean } = {
+  width: 0.2, height: 1, justify: 'centre', path: 'legs', outline: true,
 };
-const PATH: PolysolidParams['path'] = { start: [0, 0], segments: [{ to: [3, 0] }, { to: [3, 2] }], closed: false };
+const PATHS: Record<PathName, PolysolidParams['path']> = {
+  legs: { start: [0, 0], segments: [{ to: [3, 0] }, { to: [3, 2] }], closed: false },
+  arc: {
+    start: [0, 0],
+    segments: [{ to: [2, 0] }, { to: [3, 1], arc: { center: [2, 1], counterClockwise: true } }, { to: [3, 2] }],
+    closed: false,
+  },
+};
 
 function params(): PolysolidParams {
   return OG_PRIMITIVE_PARAMS_POLYSOLID({
-    path: PATH, width: CONFIG.width, height: CONFIG.height, justify: CONFIG.justify,
+    path: PATHS[CONFIG.path], width: CONFIG.width, height: CONFIG.height, justify: CONFIG.justify,
   });
 }
 
@@ -88,6 +97,13 @@ const JUSTIFY_ROW = requiredElement('[data-control="justify"]', HTMLElement);
 const JUSTIFY = requiredElement('[data-select]', HTMLSelectElement, JUSTIFY_ROW);
 JUSTIFY.addEventListener('change', () => {
   CONFIG.justify = JUSTIFY_OPTIONS.find((option) => option === JUSTIFY.value) ?? 'centre';
+  scheduleUpdate();
+});
+const PATH_OPTIONS: PathName[] = ['legs', 'arc'];
+const PATH_ROW = requiredElement('[data-control="path"]', HTMLElement);
+const PATH_SELECT = requiredElement('[data-select]', HTMLSelectElement, PATH_ROW);
+PATH_SELECT.addEventListener('change', () => {
+  CONFIG.path = PATH_OPTIONS.find((option) => option === PATH_SELECT.value) ?? 'legs';
   scheduleUpdate();
 });
 const OUTLINE_ROW = requiredElement('[data-control="outline"]', HTMLElement);

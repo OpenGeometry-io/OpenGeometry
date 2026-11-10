@@ -18,6 +18,8 @@ All notable changes to the `opengeometry` package are in this file. The format f
 - Wire primitives `OG_PRIMITIVE_REGULAR_POLYGON`, `OG_PRIMITIVE_SLOT` and
   `OG_PRIMITIVE_ROUNDED_RECTANGLE`, with their `OG_PRIMITIVE_PARAMS_*` helpers and the
   `RegularPolygonParams`, `SlotParams` and `RoundedRectangleParams` types.
+- `OG_PRIMITIVE_POLYSOLID` paths take arc segments that join their neighbours tangentially. A
+  joint where an arc meets a segment at an angle throws `InvalidParameter` that names the joint.
 
 ## [3.0.0] - 2026-11-09
 

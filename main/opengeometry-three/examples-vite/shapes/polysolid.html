@@ -17,7 +17,7 @@
     <aside class="og-controls">
       <h3>Polysolid</h3>
       <p class="og-control-summary">
-        An L-shaped wall along a path of straight legs, with width, height and justify.
+        A wall along an L-shaped path of straight legs or a path with a tangent arc, with width, height and justify.
       </p>
 
       <label class="og-control-row" data-control="width">
@@ -40,6 +40,16 @@
           <input data-range type="range" min="0.2" max="3" step="0.1" value="1" />
           <input data-number type="number" min="0.2" max="3" step="0.1" value="1" />
         </div>
+      </label>
+
+      <label class="og-control-row" data-control="path">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Path</span>
+        </div>
+        <select class="og-control-select" data-select aria-label="Path">
+          <option value="legs" selected>Straight legs</option>
+          <option value="arc">Leg and arc</option>
+        </select>
       </label>
 
       <label class="og-control-row" data-control="justify">

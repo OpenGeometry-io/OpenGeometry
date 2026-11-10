@@ -433,6 +433,8 @@
   "builders.polyline.repeated-point": "d608bd770ef548c6c94c9bee36a322fa486575308e1521e96c1f92bf0fad7156",
   "builders.polysolid.closed-loop": "bd28c9d24de20392f82def879c5dea7735d1e8bf6cb1e94899bdc8bbc0266938",
   "builders.polysolid.l-path": "8e0fbb2609ab792ec775b221cb388da198500088c0b0f5761cae0a1166d029d4",
+  "builders.polysolid.leg-arc": "eba4cf7f023931daea7b7a7c98b8f100a6b09a408ace186b99b62eb86561afa1",
+  "builders.polysolid.tube": "2890603720c6d0fbdafb1411586def72d464b7211b6771d00499a360f378448a",
   "builders.profile-keys.ring-sector": "b2ad4caf9ab117586b3c141738bd06e07bd5047d87647566a6eece7216a9f61c",
   "builders.rectangle-keys.ground": "12e2f757757dc4f3e3fb5cd08cb103ed86f9ea393295ed2897fff72605186ed2",
   "builders.rectangle.identity": "31332072019245900457cc87ce607bc825c04cddf1589c11f1e870ba7b4a78c1",

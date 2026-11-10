@@ -244,10 +244,15 @@ test('an L-shaped polysolid is a Solid of volume one that exports planes only to
   assert.equal(text.match(/CYLINDRICAL_SURFACE/g), null);
 });
 
-test('a polysolid with an arc segment is InvalidParameter', async () => {
+test('a polysolid with a tangent arc is a curved Solid and a sharp arc corner is InvalidParameter', async () => {
   await boot();
   const params = { path: lPath({ center: [3, 1], counterClockwise: true }), width: 0.2, height: 1 };
-  assert.throws(() => new Solid(OG_PRIMITIVE_POLYSOLID, params, { ogId: 'arced' }), failsWith('InvalidParameter'));
+  const wall = new Solid(OG_PRIMITIVE_POLYSOLID, params, { ogId: 'curved' });
+  assert.equal(Math.abs(wall.measure({ deflection: 1e-4 }).volume - (0.6 + 0.2 * Math.PI)) <= 1e-3, true);
+  const { text } = await OpenGeometry.exportStep({ nodes: [wall] });
+  assert.equal(text.match(/CYLINDRICAL_SURFACE/g)?.length, 2);
+  const sharp = { ...params, path: lPath({ center: [3.5, 1], counterClockwise: true }) };
+  assert.throws(() => new Solid(OG_PRIMITIVE_POLYSOLID, sharp, { ogId: 'sharp' }), failsWith('InvalidParameter'));
 });
 
 test('regular polygon, slot and rounded rectangle Wires extrude into prisms with their edges', async () => {

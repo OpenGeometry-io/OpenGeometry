@@ -413,9 +413,15 @@ fn polysolid_path(points: &[[f64; 2]], closed: bool) -> primitives::PolysolidPat
 }
 
 fn polysolid(name: &str, points: &[[f64; 2]], closed: bool) -> Result<BrepEnvelope, GeometryError> {
-    let path = polysolid_path(points, closed);
+    polysolid_along(name, &polysolid_path(points, closed))
+}
+
+fn polysolid_along(
+    name: &str,
+    path: &primitives::PolysolidPath,
+) -> Result<BrepEnvelope, GeometryError> {
     let centre = primitives::PolysolidJustify::Centre;
-    primitives::polysolid(name.into(), ground(), &path, centre, [0.2, 1.0], standard()).map_err(
+    primitives::polysolid(name.into(), ground(), path, centre, [0.2, 1.0], standard()).map_err(
         |error| match error {
             primitives::PolysolidError::Parameter(message) => {
                 GeometryError::InvalidGeometry(message)
@@ -437,6 +443,46 @@ fn polysolids() -> Vec<Case> {
     ]
 }
 
+fn arc_segment(to: [f64; 2], center: [f64; 2]) -> primitives::ProfileSegment {
+    primitives::ProfileSegment {
+        to,
+        arc: Some(primitives::SegmentArc {
+            center,
+            counter_clockwise: true,
+        }),
+    }
+}
+
+fn polysolid_arcs() -> Vec<Case> {
+    vec![
+        built("polysolid.leg-arc", || {
+            let path = primitives::PolysolidPath {
+                start: [0.0, 0.0],
+                segments: vec![
+                    primitives::ProfileSegment {
+                        to: [2.0, 0.0],
+                        arc: None,
+                    },
+                    arc_segment([3.0, 1.0], [2.0, 1.0]),
+                ],
+                closed: false,
+            };
+            polysolid_along("arc", &path)
+        }),
+        built("polysolid.tube", || {
+            let path = primitives::PolysolidPath {
+                start: [1.0, 0.0],
+                segments: vec![
+                    arc_segment([-1.0, 0.0], [0.0, 0.0]),
+                    arc_segment([1.0, 0.0], [0.0, 0.0]),
+                ],
+                closed: true,
+            };
+            polysolid_along("tube", &path)
+        }),
+    ]
+}
+
 pub(crate) fn cases() -> Vec<Case> {
     [
         cuboids(),
@@ -451,6 +497,7 @@ pub(crate) fn cases() -> Vec<Case> {
         vec![graph_case("graph.primitive.revolved", revolved_primitives)],
         standard_outlines(),
         polysolids(),
+        polysolid_arcs(),
     ]
     .into_iter()
     .flatten()

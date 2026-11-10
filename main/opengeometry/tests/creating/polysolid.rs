@@ -1,4 +1,4 @@
-use opengeometry::primitives::{PolysolidJustify, PolysolidPath, ProfileSegment, SegmentArc};
+use opengeometry::primitives::{PolysolidJustify, PolysolidPath, ProfileSegment};
 use opengeometry::world_graph::{
     CreateOptions, EditScope, ErrorCode, ModifyingOperation, Plane, Primitive, StepOptions,
     Transform, WorldGraph,
@@ -117,17 +117,6 @@ fn right_justified_polysolid_lies_outside_the_l_corner() {
     assert_valid_closed(&world, "wall", "right");
     assert_flat_volume(&world, (3.1 + 2.1) * 0.2);
     assert_bounds(&world, [0.0, 0.0, -2.0, 3.2, 1.0, 0.2]);
-}
-
-#[test]
-fn polysolid_with_an_arc_segment_is_refused_naming_the_segment() {
-    let mut arced = l_path();
-    arced.segments[1].arc = Some(SegmentArc {
-        center: [3.0, 1.0],
-        counter_clockwise: true,
-    });
-    let message = refusal(wall(arced, 0.2, PolysolidJustify::Centre));
-    assert!(message.contains("segment 1"), "{message}");
 }
 
 #[test]
