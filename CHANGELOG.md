@@ -4,24 +4,7 @@ All notable changes to the `opengeometry` package are in this file. The format f
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Added
-
-- Solid primitives `OG_PRIMITIVE_SLOT_PRISM`, `OG_PRIMITIVE_ROUNDED_BOX` and
-  `OG_PRIMITIVE_PIPE_SEGMENT`, with their `OG_PRIMITIVE_PARAMS_*` helpers and the
-  `SlotPrismParams`, `RoundedBoxParams` and `PipeSegmentParams` types.
-- `OG_PRIMITIVE_POLYSOLID`: a solid wall of constant width and height along a path of straight
-  legs, with `justify` `'centre'`, `'left'` or `'right'`, mitred corners and an open or closed
-  path. `OG_PRIMITIVE_PARAMS_POLYSOLID` and the type `PolysolidParams` give it a
-  type.
-- Wire primitives `OG_PRIMITIVE_REGULAR_POLYGON`, `OG_PRIMITIVE_SLOT` and
-  `OG_PRIMITIVE_ROUNDED_RECTANGLE`, with their `OG_PRIMITIVE_PARAMS_*` helpers and the
-  `RegularPolygonParams`, `SlotParams` and `RoundedRectangleParams` types.
-- `OG_PRIMITIVE_POLYSOLID` paths take arc segments that join their neighbours tangentially. A
-  joint where an arc meets a segment at an angle throws `InvalidParameter` that names the joint.
-
-## [3.0.0] - 2026-11-09
+## [3.0.0] - 2026-11-10
 
 3.0 is a new API. Code written for 2.0 does not run without changes. Version 2.5 was not
 published. Follow [MIGRATION.md](./MIGRATION.md): it gives every change with code before and after.
@@ -83,6 +66,17 @@ published. Follow [MIGRATION.md](./MIGRATION.md): it gives every change with cod
   report.
 - `OpenGeometry.insetCurvedRegion2D` and `OpenGeometry.offsetCurvedRingVariable` inset a
   line-and-arc region exactly, with one distance, or one distance per edge.
+- Solid primitives `OG_PRIMITIVE_SLOT_PRISM`, `OG_PRIMITIVE_ROUNDED_BOX` and
+  `OG_PRIMITIVE_PIPE_SEGMENT`, with their `OG_PRIMITIVE_PARAMS_*` helpers and the
+  `SlotPrismParams`, `RoundedBoxParams` and `PipeSegmentParams` types.
+- `OG_PRIMITIVE_POLYSOLID`: a solid wall of constant width and height along a path of straight
+  legs and tangent arcs, with `justify` `'centre'`, `'left'` or `'right'`, mitred corners and an
+  open or closed path. A joint where an arc meets a segment at an angle throws `InvalidParameter`
+  that names the joint. `OG_PRIMITIVE_PARAMS_POLYSOLID` and the type `PolysolidParams` give it a
+  type.
+- Wire primitives `OG_PRIMITIVE_REGULAR_POLYGON`, `OG_PRIMITIVE_SLOT` and
+  `OG_PRIMITIVE_ROUNDED_RECTANGLE`, with their `OG_PRIMITIVE_PARAMS_*` helpers and the
+  `RegularPolygonParams`, `SlotParams` and `RoundedRectangleParams` types.
 
 ### Removed
 
