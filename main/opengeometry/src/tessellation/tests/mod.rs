@@ -1,4 +1,5 @@
 mod display;
+mod edge_on_triangles;
 mod seams;
 mod short_loops;
 mod smooth_edges;
