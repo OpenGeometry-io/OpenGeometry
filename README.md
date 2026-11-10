@@ -1,6 +1,9 @@
 <p align="center">
   <a href="https://opengeometry.io?utm_source=github">
-    <img src="https://raw.githubusercontent.com/OpenGeometry-io/.github/main/profile/opengeometryTextLogo.png" alt="OpenGeometry" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/OpenGeometry-io/OpenGeometry/main/docs/logo/logo-dark.png" />
+      <img src="./docs/logo/logo-light.png" alt="OpenGeometry" width="420" />
+    </picture>
   </a>
 </p>
 
