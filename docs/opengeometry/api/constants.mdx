@@ -85,8 +85,8 @@ const params = OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR({
   startAngle: 0,
   sweepAngle: Math.PI / 2,
 });
-const wedge = new Solid(OG_PRIMITIVE_CYLINDER_SECTOR, params);
-console.log(wedge.validity().valid);
+const sector = new Solid(OG_PRIMITIVE_CYLINDER_SECTOR, params);
+console.log(sector.validity().valid);
 ```
 
 ## Parameter types

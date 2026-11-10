@@ -73,7 +73,7 @@ const sector = new AnalyticSolid({
   height: 3,
 });
 const arc = new Arc({ center: new Vector3(0, 0, 0), radius: 2, startAngle: 0, sweepAngle: Math.PI / 2 });
-const wedge = new AnalyticSolid({ kind: 'cylinderSector', radius: 2, height: 3, startAngle: 0, sweepAngle: Math.PI / 2 });
+const quarterCylinder = new AnalyticSolid({ kind: 'cylinderSector', radius: 2, height: 3, startAngle: 0, sweepAngle: Math.PI / 2 });
 const roof = new AnalyticSolid({
   kind: 'planarPolyhedron',
   vertices: [[0, 0, 0], [4, 0, 0], [4, 0, 2], [0, 0, 2], [1, 1, 1], [3, 1, 1]],
@@ -115,7 +115,7 @@ const sector = new Solid(OG_OPERATION_EXTRUDE, { profile, distance: 3 });
 
 const arc = new Wire(OG_PRIMITIVE_ARC, OG_PRIMITIVE_PARAMS_ARC({ radius: 2, startAngle: 0, sweepAngle: Math.PI / 2 }));
 
-const wedge = new Solid(
+const quarterCylinder = new Solid(
   OG_PRIMITIVE_CYLINDER_SECTOR,
   OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR({ radius: 2, height: 3, startAngle: 0, sweepAngle: Math.PI / 2 }),
 );
@@ -760,6 +760,8 @@ In the 2.5 column, a `?` after a parameter name marks it as optional, and rows t
 - `WorldGraph`: nodes and hierarchy become `SystemAssembly`, `addChild` or the `parent` option; `getWorldBounds(id)` becomes `body.getBounds()`, six numbers instead of a `THREE.Box3`; `removeNode(id)` becomes `parent.removeChild(body)`, which keeps the body (pass `{ keepWorld: true }` to leave it where it is), or `body.dispose()`, which frees it and everything under it; a body with no parent has only `dispose()`; `exportStep` becomes `OpenGeometry.exportStep({ nodes })` (nodes may be bodies or assemblies). Its `clash`, `clearance`, `distance`, `projectLines`, `projectViews` and `bind` are gone.
 - The pattern helpers (`AnalyticPattern`, `linearPattern`, `rectangularPattern`, `circularPattern`): make copies with `solid.instance()` and move each with `transform`; check the positions, since 2.0 drew a pattern around its own origin. `rebuild` and `operate` on an instanced body need `{ instances: 'all' }` or `makeUnique()` first.
 - `AnalyticSolid` kinds: `linearExtrusion` becomes `OG_OPERATION_EXTRUDE` with closed polyline wires for the outline and each hole, each 2.0 point `[u, v]` written `[u, 0, -v]` when the 2.0 `frame` was the default (with another `frame`, also give each wire `plane: { origin: frame.origin, normal: frame.z, xDirection: frame.x }` and check which way it extrudes); `revolvedRectangle` (a tube) becomes `OG_OPERATION_EXTRUDE` with a circle wire as `profile` and a smaller circle wire with the same centre as the one hole.
+- `Wedge`: `OG_OPERATION_EXTRUDE` with a closed triangle polyline wire as `profile`; give the wire `plane: { normal: [0, 0, 1], xDirection: [1, 0, 0] }` so it extrudes along z as the 2.0 wedge did, and move it by the 2.0 `center`; from 3.0, also a five-face `OG_PRIMITIVE_POLYHEDRON`.
+- `Curve`: a polyline through its control points, so `new Wire(OG_PRIMITIVE_POLYLINE, { points })` through the same points.
 
 ### Removed in 2.5
 
@@ -767,7 +769,7 @@ These are gone:
 
 - STL and IFC export. PDF export was never in the browser build.
 - Projection and 2D views, offset, loft, and public triangulation (`tessellate_brep`, `tessellateFacetedBrep`).
-- `Sphere`, `Wedge`, `Curve`, `EllipticalArc`, `AnalyticCurve`, arcs that are not full circles, and cylinder sectors.
+- `Sphere`, `EllipticalArc`, `AnalyticCurve`, arcs that are not full circles, and cylinder sectors.
 - `AnalyticSolid` kinds other than cuboid, cylinder, `linearExtrusion` and `revolvedRectangle`, `AnalyticSolid.fromBrep`, and `new Solid({ brep })`.
 - `WorldGraph`'s queries and projection: `clash`, `clearance`, `distance`, `projectLines`, `projectViews` and `bind`.
 - The older scene manager (`add*ToScene`, `replaceBrepEntityInScene`, `refreshBrepEntityInScene`), already removed in 2.0.16.

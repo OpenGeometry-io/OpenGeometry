@@ -21,7 +21,7 @@ rss: true
 - **Breaking: the shell hollows in place.** Use `solid.operate(OG_OPERATION_SHELL, { thickness })`.
 - **Breaking: display follows drawing.** A body gets its mesh when it is drawn or walked. Its `surface` and `outline` meshes are static: call `updateMatrix()` after you move them yourself.
 - **Smooth edges.** Outlines leave out smooth edges, and faceted curves shade smooth. Set `appearance.smoothAngle` to `0` for the 2.0 look.
-- **Removed:** IFC file text, STL and PDF export, projection, loft, public triangulation, curves other than lines, circles and arcs, and wedges.
+- **Removed:** IFC file text, STL and PDF export, projection, loft, public triangulation, and curves other than lines, circles, arcs and polylines, such as the elliptical arc. 3.0 has no spline, no ellipse and no elliptical arc. The wedge and the 2.0 `Curve` class are gone too. Build a wedge as a five-face `OG_PRIMITIVE_POLYHEDRON`, and a 2.0 `Curve` as an `OG_PRIMITIVE_POLYLINE` wire through its points.
 
 ### Added
 

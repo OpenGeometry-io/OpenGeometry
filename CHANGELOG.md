@@ -70,7 +70,11 @@ published. Follow [MIGRATION.md](./MIGRATION.md): it gives every change with cod
 ### Removed
 
 - **Breaking:** IFC file text, STL and PDF export, projection, loft, triangulation as a public
-  call, curves other than lines, circles and arcs, and wedges. They have no replacement in 3.0.
+  call, and curves other than lines, circles, arcs and polylines, such as the elliptical arc.
+  They have no replacement in 3.0. 3.0 has no spline, no ellipse and no elliptical arc. The
+  wedge and the 2.0 `Curve` class are gone too. Build a wedge as a five-face
+  `OG_PRIMITIVE_POLYHEDRON`, and a 2.0 `Curve` as an `OG_PRIMITIVE_POLYLINE` wire through its
+  points.
 
 ### Fixed
 

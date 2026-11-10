@@ -51,7 +51,7 @@ It is the geometry engine layer, not a full CAD application. Floorkit is a downs
 | **Queries** | Bounds, placements, the B-rep of a body, that B-rep placed in the world, the normal of a face at a point, whether a point is inside, volume and area within a stated error bound, whether a body is valid and closed, and the report of its last boolean. |
 | **Export** | STEP, in millimetres or metres, with Y or Z up, together with an export report. The IFC exchange body of a solid, in world metres with Z up, for an IFC writer. |
 
-Not in 3.0, though 2.0 had them: IFC file text and STL export; projection; loft; triangulation as a public call; curves other than lines, circles and arcs; wedges; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`.
+Not in 3.0, though 2.0 had them: IFC file text and STL export; projection; loft; triangulation as a public call; curves other than lines, circles, arcs and polylines, such as the elliptical arc; and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`. 3.0 has no spline, no ellipse and no elliptical arc. Build a wedge as a five-face `OG_PRIMITIVE_POLYHEDRON`, and a 2.0 `Curve` as an `OG_PRIMITIVE_POLYLINE` wire through its points.
 
 ## Installation
 
@@ -218,7 +218,7 @@ This section is a compact reference for writing OpenGeometry 3.0 code, by hand o
 - Call `dispose()` on bodies and assemblies you no longer need.
 - Catch `OGError` and branch on `code`. After a `'fatal'` event the runtime refuses every call until `OpenGeometry.reset()`.
 
-**What does not exist.** IFC file text, STL and PDF export, projection, loft, public triangulation, curves other than lines, circles and arcs, wedges, and the 2.0 classes. Do not call them.
+**What does not exist.** IFC file text, STL and PDF export, projection, loft, public triangulation, curves other than lines, circles, arcs and polylines, such as the elliptical arc, and the 2.0 classes. Do not call them. 3.0 has no spline, no ellipse and no elliptical arc. Build a wedge as a five-face `OG_PRIMITIVE_POLYHEDRON`, and a 2.0 `Curve` as an `OG_PRIMITIVE_POLYLINE` wire through its points.
 
 **Where the truth is.** `index.d.ts` in the installed package lists every export and its types. The examples in [`main/opengeometry-three/examples-vite/`](./main/opengeometry-three/examples-vite/) are working 3.0 code, except that they import the built package by path (`../../../dist/index.js`) where an app imports from `'opengeometry'`.
 
