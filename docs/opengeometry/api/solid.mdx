@@ -34,18 +34,22 @@ console.log(base.getReport()?.report.operation);
 
 `new Solid(kind: string, params: Record<string, unknown>, options?: BodyOptions)`
 
-| `kind`                         | `params`                                     |
-| ------------------------------ | -------------------------------------------- |
-| `OG_PRIMITIVE_CUBOID`          | `{ width, height, depth }`                   |
-| `OG_PRIMITIVE_CYLINDER`        | `{ radius, height }`                         |
-| `OG_PRIMITIVE_CYLINDER_SECTOR` | `{ radius, height, startAngle, sweepAngle }` |
-| `OG_PRIMITIVE_SPHERE`          | `{ radius }`                                 |
-| `OG_PRIMITIVE_CONE`            | `{ radiusBottom, radiusTop, height }`        |
-| `OG_PRIMITIVE_TORUS`           | `{ majorRadius, minorRadius }`               |
-| `OG_PRIMITIVE_POLYHEDRON`      | `{ points, faces }`                          |
-| `OG_OPERATION_EXTRUDE`         | `{ profile, holes?, distance }`              |
-| `OG_OPERATION_SWEEP`           | `{ profile, path, caps? }`                   |
-| `OG_OPERATION_REVOLVE`         | `{ profile, axis? }`                         |
+| `kind`                         | `params`                                                       |
+| ------------------------------ | -------------------------------------------------------------- |
+| `OG_PRIMITIVE_CUBOID`          | `{ width, height, depth }`                                     |
+| `OG_PRIMITIVE_CYLINDER`        | `{ radius, height }`                                           |
+| `OG_PRIMITIVE_CYLINDER_SECTOR` | `{ radius, height, startAngle, sweepAngle }`                   |
+| `OG_PRIMITIVE_SPHERE`          | `{ radius }`                                                   |
+| `OG_PRIMITIVE_CONE`            | `{ radiusBottom, radiusTop, height }`                          |
+| `OG_PRIMITIVE_TORUS`           | `{ majorRadius, minorRadius }`                                 |
+| `OG_PRIMITIVE_POLYHEDRON`      | `{ points, faces }`                                            |
+| `OG_OPERATION_EXTRUDE`         | `{ profile, holes?, distance }`                                |
+| `OG_OPERATION_SWEEP`           | `{ profile, path, caps? }`                                     |
+| `OG_OPERATION_REVOLVE`         | `{ profile, axis? }`                                           |
+| `OG_PRIMITIVE_SLOT_PRISM`      | `{ length, width, height }`                                    |
+| `OG_PRIMITIVE_ROUNDED_BOX`     | `{ width, height, depth, radius }`                             |
+| `OG_PRIMITIVE_PIPE_SEGMENT`    | `{ outerRadius, innerRadius, height, startAngle, sweepAngle }` |
+| `OG_PRIMITIVE_POLYSOLID`       | `{ path, width, height, justify? }`                            |
 
 `profile`, `holes` and `path` are wires. A sweep with `caps: false` makes a sheet, so `new Solid` throws `BodyTypeMismatch` for it.
 

@@ -1,6 +1,6 @@
-use super::support::extrude;
+use super::support::{arc, extrude, line};
 use opengeometry::brep::SurfaceGeometry;
-use opengeometry::primitives::{self, ProfileSegment, SegmentArc};
+use opengeometry::primitives::{self, ProfileSegment};
 use opengeometry::world_graph::{
     CreateOptions, CreatingOperation, EditScope, ErrorCode, Plane, Primitive, StepOptions,
     WorldGraph,
@@ -10,20 +10,6 @@ use opengeometry_test_support::part21::Document;
 use opengeometry_test_support::volume;
 use opengeometry_test_support::world_graph::{graph, named};
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
-
-fn line(to: [f64; 2]) -> ProfileSegment {
-    ProfileSegment { to, arc: None }
-}
-
-fn arc(to: [f64; 2], center: [f64; 2], counter_clockwise: bool) -> ProfileSegment {
-    ProfileSegment {
-        to,
-        arc: Some(SegmentArc {
-            center,
-            counter_clockwise,
-        }),
-    }
-}
 
 fn closed(start: [f64; 2], segments: Vec<ProfileSegment>) -> Primitive {
     Primitive::Profile {

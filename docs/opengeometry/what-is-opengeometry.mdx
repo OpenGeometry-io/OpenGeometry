@@ -30,7 +30,7 @@ It also fits AI-assisted CAD. An assistant or an agent proposes the modelling st
 
 ## What 3.0 does not have
 
-IFC file text, STL and PDF export, projection, loft, triangulation as a public call, curves other than lines, circles and arcs, wedges, and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`. Code that uses them is written for 2.0. See [Migrate from 2.0](/opengeometry/migrate-from-2-0).
+IFC file text, STL and PDF export, projection, loft, triangulation as a public call, curves other than lines, circles, arcs and polylines, such as the elliptical arc, and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`. Code that uses them is written for 2.0. 3.0 has no spline, no ellipse and no elliptical arc. Build a wedge as a five-face `OG_PRIMITIVE_POLYHEDRON`, and a 2.0 `Curve` as an `OG_PRIMITIVE_POLYLINE` wire through its points. See [Migrate from 2.0](/opengeometry/migrate-from-2-0).
 
 ## Next steps
 

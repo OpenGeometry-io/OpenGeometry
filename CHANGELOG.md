@@ -4,6 +4,23 @@ All notable changes to the `opengeometry` package are in this file. The format f
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Solid primitives `OG_PRIMITIVE_SLOT_PRISM`, `OG_PRIMITIVE_ROUNDED_BOX` and
+  `OG_PRIMITIVE_PIPE_SEGMENT`, with their `OG_PRIMITIVE_PARAMS_*` helpers and the
+  `SlotPrismParams`, `RoundedBoxParams` and `PipeSegmentParams` types.
+- `OG_PRIMITIVE_POLYSOLID`: a solid wall of constant width and height along a path of straight
+  legs, with `justify` `'centre'`, `'left'` or `'right'`, mitred corners and an open or closed
+  path. `OG_PRIMITIVE_PARAMS_POLYSOLID` and the type `PolysolidParams` give it a
+  type.
+- Wire primitives `OG_PRIMITIVE_REGULAR_POLYGON`, `OG_PRIMITIVE_SLOT` and
+  `OG_PRIMITIVE_ROUNDED_RECTANGLE`, with their `OG_PRIMITIVE_PARAMS_*` helpers and the
+  `RegularPolygonParams`, `SlotParams` and `RoundedRectangleParams` types.
+- `OG_PRIMITIVE_POLYSOLID` paths take arc segments that join their neighbours tangentially. A
+  joint where an arc meets a segment at an angle throws `InvalidParameter` that names the joint.
+
 ## [3.0.0] - 2026-11-09
 
 3.0 is a new API. Code written for 2.0 does not run without changes. Version 2.5 was not
@@ -70,7 +87,11 @@ published. Follow [MIGRATION.md](./MIGRATION.md): it gives every change with cod
 ### Removed
 
 - **Breaking:** IFC file text, STL and PDF export, projection, loft, triangulation as a public
-  call, curves other than lines, circles and arcs, and wedges. They have no replacement in 3.0.
+  call, and curves other than lines, circles, arcs and polylines, such as the elliptical arc.
+  They have no replacement in 3.0. 3.0 has no spline, no ellipse and no elliptical arc. The
+  wedge and the 2.0 `Curve` class are gone too. Build a wedge as a five-face
+  `OG_PRIMITIVE_POLYHEDRON`, and a 2.0 `Curve` as an `OG_PRIMITIVE_POLYLINE` wire through its
+  points.
 
 ### Fixed
 
