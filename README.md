@@ -7,7 +7,7 @@
 <h1 align="center">OpenGeometry</h1>
 
 <p align="center">
-  <strong>Browser-native CAD kernel for Web Apps and AI CAD built with Rust, WebAssembly, and Three.js.</strong>
+  <strong>Open-source CAD kernel for the web: exact B-rep solids, booleans, extrude, sweep and revolve, and STEP export, in Rust and WebAssembly with a TypeScript SDK for Three.js. For product configurators, mechanical parts, buildings, robotics and AI agents that model.</strong>
 </p>
 
 <p align="center">
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="https://opengeometry.io?utm_source=github">Website</a> · <a href="https://docs.opengeometry.io/OpenGeometry?utm_source=github">Documentation</a> · <a href="https://demos.opengeometry.io?utm_source=github">Live Demos</a> · <a href="https://blog.opengeometry.io?utm_source=github">Blog</a> · <a href="https://www.npmjs.com/package/opengeometry">npm</a>
+  <a href="https://opengeometry.io?utm_source=github">Website</a> · <a href="https://docs.opengeometry.io?utm_source=github">Documentation</a> · <a href="https://demos.opengeometry.io?utm_source=github">Live Demos</a> · <a href="https://blog.opengeometry.io?utm_source=github">Blog</a> · <a href="https://www.npmjs.com/package/opengeometry">npm</a>
 </p>
 
 ---
@@ -32,11 +32,24 @@
 
 ## What is OpenGeometry?
 
-OpenGeometry is an **open-source CAD kernel for the browser**. It models **B-rep solids**, runs **boolean operations** (union, subtract, intersect), builds solids by **extrude, sweep and revolve**, and writes **STEP** files. The kernel is written in **Rust** and compiled to **WebAssembly**, and a **TypeScript SDK for Three.js** puts every body straight into your scene.
+OpenGeometry is an **open-source CAD kernel for the web**. It models **B-rep solids** with exact planes, cylinders, spheres, cones and tori, runs **boolean operations** (union, subtract, intersect), builds solids by **extrude, sweep and revolve**, hollows them with **shell**, and writes **STEP** files that other CAD and CAM tools open. The kernel is written in **Rust** and compiled to **WebAssembly**. A **TypeScript SDK for Three.js** puts every body straight into your scene, and the same calls run in **Node.js** with no browser.
 
-OpenGeometry is best suited for **browser-based CAD, configurators, and geometry-heavy web tools**. Whether you're building a parametric modeler, a solid modeling workflow, a geometry viewer, or a custom Three.js modeling tool, OpenGeometry gives you deterministic, kernel-backed primitives and operations without leaving JavaScript.
+It is the geometry engine, not a CAD application: you build the product, OpenGeometry does the solid modelling. The same calls give the same shape every time, so an app, a script or an AI agent can drive it and check the result with exact queries: volume, area, bounds, validity, and whether a point is inside.
 
-It is the geometry engine layer, not a full CAD application. Floorkit is a downstream application/toolkit built on top of OpenGeometry for AEC workflows. In this repository, OpenGeometry is the primary SDK and engine.
+## Use cases
+
+| Field | What you build | What OpenGeometry gives you |
+| --- | --- | --- |
+| **Product configurators and e-commerce** | A shopper picks sizes and options and sees the exact part, then orders it | Parametric primitives that `rebuild` in place, booleans for cut-outs, STEP for the factory |
+| **Mechanical parts and enclosures** | Plates, brackets, housings, flanges, pipe parts | Rounded boxes, slots, cylinders, pipe segments, through-holes in one call, shell for walls, STEP in millimetres |
+| **Manufacturing and fabrication** | Web tools that turn an order into a production file | Exact B-rep, valid and closed solids, STEP export with an export report |
+| **Architecture, construction and interiors** | Walls, openings, slabs, furniture, MEP parts | Polysolid walls along a path, extrude with holes, sweeps along arcs, the IFC exchange body for an IFC writer |
+| **Robotics and automation** | Fixtures, grippers, end-of-arm tools, work-cell layouts | Assemblies with placements, point-inside tests, measured volume, picking down to face and edge |
+| **AI agents and prompt-to-CAD** | An agent that turns a request into a part, then checks it | Plain JSON parameters, deterministic results, `validity()` and `measure()` to verify, typed errors with a `code` |
+| **Education and geometry tools** | Teaching solids, booleans and B-rep in a browser tab | Open source, runs client-side, the B-rep of every body is readable |
+| **Server-side generation** | A Node.js service that makes STEP files from parameters | The same API in Node, with inline tessellation and no browser |
+
+Floorkit, a toolkit for building design, is one application built on OpenGeometry.
 
 ## Features
 
@@ -68,92 +81,61 @@ npm install opengeometry three
 ```ts
 import * as THREE from 'three';
 import {
-  OpenGeometry, Solid, Wire,
-  OG_OPERATION_EXTRUDE, OG_OPERATION_SUBTRACT, OG_PRIMITIVE_CUBOID, OG_PRIMITIVE_RECTANGLE, OG_TRANSFORM_TRANSLATE,
+  OpenGeometry, Solid,
+  OG_OPERATION_SUBTRACT, OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_ROUNDED_BOX, OG_TRANSFORM_TRANSLATE,
 } from 'opengeometry';
 
 await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { workerURL: '/tessellation-worker.js' });
 
-const profile = new Wire(OG_PRIMITIVE_RECTANGLE, { width: 6, breadth: 0.2 });
-const wall = new Solid(OG_OPERATION_EXTRUDE, { profile, distance: 3 });
-const door = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.9, height: 2.1, depth: 0.4 });
-door.transform(OG_TRANSFORM_TRANSLATE, { offset: [2, 0, 0] });
-wall.operate(OG_OPERATION_SUBTRACT, { tools: [door] });
+const plate = new Solid(OG_PRIMITIVE_ROUNDED_BOX, { width: 0.12, height: 0.01, depth: 0.08, radius: 0.01 });
+const holes = [[-0.045, -0.025], [0.045, -0.025], [-0.045, 0.025], [0.045, 0.025]].map(([x, z]) => {
+  const hole = new Solid(OG_PRIMITIVE_CYLINDER, { radius: 0.004, height: 0.02 });
+  hole.transform(OG_TRANSFORM_TRANSLATE, { offset: [x, -0.005, z] });
+  return hole;
+});
+plate.operate(OG_OPERATION_SUBTRACT, { tools: holes });
 
 const scene = new THREE.Scene();
-scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2), wall);
-const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
-camera.position.set(6, 5, 8);
-camera.lookAt(0, 1.5, 0);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2), plate);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.001, 10);
+camera.position.set(0.12, 0.1, 0.14);
+camera.lookAt(0, 0, 0);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 document.body.append(renderer.domElement);
 renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
-const { text, report } = await OpenGeometry.exportStep({ nodes: [wall], unit: 'millimetre', upAxis: 'Z' });
+const { text, report } = await OpenGeometry.exportStep({ nodes: [plate], unit: 'millimetre', upAxis: 'Z' });
 ```
 
-This loads the kernel, makes a 6 m by 0.2 m rectangle wire on the ground plane, extrudes it 3 m up into a wall, and cuts a door opening through the wall with a cuboid placed at x = 2. The wall is a `THREE.Group`, so it goes into the scene like any other object and is drawn on every frame. The last line writes the wall as a STEP file: `text` is the file and `report` counts what was written.
+This loads the kernel and makes a 120 mm by 80 mm mounting plate, 10 mm thick, with rounded corners (model units are metres). It drills four 8 mm bolt holes through the plate with one boolean call: the four cylinders are the tools. The plate is a `THREE.Group`, so it goes into the scene like any other object and is drawn on every frame. The last line writes the plate as a STEP file in millimetres, ready for a CAD or CAM tool: `text` is the file and `report` counts what was written.
 
 The two URLs assume both files were copied to the site root, as described under Installation. The block uses top-level `await`, so it must run as a module. If your build rejects top-level `await`, raise its target (the examples set Vite's `build.target` to `'esnext'`) or move the code after the imports into an `async` function and call it.
 
-Runnable examples live in [`main/opengeometry-three/examples-vite/`](./main/opengeometry-three/examples-vite/): a showcase, a sweep, booleans, an opening, a cuboid, a cylinder, a rounded section, a sweep along an arc path, a curved profile united with a straight one, and STEP export. From a clone, run `npm --prefix main ci`, `npm run build` and then `npm run dev-example`.
+Runnable examples live in [`main/opengeometry-three/examples-vite/`](./main/opengeometry-three/examples-vite/). Shapes: cuboid, cylinder, slot prism, rounded box, pipe segment, polysolid wall, the regular polygon, slot and rounded rectangle wires, and a rounded section. Operations: booleans, an opening, a sweep, a sweep along an arc path, a curved profile united with a straight one, and STEP export. From a clone, run `npm --prefix main ci`, `npm run build` and then `npm run dev-example`.
 
 ## Demos
 
-See OpenGeometry in action — interactive, browser-based demos showcasing the kernel's capabilities:
+Interactive demos run the kernel in your browser, with nothing to install: **[demos.opengeometry.io](https://demos.opengeometry.io?utm_source=github)**.
 
-**[demos.opengeometry.io](https://demos.opengeometry.io?utm_source=github)**
+## When not to use it
 
-Demos include primitives rendering, shape generation, sweep operations, boolean operations, file exports, and more. All running client-side via WebAssembly.
+- You need a desktop CAD application. OpenGeometry is a library you embed.
+- You only show meshes you already have. Plain Three.js is enough.
+- You need splines, ellipses, lofts, fillets or STL export. 3.0 does not have them.
 
-## When to use OpenGeometry
+## For AI agents and coding assistants
 
-Use OpenGeometry when you need:
+OpenGeometry is built to be driven by code, including code an agent writes. Every call takes plain parameters, gives the same shape for the same input, and can be checked with `validity()`, `measure()`, `getBounds()` and `classifyPoint()`.
 
-- browser-based parametric modeling with Rust + WebAssembly performance
-- cutout subtraction and other solid boolean workflows
-- profile extrusion into solids for CAD or AEC modeling
-- STEP export in web apps
-- a Three.js-friendly CAD kernel instead of ad hoc mesh math
-- a deterministic geometry engine behind AI-assisted CAD or design workflows
+- **[llms.txt](https://docs.opengeometry.io/llms.txt)**: an index of every documentation page, in Markdown, for a model's context.
+- **[Use a coding agent](https://docs.opengeometry.io/opengeometry/agents)**: the 3.0 rules that agents get wrong most often, and the sources to trust.
+- **`index.d.ts`** in the installed package: every export and its types.
+- The reference below: the whole public surface on one page.
 
-### Why it works well for AI-powered CAD apps
+### API reference on one page
 
-OpenGeometry is a good fit for **AI-assisted CAD apps** because the kernel layer stays explicit and deterministic. An AI assistant or agent can suggest modeling steps, generate profiles, or orchestrate edits, while OpenGeometry executes the actual geometry operations, booleans, and exports in a predictable browser runtime.
-
-Good examples include:
-
-- AI assistants that translate user intent into concrete modeling operations
-- prompt-to-geometry or agent-driven editing flows inside browser CAD tools
-- AI-first design interfaces that still need reliable extrusion, boolean, and export workflows
-
-## Good fit / Not the right fit
-
-**Good fit**
-
-- browser CAD, mechanical design, and geometry-heavy web applications
-- Three.js-based modeling tools that need a real kernel behind them
-- AI-first CAD frontends that need deterministic geometry execution in the browser
-
-**Not the default fit**
-
-- desktop-native CAD products instead of an embeddable web SDK
-- non-browser runtimes with no WebAssembly or browser delivery story
-- pure visualization-only apps where raw Three.js is enough and kernel-backed modeling is unnecessary
-
-## Who is this for?
-
-- Teams building **browser-based CAD and geometry tools**
-- Developers evaluating **WebAssembly-powered 3D** for the web
-- Contributors interested in the **Rust → WASM geometry pipeline**
-- Anyone exploring **open-source CAD kernel internals**
-
-If you just want a quick look, start with the [hosted demos](https://demos.opengeometry.io?utm_source=github) or the [examples](./main/opengeometry-three/examples-vite/).
-
-## Using OpenGeometry with AI coding assistants
-
-This section is a compact reference for writing OpenGeometry 3.0 code, by hand or with a coding assistant.
+This is a compact reference for writing OpenGeometry 3.0 code, by hand or with a coding assistant.
 
 **Package.** `opengeometry` on npm. ES modules only, types included, peer dependency `three` `>=0.168.0 <0.185.0`.
 
