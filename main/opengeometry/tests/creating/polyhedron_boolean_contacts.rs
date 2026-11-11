@@ -1,0 +1,159 @@
+use super::polyhedron::{gable_roof, l_roof, polyhedron};
+use super::polyhedron_boolean_checks::Pair;
+use super::polyhedron_booleans::{tetrahedron, triangular_prism};
+use opengeometry::math::Point3;
+use opengeometry::operations::modifying::boolean::BooleanOp;
+use opengeometry::world_graph::{Primitive, Transform};
+
+fn cuboid(size: f64) -> Primitive {
+    Primitive::Cuboid {
+        width: size,
+        height: size,
+        depth: size,
+    }
+}
+
+fn turned(degrees: f64, pivot: Point3) -> Transform {
+    Transform::Rotate {
+        axis: [0.0, 1.0, 0.0],
+        degrees,
+        pivot: Some(pivot),
+    }
+}
+
+fn hexahedron(origin: Point3, [a, b, c]: [Point3; 3]) -> Primitive {
+    let points = (0..8)
+        .map(|corner| {
+            let steps = [corner & 1, (corner >> 1) & 1, (corner >> 2) & 1].map(f64::from);
+            std::array::from_fn(|i| origin[i] + steps[0] * a[i] + steps[1] * b[i] + steps[2] * c[i])
+        })
+        .collect::<Vec<Point3>>();
+    let faces: [&[u32]; 6] = [
+        &[0, 4, 6, 2],
+        &[1, 3, 7, 5],
+        &[0, 1, 5, 4],
+        &[2, 6, 7, 3],
+        &[0, 2, 3, 1],
+        &[4, 5, 7, 6],
+    ];
+    polyhedron(&points, &faces)
+}
+
+#[test]
+fn turned_unit_cuboid_unions_and_intersects_with_a_cuboid() {
+    let pair = Pair::placed([
+        (cuboid(2.0), &[]),
+        (
+            cuboid(1.0),
+            &[
+                Transform::Translate {
+                    offset: [1.5, 0.5, 0.0],
+                },
+                turned(30.0, [1.5, 0.5, 0.0]),
+            ],
+        ),
+    ]);
+    let clipped = (2.0 - 3f64.sqrt()) / (4.0 * 3f64.sqrt());
+    let union = pair.planar(BooleanOp::Union, 1);
+    let intersection = pair.planar(BooleanOp::Intersection, 1);
+    let difference = pair.built(BooleanOp::Subtraction, 1);
+    union.assert_volume(9.0 - clipped);
+    intersection.assert_volume(clipped);
+    difference.assert_volume(8.0 - clipped);
+    pair.assert_identities(&union, &intersection, &difference);
+    pair.assert_both_contribute(&union);
+    pair.assert_both_contribute(&intersection);
+}
+
+#[test]
+fn bar_across_both_arms_of_an_l_roof_intersects_in_two_solids() {
+    let bar = hexahedron(
+        [-0.75, -1.0, 5.25],
+        [[6.0, 0.0, -6.0], [0.0, 3.0, 0.0], [0.5, 0.0, 0.5]],
+    );
+    let pair = Pair::new(l_roof(), bar);
+    let union = pair.planar(BooleanOp::Union, 1);
+    let intersection = pair.planar(BooleanOp::Intersection, 2);
+    let difference = pair.built(BooleanOp::Subtraction, 3);
+    union.assert_volume(547.0 / 24.0);
+    intersection.assert_volume(13.0 / 24.0);
+    difference.assert_volume(115.0 / 24.0);
+    pair.assert_identities(&union, &intersection, &difference);
+    pair.assert_both_contribute(&intersection);
+}
+
+#[test]
+fn l_roof_and_a_box_through_one_arm_union_into_one_solid() {
+    let post = hexahedron(
+        [0.5, -0.5, 0.5],
+        [[1.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 3.0]],
+    );
+    let pair = Pair::new(l_roof(), post);
+    let union = pair.planar(BooleanOp::Union, 1);
+    let intersection = pair.planar(BooleanOp::Intersection, 1);
+    let difference = pair.built(BooleanOp::Subtraction, 1);
+    union.assert_volume(73.0 / 8.0);
+    intersection.assert_volume(53.0 / 24.0);
+    difference.assert_volume(25.0 / 8.0);
+    pair.assert_identities(&union, &intersection, &difference);
+    pair.assert_both_contribute(&union);
+    pair.assert_both_contribute(&intersection);
+}
+
+#[test]
+fn turned_box_inside_a_turned_box_unions_to_the_outer_and_intersects_to_the_inner() {
+    let pair = Pair::placed([
+        (cuboid(2.0), &[turned(30.0, [0.0, 1.0, 0.0])]),
+        (
+            cuboid(1.0),
+            &[
+                Transform::Translate {
+                    offset: [0.0, 0.5, 0.0],
+                },
+                turned(45.0, [0.0, 1.0, 0.0]),
+            ],
+        ),
+    ]);
+    let union = pair.built(BooleanOp::Union, 1);
+    let intersection = pair.built(BooleanOp::Intersection, 1);
+    let difference = pair.built(BooleanOp::Subtraction, 1);
+    union.assert_volume(8.0);
+    intersection.assert_volume(1.0);
+    difference.assert_volume(7.0);
+    pair.assert_identities(&union, &intersection, &difference);
+}
+
+#[test]
+fn wedge_touching_the_ridge_along_an_edge_unions_apart_and_intersects_empty() {
+    let pair = Pair::new(
+        gable_roof(),
+        triangular_prism([[1.0, 1.0], [2.0, 0.5], [2.0, 1.5]], [1.0, 3.0]),
+    );
+    pair.assert_touching_kept_apart();
+}
+
+#[test]
+fn tetrahedron_touching_the_ridge_end_at_a_corner_unions_apart_and_intersects_empty() {
+    let tetrahedron = tetrahedron([
+        [4.0, 1.0, 1.0],
+        [5.0, 1.0, 2.0],
+        [5.0, 1.0, 0.0],
+        [5.0, 2.0, 1.0],
+    ]);
+    let pair = Pair::new(gable_roof(), tetrahedron);
+    pair.assert_touching_kept_apart();
+}
+
+#[test]
+fn box_standing_on_a_turned_cuboid_subtracts_to_the_unchanged_host() {
+    let pair = Pair::placed([
+        (cuboid(1.0), &[turned(30.0, [0.0, 0.5, 0.0])]),
+        (
+            cuboid(0.2),
+            &[Transform::Translate {
+                offset: [0.0, 1.0, 0.0],
+            }],
+        ),
+    ]);
+    pair.built(BooleanOp::Subtraction, 1).assert_volume(1.0);
+}

@@ -3,6 +3,7 @@ use opengeometry::operations::modifying::boolean::{
     boolean_brep_outcome_with_handlers, boolean_brep_with_handlers, BooleanOp,
 };
 use opengeometry::primitives;
+use opengeometry::query::validity;
 use opengeometry_test_support::{stored, volume};
 use serde_json::json;
 
@@ -152,47 +153,47 @@ fn boolean_support_matrix_matches_stored_outcomes_and_handlers() {
 }
 
 #[test]
-fn i2_uncovered_rotated_box_returns_coverage_gap_without_mesh_fallback() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/cases/boolean-matrix/rotated-box-union.json");
-    let fixture: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
-    let a: BrepEnvelope = serde_json::from_value(fixture["a"].clone()).unwrap();
-    let b: BrepEnvelope = serde_json::from_value(fixture["b"].clone()).unwrap();
-    let nearest_vertex_to_plane = |vertices: &BrepEnvelope, planes: &BrepEnvelope| {
-        vertices
-            .topology
-            .vertices
-            .iter()
-            .flat_map(|vertex| {
-                planes.geometry.surfaces.iter().filter_map(move |surface| {
-                    if let opengeometry::brep::SurfaceGeometry::Plane { frame } = surface {
-                        let delta = std::array::from_fn::<_, 3, _>(|i| {
-                            vertex.position[i] - frame.origin[i]
-                        });
-                        Some((0..3).map(|i| delta[i] * frame.z[i]).sum::<f64>().abs())
-                    } else {
-                        None
-                    }
-                })
-            })
-            .fold(f64::INFINITY, f64::min)
+fn rotated_box_union_and_intersection_build_through_planar_polyhedra() {
+    let fixture = |row: &str| -> serde_json::Value {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("tests/fixtures/cases/boolean-matrix/{row}.json"));
+        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
     };
-    let clearance = nearest_vertex_to_plane(&a, &b).min(nearest_vertex_to_plane(&b, &a));
+    let rows = [
+        (fixture("rotated-box-union"), BooleanOp::Union),
+        (fixture("rotated-box-intersection"), BooleanOp::Intersection),
+    ];
+    assert_eq!(rows[0].0["a"], rows[1].0["a"]);
+    assert_eq!(rows[0].0["b"], rows[1].0["b"]);
+    let a: BrepEnvelope = serde_json::from_value(rows[0].0["a"].clone()).unwrap();
+    let b: BrepEnvelope = serde_json::from_value(rows[0].0["b"].clone()).unwrap();
+    let [union, intersection] = rows.map(|(_, operation)| {
+        let (result, handlers) =
+            boolean_brep_outcome_with_handlers(&a, &b, operation, format!("{operation:?}"));
+        let body = result.unwrap().brep;
+        body.validate().unwrap();
+        let checked = validity(&body);
+        assert!(checked.valid && checked.closed, "{operation:?}");
+        let value = serde_json::to_value(&body).unwrap();
+        assert_eq!(
+            value["solids"].as_array().unwrap().len(),
+            1,
+            "{operation:?}"
+        );
+        assert_eq!(handlers, ["boolean_planar_polyhedra"], "{operation:?}");
+        volume::estimate(&body, 0.01)
+    });
+    let [a, b] = [&a, &b].map(|body| volume::estimate(body, 0.01));
+    let slack = a.error_bound + b.error_bound + union.error_bound + intersection.error_bound;
+    assert!(intersection.value > 0.0);
     assert!(
-        clearance > 10.0 * a.accuracy.geometric,
-        "clearance={clearance}"
+        (union.value - (a.value + b.value - intersection.value)).abs() <= slack + 1e-9,
+        "union={} a={} b={} intersection={}",
+        union.value,
+        a.value,
+        b.value,
+        intersection.value
     );
-    let (result, handlers) = boolean_brep_outcome_with_handlers(
-        &a,
-        &b,
-        BooleanOp::Union,
-        "matrix-rotated-box-union".into(),
-    );
-    assert!(matches!(
-        result,
-        Err(opengeometry::brep::GeometryError::CoverageGap { .. })
-    ));
-    assert_eq!(json!(handlers), fixture["handlers"]);
 }
 
 #[test]
