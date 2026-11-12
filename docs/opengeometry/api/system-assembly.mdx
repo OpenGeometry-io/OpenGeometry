@@ -1,0 +1,55 @@
+---
+title: SystemAssembly
+description: A node that groups bodies and other assemblies, with its own placement.
+icon: diagram-project
+---
+
+`class SystemAssembly`
+
+A `SystemAssembly` is a node in the document, not a Three.js object. Add its bodies to your scene yourself.
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  SystemAssembly,
+  OG_PRIMITIVE_CUBOID,
+  OG_TRANSFORM_ROTATE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const shelf = new SystemAssembly({ ogId: 'shelf' });
+new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 0.02, depth: 0.3 }, { parent: shelf });
+shelf.transform(OG_TRANSFORM_ROTATE, { axis: [0, 1, 0], degrees: 90 });
+console.log(shelf.getChildren(), shelf.getWorldPlacement().xDirection);
+```
+
+## Constructor
+
+`new SystemAssembly(options?: { ogId?: string; parent?: SystemAssembly })`
+
+## Methods
+
+| Method                               | Returns                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `transform(kind, params)`            | `void`. Moves the assembly and everything under it                       |
+| `getPlacement()`                     | `{ origin, xDirection, normal, scale }` relative to the parent           |
+| `getWorldPlacement()`                | The same, in the world                                                   |
+| `addChild(children, { keepWorld? })` | `void`. `children` are bodies or assemblies                              |
+| `removeChild(child, { keepWorld? })` | `void`. With `keepWorld: true` the child keeps its world position        |
+| `getChildren()`                      | `string[]`, the children's `ogId` values                                 |
+| `getParent()`                        | `string \| null`                                                         |
+| `getBounds()`                        | `[minX, minY, minZ, maxX, maxY, maxZ]` of everything under it, or `null` |
+| `dispose()`                          | `void`                                                                   |
+
+| Field  | Type     |
+| ------ | -------- |
+| `ogId` | `string` |
+
+An `addChild` that would make a node its own ancestor throws `CycleDetected`. A `removeChild` of a node that is not a child throws `NotAChild`.
+
+See [Transforms and assemblies](/opengeometry/guides/transforms-and-assemblies).

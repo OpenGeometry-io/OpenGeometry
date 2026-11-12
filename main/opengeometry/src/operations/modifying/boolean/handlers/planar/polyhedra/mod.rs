@@ -9,10 +9,10 @@ use crate::geom2d::{
 use crate::math::{dot, scale, sub, Point3};
 use crate::operations::modifying::boolean::operands::brep_face_source;
 use crate::operations::modifying::boolean::types::BooleanResult;
-use crate::query::{classify_point, PointClassification};
+use crate::query::{Classifier, PointClassification};
 use sections::{
-    convex_faces, convex_section_polygon, planar_faces, planar_section_segments, split_planar_ring,
-    PlanarFace, PlanarFacet,
+    convex_faces, convex_section_polygon, planar_faces, planar_section_segments,
+    ring_vertex_candidates, split_planar_ring, PlanarFace, PlanarFacet,
 };
 use std::cell::RefCell;
 
@@ -43,8 +43,9 @@ pub(crate) fn subtract_planar_polyhedra(
             pieces.push(host_piece(host, face, &region));
         }
     }
+    let classifier = Classifier::new(host);
     for face in &cutter_faces {
-        let regions = cutter_face_regions(host, &host_faces, face, accuracy)?;
+        let regions = cutter_face_regions(host, &classifier, &host_faces, face, accuracy)?;
         let reversed = Frame3 {
             origin: face.frame.origin,
             x: face.frame.x,
@@ -68,14 +69,22 @@ pub(crate) fn subtract_planar_polyhedra(
                 .copied()
         })
         .collect::<Vec<_>>();
+    let tolerance = accuracy.geometric / 4.0;
+    let rings = pieces
+        .iter()
+        .flat_map(|piece| std::iter::once(&piece.outer).chain(&piece.holes))
+        .map(Vec::as_slice)
+        .collect::<Vec<_>>();
+    let near = ring_vertex_candidates(&rings, &vertices, tolerance);
+    let mut offset = 0;
+    let mut split = |ring: &[Point3]| {
+        offset += ring.len();
+        split_planar_ring(ring, &vertices, &near, offset - ring.len(), tolerance)
+    };
     let mut facets = PlanarFacets::new(id, accuracy)?;
     for piece in pieces {
-        let outer = split_planar_ring(&piece.outer, &vertices, accuracy.geometric / 4.0);
-        let holes = piece
-            .holes
-            .iter()
-            .map(|ring| split_planar_ring(ring, &vertices, accuracy.geometric / 4.0))
-            .collect();
+        let outer = split(&piece.outer);
+        let holes = piece.holes.iter().map(|ring| split(ring)).collect();
         facets.face(&piece.key, piece.frame, outer, holes, piece.provenance)?;
     }
     let mut result = finish(facets, host, cutter)?;
@@ -84,14 +93,15 @@ pub(crate) fn subtract_planar_polyhedra(
 }
 
 fn check_not_nested(host: &BrepEnvelope, cutter: &BrepEnvelope) -> Result<(), GeometryError> {
+    let (in_host, in_cutter) = (Classifier::new(host), Classifier::new(cutter));
     if cutter.topology.vertices.iter().all(|vertex| {
         matches!(
-            classify_point(host, vertex.position),
+            in_host.classify(vertex.position),
             Ok(PointClassification::Inside)
         )
     }) || host.topology.vertices.iter().all(|vertex| {
         matches!(
-            classify_point(cutter, vertex.position),
+            in_cutter.classify(vertex.position),
             Ok(PointClassification::Inside)
         )
     }) {
@@ -149,6 +159,7 @@ fn classified_host_regions(
         );
     }
     let failure = RefCell::new(None);
+    let classifier = Classifier::new(cutter);
     let regions = regions_from_edges_by(&edges, accuracy.intersection, |point| {
         if base
             .iter()
@@ -159,18 +170,15 @@ fn classified_host_regions(
             return false;
         }
         let position = face.frame.point([point.x, point.z, 0.0]);
-        let classification = classify_point(cutter, position);
+        let classification = classifier.classify(position);
         let classification = match classification {
-            Ok(PointClassification::Boundary) => classify_point(
-                cutter,
-                sub(
-                    position,
-                    scale(
-                        face.frame.z,
-                        accuracy.geometric.max(accuracy.intersection) * 4.0,
-                    ),
+            Ok(PointClassification::Boundary) => classifier.classify(sub(
+                position,
+                scale(
+                    face.frame.z,
+                    accuracy.geometric.max(accuracy.intersection) * 4.0,
                 ),
-            ),
+            )),
             other => other,
         };
         match classification {
@@ -236,6 +244,7 @@ fn host_piece(host: &BrepEnvelope, face: &PlanarFace, region: &RingRegion) -> Pl
 
 fn cutter_face_regions(
     host: &BrepEnvelope,
+    classifier: &Classifier,
     host_faces: &[PlanarFace],
     face: &PlanarFace,
     accuracy: Accuracy,
@@ -266,7 +275,7 @@ fn cutter_face_regions(
         {
             return false;
         }
-        match classify_point(host, face.frame.point([point.x, point.z, 0.0])) {
+        match classifier.classify(face.frame.point([point.x, point.z, 0.0])) {
             Ok(PointClassification::Inside) | Ok(PointClassification::Boundary) => true,
             Ok(PointClassification::Outside) => false,
             Ok(PointClassification::Unknown) => {

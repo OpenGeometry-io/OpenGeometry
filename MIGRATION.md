@@ -36,6 +36,7 @@ It is written for people and for coding assistants alike: each section says what
 - An arched opening is one cutter: extrude a closed `OG_PRIMITIVE_PROFILE` (jambs, sill and an arch) across a curved or straight wall and subtract it with `wall.operate(OG_OPERATION_SUBTRACT, { tools: [arch] })`. 2.0 needed a box and a half-cylinder for it, and a curved wall then failed.
 - An arched door from the floor is one cutter too: when its sill is at or below the wall's bottom face, the subtraction cuts a notch out of the wall instead of a hole. A cutter through both the floor and the top of the wall still throws `CoverageGap`.
 - The 2D offsets are back as statics. `OpenGeometry.offsetRingVariable(ring, distances, holes?)` insets a closed ring by one distance per edge, each hole grown by its own distances. `OpenGeometry.offsetPolylineRegions(path, width, closed, miterLimit?)` strokes a path, with mitres up to `miterLimit` (default 4) and bevels past it. Both take 2.0's flat `[x, y, z, ...]` lists or a `Float64Array` and return `CurvedRegion2D[]`, exact line and arc edges in XZ. `OpenGeometry.offsetPolyline(path, distance, options?)` replaces 2.0's `polyline.getOffset(distance, acuteThresholdDegrees, bevel)`. It returns `OffsetPath2D`, `{ edges, bevelled, closed }`, and its options are `{ acuteThresholdDegrees?, bevel?, closed? }`, with defaults 35 and `true`. When `closed` is left out, a path whose ends meet is closed. The entry exports the types `OffsetHole`, `OffsetPath2D` and `OffsetPolylineOptions`.
+- `OpenGeometry.offsetCurvedRingVariable(region, distances, holeDistances = [])` insets one `CurvedRegion2D` of lines and arcs by one distance (finite, >= 0) per edge, with one list per hole ring, and returns `CurvedRegion2D[]`. An arc edge stays on its centre: a convex arc moves to `r - d`, a concave arc or a hole's arc to `r + d`. A distance of 0 keeps its edge. A distance larger than an arc's radius, a wrong count, or a negative or non-finite distance is `InvalidParameter`. A collapsed result is an empty list. `offsetRingVariable` is unchanged.
 - `OG_PRIMITIVE_SPHERE` makes a solid sphere: `{ radius }`, centred on the `plane` origin.
 - `OG_PRIMITIVE_CONE` makes a solid cone or frustum standing on the `plane`, its axis along the normal: `{ radiusBottom, radiusTop, height }`. One radius may be `0` for a pointed cone; radii within four times the geometric tolerance of each other make a cylinder.
 - `OG_PRIMITIVE_TORUS` makes a solid ring torus lying on the `plane`, its axis along the normal: `{ majorRadius, minorRadius }`, with the minor radius below the major one.
@@ -72,7 +73,7 @@ const sector = new AnalyticSolid({
   height: 3,
 });
 const arc = new Arc({ center: new Vector3(0, 0, 0), radius: 2, startAngle: 0, sweepAngle: Math.PI / 2 });
-const wedge = new AnalyticSolid({ kind: 'cylinderSector', radius: 2, height: 3, startAngle: 0, sweepAngle: Math.PI / 2 });
+const quarterCylinder = new AnalyticSolid({ kind: 'cylinderSector', radius: 2, height: 3, startAngle: 0, sweepAngle: Math.PI / 2 });
 const roof = new AnalyticSolid({
   kind: 'planarPolyhedron',
   vertices: [[0, 0, 0], [4, 0, 0], [4, 0, 2], [0, 0, 2], [1, 1, 1], [3, 1, 1]],
@@ -114,7 +115,7 @@ const sector = new Solid(OG_OPERATION_EXTRUDE, { profile, distance: 3 });
 
 const arc = new Wire(OG_PRIMITIVE_ARC, OG_PRIMITIVE_PARAMS_ARC({ radius: 2, startAngle: 0, sweepAngle: Math.PI / 2 }));
 
-const wedge = new Solid(
+const quarterCylinder = new Solid(
   OG_PRIMITIVE_CYLINDER_SECTOR,
   OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR({ radius: 2, height: 3, startAngle: 0, sweepAngle: Math.PI / 2 }),
 );
@@ -591,6 +592,11 @@ console.log(pan.getReport()?.handlers, cistern.getReport()?.handlers, bowl.ogId)
 - An `operate` call (subtract, union or intersect) whose intersection reaches the apex of a cone throws `CoverageGap`. `details.families` names the pair, for example `['cone or frustum', 'cuboid']` or `['cylinder', 'noncoaxial cone or frustum']`. The `message` names `'singular surface point'`.
 - When that failure is `CoverageGap`, `details` also has `families`. It names the specialised gap the kernel met, such as `['cylinder', 'oblique cuboid intersection']`; for two planar bodies, that of the last box handler tried. With no specialised gap, it is the error's own pair. For most gaps the `message` names only the generic pair, `generic analytic solid` and `intersecting analytic solid`, so read `details.families` for the specialised one. The `code` is `CoverageGap`.
 - `flush({ geometry: 'sync', bodies })` checks its input before it meshes anything. A body that was disposed, or that comes from a reset runtime, throws `Disposed`. `bodies` without `geometry: 'sync'`, a `bodies` that is not an array, and an item that is not a Wire, a Sheet or a Solid throw `InvalidParameter`. Hidden bodies, bodies with no shape and bodies disposed while a mark is live are skipped.
+- A body counts as displayed when it is drawn, not only when `updateMatrixWorld` walks it: its surface or outline `onBeforeRender`, or `OpenGeometry.markDisplayed(bodies)`, stamps it for the current render pass, and its new display geometry is installed after that render, so the next frame shows it. A body that is neither drawn nor walked for a full pass is no longer displayed and gets no level-of-detail target or record swap. A walk still stamps and installs at once, so code that walks, then calls `OpenGeometry.flush({ geometry: 'sync' })`, gets the same meshes as before.
+- Display buffers leave smooth edges out of `outline` and `edgeIds`. An edge is smooth when its two faces are tangent-continuous, or when two planes fold by less than the smooth angle, 20° by default. The outline of a polygon that approximates a curve therefore loses its fold lines, and planar faces average their vertex normals across smooth edges, so the shading no longer shows the facets. A new `smoothEdges` `Uint8Array` gives one byte per topology edge, 1 for smooth.
+- `appearance.smoothAngle` sets the angle per body, in degrees from 0 up to but not including 90; `0` restores the previous outline and normals. `OGWorldGraph.buffers` and `OGTessellator.buffers` take it as an optional fourth argument.
+- Rust: `SnapshotStore::buffers()`, `WorldGraph::buffers()` and `display_buffers()` now default to 20°, not 0°. `tessellate_with_smooth_angle`, `display_buffers_with_smooth_angle` and `buffers_with_smooth_angle` take an explicit angle, and `SMOOTH_ANGLE` is the default. `tessellate()` stays at 0°.
+- A body's `surface` and `outline` meshes are static: their `matrixAutoUpdate` is `false`, so a world matrix update no longer recomputes their local matrix. Code that writes their `position`, `rotation`, `quaternion` or `scale` must call `updateMatrix()` on that mesh after the write.
 - `OGError.details` is typed as `ErrorDetails`, which the package exports with `OperateErrorDetails`. A `details` value that is not an object becomes `{}`.
 - Point classification counts each solid of a body on its own, outer shell and cavities. A body is Inside if any solid holds the point. Before, the faces of all solids were counted together, so a point inside one of two touching solids could read Outside, and a Boolean that tested such a point could go wrong.
 - `classifyPoint` returns `'Boundary'` for a point within the geometric tolerance (`1e-8`) of the body's surface: on faces at any rotation, on seams, rims, edges, corners, sphere poles and a cone apex. Limit: the face test follows a circle, an ellipse or a full-turn line trim as 64 straight pieces, and an intersection curve as 128. So near such a trim the answer can be wrong. A point a little off a cylinder or cone cap near its rim (within about 1.2e-3 times the radius) can get the wrong side. A point on the surface just past a cut edge can read `'Boundary'`, up to about 7e-5 from the body on a cylinder minus a cuboid tilted 45 degrees. A point 1e-7 off a sphere pole or a cone apex can read `'Unknown'`.
@@ -754,6 +760,8 @@ In the 2.5 column, a `?` after a parameter name marks it as optional, and rows t
 - `WorldGraph`: nodes and hierarchy become `SystemAssembly`, `addChild` or the `parent` option; `getWorldBounds(id)` becomes `body.getBounds()`, six numbers instead of a `THREE.Box3`; `removeNode(id)` becomes `parent.removeChild(body)`, which keeps the body (pass `{ keepWorld: true }` to leave it where it is), or `body.dispose()`, which frees it and everything under it; a body with no parent has only `dispose()`; `exportStep` becomes `OpenGeometry.exportStep({ nodes })` (nodes may be bodies or assemblies). Its `clash`, `clearance`, `distance`, `projectLines`, `projectViews` and `bind` are gone.
 - The pattern helpers (`AnalyticPattern`, `linearPattern`, `rectangularPattern`, `circularPattern`): make copies with `solid.instance()` and move each with `transform`; check the positions, since 2.0 drew a pattern around its own origin. `rebuild` and `operate` on an instanced body need `{ instances: 'all' }` or `makeUnique()` first.
 - `AnalyticSolid` kinds: `linearExtrusion` becomes `OG_OPERATION_EXTRUDE` with closed polyline wires for the outline and each hole, each 2.0 point `[u, v]` written `[u, 0, -v]` when the 2.0 `frame` was the default (with another `frame`, also give each wire `plane: { origin: frame.origin, normal: frame.z, xDirection: frame.x }` and check which way it extrudes); `revolvedRectangle` (a tube) becomes `OG_OPERATION_EXTRUDE` with a circle wire as `profile` and a smaller circle wire with the same centre as the one hole.
+- `Wedge`: `OG_OPERATION_EXTRUDE` with a closed triangle polyline wire as `profile`; give the wire `plane: { normal: [0, 0, 1], xDirection: [1, 0, 0] }` so it extrudes along z as the 2.0 wedge did, and move it by the 2.0 `center`; from 3.0, also a five-face `OG_PRIMITIVE_POLYHEDRON`.
+- `Curve`: a polyline through its control points, so `new Wire(OG_PRIMITIVE_POLYLINE, { points })` through the same points.
 
 ### Removed in 2.5
 
@@ -761,7 +769,7 @@ These are gone:
 
 - STL and IFC export. PDF export was never in the browser build.
 - Projection and 2D views, offset, loft, and public triangulation (`tessellate_brep`, `tessellateFacetedBrep`).
-- `Sphere`, `Wedge`, `Curve`, `EllipticalArc`, `AnalyticCurve`, arcs that are not full circles, and cylinder sectors.
+- `Sphere`, `EllipticalArc`, `AnalyticCurve`, arcs that are not full circles, and cylinder sectors.
 - `AnalyticSolid` kinds other than cuboid, cylinder, `linearExtrusion` and `revolvedRectangle`, `AnalyticSolid.fromBrep`, and `new Solid({ brep })`.
 - `WorldGraph`'s queries and projection: `clash`, `clearance`, `distance`, `projectLines`, `projectViews` and `bind`.
 - The older scene manager (`add*ToScene`, `replaceBrepEntityInScene`, `refreshBrepEntityInScene`), already removed in 2.0.16.

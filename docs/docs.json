@@ -1,139 +1,275 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "name": "OpenGeometry",
   "theme": "almond",
   "colors": {
     "primary": "#4460FF",
-    "light": "#4460FF",
-    "dark": "#4460FF"
+    "light": "#7C8FFF",
+    "dark": "#2A44D6"
   },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/OpenGeometry-io/OpenGeometry"
-    }
+  "contextual": {
+    "options": ["copy", "view", "chatgpt", "claude", "perplexity", "mcp", "cursor", "vscode"]
   },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/OpenGeometry-io/OpenGeometry"
+  "metadata": {
+    "timestamp": true
+  },
+  "name": "OpenGeometry",
+  "description": "OpenGeometry is an open-source CAD kernel for the browser: B-rep solids, booleans, extrude, sweep, revolve and STEP export, in Rust and WebAssembly with a TypeScript SDK for Three.js.",
+  "seo": {
+    "indexing": "navigable",
+    "metatags": {
+      "og:site_name": "OpenGeometry Docs",
+      "og:locale": "en_US",
+      "og:image": "https://docs.opengeometry.io/logo/og.png",
+      "twitter:card": "summary_large_image",
+      "twitter:image": "https://docs.opengeometry.io/logo/og.png",
+      "twitter:site": "@openGeometry"
     }
   },
   "navigation": {
     "tabs": [
       {
         "tab": "Documentation",
-        "global": {
-          "anchors": [
-            {
-              "anchor": "Blog",
-              "href": "https://mintlify.com/blog",
-              "icon": "newspaper"
-            },
-            {
-              "anchor": "Discord",
-              "href": "https://discord.gg/9wJpbfgGGA",
-              "icon": "discord"
-            },
-            {
-              "anchor": "SDK",
-              "href": "https://npmjs.com/org/mintlify",
-              "icon": "npm" 
-            }
-          ]
-        },
-        "groups": [
+        "icon": "book-open",
+        "pages": [
           {
-            "group": "Introduction",
+            "group": "Documentation",
             "pages": [
-              "what-is-opengeometry",
-              "installation",
-              "quickstart"
-            ]
-          },
-          {
-            "group": "Core Concepts",
-            "pages": [
-              "concepts/architecture",
-              "concepts/primitives-and-shapes",
-              "concepts/operations",
-              "concepts/brep",
-              "concepts/booleans",
-              "concepts/exports",
-              "concepts/scene-graph"
-            ]
-          },
-          {
-            "group": "Integration",
-            "pages": [
-              "integration/threejs",
-              "integration/examples"
+              {
+                "group": "Get started",
+                "icon": "rocket",
+                "expanded": true,
+                "pages": [
+                  "opengeometry/what-is-opengeometry",
+                  "opengeometry/installation",
+                  "opengeometry/quickstart",
+                  "opengeometry/agents",
+                  "opengeometry/troubleshooting"
+                ]
+              },
+              {
+                "group": "Core concepts",
+                "icon": "layer-group",
+                "expanded": false,
+                "pages": [
+                  "opengeometry/concepts/architecture",
+                  "opengeometry/concepts/bodies",
+                  "opengeometry/concepts/coordinates-and-planes",
+                  "opengeometry/concepts/display",
+                  "opengeometry/concepts/history",
+                  "opengeometry/concepts/errors"
+                ]
+              },
+              {
+                "group": "Guides",
+                "icon": "route",
+                "expanded": false,
+                "pages": [
+                  {
+                    "group": "Make bodies",
+                    "icon": "cube",
+                    "expanded": true,
+                    "pages": [
+                      "opengeometry/guides/primitives",
+                      "opengeometry/guides/extrude",
+                      "opengeometry/guides/sweep",
+                      "opengeometry/guides/revolve"
+                    ]
+                  },
+                  {
+                    "group": "Edit bodies",
+                    "icon": "pen-ruler",
+                    "expanded": false,
+                    "pages": [
+                      "opengeometry/guides/booleans",
+                      "opengeometry/guides/shell",
+                      "opengeometry/guides/rebuild-and-mirror",
+                      "opengeometry/guides/transforms-and-assemblies"
+                    ]
+                  },
+                  {
+                    "group": "Read and export",
+                    "icon": "file-export",
+                    "expanded": false,
+                    "pages": [
+                      "opengeometry/guides/measure-and-validate",
+                      "opengeometry/guides/picking",
+                      "opengeometry/guides/export-step",
+                      "opengeometry/guides/ifc-exchange-body"
+                    ]
+                  },
+                  {
+                    "group": "2D",
+                    "icon": "vector-square",
+                    "expanded": false,
+                    "pages": ["opengeometry/guides/regions-and-offsets"]
+                  },
+                  {
+                    "group": "Integrate",
+                    "icon": "plug",
+                    "expanded": false,
+                    "pages": [
+                      "opengeometry/guides/use-your-threejs-scene",
+                      "opengeometry/guides/run-in-node"
+                    ]
+                  }
+                ]
+              },
+              "opengeometry/examples",
+              "opengeometry/migrate-from-2-0",
+              "opengeometry/changelog"
             ]
           }
         ]
       },
       {
         "tab": "API Reference",
+        "icon": "code",
         "groups": [
           {
-            "group": "Core",
+            "group": "API Reference",
+            "icon": "code",
+            "pages": ["opengeometry/api/overview"]
+          },
+          {
+            "group": "Runtime",
+            "icon": "power-off",
+            "expanded": false,
             "pages": [
-              "api/core/opengeometry"
+              "opengeometry/api/opengeometry",
+              "opengeometry/api/display",
+              "opengeometry/api/picking"
             ]
           },
           {
-            "group": "Scene",
+            "group": "Bodies",
+            "icon": "cube",
+            "expanded": false,
             "pages": [
-              "api/scene/scene-management"
+              "opengeometry/api/body",
+              "opengeometry/api/wire",
+              "opengeometry/api/solid",
+              "opengeometry/api/sheet",
+              "opengeometry/api/system-assembly"
             ]
           },
           {
-            "group": "2D Primitives",
-            "pages": [
-              "api/primitives/line",
-              "api/primitives/arc",
-              "api/primitives/elliptical-arc",
-              "api/primitives/rectangle",
-              "api/primitives/polyline",
-              "api/primitives/curve"
-            ]
+            "group": "History",
+            "icon": "clock-rotate-left",
+            "expanded": false,
+            "pages": ["opengeometry/api/og-mark"]
           },
           {
-            "group": "3D Shapes",
-            "pages": [
-              "api/shapes/polygon",
-              "api/shapes/solid",
-              "api/shapes/analytic-solid",
-              "api/shapes/cylinder",
-              "api/shapes/cuboid",
-              "api/shapes/sphere",
-              "api/shapes/wedge",
-              "api/shapes/sweep",
-              "api/shapes/opening"
-            ]
+            "group": "Export",
+            "icon": "file-export",
+            "expanded": false,
+            "pages": ["opengeometry/api/export"]
           },
           {
-            "group": "Operations",
-            "pages": [
-              "api/operations/extrude",
-              "api/operations/loft",
-              "api/operations/offset",
-              "api/operations/sweep",
-              "api/operations/triangulate",
-              "api/operations/boolean-operations"
-            ]
+            "group": "2D",
+            "icon": "vector-square",
+            "expanded": false,
+            "pages": ["opengeometry/api/regions", "opengeometry/api/offsets"]
           },
           {
-            "group": "Export (Experimental)",
-            "pages": [
-              "api/export/projection",
-              "api/export/stl",
-              "api/export/ifc",
-              "api/export/pdf",
-              "api/export/step"
-            ]
+            "group": "Errors and constants",
+            "icon": "list-check",
+            "expanded": false,
+            "pages": ["opengeometry/api/og-error", "opengeometry/api/constants"]
           }
         ]
       }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "npm",
+          "href": "https://www.npmjs.com/package/opengeometry",
+          "icon": "npm"
+        },
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/OpenGeometry-io/OpenGeometry",
+          "icon": "github"
+        },
+        {
+          "anchor": "Discord",
+          "href": "https://discord.com/invite/9wJpbfgGGA",
+          "icon": "discord"
+        },
+        {
+          "anchor": "llms.txt",
+          "href": "/llms.txt",
+          "icon": "file"
+        }
+      ]
+    }
+  },
+  "redirects": [
+    {
+      "source": "/OpenGeometry",
+      "destination": "/opengeometry/what-is-opengeometry"
+    },
+    {
+      "source": "/OpenGeometry/:slug*",
+      "destination": "/opengeometry/what-is-opengeometry"
+    },
+    {
+      "source": "/opengeometry",
+      "destination": "/opengeometry/what-is-opengeometry"
+    },
+    {
+      "source": "/what-is-opengeometry",
+      "destination": "/opengeometry/what-is-opengeometry"
+    },
+    {
+      "source": "/installation",
+      "destination": "/opengeometry/installation"
+    },
+    {
+      "source": "/quickstart",
+      "destination": "/opengeometry/quickstart"
+    },
+    {
+      "source": "/concepts/:slug*",
+      "destination": "/opengeometry/concepts/architecture"
+    },
+    {
+      "source": "/integration/threejs",
+      "destination": "/opengeometry/guides/use-your-threejs-scene"
+    },
+    {
+      "source": "/integration/examples",
+      "destination": "/opengeometry/examples"
+    },
+    {
+      "source": "/api/:slug*",
+      "destination": "/opengeometry/api/overview"
+    }
+  ],
+  "logo": {
+    "light": "/logo/wordmark-light.png",
+    "dark": "/logo/wordmark-dark.png"
+  },
+  "favicon": "/favicon.png",
+  "navbar": {
+    "links": [
+      {
+        "label": "Website",
+        "href": "https://opengeometry.io",
+        "icon": "globe"
+      }
     ]
+  },
+  "footer": {
+    "socials": {
+      "website": "https://opengeometry.io",
+      "github": "https://github.com/OpenGeometry-io/OpenGeometry",
+      "discord": "https://discord.com/invite/9wJpbfgGGA",
+      "x": "https://x.com/openGeometry",
+      "linkedin": "https://linkedin.com/company/openGeometry"
+    }
+  },
+  "icons": {
+    "library": "fontawesome"
   }
 }

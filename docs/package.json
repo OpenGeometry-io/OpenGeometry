@@ -1,0 +1,31 @@
+{
+  "name": "opengeometry-docs",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "dev": "mint dev --no-open",
+    "validate": "mint validate",
+    "links": "mint broken-links --check-anchors",
+    "format:check": "prettier --check . ../.github/workflows/docs.yml",
+    "format": "prettier --write . ../.github/workflows/docs.yml",
+    "index": "node scripts/build-index.mjs",
+    "index:check": "node scripts/build-index.mjs --check",
+    "check": "npm run format:check && npm run index:check && npm run validate && npm run links"
+  },
+  "devDependencies": {
+    "front-matter": "4.0.2",
+    "mint": "4.2.981",
+    "prettier": "3.8.3"
+  },
+  "overrides": {
+    "adm-zip": "^0.6.1",
+    "axios": "^1.20.0",
+    "fflate": "^0.8.3",
+    "js-yaml@^4": "^4.3.2",
+    "qs": "^6.16.0",
+    "sharp": "^0.35.5"
+  }
+}

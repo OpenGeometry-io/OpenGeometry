@@ -126,6 +126,32 @@ test('a boundary that cannot be closed is InvalidTopology with the 2.0 text', ()
   );
 });
 
+test('two wall pieces whose mitre faces cross at a 0.003 degree bend unite to one region', () => {
+  const ring = (points) => points.map(([x, z]) => ({ x, y: 0, z }));
+  const first = {
+    outer: ring([
+      [-7.915506291175921, -2.642064756497319], [-7.840493708824079, -2.575935243502681],
+      [-5.360466317231342, -5.389100659702814], [-5.435482107488363, -5.455226533879618],
+      [-7.915504659116948, -2.642066607788105],
+    ]),
+    holes: [],
+  };
+  const second = {
+    outer: ring([
+      [-8.973504659071258, -1.442066607747827], [-8.898495340928742, -1.375933392252173],
+      [-7.840495340928741, -2.575933392252173], [-7.915504659071259, -2.642066607747827],
+      [-7.915506291221608, -2.642064756537601],
+    ]),
+    holes: [],
+  };
+  const united = OpenGeometry.booleanRegions2D([first], [second], 'union');
+  const overlap = area(OpenGeometry.booleanRegions2D([first], [second], 'intersection'));
+  const apart = Math.abs(signedArea(first.outer)) + Math.abs(signedArea(second.outer));
+  assert.equal(united.length, 1);
+  assert(overlap > 0 && overlap < 1e-7, `overlap ${overlap}`);
+  assert(Math.abs(area(united) + overlap - apart) < 1e-9);
+});
+
 test('the curved boolean keeps an island in the hole of a frame apart in both operand orders', () => {
   const frame = curvedRegion(0, 0, 10, 10, [1, 1, 9, 9]);
   const island = curvedRegion(3, 3, 7, 7, [4, 4, 6, 6]);

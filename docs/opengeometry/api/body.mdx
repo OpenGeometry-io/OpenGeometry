@@ -1,0 +1,126 @@
+---
+title: Body methods
+description: The methods and fields that Wire, Solid and Sheet share, with the types Measure, Validity, MirrorPlane, PointClassification and BodyEventMap.
+icon: cube
+---
+
+`Wire`, `Solid` and `Sheet` extend one base class, which extends `THREE.Group<BodyEventMap>`. This page lists what they share.
+
+## Fields
+
+| Field        | Type                           | Meaning                                                |
+| ------------ | ------------------------------ | ------------------------------------------------------ |
+| `ogId`       | `string`                       | The body's id in the document. Read-only               |
+| `bodyType`   | `'Wire' \| 'Sheet' \| 'Solid'` | Read-only                                              |
+| `surface`    | `THREE.Mesh`                   | The display surface                                    |
+| `outline`    | `THREE.LineSegments`           | The display outline                                    |
+| `appearance` | `Appearance`                   | The current appearance. Change it with `setAppearance` |
+
+## Options
+
+`new Wire | Solid | Sheet(kind, params, options?)` takes `{ ogId?, parent?, plane?, appearance? }`:
+
+| Option       | Type                                                                      | Meaning                                                  |
+| ------------ | ------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `ogId`       | `string`                                                                  | Your id. It must not be in use                           |
+| `parent`     | `SystemAssembly`                                                          | The parent node                                          |
+| `plane`      | `{ origin?, normal?, xDirection? }`                                       | The plane of a primitive. Ignored by operations          |
+| `appearance` | `{ color?, opacity?, outline?, pickOutline?, deflection?, smoothAngle? }` | See [Display](/opengeometry/concepts/display#appearance) |
+
+## Appearance
+
+`setAppearance(partial)` merges new values into `appearance`.
+
+## Placement and tree
+
+| Method                               | Returns                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `transform(kind, params)`            | `void`. See [Transforms](/opengeometry/guides/transforms-and-assemblies) |
+| `getPlacement()`                     | `{ origin, xDirection, normal, scale }` relative to the parent           |
+| `getWorldPlacement()`                | The same, in the world                                                   |
+| `addChild(children, { keepWorld? })` | `void`                                                                   |
+| `removeChild(child, { keepWorld? })` | `void`                                                                   |
+| `getChildren()`                      | `string[]`, the children's `ogId` values                                 |
+| `getParent()`                        | `string \| null`                                                         |
+
+## Queries
+
+| Method                        | Returns                                                        |
+| ----------------------------- | -------------------------------------------------------------- |
+| `getBounds()`                 | `[minX, minY, minZ, maxX, maxY, maxZ]` in the world, or `null` |
+| `getBrep()`                   | The B-rep in the body's own coordinates                        |
+| `getWorldBrep()`              | The B-rep placed in the world                                  |
+| `faceNormalAt(faceId, point)` | `[x, y, z]`, the unit normal in the body's own coordinates     |
+| `classifyPoint(point)`        | `PointClassification`                                          |
+| `measure({ deflection? })`    | `Measure`                                                      |
+| `validity()`                  | `Validity`                                                     |
+| `getInstanceCount()`          | `number`, the bodies that share this shape                     |
+
+### PointClassification
+
+`'Inside' | 'Outside' | 'Boundary' | 'Unknown'`. A wire or a sheet throws `InvalidOperand`.
+
+### Measure
+
+| Field            | Type     | Meaning                                   |
+| ---------------- | -------- | ----------------------------------------- |
+| `volume`         | `number` | Within `errorBound` of the exact volume   |
+| `area`           | `number` | Within `areaErrorBound` of the exact area |
+| `errorBound`     | `number` | The volume bound                          |
+| `areaErrorBound` | `number` | The area bound                            |
+| `deflection`     | `number` | The deflection that was used              |
+
+### Validity
+
+| Field      | Type                                   | Meaning                       |
+| ---------- | -------------------------------------- | ----------------------------- |
+| `valid`    | `boolean`                              |                               |
+| `closed`   | `boolean`                              | Every shell or wire is closed |
+| `bodyType` | `'Wire' \| 'Sheet' \| 'Solid' \| null` | `null` when not valid         |
+| `error`    | `{ code, message }`                    | Only when not valid           |
+
+## Edits
+
+| Method                                  | What it does                                                    |
+| --------------------------------------- | --------------------------------------------------------------- |
+| `rebuild(kind, params, { instances? })` | Gives the body new parameters. The body type must stay the same |
+| `mirror(plane, { instances? })`         | Rebuilds the shape as its reflection across a `MirrorPlane`     |
+| `makeUnique()`                          | Gives the body its own copy of a shared shape                   |
+| `dispose()`                             | Removes the body from the document                              |
+
+`instances: 'all'` changes every body that shares the shape. Without it, a shared shape throws `SharedShape`.
+
+### MirrorPlane
+
+`{ origin: [x, y, z]; normal: [x, y, z] }`, in the body's own coordinates. The normal need not be of unit length.
+
+## Copies
+
+| Method                          | Returns                                                     |
+| ------------------------------- | ----------------------------------------------------------- |
+| `duplicate({ ogId?, parent? })` | A new body of the same class with its own copy of the shape |
+| `instance({ ogId?, parent? })`  | A new body of the same class that shares the shape          |
+| `clone()`                       | A display copy for Three.js only, not a body                |
+| `copy()`                        | Throws `InvalidOperand`. Use `duplicate()`                  |
+
+## Events
+
+`BodyEventMap` adds two events to those of a Three.js object:
+
+| Event              | When                                       |
+| ------------------ | ------------------------------------------ |
+| `geometrychanged`  | After the body installs a new display mesh |
+| `placementchanged` | When a flush moves the body                |
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, type BodyEventMap } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const box = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 });
+const event: keyof BodyEventMap = 'geometrychanged';
+box.addEventListener(event, () => console.log('new mesh'));
+```

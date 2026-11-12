@@ -177,7 +177,7 @@ export type AcceptanceFixture = {
 };
 
 export type QuickStartFixture = {
-  wall: Solid;
+  plate: Solid;
   bounds: Bounds | null;
   renderer: THREE.WebGLRenderer;
   settled: Awaited<Settled>;
@@ -188,8 +188,20 @@ export type QuickStartFixture = {
   dispose(): void;
 };
 
+export type ReleaseIdleResult = {
+  idle: number;
+  idleBytes: number;
+  idleWithListeners: number;
+  released: { records: number; bytes: number };
+  idleAfter: number;
+  releasedWithListeners: number;
+};
+
+export type ReleaseIdleFixture = { releaseIdleProbe(): Promise<ReleaseIdleResult> };
+
 declare global {
   var ogSmoke: SmokeFixture | undefined;
   var ogAcceptance: AcceptanceFixture | undefined;
   var ogQuickStart: QuickStartFixture | undefined;
+  var ogReleaseIdle: ReleaseIdleFixture | undefined;
 }

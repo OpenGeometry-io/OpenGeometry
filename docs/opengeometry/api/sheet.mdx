@@ -1,0 +1,46 @@
+---
+title: Sheet
+description: A body of faces that enclose no volume, made by an open-ended sweep.
+icon: note-sticky
+---
+
+`class Sheet extends Body`
+
+```ts
+import {
+  OpenGeometry,
+  Sheet,
+  Wire,
+  OG_OPERATION_SWEEP,
+  OG_PRIMITIVE_CIRCLE,
+  OG_PRIMITIVE_POLYLINE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const profile = new Wire(OG_PRIMITIVE_CIRCLE, { radius: 0.1 });
+const path = new Wire(OG_PRIMITIVE_POLYLINE, {
+  points: [
+    [0, 0, 0],
+    [0, 2, 0],
+  ],
+});
+const sleeve = new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false });
+console.log(sleeve.validity());
+```
+
+## Constructor
+
+`new Sheet(kind: string, params: Record<string, unknown>, options?: BodyOptions)`
+
+The only kind is `OG_OPERATION_SWEEP` with `{ profile, path, caps: false }`. With caps the sweep makes a solid, so `new Sheet` throws `BodyTypeMismatch`.
+
+## What a sheet can do
+
+- It shows its surface, from the front only, and its outline.
+- It has the [Body methods](/opengeometry/api/body). `duplicate(options?)` and `instance(options?)` return a `Sheet`.
+- It has no `operate`. It is not thickened into a solid.
+- `exportStep` and `exportIfcBody` refuse it. `classifyPoint` throws `InvalidOperand`.

@@ -2,6 +2,7 @@ mod curved_trims;
 mod display;
 mod seams;
 mod short_loops;
+mod smooth_edges;
 mod support;
 
 use super::cache::TessellationCache;

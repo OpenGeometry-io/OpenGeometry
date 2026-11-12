@@ -5,18 +5,29 @@ use super::grid::{grid_size, rectangle, Rect};
 use super::loop_minimum::raise_short_loops;
 use super::mesh::Tessellation;
 use super::planar_face::planar_face;
+use super::smooth::{check_smooth_angle, smooth_edges};
 use super::trimmed_face::{curved_trimmed_face, FaceGrid};
 use crate::brep::{
     BrepEnvelope, Curve, CurveGeometry, EdgeGeometry, GeometryError, Surface, SurfaceGeometry,
 };
-use crate::math::{scale, Point3};
+use crate::math::Point3;
 
 pub fn tessellate(
     brep: &BrepEnvelope,
     deflection: f64,
     max_triangles: usize,
 ) -> Result<Tessellation, GeometryError> {
+    tessellate_with_smooth_angle(brep, deflection, max_triangles, 0.0)
+}
+
+pub fn tessellate_with_smooth_angle(
+    brep: &BrepEnvelope,
+    deflection: f64,
+    max_triangles: usize,
+    smooth_angle: f64,
+) -> Result<Tessellation, GeometryError> {
     brep.validate()?;
+    check_smooth_angle(smooth_angle)?;
     if !deflection.is_finite()
         || deflection <= 2.0 * brep.accuracy.geometric
         || max_triangles == 0
@@ -75,6 +86,7 @@ pub fn tessellate(
         samples.push(sample_edge(brep, id as u32, n)?);
     }
     let mut mesh = Tessellation::new(brep.revision, deflection);
+    mesh.smooth_edges = smooth_edges(brep, &samples, smooth_angle)?;
     add_face_triangles(brep, &grids, &samples, error, &mut mesh, max_triangles)?;
     add_edge_outlines(brep, samples, &mut mesh);
     Ok(mesh)
@@ -167,29 +179,7 @@ fn add_face_triangles(
 
 fn add_edge_outlines(brep: &BrepEnvelope, samples: Vec<Vec<Point3>>, mesh: &mut Tessellation) {
     for (edge, points) in brep.topology.edges.iter().zip(samples) {
-        let planar_subdivision = edge
-            .twin_halfedge
-            .and_then(|twin| {
-                let first = &brep.topology.halfedges[edge.halfedge as usize];
-                let second = &brep.topology.halfedges[twin as usize];
-                let a = &brep.topology.faces[first.face? as usize];
-                let b = &brep.topology.faces[second.face? as usize];
-                match (
-                    &brep.geometry.surfaces[a.surface as usize],
-                    &brep.geometry.surfaces[b.surface as usize],
-                ) {
-                    (
-                        SurfaceGeometry::Plane { frame: a_frame },
-                        SurfaceGeometry::Plane { frame: b_frame },
-                    ) => Some(
-                        scale(a_frame.z, a.sense.multiplier())
-                            == scale(b_frame.z, b.sense.multiplier()),
-                    ),
-                    _ => Some(false),
-                }
-            })
-            .unwrap_or(false);
-        if edge.chart_seam || planar_subdivision {
+        if mesh.smooth_edges[edge.id as usize] == 1 {
             continue;
         }
         for pair in points.windows(2) {

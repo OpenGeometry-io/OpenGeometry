@@ -1,0 +1,66 @@
+---
+title: Coordinates and planes
+description: Units, axes, the plane option of a primitive, and where a profile point lands in the world.
+icon: compass
+---
+
+- Every point and vector is an `[x, y, z]` array.
+- Model units are metres.
+- Y is up, as in Three.js.
+- Angles of primitives are in radians. Angles of transforms are in degrees.
+
+## The plane of a primitive
+
+Each primitive is made on a plane. The `plane` option sets it:
+
+| Field        | Default     | Meaning                                      |
+| ------------ | ----------- | -------------------------------------------- |
+| `origin`     | `[0, 0, 0]` | Where the primitive's centre or start goes   |
+| `normal`     | `[0, 1, 0]` | The plane's normal; an extrude goes this way |
+| `xDirection` | `[1, 0, 0]` | The plane's u axis                           |
+
+By default this is the ground plane through the origin. `plane` applies to primitives only, not to operations.
+
+## Where a profile point lands
+
+A profile, a polyline in a profile, and the angles of an arc are given in the plane's own `[u, v]` axes. The u axis is `xDirection`. The v axis is `normal × xDirection`.
+
+On the default ground plane, v runs along −Z. A point `[u, v]` lands at world `(u, 0, −v)`. If you miss the sign, a D-shape comes out the wrong way round.
+
+With `plane: { normal: [0, 0, 1], xDirection: [1, 0, 0] }`, an upright plane facing +Z, a point `[u, v]` lands at `(u, v, 0)`.
+
+```ts
+import { OpenGeometry, Wire, OG_PRIMITIVE_PROFILE } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const upright = {
+  normal: [0, 0, 1] as [number, number, number],
+  xDirection: [1, 0, 0] as [number, number, number],
+};
+const triangle = new Wire(
+  OG_PRIMITIVE_PROFILE,
+  { start: [0, 0], segments: [{ to: [1, 0] }, { to: [0, 1] }, { to: [0, 0] }], closed: true },
+  { plane: upright },
+);
+console.log(triangle.getBounds());
+```
+
+The bounds are about `[0, 0, 0, 1, 1, 0]`: the triangle stands in the XY plane.
+
+## Positive angles
+
+A positive angle turns counter-clockwise, seen from the side that the plane normal points to. On the default ground plane that is seen from above, from +X towards −Z.
+
+## Placement
+
+Each node has a placement: `{ origin, xDirection, normal, scale }`. `getPlacement()` reads it relative to the parent. `getWorldPlacement()` reads it in the world. Change it with `transform`. See [Transforms and assemblies](/opengeometry/guides/transforms-and-assemblies).
+
+A body's own coordinates are those of `getBrep()`, before its placement. `classifyPoint`, `faceNormalAt`, `measure` and `mirror` use them.
+
+## Tolerances
+
+The geometric tolerance is `1e-8` m. The 2D region calls use `OG_REGION_TOLERANCE`, `1e-6` m. Sizes must be above four times the geometric tolerance.

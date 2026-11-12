@@ -1,0 +1,77 @@
+---
+title: Installation
+description: Install opengeometry and three, and serve the WebAssembly kernel and the display worker.
+icon: download
+---
+
+```bash
+npm install opengeometry three
+```
+
+- `three` is a peer dependency. Versions `>=0.168.0 <0.185.0` are supported.
+- The package is ES modules only. Its TypeScript types are included. They use the types of `three`, which `three` does not ship: in a TypeScript project, also run `npm install --save-dev @types/three`.
+
+## Serve the two files
+
+The package ships two files that your page must fetch at run time:
+
+| File                     | What it is                                   |
+| ------------------------ | -------------------------------------------- |
+| `opengeometry_bg.wasm`   | The kernel, compiled to WebAssembly          |
+| `tessellation-worker.js` | The web worker that makes the display meshes |
+
+With no arguments, `OpenGeometry.create()` looks for both files next to the package's own `index.js`. A bundler that moves or rewrites `index.js` breaks that lookup. The dependable way is to copy both files into the folder that your site serves at its root, and pass their addresses to `create`.
+
+In Vite, that folder is `public/`:
+
+```bash
+cp node_modules/opengeometry/opengeometry_bg.wasm node_modules/opengeometry/tessellation-worker.js public/
+```
+
+Then start the kernel once, before you make a body:
+
+```ts
+import { OpenGeometry } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+```
+
+`workerURL` goes in the second argument, not the first.
+
+## Vite settings
+
+Vite pre-bundles dependencies. Keep `opengeometry` out of that step, and allow top-level `await` in the build:
+
+```js
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  optimizeDeps: { exclude: ['opengeometry'] },
+  build: { target: 'esnext' },
+});
+```
+
+If your build cannot use top-level `await`, put the code after the imports in an `async` function and call it.
+
+## Without a worker
+
+Pass `{ tessellation: 'inline' }` to make the display meshes on the main thread. You then need no worker file:
+
+```ts
+import { OpenGeometry } from 'opengeometry';
+
+await OpenGeometry.create({ wasmURL: '/opengeometry_bg.wasm' }, { tessellation: 'inline' });
+```
+
+For Node, see [Run in Node](/opengeometry/guides/run-in-node).
+
+## Check the installed line
+
+```bash
+npm ls opengeometry
+```
+
+The 2.0 line has a different API. Code that uses `Cuboid`, `Vector3` or `setPlacement` is written for 2.0.

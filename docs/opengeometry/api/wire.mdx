@@ -1,0 +1,48 @@
+---
+title: Wire
+description: A body of lines and arcs, open or closed, with no faces.
+icon: wave-square
+---
+
+`class Wire extends Body`
+
+```ts
+import { OpenGeometry, Wire, OG_PRIMITIVE_POLYLINE } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const path = new Wire(OG_PRIMITIVE_POLYLINE, {
+  points: [
+    [0, 0, 0],
+    [2, 0, 0],
+    [2, 0, 2],
+  ],
+});
+console.log(path.bodyType, path.validity().closed);
+```
+
+## Constructor
+
+`new Wire(kind: string, params: Record<string, unknown>, options?: BodyOptions)`
+
+| `kind`                           | `params`                             |
+| -------------------------------- | ------------------------------------ |
+| `OG_PRIMITIVE_RECTANGLE`         | `{ width, breadth }`                 |
+| `OG_PRIMITIVE_CIRCLE`            | `{ radius }`                         |
+| `OG_PRIMITIVE_POLYLINE`          | `{ points, closed? }`                |
+| `OG_PRIMITIVE_PROFILE`           | `{ start, segments, closed }`        |
+| `OG_PRIMITIVE_ARC`               | `{ radius, startAngle, sweepAngle }` |
+| `OG_PRIMITIVE_REGULAR_POLYGON`   | `{ sides, radius }`                  |
+| `OG_PRIMITIVE_SLOT`              | `{ length, width }`                  |
+| `OG_PRIMITIVE_ROUNDED_RECTANGLE` | `{ width, breadth, radius }`         |
+
+A kind that makes another body type throws `BodyTypeMismatch`. See [Primitives](/opengeometry/guides/primitives).
+
+## Methods
+
+`duplicate(options?)` and `instance(options?)` return a `Wire`. Everything else is on [Body methods](/opengeometry/api/body).
+
+A wire is used as the `profile`, a `hole` or the `path` of an operation. `classifyPoint` throws `InvalidOperand` on a wire.

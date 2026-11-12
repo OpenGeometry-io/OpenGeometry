@@ -4,7 +4,8 @@ mod ssi_result;
 mod universal_ssi;
 
 pub(super) use face_intersection::{
-    intersect_breps, intersect_faces, FaceView, IntersectionBranch, IntersectionGraph,
+    intersect_breps, intersect_breps_until_branch, intersect_faces, FaceView, IntersectionBranch,
+    IntersectionGraph,
 };
 pub(super) use ssi::intersect_surfaces;
 

@@ -5,15 +5,16 @@ use crate::brep::{
 };
 use crate::math::{cross, dot, norm, sub, Interval, Point3};
 use crate::operations::modifying::boolean::assembly::{
-    add_welded_vertex, analytic_face_mappings, assign_shell_faces, enclosing_solid,
+    analytic_face_mappings, assign_shell_faces, enclosing_solid,
 };
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanReport, BooleanResult};
 use crate::query::face_contains_uv;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 pub(super) struct PlanarFacets {
     builder: Builder,
     vertices: Vec<(Point3, u32)>,
+    cells: HashMap<[i64; 3], Vec<usize>>,
     edges: BTreeMap<(u32, u32), u32>,
     pub(super) accuracy: Accuracy,
 }
@@ -66,13 +67,37 @@ impl PlanarFacets {
         Ok(Self {
             builder: Builder::new(id, accuracy)?,
             vertices: Vec::new(),
+            cells: HashMap::new(),
             edges: BTreeMap::new(),
             accuracy,
         })
     }
 
     fn vertex(&mut self, point: Point3) -> u32 {
-        add_welded_vertex(&mut self.builder, &mut self.vertices, point, self.accuracy)
+        let reach = self.accuracy.geometric / 4.0;
+        let cell = point.map(|value| (value / (2.0 * reach)).floor() as i64);
+        let found = (0..27)
+            .filter_map(|step: i64| {
+                self.cells.get(&[
+                    cell[0].saturating_add(step % 3 - 1),
+                    cell[1].saturating_add(step / 3 % 3 - 1),
+                    cell[2].saturating_add(step / 9 - 1),
+                ])
+            })
+            .flatten()
+            .copied()
+            .filter(|&index| norm(sub(self.vertices[index].0, point)) <= reach)
+            .min();
+        if let Some(index) = found {
+            return self.vertices[index].1;
+        }
+        let id = self.builder.vertex(point);
+        self.cells
+            .entry(cell)
+            .or_default()
+            .push(self.vertices.len());
+        self.vertices.push((point, id));
+        id
     }
 
     fn uses(&mut self, ring: &[Point3], frame: Frame3) -> Result<Vec<Use>, GeometryError> {

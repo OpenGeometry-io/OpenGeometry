@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three';
-import { Solid, OG_PRIMITIVE_CYLINDER, OG_TRANSFORM_TRANSLATE } from '../../../dist/index.js';
+import {
+  OpenGeometry, Solid, Wire, OG_OPERATION_EXTRUDE, OG_PRIMITIVE_CYLINDER, OG_PRIMITIVE_PROFILE, OG_TRANSFORM_TRANSLATE,
+} from '../../../dist/index.js';
 import { graph } from '../../../dist/testing.js';
 import { boot, cuboid, listen, nextTask } from './support.mjs';
 
@@ -92,5 +94,58 @@ test('a thin cylinder keeps an even count of twelve or more cap segments at rest
     assert.deepEqual(capSegments(body, 2 ** -7), [12, 12]);
   } finally {
     body.dispose();
+  }
+});
+
+function prism(ogId, appearance) {
+  const corner = (i) => [2 * Math.cos(i * Math.PI / 13), 2 * Math.sin(i * Math.PI / 13)];
+  const segments = Array.from({ length: 26 }, (_, i) => ({ to: corner(i + 1) }));
+  const profile = { start: corner(0), segments, closed: true };
+  const outline = new Wire(OG_PRIMITIVE_PROFILE, profile, { ogId: `${ogId}-outline` });
+  const body = new Solid(OG_OPERATION_EXTRUDE, { profile: outline, distance: 3 }, { ogId, appearance });
+  return { outline, body };
+}
+
+function drawn(buffers) {
+  return new Set(buffers.edgeIds).size;
+}
+
+function smooth(buffers) {
+  return buffers.smoothEdges.reduce((sum, flag) => sum + flag, 0);
+}
+
+test('a polygon prism hides its folds under the smooth angle and flags them per edge', async () => {
+  await boot();
+  const { outline, body } = prism('prism');
+  try {
+    const { shapeId } = JSON.parse(graph().node(body.ogId));
+    const { static: bucket } = JSON.parse(graph().displayBuckets(body.ogId));
+    const folded = graph().buffers(shapeId, bucket, 2_000_000);
+    const sharp = graph().buffers(shapeId, bucket, 2_000_000, 0);
+    assert.deepEqual([drawn(folded), smooth(folded), folded.smoothEdges.length], [52, 26, 78]);
+    assert.deepEqual([drawn(sharp), smooth(sharp)], [78, 0]);
+    assert.throws(() => graph().buffers(shapeId, bucket, 2_000_000, 90));
+  } finally {
+    body.dispose();
+    outline.dispose();
+  }
+});
+
+test('a body smooth angle reaches its rendered outline', async () => {
+  await boot();
+  const folded = prism('folded-prism');
+  const sharp = prism('sharp-prism', { smoothAngle: 0 });
+  const scene = new THREE.Scene();
+  scene.add(folded.body, sharp.body);
+  try {
+    scene.updateMatrixWorld(true);
+    OpenGeometry.flush({ geometry: 'sync' });
+    assert.deepEqual([drawn(folded.body.record), smooth(folded.body.record)], [52, 26]);
+    assert.deepEqual([drawn(sharp.body.record), smooth(sharp.body.record)], [78, 0]);
+  } finally {
+    for (const { body, outline } of [folded, sharp]) {
+      body.dispose();
+      outline.dispose();
+    }
   }
 });

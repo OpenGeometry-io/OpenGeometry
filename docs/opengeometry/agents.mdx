@@ -1,0 +1,41 @@
+---
+title: Use a coding agent
+description: Give a coding assistant the OpenGeometry 3.0 rules it gets wrong most often, and the sources it can trust.
+icon: sparkles
+---
+
+A coding assistant trained on older code often writes OpenGeometry 2.0: `new Cuboid(...)`, `new Vector3(...)`, `setPlacement(...)`. None of that exists in 3.0. Give the assistant these pages and the rules below.
+
+## Sources to give the assistant
+
+| Source                                   | Use it for                                            |
+| ---------------------------------------- | ----------------------------------------------------- |
+| [`/llms.txt`](/llms.txt)                 | The index of these docs, one line per page            |
+| Any page with `.md` added to its address | That page as plain Markdown                           |
+| `node_modules/opengeometry/index.d.ts`   | Every export and its types, for the installed version |
+| `node_modules/opengeometry/README.md`    | A compact reference of every call                     |
+| [Examples](/opengeometry/examples)       | Working 3.0 code                                      |
+
+The contextual menu at the top of each page copies the page or opens it in an assistant.
+
+## Rules to put in the prompt
+
+```text
+This project uses OpenGeometry 3.0 (npm package "opengeometry").
+- Await OpenGeometry.create(input, options) once before making any body. workerURL goes in the second argument.
+- Make bodies with new Wire(kind, params), new Solid(kind, params) or new Sheet(OG_OPERATION_SWEEP, params).
+  kind is an OG_PRIMITIVE_* or OG_OPERATION_* constant.
+- Points and vectors are [x, y, z] arrays. Units are metres. Y is up.
+- A Profile point [u, v] on the default ground plane lands at world (u, 0, -v).
+- Move bodies with body.transform(OG_TRANSFORM_*, params). Do not set position, rotation or scale.
+- solid.operate(kind, { tools }) changes the target once. Tools stay separate live solids.
+- A shape shared by instances needs { instances: 'all' } or makeUnique() before an edit.
+- Add bodies to the THREE.Scene yourself. A SystemAssembly is not a Three.js object.
+- Surfaces use MeshStandardMaterial, so the scene needs a light.
+- Catch OGError and branch on error.code.
+- Do not use Cuboid, Polygon, Opening, Vector3, setPlacement, STL, PDF, IFC file text, projection or loft: they are not in 3.0.
+```
+
+## Check the result
+
+Ask the assistant to run the type check. A call to a 2.0 class fails at compile time against the 3.0 types. Then run the page in a browser: a missing light gives a black body, and a missing `create` throws `NotInitialised`.

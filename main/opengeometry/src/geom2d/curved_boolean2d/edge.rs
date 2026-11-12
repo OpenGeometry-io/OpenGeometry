@@ -354,8 +354,10 @@ pub(crate) fn intersections(a: &CurveEdge2, b: &CurveEdge2, eps: f64) -> Vec<Pt2
             let bb = 2.0 * dot(f, d);
             let cc = dot(f, f) - radius * radius;
             let disc = bb * bb - 4.0 * aa * cc;
-            if disc >= -eps * eps * aa {
-                let root = disc.max(0.0).sqrt();
+            if disc.abs() <= 8.0 * aa * radius * eps {
+                offer(add(p(*from), scale(d, -bb / (2.0 * aa))));
+            } else if disc > 0.0 {
+                let root = disc.sqrt();
                 for t in [(-bb - root) / (2.0 * aa), (-bb + root) / (2.0 * aa)] {
                     offer(add(p(*from), scale(d, t)));
                 }
