@@ -1,6 +1,9 @@
 use super::classification::PointClassification;
 use super::classify::{classify_point, classify_point_validated};
-use crate::brep::{coarse_accuracy, unit, Accuracy, BrepEnvelope, Frame3};
+use super::{validate_orientation, validity};
+use crate::brep::{
+    coarse_accuracy, fine_accuracy, unit, Accuracy, BrepEnvelope, Frame3, GeometryError,
+};
 use crate::math::{add, cross, dot, scale, Point3};
 use crate::primitives;
 
@@ -432,4 +435,76 @@ fn cuboid_corners_edges_and_face_points_are_boundary() {
             })
             .collect(),
     );
+}
+
+fn assert_inverted(body: &BrepEnvelope, face: u32) {
+    body.validate().unwrap();
+    let key = &body.topology.faces[face as usize].key;
+    match validate_orientation(body) {
+        Err(GeometryError::InvalidTopology(message)) => {
+            assert!(message.contains(&format!("'{key}'")), "{message}")
+        }
+        other => panic!("face {face} not reported: {other:?}"),
+    }
+    assert!(!validity(body).valid);
+}
+
+#[test]
+fn a_face_whose_material_normal_points_into_the_solid_is_rejected() {
+    let accuracy = coarse_accuracy(1e-5);
+    let mut cube = primitives::cuboid("cube".into(), Frame3::IDENTITY, [1.0; 3], accuracy).unwrap();
+    validate_orientation(&cube).unwrap();
+    cube.topology.faces[5].sense = cube.topology.faces[5].sense.reversed();
+    assert_inverted(&cube, 5);
+
+    let mut sphere = primitives::sphere("ball".into(), Frame3::IDENTITY, 1.0, accuracy).unwrap();
+    for face in &mut sphere.topology.faces {
+        face.sense = face.sense.reversed();
+    }
+    assert_inverted(&sphere, 0);
+}
+
+#[test]
+fn reversed_bores_thin_plates_and_curved_solids_pass_the_orientation_check() {
+    let accuracy = coarse_accuracy(1e-5);
+    let bodies = [
+        primitives::annular_cylinder("tube".into(), Frame3::IDENTITY, 0.5, 1.0, 2.0, accuracy),
+        primitives::cuboid(
+            "plate".into(),
+            Frame3::IDENTITY,
+            [1000.0, 500.0, 1.0],
+            Accuracy::STANDARD,
+        ),
+        primitives::torus("ring".into(), Frame3::IDENTITY, 2.0, 0.5, accuracy),
+        primitives::cone("cone".into(), Frame3::IDENTITY, 1.0, 2.0, accuracy),
+    ];
+    for body in bodies {
+        let body = body.unwrap();
+        validate_orientation(&body).unwrap();
+        assert!(validity(&body).valid, "{}", body.id);
+    }
+}
+
+#[test]
+fn the_orientation_check_stands_aside_where_classification_is_unreliable() {
+    let near_cylinder = primitives::frustum(
+        "near".into(),
+        Frame3::IDENTITY,
+        1.0,
+        1.0 + 2.0_f64.powi(-48),
+        1.0,
+        fine_accuracy(),
+    )
+    .unwrap();
+    validate_orientation(&near_cylinder).unwrap();
+    for (radius, geometric) in [(1e300, 1e290), (1e-200, 1e-210)] {
+        let accuracy = Accuracy {
+            geometric,
+            intersection: geometric / 4.0,
+            ..fine_accuracy()
+        };
+        let sphere =
+            primitives::sphere("extreme".into(), Frame3::IDENTITY, radius, accuracy).unwrap();
+        validate_orientation(&sphere).unwrap();
+    }
 }
