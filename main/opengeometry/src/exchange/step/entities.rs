@@ -46,7 +46,7 @@ pub(super) fn curve(
                 real(minor_radius * scale)
             ))
         }
-        CurveGeometry::Intersection { .. } => {
+        CurveGeometry::Intersection { .. } | CurveGeometry::Wrapped { .. } => {
             return Err(GeometryError::UnsupportedGeometry(
                 "STEP numerical branches require bounded export-curve fitting".into(),
             ))

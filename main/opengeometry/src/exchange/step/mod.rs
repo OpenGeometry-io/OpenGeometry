@@ -4,6 +4,7 @@ mod product;
 mod report;
 #[cfg(test)]
 mod tests;
+mod wrapped;
 
 pub(crate) use report::{StepBodyInput, StepExportFailure};
 pub use report::{StepBodyReport, StepExportReport, StepReport, StepSkipped};

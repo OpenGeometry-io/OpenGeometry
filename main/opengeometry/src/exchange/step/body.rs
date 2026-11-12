@@ -1,6 +1,7 @@
 use super::entities::{
     bspline_curve, curve, pcurve, placement, point, real, refs, sense, PcurveOnSurface,
 };
+use super::wrapped::{add_wrapped_curve, add_wrapped_surface};
 use crate::brep::{
     BrepEnvelope, CurveGeometry, Edge, EdgeGeometry, GeometryError, Orientation, PcurveGeometry,
     SurfaceGeometry,
@@ -42,7 +43,7 @@ pub(super) fn emit_body(
     mut exchange_bound: f64,
 ) -> Result<BodyEmission, GeometryError> {
     let fitting_budget = brep.accuracy.exchange - exchange_bound;
-    let surfaces = add_surfaces(writer, brep, scale)?;
+    let (surfaces, surface_error) = add_surfaces(writer, brep, scale, fitting_budget)?;
     let vertices = add_vertices(writer, brep, scale);
     let body_entities = BodyEntities {
         brep,
@@ -58,7 +59,7 @@ pub(super) fn emit_body(
         pcurveless_edges,
     } = add_edges(writer, &body_entities, fitting_budget)?;
     let (faces, collapsed_chart_uses) = add_faces(writer, brep, &surfaces, &vertices, &edges)?;
-    exchange_bound += fitting_error;
+    exchange_bound += fitting_error.max(surface_error);
     if exchange_bound > brep.accuracy.exchange {
         return Err(GeometryError::LimitExceeded(
             "STEP fitted curves exceed the exchange error budget".into(),
@@ -86,13 +87,22 @@ fn add_surfaces(
     writer: &mut Part21Writer,
     brep: &BrepEnvelope,
     scale: f64,
-) -> Result<Vec<Option<usize>>, GeometryError> {
+    fitting_budget: f64,
+) -> Result<(Vec<Option<usize>>, f64), GeometryError> {
     let mut surfaces = vec![None; brep.geometry.surfaces.len()];
+    let mut fitting_error: f64 = 0.0;
     for face in &brep.topology.faces {
         if surfaces[face.surface as usize].is_some() {
             continue;
         }
         let surface = brep.geometry.surface(face.surface)?;
+        if let SurfaceGeometry::Wrapped { .. } = surface {
+            let (id, error) =
+                add_wrapped_surface(writer, brep, face.surface, fitting_budget, scale)?;
+            fitting_error = fitting_error.max(error);
+            surfaces[face.surface as usize] = Some(id);
+            continue;
+        }
         let frame = placement(writer, *surface.frame(), scale);
         let expression = match surface {
             SurfaceGeometry::Plane { .. } => format!("PLANE('',#{frame})"),
@@ -114,10 +124,15 @@ fn add_surfaces(
                 real(major_radius * scale),
                 real(minor_radius * scale)
             ),
+            SurfaceGeometry::Wrapped { .. } => {
+                return Err(GeometryError::UnsupportedGeometry(
+                    "STEP wrapped surfaces require B-spline fitting".into(),
+                ))
+            }
         };
         surfaces[face.surface as usize] = Some(writer.add_entity(expression));
     }
-    Ok(surfaces)
+    Ok((surfaces, fitting_error))
 }
 
 fn add_vertices(writer: &mut Part21Writer, brep: &BrepEnvelope, scale: f64) -> Vec<usize> {
@@ -174,6 +189,12 @@ fn add_edges(
                             &mut fitting_error,
                         )?;
                         fitted_curves[curve_id as usize] = Some(fitted);
+                        id
+                    }
+                    CurveGeometry::Wrapped { .. } => {
+                        let (id, error) =
+                            add_wrapped_curve(writer, brep, curve_id, fitting_budget, scale)?;
+                        fitting_error = fitting_error.max(error);
                         id
                     }
                     _ => curve(writer, geometry, scale)?,

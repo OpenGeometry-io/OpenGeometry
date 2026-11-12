@@ -51,6 +51,10 @@ pub(super) fn preflight(brep: &BrepEnvelope, scale: f64) -> Result<f64, Geometry
                 CurveGeometry::Circle { frame, .. } | CurveGeometry::Ellipse { frame, .. } => {
                     &frame.origin
                 }
+                CurveGeometry::Wrapped { wrap, .. } => {
+                    frame_bound = frame_bound.max(frame_error(wrap.frame, bounds)?);
+                    &wrap.frame.origin
+                }
                 CurveGeometry::Intersection { .. } => continue,
             };
             magnitude = origin.iter().fold(magnitude, |m, v| m.max(v.abs()));
@@ -219,6 +223,11 @@ fn surface_numbers(surface: &SurfaceGeometry, numbers: &mut Vec<f64>) {
             frame_numbers(*frame, numbers);
             numbers.extend([major_radius, minor_radius]);
         }
+        SurfaceGeometry::Wrapped { wrap, surface } => {
+            frame_numbers(wrap.frame, numbers);
+            numbers.push(wrap.radius);
+            surface_numbers(surface, numbers);
+        }
     }
 }
 
@@ -243,6 +252,11 @@ fn curve_numbers(curve: &CurveGeometry, numbers: &mut Vec<f64>) {
             numbers.extend([major_radius, minor_radius]);
         }
         CurveGeometry::Intersection { definition } => index_numbers([definition], numbers),
+        CurveGeometry::Wrapped { wrap, curve } => {
+            frame_numbers(wrap.frame, numbers);
+            numbers.push(wrap.radius);
+            curve_numbers(curve, numbers);
+        }
     }
 }
 
