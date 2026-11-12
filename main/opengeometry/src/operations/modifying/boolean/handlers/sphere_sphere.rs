@@ -99,6 +99,8 @@ fn sphere_operands<'a>(
             Some(SurfaceGeometry::Cone { .. }) => "cone",
             Some(SurfaceGeometry::Torus { .. }) => "torus",
             Some(SurfaceGeometry::Plane { .. }) => "planar/compound solid",
+            Some(SurfaceGeometry::Wrapped { .. }) => "wrapped",
+            Some(SurfaceGeometry::Conoid { .. }) => "conoid",
             None => "empty solid",
         }
         .to_string()
@@ -234,6 +236,7 @@ fn finish_sphere_sphere_result(
         .max(b.brep.revision)
         .checked_add(1)
         .ok_or_else(|| GeometryError::LimitExceeded("boolean revision overflow".into()))?;
+    out.orient_loops()?;
     out.validate()?;
     let report = BooleanReport {
         operation,

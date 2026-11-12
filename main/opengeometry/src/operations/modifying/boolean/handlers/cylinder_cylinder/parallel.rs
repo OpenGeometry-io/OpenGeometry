@@ -94,6 +94,7 @@ pub(super) fn sliced_parallel_cylinder_boolean(
                 face_provenance(sources, FaceRole::Split, false);
         }
         result.report.face_mappings = cylinder_face_mappings(&result.brep, [a, b]);
+        result.brep.orient_loops()?;
         result.brep.validate()?;
     } else if operation == BooleanOp::Subtraction {
         result.report.coincident =
@@ -410,7 +411,8 @@ fn add_parallel_caps(
         SurfaceGeometry::Plane { frame: upper_frame },
         planar_bounds,
         upper_uses,
-    )
+    )?;
+    Ok(())
 }
 
 fn parallel_cap_bounds(

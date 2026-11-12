@@ -1,5 +1,7 @@
 use super::entities::{enumeration, real, reals, reference, references, Entities, IfcValue};
-use crate::brep::{BrepEnvelope, CurveGeometry, EdgeGeometry, GeometryError, Orientation};
+use crate::brep::{
+    unsupported_wrapped, BrepEnvelope, CurveGeometry, EdgeGeometry, GeometryError, Orientation,
+};
 use crate::exchange::fit_curve::{fit_intersection_curve, FittedIntersectionCurve};
 use crate::math::{norm, Point3};
 use std::f64::consts::TAU;
@@ -133,6 +135,7 @@ fn add_curve(entities: &mut Entities, geometry: &CurveGeometry) -> Result<u32, G
                 "IFC numerical intersection edges require bounded export-only fitting".into(),
             ))
         }
+        CurveGeometry::Wrapped { .. } => return Err(unsupported_wrapped("IFC export")),
     })
 }
 
