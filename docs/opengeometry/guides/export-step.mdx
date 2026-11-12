@@ -1,0 +1,75 @@
+---
+title: Export STEP
+description: Write bodies and assemblies to a STEP file in millimetres or metres, with Y or Z up, and read the export report.
+icon: file-export
+---
+
+`OpenGeometry.exportStep(options)` writes a STEP file. It returns a promise of `{ text, report }`.
+
+| Option      | Default          | Meaning                                                        |
+| ----------- | ---------------- | -------------------------------------------------------------- |
+| `nodes`     | required         | Bodies, assemblies, or `ogId` strings                          |
+| `unit`      | `'millimetre'`   | `'millimetre'` or `'metre'`                                    |
+| `upAxis`    | `'Z'`            | `'Z'` or `'Y'`. The model is Y up; the file is Z up by default |
+| `name`      | none             | The product name in the file                                   |
+| `timestamp` | the current time | The time in the file header, for files that must not change    |
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  SystemAssembly,
+  OG_PRIMITIVE_CUBOID,
+  OG_PRIMITIVE_CYLINDER,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const stool = new SystemAssembly({ ogId: 'stool' });
+new Solid(
+  OG_PRIMITIVE_CYLINDER,
+  { radius: 0.18, height: 0.04 },
+  { parent: stool, plane: { origin: [0, 0.45, 0] } },
+);
+new Solid(OG_PRIMITIVE_CUBOID, { width: 0.04, height: 0.45, depth: 0.04 }, { parent: stool });
+
+const { text, report } = await OpenGeometry.exportStep({
+  nodes: [stool],
+  unit: 'millimetre',
+  upAxis: 'Z',
+  name: 'Stool',
+  timestamp: '2026-01-01T00:00:00',
+});
+console.log(report.products, report.solids, text.startsWith('ISO-10303-21;'));
+```
+
+## Save the file in a browser
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const box = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 });
+const { text } = await OpenGeometry.exportStep({ nodes: [box] });
+const link = document.createElement('a');
+link.href = URL.createObjectURL(new Blob([text], { type: 'model/step' }));
+link.download = 'box.step';
+link.click();
+```
+
+## The report
+
+`report` counts what was written: `products`, `solids`, `faces`, `edges`, `cavityShells`, `entities` and `bytes`. It also gives the `exchangeErrorBound` and the `geometricTolerance`, and one entry per body in `bodies`. `skipped` lists the nodes that were not written, with a reason.
+
+## Rules
+
+- A wire or a sheet cannot be exported on its own. It throws `InvalidOperand`.
+- A selection with no solid in it throws `EmptyResult`.
+- Planes, cylinders, cones, spheres and tori are written as exact STEP surfaces. `report.fittedCurves` counts the curves that had to be fitted.

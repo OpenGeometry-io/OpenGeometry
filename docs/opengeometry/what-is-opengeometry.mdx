@@ -1,0 +1,50 @@
+---
+title: What is OpenGeometry?
+description: An open-source CAD kernel for the browser, written in Rust, compiled to WebAssembly, with a TypeScript SDK for Three.js.
+icon: circle-info
+---
+
+OpenGeometry is an open-source CAD kernel for the browser. It models B-rep solids, runs boolean operations, builds solids by extrude, sweep and revolve, and writes STEP files. The kernel is written in Rust and compiled to WebAssembly. A TypeScript SDK puts every body straight into a Three.js scene.
+
+These pages describe OpenGeometry 3.0. The npm package is `opengeometry`.
+
+## What you can build
+
+Use OpenGeometry for browser CAD, configurators and geometry-heavy web tools: a parametric modeller, a solid modelling workflow, a geometry viewer or a custom Three.js modelling tool. It is the geometry engine, not a full CAD application.
+
+It also fits AI-assisted CAD. An assistant or an agent proposes the modelling steps. OpenGeometry runs the geometry, the booleans and the exports, and gives the same result for the same input.
+
+## What 3.0 has
+
+| Area                 | What you get                                                                                                                                                                                   |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Primitives           | Wires: rectangle, circle, polyline, line-and-arc profile, arc. Solids: cuboid, cylinder, cylinder sector, sphere, cone or frustum, ring torus, planar polyhedron. Each goes on any plane.      |
+| Operations           | Extrude with holes. Sweep along lines and arcs into a solid, an open sheet or a closed ring. Revolve a full turn. Shell a solid. Union, subtract and intersect with one to a hundred tools.    |
+| Parametric edits     | `rebuild` gives a body new parameters in place. `mirror` reflects a body across a plane.                                                                                                       |
+| Assemblies           | Parent and child placement, translate, rotate, scale and place, independent copies and shared instances.                                                                                       |
+| History              | Marks with rollback and release, and transactions with a dry run.                                                                                                                              |
+| Display for Three.js | Every body is a `THREE.Group`. Level of detail that follows the camera, tessellation in a web worker or inline, picking down to a face or an edge, outlines, smooth edges, colour and opacity. |
+| Queries              | Bounds, placements, the B-rep, the normal of a face at a point, point classification, volume and area within a stated error bound, validity, and the report of the last boolean.               |
+| Export               | STEP in millimetres or metres with Y or Z up, with a report. The IFC exchange body of a solid, for an IFC writer.                                                                              |
+| 2D                   | Region booleans on point or line-and-arc regions, exact insets and offsets, and polyline strokes.                                                                                              |
+
+## What 3.0 does not have
+
+IFC file text, STL and PDF export, projection, loft, triangulation as a public call, curves other than lines, circles, arcs and polylines, such as the elliptical arc, and the 2.0 classes such as `Cuboid`, `Polygon`, `Opening` and `Vector3`. Code that uses them is written for 2.0. 3.0 has no spline, no ellipse and no elliptical arc. Build a wedge as a five-face `OG_PRIMITIVE_POLYHEDRON`, and a 2.0 `Curve` as an `OG_PRIMITIVE_POLYLINE` wire through its points. See [Migrate from 2.0](/opengeometry/migrate-from-2-0).
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Install" icon="download" href="/opengeometry/installation">
+    Add the package and serve its two files.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/opengeometry/quickstart">
+    Cut a door into a wall and export it as STEP.
+  </Card>
+  <Card title="Concepts" icon="layer-group" href="/opengeometry/concepts/architecture">
+    How the kernel, the SDK and your scene fit together.
+  </Card>
+  <Card title="Use a coding agent" icon="sparkles" href="/opengeometry/agents">
+    Give an assistant the rules that matter.
+  </Card>
+</CardGroup>

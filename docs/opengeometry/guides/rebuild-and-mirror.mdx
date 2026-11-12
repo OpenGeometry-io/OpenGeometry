@@ -1,0 +1,71 @@
+---
+title: Rebuild and mirror
+description: Give a body new parameters in place, or rebuild it as its reflection across a plane.
+icon: arrows-left-right
+---
+
+## Rebuild
+
+`body.rebuild(kind, params, { instances? })` gives an existing body new parameters. The body keeps its `ogId`, its placement, its parent and its place in your scene. Its shape gets a new revision.
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const table = new Solid(OG_PRIMITIVE_CUBOID, { width: 1.6, height: 0.75, depth: 0.8 });
+table.rebuild(OG_PRIMITIVE_CUBOID, { width: 2, height: 0.75, depth: 0.9 });
+console.log(table.getBounds());
+```
+
+- The kind may change, but a wire stays a wire and a solid a solid. A change of body type throws `BodyTypeMismatch`.
+- `rebuild` replaces the shape, so an earlier `operate` result is gone. Call `operate` again after it.
+- A shape shared by instances needs `{ instances: 'all' }`, or `makeUnique()` first.
+
+## Mirror
+
+`body.mirror({ origin, normal }, { instances? })` rebuilds the shape as its reflection across the plane through `origin` with normal `normal`. Both are in the body's own coordinates. The normal does not need unit length.
+
+This makes a right chair arm from a copy of the left arm:
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_EXTRUDE,
+  OG_PRIMITIVE_PROFILE,
+  type MirrorPlane,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const outline = new Wire(OG_PRIMITIVE_PROFILE, {
+  start: [0, 0],
+  segments: [
+    { to: [0.55, 0] },
+    { to: [0.55, 0.08], arc: { center: [0.55, 0.04], counterClockwise: true } },
+    { to: [0, 0.08] },
+    { to: [0, 0] },
+  ],
+  closed: true,
+});
+const left = new Solid(OG_OPERATION_EXTRUDE, { profile: outline, distance: 0.06 });
+const right = left.duplicate();
+const across: MirrorPlane = { origin: [0.3, 0, 0], normal: [1, 0, 0] };
+right.mirror(across);
+console.log(Math.abs(right.measure().volume - left.measure().volume) < 1e-9);
+```
+
+- It works on a wire, a sheet or a solid.
+- The placement does not change.
+- The boolean report is cleared, so `getReport()` gives `null`.
+- A zero normal or a coordinate that is not finite throws `InvalidParameter`.
+
+A placement cannot hold a reflection: a negative scale throws `InvalidTransform`. Use `mirror`.

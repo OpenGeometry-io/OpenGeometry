@@ -21,7 +21,9 @@ pub use cuboid::cuboid;
 pub use cylinder::cylinder;
 pub use internal::{
     annular_cylinder, arc_edged_extrusion, arc_edged_extrusion_with_holes, cone, cylinder_sector,
-    cylinder_with_circular_hole, frustum, linear_extrusion, revolved_profile, sphere, torus,
+    cylinder_with_circular_hole, frustum, linear_extrusion, polysolid, revolved_profile,
+    ring_sector_outline, rounded_rectangle_outline, slot_outline, sphere, torus, PolysolidError,
+    PolysolidJustify, PolysolidPath,
 };
 pub use polyhedron::polyhedron;
 pub use polyline::{polyline, polyline_with_keys};

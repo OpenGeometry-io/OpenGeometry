@@ -1,0 +1,46 @@
+---
+title: Changelog
+description: What changed in each OpenGeometry release, newest first.
+icon: clock-rotate-left
+rss: true
+---
+
+<Update label="3.0.0" description="2026-11-10">
+
+3.0 is a new API. Code written for 2.0 does not run without changes. Follow [Migrate from 2.0](/opengeometry/migrate-from-2-0).
+
+### Check these when you upgrade
+
+- **Breaking: three body classes.** Make bodies with `new Wire(kind, params)`, `new Solid(kind, params)` and `new Sheet(OG_OPERATION_SWEEP, params)`. The 2.0 classes such as `Cuboid`, `Polygon`, `Sweep` and `AnalyticSolid` are gone.
+- **Breaking: arrays, not `Vector3`.** Points and vectors are `[x, y, z]`.
+- **Breaking: move with `transform`.** Setting `position`, `rotation` or `scale` is reverted.
+- **Breaking: start the kernel first.** Await `OpenGeometry.create(input, options)` once. `workerURL` goes in the second argument.
+- **Breaking: 2D calls are statics.** Use `OpenGeometry.booleanRegions2D`, `OpenGeometry.offsetRingVariable` and the others. Offsets return line and arc edges.
+- **Breaking: `OpenGeometry.exportIfcBody(solid)`** replaces `solid.prepareIfcExchange()`.
+- **Breaking: `OGError`.** Catch it and branch on `code`.
+- **Breaking: the shell hollows in place.** Use `solid.operate(OG_OPERATION_SHELL, { thickness })`.
+- **Breaking: display follows drawing.** A body gets its mesh when it is drawn or walked. Its `surface` and `outline` meshes are static: call `updateMatrix()` after you move them yourself.
+- **Smooth edges.** Outlines leave out smooth edges, and faceted curves shade smooth. Set `appearance.smoothAngle` to `0` for the 2.0 look.
+- **Removed:** IFC file text, STL and PDF export, projection, loft, public triangulation, and curves other than lines, circles, arcs and polylines, such as the elliptical arc. 3.0 has no spline, no ellipse and no elliptical arc. The wedge and the 2.0 `Curve` class are gone too. Build a wedge as a five-face `OG_PRIMITIVE_POLYHEDRON`, and a 2.0 `Curve` as an `OG_PRIMITIVE_POLYLINE` wire through its points.
+
+### Added
+
+- Solid primitives: cuboid, cylinder, cylinder sector, sphere, cone, torus and polyhedron. Wire primitives: rectangle, circle, polyline, profile and arc. See [Primitives](/opengeometry/guides/primitives).
+- [Extrude](/opengeometry/guides/extrude), [sweep](/opengeometry/guides/sweep) and [revolve](/opengeometry/guides/revolve), with exact arcs.
+- [Booleans](/opengeometry/guides/booleans) with up to a hundred tools, and [shell](/opengeometry/guides/shell).
+- [Rebuild and mirror](/opengeometry/guides/rebuild-and-mirror), [assemblies, copies and instances](/opengeometry/guides/transforms-and-assemblies), and [marks and transactions](/opengeometry/concepts/history).
+- [Queries](/opengeometry/guides/measure-and-validate): bounds, B-rep, face normals, point classification, measured volume and area, validity.
+- [Display for Three.js](/opengeometry/concepts/display), [picking](/opengeometry/guides/picking) and [host-drawn layers](/opengeometry/guides/use-your-threejs-scene).
+- [STEP export](/opengeometry/guides/export-step) and the [IFC exchange body](/opengeometry/guides/ifc-exchange-body).
+- Exact curved insets: `OpenGeometry.insetCurvedRegion2D` and `OpenGeometry.offsetCurvedRingVariable`. See [Regions and offsets](/opengeometry/guides/regions-and-offsets).
+- Solid primitives: slot prism, rounded box and pipe segment. See [Primitives](/opengeometry/guides/primitives).
+- **Polysolid.** `OG_PRIMITIVE_POLYSOLID` makes a solid wall of constant width and height along a path of straight legs and tangent arcs, justified `'centre'`, `'left'` or `'right'`, with mitred corners. A joint where an arc meets a segment at an angle throws `InvalidParameter` that names the joint. See [Primitives](/opengeometry/guides/primitives).
+- Wire primitives: regular polygon, slot and rounded rectangle. See [Primitives](/opengeometry/guides/primitives).
+
+### Fixed
+
+- A circular hole away from the profile centre extrudes.
+- Offset corners are exact arcs.
+- A point inside one of two touching solids of a body is `Inside`.
+
+</Update>

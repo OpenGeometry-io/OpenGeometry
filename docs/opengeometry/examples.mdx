@@ -1,0 +1,42 @@
+---
+title: Examples
+description: Runnable example pages for OpenGeometry 3.0, and how to run them from a clone of the repository.
+icon: play
+---
+
+The examples are working 3.0 code. They are in [`main/opengeometry-three/examples-vite/`](https://github.com/OpenGeometry-io/OpenGeometry/tree/main/main/opengeometry-three/examples-vite) in the repository. Hosted demos are at [demos.opengeometry.io](https://demos.opengeometry.io).
+
+| Page                                          | What it shows                                                                             |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `index.html`                                  | A showcase: walls, an opening, a sweep and booleans in one scene, with STEP export        |
+| `sweep.html`                                  | Three open sweep frames along polyline paths                                              |
+| `boolean.html`                                | Union, subtract and intersect of two cuboids, with the boolean report                     |
+| `opening.html`                                | A cutter subtracted from a wall on each change                                            |
+| `operations/analytic-boolean-operations.html` | Booleans of two cylinders, with exact curved faces                                        |
+| `operations/curved-meets-straight.html`       | A curved profile united with a straight one, where a side runs on along an arc's tangent  |
+| `operations/sweep-arc-path.html`              | A profile swept along a path with an arc bend, with the bend radius and angle as controls |
+| `operations/step-export.html`                 | One cuboid exported as a STEP file, with the export report                                |
+| `shapes/cuboid.html`                          | A cuboid with width, height, depth and an outline toggle                                  |
+| `shapes/cylinder.html`                        | An exact cylinder. Click a face to inspect it                                             |
+| `shapes/rounded-profile.html`                 | A section with rounded corners, extruded from a line-and-arc profile                      |
+| `shapes/slot-prism.html`                      | A slot prism with length, width and height controls                                       |
+| `shapes/rounded-box.html`                     | A rounded box with width, height, depth and corner radius controls                        |
+| `shapes/pipe-segment.html`                    | A pipe segment with both radii, height and the two angles as controls                     |
+| `shapes/polysolid.html`                       | A polysolid wall on straight legs or a tangent arc, with width, height and justify        |
+| `shapes/wire-kinds.html`                      | A regular polygon, a slot and a rounded rectangle wire, each extruded into a prism        |
+
+## Run them
+
+You need Node.js, Rust with the `wasm32-unknown-unknown` target, and `wasm-pack`:
+
+```bash
+git clone https://github.com/OpenGeometry-io/OpenGeometry.git
+cd OpenGeometry
+npm --prefix main ci
+npm run build
+npm run dev-example
+```
+
+Open the address that Vite prints.
+
+The examples import the built package by path, `../../../dist/index.js`. In your app, import from `'opengeometry'`.

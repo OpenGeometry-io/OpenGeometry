@@ -14,14 +14,28 @@ import {
   OG_PRIMITIVE_PARAMS_CONE,
   OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR,
   OG_PRIMITIVE_PARAMS_POLYHEDRON,
+  OG_PRIMITIVE_PARAMS_POLYSOLID,
   OG_PRIMITIVE_PARAMS_SPHERE,
   OG_PRIMITIVE_PARAMS_TORUS,
   OG_PRIMITIVE_POLYHEDRON,
+  OG_PRIMITIVE_POLYSOLID,
   OG_PRIMITIVE_PROFILE,
   OG_PRIMITIVE_RECTANGLE,
   OG_PRIMITIVE_SPHERE,
   OG_PRIMITIVE_TORUS,
   OG_TRANSFORM_TRANSLATE,
+  OG_PRIMITIVE_SLOT_PRISM,
+  OG_PRIMITIVE_ROUNDED_BOX,
+  OG_PRIMITIVE_PIPE_SEGMENT,
+  OG_PRIMITIVE_PARAMS_SLOT_PRISM,
+  OG_PRIMITIVE_PARAMS_ROUNDED_BOX,
+  OG_PRIMITIVE_PARAMS_PIPE_SEGMENT,
+  OG_PRIMITIVE_REGULAR_POLYGON,
+  OG_PRIMITIVE_SLOT,
+  OG_PRIMITIVE_ROUNDED_RECTANGLE,
+  OG_PRIMITIVE_PARAMS_REGULAR_POLYGON,
+  OG_PRIMITIVE_PARAMS_SLOT,
+  OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE,
 } from '../../../dist/index.js';
 import { boot, failsWith } from './support.mjs';
 
@@ -165,4 +179,107 @@ test('an arc-edged pan minus a blind inset is one Solid built by the prismatic c
   assert.equal(pan.getBrep().solids.length, 1);
   const { text } = await OpenGeometry.exportStep({ nodes: [pan] });
   assert.equal(text.match(/CYLINDRICAL_SURFACE/g)?.length, 2);
+});
+
+const STANDARD_SOLIDS = [
+  {
+    kind: OG_PRIMITIVE_SLOT_PRISM,
+    params: OG_PRIMITIVE_PARAMS_SLOT_PRISM({ length: 1, width: 0.5, height: 1 }),
+    cylinders: 2,
+    volume: 0.5 + Math.PI / 16,
+  },
+  {
+    kind: OG_PRIMITIVE_ROUNDED_BOX,
+    params: OG_PRIMITIVE_PARAMS_ROUNDED_BOX({ width: 1, height: 1, depth: 1, radius: 0.1 }),
+    cylinders: 4,
+    volume: 1 - (4 - Math.PI) * 0.01,
+  },
+  {
+    kind: OG_PRIMITIVE_PIPE_SEGMENT,
+    params: OG_PRIMITIVE_PARAMS_PIPE_SEGMENT({
+      outerRadius: 0.5, innerRadius: 0.3, height: 1, startAngle: 0, sweepAngle: Math.PI / 2,
+    }),
+    cylinders: 2,
+    volume: Math.PI * 0.16 / 4,
+  },
+];
+
+test('slot prism, rounded box and pipe segment Solids have exact volumes and cylindrical faces', async () => {
+  await boot();
+  for (const { kind, params, cylinders, volume } of STANDARD_SOLIDS) {
+    const solid = new Solid(kind, params, { ogId: kind });
+    assert.equal(solid.lastInfo.bodyType, 'Solid');
+    const measured = solid.measure({ deflection: 1e-4 });
+    assert.equal(Math.abs(measured.volume - volume) <= measured.errorBound, true, kind);
+    const { text } = await OpenGeometry.exportStep({ nodes: [solid] });
+    assert.equal(text.match(/CYLINDRICAL_SURFACE/g)?.length, cylinders, kind);
+  }
+});
+
+test('a rounded box radius of half its width and an inverted pipe segment are InvalidParameter', async () => {
+  await boot();
+  const corner = { width: 1, height: 1, depth: 2, radius: 0.5 };
+  assert.throws(() => new Solid(OG_PRIMITIVE_ROUNDED_BOX, corner, { ogId: 'corner' }), failsWith('InvalidParameter'));
+  const pipe = { outerRadius: 0.3, innerRadius: 0.5, height: 1, startAngle: 0, sweepAngle: 1 };
+  assert.throws(() => new Solid(OG_PRIMITIVE_PIPE_SEGMENT, pipe, { ogId: 'pipe' }), failsWith('InvalidParameter'));
+});
+
+function lPath(arc) {
+  return { start: [0, 0], segments: [{ to: [3, 0] }, { to: [3, 2], arc }], closed: false };
+}
+
+test('an L-shaped polysolid is a Solid of volume one that exports planes only to STEP', async () => {
+  await boot();
+  const params = OG_PRIMITIVE_PARAMS_POLYSOLID({
+    path: { start: [0, 0], segments: [{ to: [3, 0] }, { to: [3, 2] }], closed: false },
+    width: 0.2,
+    height: 1,
+    justify: 'centre',
+  });
+  const wall = new Solid(OG_PRIMITIVE_POLYSOLID, params, { ogId: 'l-wall' });
+  assert.equal(wall.lastInfo.bodyType, 'Solid');
+  assert.equal(Math.abs(wall.measure().volume - 1) <= 1e-9, true);
+  const { text } = await OpenGeometry.exportStep({ nodes: [wall] });
+  assert.equal(text.match(/\bPLANE\(/g)?.length, wall.getBrep().topology.faces.length);
+  assert.equal(text.match(/CYLINDRICAL_SURFACE/g), null);
+});
+
+test('a polysolid with a tangent arc is a curved Solid and a sharp arc corner is InvalidParameter', async () => {
+  await boot();
+  const params = { path: lPath({ center: [3, 1], counterClockwise: true }), width: 0.2, height: 1 };
+  const wall = new Solid(OG_PRIMITIVE_POLYSOLID, params, { ogId: 'curved' });
+  assert.equal(Math.abs(wall.measure({ deflection: 1e-4 }).volume - (0.6 + 0.2 * Math.PI)) <= 1e-3, true);
+  const { text } = await OpenGeometry.exportStep({ nodes: [wall] });
+  assert.equal(text.match(/CYLINDRICAL_SURFACE/g)?.length, 2);
+  const sharp = { ...params, path: lPath({ center: [3.5, 1], counterClockwise: true }) };
+  assert.throws(() => new Solid(OG_PRIMITIVE_POLYSOLID, sharp, { ogId: 'sharp' }), failsWith('InvalidParameter'));
+});
+
+test('regular polygon, slot and rounded rectangle Wires extrude into prisms with their edges', async () => {
+  await boot();
+  const wires = [
+    {
+      kind: OG_PRIMITIVE_REGULAR_POLYGON,
+      params: OG_PRIMITIVE_PARAMS_REGULAR_POLYGON({ sides: 6, radius: 0.5 }),
+      edges: 6,
+    },
+    { kind: OG_PRIMITIVE_SLOT, params: OG_PRIMITIVE_PARAMS_SLOT({ length: 1, width: 0.5 }), edges: 4 },
+    {
+      kind: OG_PRIMITIVE_ROUNDED_RECTANGLE,
+      params: OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE({ width: 1.2, breadth: 0.8, radius: 0.1 }),
+      edges: 8,
+    },
+  ];
+  for (const { kind, params, edges } of wires) {
+    const profile = new Wire(kind, params, { ogId: kind });
+    assert.equal(profile.lastInfo.bodyType, 'Wire');
+    assert.equal(profile.getBrep().topology.edges.length, edges, kind);
+    const solid = new Solid(OG_OPERATION_EXTRUDE, { profile, distance: 1 }, { ogId: `${kind}-solid` });
+    assert.equal(solid.getBrep().topology.faces.length, edges + 2, kind);
+  }
+  for (const sides of [2, 5.5, -3]) {
+    const params = { sides, radius: 1 };
+    const options = { ogId: `sides-${sides}` };
+    assert.throws(() => new Wire(OG_PRIMITIVE_REGULAR_POLYGON, params, options), failsWith('InvalidParameter'));
+  }
 });

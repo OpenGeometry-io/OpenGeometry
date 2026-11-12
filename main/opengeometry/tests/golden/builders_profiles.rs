@@ -1,7 +1,7 @@
 use crate::builder_case::{built, keyed};
 use crate::fixtures::{fine, ground, rectangle, standard, upright};
-use crate::graph_case::ring_segments;
-use crate::kernel::{primitives, CurveGeometry, Frame3};
+use crate::graph_case::{create_options, graph_case, inspect, primitive, ring_segments};
+use crate::kernel::{primitives, CurveGeometry, Frame3, Primitive};
 use crate::planar_shapes::profile_shell;
 use crate::profiles::{
     band, line, polygon, quarter_annulus, rounded_outer, sector, split_quarter_annulus,
@@ -240,9 +240,52 @@ fn curved_with_holes() -> Vec<Case> {
     ]
 }
 
+fn wire_kind(name: &'static str, kind: Primitive) -> Case {
+    graph_case(&format!("graph.primitive.{name}"), move |graph, record| {
+        if primitive(record, graph, kind.clone(), create_options(name)).is_some() {
+            inspect(record, graph, name)?;
+        }
+        Ok(())
+    })
+}
+
+fn wire_kinds() -> Vec<Case> {
+    vec![
+        wire_kind(
+            "regular-polygon",
+            Primitive::RegularPolygon {
+                sides: 6,
+                radius: 0.5,
+            },
+        ),
+        wire_kind(
+            "slot",
+            Primitive::Slot {
+                length: 1.0,
+                width: 0.5,
+            },
+        ),
+        wire_kind(
+            "rounded-rectangle",
+            Primitive::RoundedRectangle {
+                width: 1.2,
+                breadth: 0.8,
+                radius: 0.1,
+            },
+        ),
+    ]
+}
+
 pub(crate) fn cases() -> Vec<Case> {
-    [wires(), arcs(), linear(), curved(), curved_with_holes()]
-        .into_iter()
-        .flatten()
-        .collect()
+    [
+        wires(),
+        arcs(),
+        linear(),
+        curved(),
+        curved_with_holes(),
+        wire_kinds(),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
 }
