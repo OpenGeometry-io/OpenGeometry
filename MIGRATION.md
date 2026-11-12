@@ -12,6 +12,26 @@ It is written for people and for coding assistants alike: each section says what
 4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
 5. Finish with its "Check your result" steps.
 
+## Unreleased
+
+### What changed
+
+- `operate` now builds the union and the intersection of two planar solids that are not both axis-aligned boxes: a cuboid turned against the other body's axes, a polyhedron with sloped faces such as a roof, or a polyhedron that is not convex. 3.0 threw an error for these (`CoverageGap`, for some pairs `UnresolvedIntersection`). The result is one closed solid, or several when the intersection falls apart into pieces. The report's `handlers` is `['boolean_planar_polyhedra']`.
+
+### Different behaviour
+
+- Where faces of both bodies lie in one plane and face the same way, the connected region they cover becomes one face. Faces of one body alone in a plane stay as they are.
+- Some pairs that 3.0 already built through the generic route, for example a body inside the other that touches it along an edge, are now built by the planar handler with the same volume and number of solids. The report's `handlers` becomes `['boolean_planar_polyhedra']`.
+- Two of these solids that touch on a face, one standing on the other, now unite into one solid. 3.0 threw.
+- Two planar solids that touch only along an edge or at a corner give the same result as in 3.0: the union keeps both solids, and the intersection throws `EmptyResult`, as for two separate solids.
+- An intersection of two planar solids that touch only on a face now throws `EmptyResult` too, because nothing is left. 3.0 threw `CoverageGap` or `UnresolvedIntersection`.
+- Subtraction: pairs that built in 3.0 build the same bodies, and the report's `handlers` is still `['subtract_planar_polyhedra']`. Subtracting a body that only stands on a face of the host now returns the host. 3.0 threw `InvalidTopology`.
+- A union or intersection of two planar solids that is still refused throws `CoverageGap` with `details.families` equal to `['layered planar profile extrusion', 'layered planar profile extrusion']`. 3.0 gave `['canonical aligned cuboid', 'canonical aligned cuboid']`. Code that matches the old pair must match the new one.
+
+### Check your result
+
+1. A union of a cuboid of width 2, height 1 and depth 2 with a cuboid of width 1, height 1 and depth 1, turned 30 degrees about `[0, 1, 0]` and moved by `[1, 0, 0]`, does not throw. `validity()` gives `{ valid: true, closed: true, bodyType: 'Solid' }`, `measure().volume` is within `errorBound` of 4.5, and the report's `handlers` is `['boolean_planar_polyhedra']`. The intersection of the same pair has a volume of 0.5.
+
 ## 2.5 to 3.0
 
 2.5 was not published. From 2.0, follow 2.0 to 2.5, then 2.5 to 3.0.
