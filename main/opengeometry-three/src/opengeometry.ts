@@ -13,11 +13,16 @@ import { exportStep } from './export/export-step';
 import { exportIfcBody } from './export/ifc-body';
 import { createMark, markStats, type OGMark } from './marks/og-mark';
 import { transaction } from './marks/transaction';
-import { offsetPolyline, offsetPolylineRegions, offsetRingVariable } from './operations/offsets';
-import { booleanCurvedRegions2D, booleanRegions2D } from './operations/regions';
+import {
+  offsetCurvedRingVariable, offsetPolyline, offsetPolylineRegions, offsetRingVariable,
+} from './operations/offsets';
+import { booleanCurvedRegions2D, booleanRegions2D, insetCurvedRegion2D } from './operations/regions';
 import { resolveHit } from './picking/resolve-hit';
 import { flush } from './rendering/geometry/geometry-scheduler';
+import { HostGroup } from './rendering/geometry/host-group';
+import { markDisplayed, setHostDrawn } from './rendering/geometry/render-pass';
 import { settled } from './rendering/geometry/settle';
+import { observeCamera } from './rendering/lod/camera-observer';
 import { motionHint, overrideChanged } from './rendering/lod/lod-controller';
 import { createRuntimeOnce } from './runtime/create-runtime';
 import { on } from './runtime/event-bus';
@@ -36,6 +41,9 @@ export class OpenGeometry {
 
   static on(event: Events, handler: Listener): () => boolean { return on(event, handler); }
   static flush(options: { geometry?: 'sync'; bodies?: readonly Body[] } = {}): void { flush(options); }
+  static markDisplayed(bodies: readonly Body[]): void { markDisplayed(bodies); }
+  static setHostDrawn(bodies: readonly Body[], hostDrawn: boolean): void { setHostDrawn(bodies, hostDrawn); }
+  static hostGroup(bodies: readonly Body[]): HostGroup { return new HostGroup(bodies); }
   static settled(options: { deflection?: number } = {}): Promise<{ failed: { ogId: string; error: unknown }[] }> {
     return settled(options);
   }
@@ -48,10 +56,14 @@ export class OpenGeometry {
     overrideChanged(runtime());
   }
 
+  static releaseIdleGeometry(): { records: number; bytes: number } { return runtime().records.releaseIdle(); }
+
   static setCameraMotion(moving: boolean): void {
     const state = runtime();
     if (moving) motionHint(state, Date.now());
   }
+
+  static observeCamera(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void { observeCamera(renderer, camera); }
 
   static resolveHit(
     hit: THREE.Intersection,
@@ -81,11 +93,21 @@ export class OpenGeometry {
     operation: RegionOperation,
   ): CurvedRegion2D[] { return booleanCurvedRegions2D(a, b, operation); }
 
+  static insetCurvedRegion2D(region: CurvedRegion2D, distance: number): CurvedRegion2D[] {
+    return insetCurvedRegion2D(region, distance);
+  }
+
   static offsetRingVariable(
     ring: readonly number[] | Float64Array,
     distances: readonly number[] | Float64Array,
     holes: readonly OffsetHole[] = [],
   ): CurvedRegion2D[] { return offsetRingVariable(ring, distances, holes); }
+
+  static offsetCurvedRingVariable(
+    region: CurvedRegion2D,
+    distances: readonly number[] | Float64Array,
+    holeDistances: readonly (readonly number[] | Float64Array)[] = [],
+  ): CurvedRegion2D[] { return offsetCurvedRingVariable(region, distances, holeDistances); }
 
   static offsetPolylineRegions(
     path: readonly number[] | Float64Array,

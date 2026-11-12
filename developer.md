@@ -1,7 +1,7 @@
 # Developer Documentation
 
-Contributor-facing notes. For end-user docs see [README.md](./README.md);
-[docs.opengeometry.io](https://docs.opengeometry.io) still describes the 2.0 API.
+Contributor-facing notes. For end-user docs see [README.md](./README.md) and
+[docs.opengeometry.io](https://docs.opengeometry.io), whose source is in [`docs/`](./docs/README.md).
 
 ## Prerequisites
 
@@ -123,18 +123,20 @@ commit and says why. The golden file is the only fixture with a record command.
 2. If the release changes how existing code must be written, check that `MIGRATION.md`
    has its entry (its "Adding an entry" section asks for it in the change that broke the
    code) and rename an "Unreleased" section after the two versions, such as "2.5 to 2.6".
-3. Run both gates with `CI` unset on a machine that has a golden file for its target and
+3. Rename the `## [Unreleased]` heading of `CHANGELOG.md` to the version and the release
+   date, and add the same entry to `docs/opengeometry/changelog.mdx`.
+4. Run both gates with `CI` unset on a machine that has a golden file for its target and
    a `timings` block, where the golden comparison, the comparisons with stored results and
    the timing budgets run:
    ```bash
    npm run check
    npm run check:full
    ```
-4. Merge to the `main` branch, then start the GitHub Action at
+5. Merge to the `main` branch, then start the GitHub Action at
    `.github/workflows/release.yml` by hand on the `main` branch; a push does not publish.
    It rebuilds, runs `npm run check` (required to pass), and publishes `main/dist/` to npm
    if the version is not already on the registry.
-5. The action also creates a GitHub release tagged `v<version>`.
+6. The action also creates a GitHub release tagged `v<version>`.
 
 If the publish step fails for an environmental reason but the version was already
 bumped, re-running the workflow will re-attempt publish (the action checks npm and only

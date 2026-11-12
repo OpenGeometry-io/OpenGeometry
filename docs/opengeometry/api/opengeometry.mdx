@@ -1,0 +1,65 @@
+---
+title: OpenGeometry
+description: The runtime statics - start the kernel, listen to events, reset, history, export and the 2D calls.
+icon: power-off
+---
+
+`OpenGeometry` is a class with static methods only. You never make an instance.
+
+```ts
+import { OpenGeometry } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+const stop = OpenGeometry.on('warning', (event) => console.warn(event));
+stop();
+```
+
+## Start and stop
+
+### create
+
+`static create(input?: { wasmURL?, wasmModule? }, options?: { workerURL?, tessellation? }): Promise<typeof OpenGeometry>`
+
+Loads the kernel and starts one document. Await it once, before the first body.
+
+| Argument               | Type                   | Meaning                                                              |
+| ---------------------- | ---------------------- | -------------------------------------------------------------------- |
+| `input.wasmURL`        | `string \| URL`        | Where to fetch `opengeometry_bg.wasm`. Default: next to `index.js`   |
+| `input.wasmModule`     | `WebAssembly.Module`   | A compiled module. Use it in Node                                    |
+| `options.workerURL`    | `string \| URL`        | Where to fetch `tessellation-worker.js`. Default: next to `index.js` |
+| `options.tessellation` | `'worker' \| 'inline'` | Where display meshes are made. Inline when there is no `Worker`      |
+
+### reset
+
+`static reset(): void`
+
+Frees every body and leaves an empty document. A body from before the reset throws `Disposed`. Use it after a `'fatal'` event, and between tests.
+
+### on
+
+`static on(event, handler): () => boolean`
+
+Subscribes to `'geometry'`, `'warning'`, `'error'` or `'fatal'`. Returns a function that unsubscribes. See [Errors and limits](/opengeometry/concepts/errors#events).
+
+## History
+
+| Method                         | Returns                            | See                                                    |
+| ------------------------------ | ---------------------------------- | ------------------------------------------------------ |
+| `mark()`                       | `OGMark`                           | [OGMark](/opengeometry/api/og-mark)                    |
+| `markStats()`                  | `{ liveMarks, retainedRevisions }` | [History](/opengeometry/concepts/history)              |
+| `transaction(fn, { dryRun? })` | What `fn` returns                  | [History](/opengeometry/concepts/history#transactions) |
+
+## Display and picking
+
+`flush`, `settled`, `markDisplayed`, `setHostDrawn`, `hostGroup`, `setDisplayDeflection`, `releaseIdleGeometry`, `setCameraMotion` and `observeCamera` are on [Display](/opengeometry/api/display). `resolveHit` is on [Picking](/opengeometry/api/picking).
+
+## Export
+
+`exportStep` and `exportIfcBody` are on [Export](/opengeometry/api/export).
+
+## 2D
+
+`booleanRegions2D`, `booleanCurvedRegions2D` and `insetCurvedRegion2D` are on [Regions](/opengeometry/api/regions). `offsetRingVariable`, `offsetCurvedRingVariable`, `offsetPolylineRegions` and `offsetPolyline` are on [Offsets](/opengeometry/api/offsets).

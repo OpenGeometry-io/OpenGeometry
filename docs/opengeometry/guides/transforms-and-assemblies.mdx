@@ -1,0 +1,106 @@
+---
+title: Transforms and assemblies
+description: Move, turn, scale and place bodies, group them in assemblies, and make copies and instances.
+icon: diagram-project
+---
+
+## Transforms
+
+`node.transform(kind, params)` moves a body or an assembly. It changes the node's placement, not its shape.
+
+| Kind                     | Parameters                                  |
+| ------------------------ | ------------------------------------------- |
+| `OG_TRANSFORM_TRANSLATE` | `{ offset }`                                |
+| `OG_TRANSFORM_ROTATE`    | `{ axis, degrees, pivot? }`                 |
+| `OG_TRANSFORM_SCALE`     | `{ factor, pivot? }`                        |
+| `OG_TRANSFORM_PLACE`     | `{ origin?, xDirection?, normal?, scale? }` |
+
+Translate, rotate and scale add to the current placement. Place sets it.
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  OG_PRIMITIVE_CUBOID,
+  OG_TRANSFORM_ROTATE,
+  OG_TRANSFORM_TRANSLATE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const box = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 });
+box.transform(OG_TRANSFORM_TRANSLATE, { offset: [2, 0, 0] });
+box.transform(OG_TRANSFORM_ROTATE, { axis: [0, 1, 0], degrees: 90, pivot: [2, 0, 0] });
+console.log(box.getPlacement());
+```
+
+`getPlacement()` returns `{ origin, xDirection, normal, scale }` relative to the parent. `getWorldPlacement()` returns it in the world.
+
+Do not set `position`, `rotation` or `scale` on a body. The kernel puts the placement back and sends a `PlacementOverwritten` warning.
+
+A negative scale throws `InvalidTransform`. Use [mirror](/opengeometry/guides/rebuild-and-mirror#mirror).
+
+## Assemblies
+
+A `SystemAssembly` groups nodes. Its children follow its placement.
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  SystemAssembly,
+  OG_PRIMITIVE_CUBOID,
+  OG_TRANSFORM_TRANSLATE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const desk = new SystemAssembly({ ogId: 'desk' });
+const top = new Solid(
+  OG_PRIMITIVE_CUBOID,
+  { width: 1.6, height: 0.04, depth: 0.8 },
+  { parent: desk },
+);
+const leg = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.05, height: 0.71, depth: 0.05 });
+desk.addChild([leg]);
+top.transform(OG_TRANSFORM_TRANSLATE, { offset: [0, 0.71, 0] });
+desk.transform(OG_TRANSFORM_TRANSLATE, { offset: [3, 0, 0] });
+console.log(desk.getChildren(), desk.getBounds());
+```
+
+- Pass `parent` in the options, or call `addChild(children, { keepWorld? })`.
+- `removeChild(child, { keepWorld? })` takes a node out. With `keepWorld: true` the node keeps its world position; otherwise it keeps its local placement.
+- `getChildren()` returns the children's `ogId` values. `getParent()` returns the parent's `ogId`, or `null`.
+- Bodies have the same tree methods, so a body can be the parent of another body.
+- A `SystemAssembly` is not a Three.js object. Add its bodies to the scene yourself.
+- `assembly.dispose()` disposes the assembly.
+
+## Copies and instances
+
+| Call                                 | Shape    | Use it for                              |
+| ------------------------------------ | -------- | --------------------------------------- |
+| `body.duplicate({ ogId?, parent? })` | Own copy | A body that you will edit on its own    |
+| `body.instance({ ogId?, parent? })`  | Shared   | Many copies of one part, such as chairs |
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, OG_TRANSFORM_TRANSLATE } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const chair = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.5, height: 0.9, depth: 0.5 });
+const second = chair.instance();
+second.transform(OG_TRANSFORM_TRANSLATE, { offset: [1, 0, 0] });
+chair.rebuild(OG_PRIMITIVE_CUBOID, { width: 0.55, height: 0.9, depth: 0.5 }, { instances: 'all' });
+console.log(chair.getInstanceCount(), second.getBounds());
+```
+
+An instance has its own placement and shares the shape. An edit of a shared shape needs `{ instances: 'all' }`, or `makeUnique()` on the body that should change alone.

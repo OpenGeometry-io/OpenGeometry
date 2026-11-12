@@ -3,17 +3,46 @@ use super::face_trim::face_contains_uv;
 use super::ray_roots::{ray_box_domain, support_roots};
 use super::wrapped_roots::{wrapped_ray_roots, Ray};
 use crate::brep::{
-    unit, BrepEnvelope, Face, GeometryError, SolidRegion, Surface, SurfaceGeometry, UV,
+    unit, BrepEnvelope, Face, GeometryError, PatchBounds, SolidRegion, Surface, SurfaceGeometry, UV,
 };
 use crate::math::{dot, norm, scale, sub, Point3};
+use std::cell::Cell;
+
+pub(crate) struct Classifier<'a> {
+    brep: &'a BrepEnvelope,
+    bounds: Cell<Option<Option<PatchBounds>>>,
+}
+
+impl<'a> Classifier<'a> {
+    pub(crate) fn new(brep: &'a BrepEnvelope) -> Self {
+        Self {
+            brep,
+            bounds: Cell::new(None),
+        }
+    }
+
+    pub(crate) fn classify(&self, point: Point3) -> Result<PointClassification, GeometryError> {
+        classify_validated(self, point)
+    }
+
+    fn bounds(&self) -> Result<Option<PatchBounds>, GeometryError> {
+        if let Some(bounds) = self.bounds.get() {
+            return Ok(bounds);
+        }
+        let bounds = self.brep.bounds_unchecked()?;
+        self.bounds.set(Some(bounds));
+        Ok(bounds)
+    }
+}
 
 fn classify_with_ray<'a>(
-    brep: &BrepEnvelope,
+    classifier: &Classifier,
     point: Point3,
     direction: Point3,
     faces: impl Iterator<Item = &'a Face>,
 ) -> Result<PointClassification, GeometryError> {
-    let Some(domain) = ray_box_domain(brep, point, direction)? else {
+    let brep = classifier.brep;
+    let Some(domain) = ray_box_domain(classifier.bounds()?, point, direction)? else {
         return Ok(PointClassification::Outside);
     };
     let mut hits: Vec<(f64, Point3)> = Vec::new();
@@ -89,6 +118,14 @@ pub(crate) fn classify_point_validated(
     brep: &BrepEnvelope,
     point: Point3,
 ) -> Result<PointClassification, GeometryError> {
+    classify_validated(&Classifier::new(brep), point)
+}
+
+fn classify_validated(
+    classifier: &Classifier,
+    point: Point3,
+) -> Result<PointClassification, GeometryError> {
+    let brep = classifier.brep;
     if point.into_iter().any(|value| !value.is_finite()) {
         return Err(GeometryError::InvalidGeometry(
             "point classification requires finite coordinates".into(),
@@ -96,7 +133,7 @@ pub(crate) fn classify_point_validated(
     }
     let mut answer = PointClassification::Outside;
     for solid in &brep.solids {
-        match classify_point_in_solid(brep, solid, point)? {
+        match classify_point_in_solid(classifier, solid, point)? {
             PointClassification::Inside => return Ok(PointClassification::Inside),
             PointClassification::Boundary => answer = PointClassification::Boundary,
             PointClassification::Unknown if answer == PointClassification::Outside => {
@@ -109,17 +146,17 @@ pub(crate) fn classify_point_validated(
 }
 
 fn classify_point_in_solid(
-    brep: &BrepEnvelope,
+    classifier: &Classifier,
     solid: &SolidRegion,
     point: Point3,
 ) -> Result<PointClassification, GeometryError> {
-    let shell_faces = |shell: u32| &brep.topology.shells[shell as usize].faces;
-    let outer = classify_point_in_shell(brep, shell_faces(solid.outer_shell), point)?;
+    let shell_faces = |shell: u32| &classifier.brep.topology.shells[shell as usize].faces;
+    let outer = classify_shell(classifier, shell_faces(solid.outer_shell), point)?;
     if outer != PointClassification::Inside {
         return Ok(outer);
     }
     for cavity in &solid.cavity_shells {
-        match classify_point_in_shell(brep, shell_faces(*cavity), point)? {
+        match classify_shell(classifier, shell_faces(*cavity), point)? {
             PointClassification::Outside => {}
             PointClassification::Inside => return Ok(PointClassification::Outside),
             other => return Ok(other),
@@ -133,6 +170,15 @@ pub(crate) fn classify_point_in_shell(
     faces: &[u32],
     point: Point3,
 ) -> Result<PointClassification, GeometryError> {
+    classify_shell(&Classifier::new(brep), faces, point)
+}
+
+fn classify_shell(
+    classifier: &Classifier,
+    faces: &[u32],
+    point: Point3,
+) -> Result<PointClassification, GeometryError> {
+    let brep = classifier.brep;
     for face in faces {
         if on_face(brep, &brep.topology.faces[*face as usize], point)? {
             return Ok(PointClassification::Boundary);
@@ -145,7 +191,7 @@ pub(crate) fn classify_point_in_shell(
     ];
     for direction in directions {
         let result = classify_with_ray(
-            brep,
+            classifier,
             point,
             direction,
             faces

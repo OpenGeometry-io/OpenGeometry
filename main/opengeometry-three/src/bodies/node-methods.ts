@@ -27,12 +27,19 @@ export function getWorldPlacement(owner: string, ogId: string): Placement {
   return decodePlacement(call(label, () => worldGraph().worldPlacement(ogId)), label);
 }
 
+export function transformNode(owner: string, ogId: string, kind: string, params: Record<string, unknown>): void {
+  call(`${owner}.transform`, () => worldGraph().transform(ogId, encode({ kind, ...params })));
+  runtime().graphMoved = true;
+}
+
 export function addChild(owner: string, ogId: string, children: { ogId: string }[], keepWorld: boolean): void {
   call(`${owner}.addChild`, () => worldGraph().addChild(ogId, encode(children.map((child) => child.ogId)), keepWorld));
+  runtime().graphMoved = true;
 }
 
 export function removeChild(owner: string, ogId: string, childId: string, keepWorld: boolean): void {
   call(`${owner}.removeChild`, () => worldGraph().removeChild(ogId, childId, keepWorld));
+  runtime().graphMoved = true;
 }
 
 export function getChildren(owner: string, ogId: string): string[] {

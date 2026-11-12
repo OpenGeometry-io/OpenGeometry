@@ -1,4 +1,4 @@
-use super::support::cuboid;
+use super::support::{assert_valid_closed, assert_volume, cuboid};
 use opengeometry::brep::FaceRole;
 use opengeometry::world_graph::{
     CopyOptions, EditScope, ErrorCode, ErrorDetails, GraphError, ModifyingOperation, Primitive,
@@ -122,6 +122,114 @@ fn shared_target_requires_explicit_all_instances_and_tool_instance_is_allowed() 
             .error_code(),
         ErrorCode::ToolSharesTargetShape
     );
+}
+
+fn plate_cut_by_instances_of_one_cylinder(count: usize) {
+    let mut world = graph();
+    world
+        .create_primitive(
+            Primitive::Cuboid {
+                width: 12.0,
+                height: 0.5,
+                depth: 4.0,
+            },
+            named("plate"),
+        )
+        .unwrap();
+    world
+        .create_primitive(
+            Primitive::Cylinder {
+                radius: 0.2,
+                height: 2.0,
+            },
+            named("hole-0"),
+        )
+        .unwrap();
+    let mut tools = vec!["hole-0".to_string()];
+    for index in 1..count {
+        let (og_id, _) = world
+            .instance(
+                "hole-0",
+                CopyOptions {
+                    og_id: Some(format!("hole-{index}")),
+                    ..CopyOptions::default()
+                },
+            )
+            .unwrap();
+        tools.push(og_id);
+    }
+    for (index, tool) in tools.iter().enumerate() {
+        world
+            .transform(
+                tool,
+                Transform::Translate {
+                    offset: [-5.4 + 1.2 * index as f64, -0.5, 0.0],
+                },
+            )
+            .unwrap();
+    }
+    world
+        .operate(
+            "plate",
+            ModifyingOperation::Subtract,
+            &tools,
+            EditScope::Node,
+        )
+        .unwrap();
+    let plate = world.brep("plate").unwrap();
+    assert_valid_closed(&plate, 1, "plate");
+    assert_eq!(plate.revision, 1);
+    let mut handlers = vec!["cylinder_box_boolean"];
+    handlers.resize(count, "generic_two_sided_cutter_band_subtraction");
+    assert_eq!(
+        world.report("plate").unwrap().unwrap()["handlers"],
+        serde_json::json!(handlers)
+    );
+    let removed = count as f64 * std::f64::consts::PI * 0.2 * 0.2 * 0.5;
+    assert_volume(volume::estimate(&plate, 0.01), 24.0 - removed, "plate");
+}
+
+#[test]
+fn two_instances_of_one_tool_cut_a_plate_in_one_call() {
+    plate_cut_by_instances_of_one_cylinder(2);
+}
+
+#[test]
+fn ten_instances_of_one_tool_cut_a_plate_in_one_call() {
+    plate_cut_by_instances_of_one_cylinder(10);
+}
+
+#[test]
+fn node_listed_twice_as_a_tool_is_refused_without_a_commit() {
+    let mut world = graph();
+    world.create_primitive(cuboid(2.0), named("host")).unwrap();
+    world.create_primitive(cuboid(2.0), named("tool")).unwrap();
+    world
+        .transform(
+            "tool",
+            Transform::Translate {
+                offset: [1.0, 0.0, 0.0],
+            },
+        )
+        .unwrap();
+    let revision = world.revision();
+    let before = world.brep("host").unwrap().to_json().unwrap();
+    let report = world.report("host").unwrap().cloned();
+    assert_eq!(
+        world
+            .operate(
+                "host",
+                ModifyingOperation::Subtract,
+                &["tool".into(), "tool".into()],
+                EditScope::Node
+            )
+            .unwrap_err()
+            .error_code(),
+        ErrorCode::DuplicateNode
+    );
+    assert_eq!(world.revision(), revision);
+    assert_eq!(world.brep("host").unwrap().to_json().unwrap(), before);
+    assert_eq!(world.report("host").unwrap().cloned(), report);
 }
 
 #[test]

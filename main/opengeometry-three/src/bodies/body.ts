@@ -7,10 +7,12 @@ import type { Placement } from '../dto/placement';
 import { OGError } from '../errors';
 import { call } from '../kernel/kernel-session';
 import { enterLimbo, revive } from '../marks/limbo';
-import { flush, flushForDispose, wanted } from '../rendering/geometry/geometry-scheduler';
-import { noteDisplayed } from '../rendering/geometry/render-pass';
+import { flush, flushForDispose, notifyBody, wanted } from '../rendering/geometry/geometry-scheduler';
+import { noteDisplayed, noteDrawn } from '../rendering/geometry/render-pass';
 import { observeCamera } from '../rendering/lod/camera-observer';
-import { isDisplayed, overrideChanged } from '../rendering/lod/lod-controller';
+import { shown } from '../rendering/lod/host-drawn';
+import { isDisplayed } from '../rendering/lod/displayed';
+import { overrideChanged } from '../rendering/lod/lod-controller';
 import {
   lineMaterial, releaseLine, releaseSurface, surfaceMaterial, type MaterialAppearance,
 } from '../rendering/materials/material-pool';
@@ -24,7 +26,7 @@ import { register, unregister } from './body-registry';
 import { DisplayClone } from './display-clone';
 import {
   addChild, checkNode, classifyPoint, faceNormalAt, getBounds, getBrep, getChildren, getInstanceCount, getParent,
-  getPlacement, getWorldBrep, getWorldPlacement, localBounds, measure, mirror, removeChild, validity,
+  getPlacement, getWorldBrep, getWorldPlacement, localBounds, measure, mirror, removeChild, transformNode, validity,
 } from './node-methods';
 import type { PointClassification } from './node-methods';
 import type { SystemAssembly } from './system-assembly';
@@ -38,7 +40,9 @@ function lineStyle(bodyType: 'Wire' | 'Sheet' | 'Solid', appearance: Appearance)
   return { color: bodyType === 'Wire' ? appearance.color : 0x243040, opacity: appearance.opacity };
 }
 
-export abstract class Body extends THREE.Group {
+export type BodyEventMap = THREE.Object3DEventMap & { geometrychanged: object; placementchanged: object };
+
+export abstract class Body extends THREE.Group<BodyEventMap> {
   readonly ogId: string;
   readonly handle: number;
   readonly generation: number;
@@ -74,15 +78,17 @@ export abstract class Body extends THREE.Group {
     const surfaceStyle = surfaceMaterial(this.appearance);
     this.surfaceKey = surfaceStyle.key;
     this.surface = new THREE.Mesh(placeholder ?? new THREE.BufferGeometry(), surfaceStyle.material);
+    this.surface.matrixAutoUpdate = false;
     this.surface.visible = Boolean(placeholder) && bodyType !== 'Wire';
     const outlineStyle = lineMaterial(lineStyle(bodyType, this.appearance));
     this.lineKey = outlineStyle.key;
     this.outline = new THREE.LineSegments(placeholder ?? new THREE.BufferGeometry(), outlineStyle.material);
+    this.outline.matrixAutoUpdate = false;
     this.outline.visible = Boolean(placeholder) && this.appearance.outline;
     if (!this.appearance.pickOutline) this.outline.raycast = THREE.Object3D.prototype.raycast.bind(this.outline);
     this.add(this.surface, this.outline);
-    this.surface.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); };
-    this.outline.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); };
+    this.surface.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); noteDrawn(this); };
+    this.outline.onBeforeRender = (renderer, _scene, camera) => { observeCamera(renderer, camera); noteDrawn(this); };
     register(this);
     this.applyWorldMatrix(call(`${bodyType}.constructor`, () => worldGraph().worldMatrix(ogId)));
   }
@@ -97,7 +103,7 @@ export abstract class Body extends THREE.Group {
 
   override updateMatrixWorld(force?: boolean): void {
     keepPose(this.pose, this, this.ogId);
-    if (this.visible) noteDisplayed(this);
+    if (shown(runtime(), this)) noteDisplayed(this);
     super.updateMatrixWorld(force);
   }
 
@@ -105,7 +111,8 @@ export abstract class Body extends THREE.Group {
     if (!isDisplayed(runtime(), this) || !this.lastInfo.shapeId || this.lastInfo.shapeRevision === null) return;
     const bucket = wanted(this);
     if (bucket === undefined) return;
-    const record = runtime().records.get(this.lastInfo.shapeId, this.lastInfo.shapeRevision, bucket);
+    const { shapeId, shapeRevision } = this.lastInfo;
+    const record = runtime().records.get(shapeId, shapeRevision, bucket, this.appearance.smoothAngle);
     if (record) this.install(record);
   }
 
@@ -121,10 +128,13 @@ export abstract class Body extends THREE.Group {
     this.outline.geometry = record.outline;
     this.surface.position.copy(record.origin);
     this.outline.position.copy(record.origin);
+    this.surface.updateMatrix();
+    this.outline.updateMatrix();
     this.surface.updateMatrixWorld();
     this.outline.updateMatrixWorld();
     this.surface.visible = this.bodyType !== 'Wire';
     this.outline.visible = this.appearance.outline;
+    notifyBody(this, 'geometrychanged');
   }
 
   setAppearance(partial: Partial<Appearance>): void {
@@ -153,7 +163,7 @@ export abstract class Body extends THREE.Group {
 
   transform(kind: string, params: Record<string, unknown>): void {
     this.check(`${this.bodyType}.transform`);
-    call(`${this.bodyType}.transform`, () => worldGraph().transform(this.ogId, encode({ kind, ...params })));
+    transformNode(this.bodyType, this.ogId, kind, params);
   }
 
   getPlacement(): Placement {

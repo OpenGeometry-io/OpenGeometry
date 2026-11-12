@@ -1,0 +1,117 @@
+---
+title: Quickstart
+description: Make a Vite app, cut a door opening into a wall, show it in Three.js and export it as STEP.
+icon: rocket
+---
+
+In this quickstart you make a wall from a rectangle, cut a door opening into it, show it in a Three.js scene and write it as a STEP file.
+
+Use a modern browser and a Node.js version that [Vite](https://vite.dev/guide/) supports.
+
+<Steps>
+<Step title="Create the project">
+
+```bash
+npm create vite@latest og-app -- --template vanilla-ts --no-interactive
+cd og-app
+npm install opengeometry three
+npm install --save-dev @types/three
+```
+
+</Step>
+<Step title="Serve the kernel files">
+
+Copy the kernel and the display worker into `public/`, so the page can fetch them from the site root:
+
+```bash
+cp node_modules/opengeometry/opengeometry_bg.wasm node_modules/opengeometry/tessellation-worker.js public/
+```
+
+</Step>
+<Step title="Configure Vite">
+
+Put this in `vite.config.ts`:
+
+```js
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  optimizeDeps: { exclude: ['opengeometry'] },
+  build: { target: 'esnext' },
+});
+```
+
+</Step>
+<Step title="Write the model">
+
+Replace `src/main.ts` with this:
+
+```ts
+import * as THREE from 'three';
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_EXTRUDE,
+  OG_OPERATION_SUBTRACT,
+  OG_PRIMITIVE_CUBOID,
+  OG_PRIMITIVE_RECTANGLE,
+  OG_TRANSFORM_TRANSLATE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const profile = new Wire(OG_PRIMITIVE_RECTANGLE, { width: 6, breadth: 0.2 });
+const wall = new Solid(OG_OPERATION_EXTRUDE, { profile, distance: 3 });
+const door = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.9, height: 2.1, depth: 0.4 });
+door.transform(OG_TRANSFORM_TRANSLATE, { offset: [2, 0, 0] });
+wall.operate(OG_OPERATION_SUBTRACT, { tools: [door] });
+
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2), wall);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(6, 5, 8);
+camera.lookAt(0, 1.5, 0);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+document.body.replaceChildren(renderer.domElement);
+renderer.setAnimationLoop(() => renderer.render(scene, camera));
+
+const { text, report } = await OpenGeometry.exportStep({
+  nodes: [wall],
+  unit: 'millimetre',
+  upAxis: 'Z',
+});
+console.log(report.solids, text.length);
+```
+
+</Step>
+<Step title="Run it">
+
+```bash
+npm run dev
+```
+
+Open the address that Vite prints. You see a blue wall with a door opening at x = 2. The console prints `1` and the length of the STEP text.
+
+</Step>
+</Steps>
+
+## What the code does
+
+- `OpenGeometry.create` loads the kernel. Await it once, before you make a body.
+- The rectangle wire lies on the ground plane. The extrude raises it 3 m along +Y into a wall.
+- `operate` cuts the cuboid out of the wall. The cuboid stays a separate, live solid. It is not drawn, because it is not in the scene.
+- The wall is a `THREE.Group`, so it goes into the scene like any other object. Rendering asks the kernel for its mesh.
+- `exportStep` returns the STEP file as `text` and counts what it wrote in `report`.
+
+Model units are metres and Y is up. See [Coordinates and planes](/opengeometry/concepts/coordinates-and-planes).
+
+## Next steps
+
+- Make other shapes: [Primitives](/opengeometry/guides/primitives), [Sweep](/opengeometry/guides/sweep), [Revolve](/opengeometry/guides/revolve).
+- Learn how display works: [Display](/opengeometry/concepts/display).
+- Look at the runnable [examples](/opengeometry/examples).

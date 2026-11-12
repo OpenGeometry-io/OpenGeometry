@@ -2,7 +2,7 @@ use crate::brep::{
     unit, BrepEnvelope, CurveGeometry, FaceProvenance, Frame3, GeometryError, Orientation,
     SurfaceGeometry,
 };
-use crate::geom2d::Pt2;
+use crate::geom2d::{nearby_boxes, Nearby, Pt2};
 use crate::math::{cross, dot, norm, scale, sub, Point3};
 use crate::operations::modifying::boolean::handlers::planar::facets::{coverage, loop_positions};
 use crate::query::face_contains_uv;
@@ -324,9 +324,49 @@ fn clip_convex_face(polygon: &[Point3], planes: &[PlanarFace], tolerance: f64) -
     }
 }
 
+pub(super) fn ring_vertex_candidates(
+    rings: &[&[Point3]],
+    vertices: &[Point3],
+    tolerance: f64,
+) -> Nearby {
+    let extent = |axis: usize| {
+        let (lo, hi) = vertices
+            .iter()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), point| {
+                (lo.min(point[axis]), hi.max(point[axis]))
+            });
+        hi - lo
+    };
+    let mut axes = [0, 1, 2];
+    axes.sort_by(|&first, &second| extent(second).total_cmp(&extent(first)));
+    let [a, b, _] = axes;
+    let reach = vertices
+        .iter()
+        .flatten()
+        .fold(0.0_f64, |most, value| most.max(value.abs()));
+    let boxes = vertices
+        .iter()
+        .map(|point| [point[a], point[a], point[b], point[b]])
+        .chain(rings.iter().flat_map(|ring| {
+            (0..ring.len()).map(|index| {
+                let (from, to) = (ring[index], ring[(index + 1) % ring.len()]);
+                [
+                    from[a].min(to[a]),
+                    from[a].max(to[a]),
+                    from[b].min(to[b]),
+                    from[b].max(to[b]),
+                ]
+            })
+        }))
+        .collect::<Vec<_>>();
+    nearby_boxes(&boxes, 2.0 * tolerance + 16.0 * f64::EPSILON * reach)
+}
+
 pub(super) fn split_planar_ring(
     ring: &[Point3],
     vertices: &[Point3],
+    near: &Nearby,
+    first_edge: usize,
     tolerance: f64,
 ) -> Vec<Point3> {
     let mut split = Vec::new();
@@ -340,7 +380,11 @@ pub(super) fn split_planar_ring(
         }
         split.push(from);
         let mut interior = Vec::new();
-        for &point in vertices {
+        for point in near
+            .of(vertices.len() + first_edge + index)
+            .filter(|&vertex| vertex < vertices.len())
+            .map(|vertex| vertices[vertex])
+        {
             let offset = sub(point, from);
             let fraction = dot(offset, delta) / (length * length);
             if fraction > tolerance / length

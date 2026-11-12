@@ -1,18 +1,20 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import type { Body } from '../../bodies/body';
-import type { Bounds } from '../../dto/bounds';
 import { call } from '../../kernel/kernel-session';
 import { EVALUATION_INTERVAL_MS, MOTION_WINDOW_MS, PIXELS_AT_REST, PIXELS_MOVING } from '../../limits';
 import { currentRuntime, type Runtime } from '../../runtime/runtime-state';
-import { decodeBounds } from '../../world-graph/codec';
 import { finestLocal, localTarget, shapeBuckets, type ShapeBuckets } from './body-size';
 import { deflectionBucket, wantedBucket } from './deflection';
+import { displayBounds } from './display-bounds';
+import { displayedBodies, isDisplayed, stampedCount } from './displayed';
+import { groupsKey, queueShapes } from './host-groups';
 import { worldUnitsPerPixel } from './screen-metrics';
 
 type Tiers = { temporary: number | undefined; own: number | undefined; global: number | undefined };
 type SeenCamera = { camera: THREE.Camera; height: number };
 type ShapeTarget = { target: number; body: Body };
 type TemporaryTarget = { deflection: number };
+type PassInputs = { revision: bigint; flushed: bigint; moving: boolean; displayed: number; groups: number[] };
 
 type ShapeLod = {
   shapeId: string;
@@ -28,49 +30,50 @@ type ShapeLod = {
 export type LodState = {
   shapes: Map<string, ShapeLod>;
   camera: Float64Array;
+  frames: WeakMap<THREE.WebGLRenderer, number>;
+  bufferSize: THREE.Vector2;
   initialised: boolean;
   lastMotion: number;
   lastSchedule: number;
   settleTimer?: ReturnType<typeof setTimeout>;
   lastSeen?: SeenCamera;
   temporaries: TemporaryTarget[];
+  stale: boolean;
+  evaluated?: PassInputs;
+  drawn: Set<Body>;
+  walked: WeakMap<Body, number>;
   refresh: () => void;
 };
 
 export function createLodState(refresh: () => void): LodState {
   return {
-    shapes: new Map(), camera: new Float64Array(33), initialised: false, lastMotion: -Infinity,
-    lastSchedule: -Infinity, temporaries: [], refresh,
+    shapes: new Map(), camera: new Float64Array(33), frames: new WeakMap(), bufferSize: new THREE.Vector2(),
+    initialised: false, lastMotion: -Infinity, lastSchedule: -Infinity, temporaries: [], stale: true, drawn: new Set(),
+    walked: new WeakMap(), refresh,
   };
-}
-
-export function isDisplayed(state: Runtime, body: Body): boolean {
-  return body.visible && (state.displayed.get(body) ?? -Infinity) >= state.pass - 1;
-}
-
-export function displayedBodies(state: Runtime): Body[] {
-  return [...state.displayed.keys()].filter((body) => isDisplayed(state, body));
-}
-
-export function stampDisplayed(state: Runtime, body: Body): void {
-  const shapeId = body.lastInfo.shapeId;
-  if (shapeId && !isDisplayed(state, body)) delete state.lod.shapes.get(shapeId)?.overrides;
-  state.displayed.set(body, state.pass);
 }
 
 export function observe(state: Runtime, camera: THREE.Camera, height: number, now: number): void {
   const lod = state.lod;
-  const values = [...camera.matrixWorld.elements, ...camera.projectionMatrix.elements, height];
-  const changed = values.some((value, index) => value !== lod.camera[index]);
-  lod.camera.set(values);
-  if (lod.initialised && changed) motionHint(state, now);
+  const moved = storeChanged(lod.camera, camera.matrixWorld.elements, 0);
+  const projected = storeChanged(lod.camera, camera.projectionMatrix.elements, 16);
+  const resized = lod.camera[32] !== height;
+  lod.camera[32] = height;
+  if (lod.initialised && (moved || projected || resized)) motionHint(state, now);
   lod.initialised = true;
   lod.lastSeen = { camera, height };
+}
+
+function storeChanged(target: Float64Array, values: readonly number[], offset: number): boolean {
+  const same = values.every((value, index) => target[offset + index] === value);
+  if (!same) target.set(values, offset);
+  return !same;
 }
 
 export function motionHint(state: Runtime, now: number): void {
   const lod = state.lod;
   lod.lastMotion = now;
+  lod.stale = true;
   clearTimeout(lod.settleTimer);
   lod.settleTimer = setTimeout(() => { fireSettle(state); }, MOTION_WINDOW_MS);
 }
@@ -93,8 +96,16 @@ export function evaluatePass(state: Runtime, now: number, forced: boolean): bool
   if (!seen || state.poisoned || (!forced && now - lod.lastSchedule < EVALUATION_INTERVAL_MS)) return false;
   lod.lastSchedule = now;
   const moving = !forced && now - lod.lastMotion < MOTION_WINDOW_MS;
+  const revision = call('OpenGeometry.flush', () => state.graph.revision());
+  const groups = [state.groups.revision, groupsKey(state)];
+  const inputs = { revision, flushed: state.revision, moving, displayed: stampedCount(state), groups };
+  if (!forced && !stalePass(lod, inputs)) return false;
+  const bodies = displayedBodies(state);
+  lod.stale = false;
+  lod.evaluated = inputs;
   let changed = false;
-  for (const [shapeId, { target, body }] of shapeTargets(state, seen, moving ? PIXELS_MOVING : PIXELS_AT_REST)) {
+  const pixels = moving ? PIXELS_MOVING : PIXELS_AT_REST;
+  for (const [shapeId, { target, body }] of shapeTargets(state, seen, bodies, inputs.revision, pixels)) {
     const buckets = shapeBuckets(state, body);
     if (!buckets) continue;
     const entry = shapeLod(state, shapeId);
@@ -106,11 +117,20 @@ export function evaluatePass(state: Runtime, now: number, forced: boolean): bool
   return changed;
 }
 
-function shapeTargets(state: Runtime, seen: SeenCamera, pixels: number): Map<string, ShapeTarget> {
+function stalePass(lod: LodState, inputs: PassInputs): boolean {
+  const last = lod.evaluated;
+  return lod.stale || !last || last.revision !== inputs.revision || last.flushed !== inputs.flushed
+    || last.moving !== inputs.moving || last.displayed !== inputs.displayed
+    || last.groups.some((value, index) => value !== inputs.groups[index]);
+}
+
+function shapeTargets(
+  state: Runtime, seen: SeenCamera, bodies: Body[], revision: bigint, pixels: number,
+): Map<string, ShapeTarget> {
   const targets = new Map<string, ShapeTarget>();
-  for (const body of displayedBodies(state)) {
+  for (const body of bodies) {
     const shapeId = body.lastInfo.shapeId;
-    const bounds = shapeId ? displayBounds(state, body) : null;
+    const bounds = shapeId ? displayBounds(state, body, revision) : null;
     const world = bounds ? worldUnitsPerPixel(seen.camera, bounds, seen.height) * pixels : undefined;
     const target = world === undefined ? undefined : localTarget(world, body);
     if (!shapeId || target === undefined || !Number.isFinite(target) || target <= 0) continue;
@@ -118,11 +138,6 @@ function shapeTargets(state: Runtime, seen: SeenCamera, pixels: number): Map<str
     if (!best || target < best.target) targets.set(shapeId, { target, body });
   }
   return targets;
-}
-
-function displayBounds(state: Runtime, body: Body): Bounds | null {
-  const label = `${body.bodyType}.getBounds`;
-  return decodeBounds(call(label, () => state.graph.bounds(body.ogId)), label);
 }
 
 export function wantedKey(state: Runtime, body: Body): number | undefined {
@@ -186,6 +201,8 @@ function failedKey(revision: number, bucket: number): string {
 }
 
 export function overrideChanged(state: Runtime, shapeId?: string): void {
+  state.lod.stale = true;
+  queueShapes(state, shapeId);
   const entries = shapeId === undefined ? [...state.lod.shapes.values()] : [state.lod.shapes.get(shapeId)];
   for (const entry of entries) {
     if (!entry) continue;
@@ -208,6 +225,8 @@ export function popTemporaryTarget(state: Runtime, token: TemporaryTarget): void
 }
 
 function clearAllMarks(state: Runtime): void {
+  state.lod.stale = true;
+  queueShapes(state);
   for (const entry of state.lod.shapes.values()) clearMarks(entry);
 }
 
@@ -223,6 +242,7 @@ export function markFailed(state: Runtime, shapeId: string, revision: number, bu
   if (entry.failed.has(key)) return false;
   entry.failed.add(key);
   entry.pinned = { revision, bucket: bucket * 2 };
+  state.lod.stale = true;
   return true;
 }
 
@@ -254,4 +274,6 @@ export function capturedError(state: Runtime, body: Body): unknown {
 
 export function forceNextBucket(state: Runtime, shapeId: string, bucket: number): void {
   shapeLod(state, shapeId).forced = bucket;
+  state.lod.stale = true;
+  queueShapes(state, shapeId);
 }

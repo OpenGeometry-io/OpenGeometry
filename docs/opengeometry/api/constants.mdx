@@ -1,0 +1,132 @@
+---
+title: Constants
+description: The kind constants for primitives, operations and transforms, the typed parameter helpers and their types, and the region tolerance.
+icon: list-check
+---
+
+Each kind is a string constant. Pass it as the first argument of a constructor, `operate`, `rebuild` or `transform`.
+
+## Primitives
+
+| Constant                         | Value                | Body  | Parameters type            |
+| -------------------------------- | -------------------- | ----- | -------------------------- |
+| `OG_PRIMITIVE_RECTANGLE`         | `'Rectangle'`        | Wire  | `{ width, breadth }`       |
+| `OG_PRIMITIVE_CIRCLE`            | `'Circle'`           | Wire  | `{ radius }`               |
+| `OG_PRIMITIVE_POLYLINE`          | `'Polyline'`         | Wire  | `{ points, closed? }`      |
+| `OG_PRIMITIVE_PROFILE`           | `'Profile'`          | Wire  | `ProfileParams`            |
+| `OG_PRIMITIVE_ARC`               | `'Arc'`              | Wire  | `ArcParams`                |
+| `OG_PRIMITIVE_CUBOID`            | `'Cuboid'`           | Solid | `{ width, height, depth }` |
+| `OG_PRIMITIVE_CYLINDER`          | `'Cylinder'`         | Solid | `{ radius, height }`       |
+| `OG_PRIMITIVE_CYLINDER_SECTOR`   | `'CylinderSector'`   | Solid | `CylinderSectorParams`     |
+| `OG_PRIMITIVE_POLYHEDRON`        | `'Polyhedron'`       | Solid | `PolyhedronParams`         |
+| `OG_PRIMITIVE_SPHERE`            | `'Sphere'`           | Solid | `SphereParams`             |
+| `OG_PRIMITIVE_CONE`              | `'Cone'`             | Solid | `ConeParams`               |
+| `OG_PRIMITIVE_TORUS`             | `'Torus'`            | Solid | `TorusParams`              |
+| `OG_PRIMITIVE_SLOT_PRISM`        | `'SlotPrism'`        | Solid | `SlotPrismParams`          |
+| `OG_PRIMITIVE_ROUNDED_BOX`       | `'RoundedBox'`       | Solid | `RoundedBoxParams`         |
+| `OG_PRIMITIVE_PIPE_SEGMENT`      | `'PipeSegment'`      | Solid | `PipeSegmentParams`        |
+| `OG_PRIMITIVE_POLYSOLID`         | `'Polysolid'`        | Solid | `PolysolidParams`          |
+| -------------------------------- | -------------------- | ----- | -------------------------- |
+| `OG_PRIMITIVE_REGULAR_POLYGON`   | `'RegularPolygon'`   | Wire  | `RegularPolygonParams`     |
+| `OG_PRIMITIVE_SLOT`              | `'Slot'`             | Wire  | `SlotParams`               |
+| `OG_PRIMITIVE_ROUNDED_RECTANGLE` | `'RoundedRectangle'` | Wire  | `RoundedRectangleParams`   |
+
+## Operations
+
+| Constant                 | Value         | Used with                |
+| ------------------------ | ------------- | ------------------------ |
+| `OG_OPERATION_EXTRUDE`   | `'Extrude'`   | `new Solid`              |
+| `OG_OPERATION_SWEEP`     | `'Sweep'`     | `new Solid`, `new Sheet` |
+| `OG_OPERATION_REVOLVE`   | `'Revolve'`   | `new Solid`              |
+| `OG_OPERATION_UNION`     | `'Union'`     | `solid.operate`          |
+| `OG_OPERATION_SUBTRACT`  | `'Subtract'`  | `solid.operate`          |
+| `OG_OPERATION_INTERSECT` | `'Intersect'` | `solid.operate`          |
+| `OG_OPERATION_SHELL`     | `'Shell'`     | `solid.operate`          |
+
+## Transforms
+
+| Constant                 | Value         | Parameters                                  |
+| ------------------------ | ------------- | ------------------------------------------- |
+| `OG_TRANSFORM_TRANSLATE` | `'Translate'` | `{ offset }`                                |
+| `OG_TRANSFORM_ROTATE`    | `'Rotate'`    | `{ axis, degrees, pivot? }`                 |
+| `OG_TRANSFORM_SCALE`     | `'Scale'`     | `{ factor, pivot? }`                        |
+| `OG_TRANSFORM_PLACE`     | `'Place'`     | `{ origin?, xDirection?, normal?, scale? }` |
+
+## Typed parameter helpers
+
+Each helper returns its argument unchanged. It only gives the object a type, so the compiler checks the field names.
+
+| Helper                                  | Type                            |
+| --------------------------------------- | ------------------------------- |
+| `OG_PRIMITIVE_PARAMS_RECTANGLE`         | `{ width, breadth }`            |
+| `OG_PRIMITIVE_PARAMS_CIRCLE`            | `{ radius }`                    |
+| `OG_PRIMITIVE_PARAMS_POLYLINE`          | `{ points, closed? }`           |
+| `OG_PRIMITIVE_PARAMS_CUBOID`            | `{ width, height, depth }`      |
+| `OG_PRIMITIVE_PARAMS_CYLINDER`          | `{ radius, height }`            |
+| `OG_PRIMITIVE_PARAMS_PROFILE`           | `ProfileParams`                 |
+| `OG_PRIMITIVE_PARAMS_ARC`               | `ArcParams`                     |
+| `OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR`   | `CylinderSectorParams`          |
+| `OG_PRIMITIVE_PARAMS_POLYHEDRON`        | `PolyhedronParams`              |
+| `OG_PRIMITIVE_PARAMS_SPHERE`            | `SphereParams`                  |
+| `OG_PRIMITIVE_PARAMS_CONE`              | `ConeParams`                    |
+| `OG_PRIMITIVE_PARAMS_TORUS`             | `TorusParams`                   |
+| `OG_PRIMITIVE_PARAMS_POLYSOLID`         | `PolysolidParams`               |
+| `OG_OPERATION_PARAMS_EXTRUDE`           | `{ profile, holes?, distance }` |
+| `OG_OPERATION_PARAMS_SWEEP`             | `{ profile, path, caps? }`      |
+| `OG_OPERATION_PARAMS_REVOLVE`           | `{ profile, axis? }`            |
+| `OG_PRIMITIVE_PARAMS_SLOT_PRISM`        | `SlotPrismParams`               |
+| `OG_PRIMITIVE_PARAMS_ROUNDED_BOX`       | `RoundedBoxParams`              |
+| `OG_PRIMITIVE_PARAMS_PIPE_SEGMENT`      | `PipeSegmentParams`             |
+| --------------------------------------- | ------------------------------- |
+| `OG_PRIMITIVE_PARAMS_REGULAR_POLYGON`   | `RegularPolygonParams`          |
+| `OG_PRIMITIVE_PARAMS_SLOT`              | `SlotParams`                    |
+| `OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE` | `RoundedRectangleParams`        |
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  OG_PRIMITIVE_CYLINDER_SECTOR,
+  OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const params = OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR({
+  radius: 2,
+  height: 3,
+  startAngle: 0,
+  sweepAngle: Math.PI / 2,
+});
+const sector = new Solid(OG_PRIMITIVE_CYLINDER_SECTOR, params);
+console.log(sector.validity().valid);
+```
+
+## Parameter types
+
+| Type                     | Fields                                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `ProfileParams`          | `start: [u, v]`, `segments: ProfileSegment[]`, `closed`                                 |
+| `ProfileSegment`         | `to: [u, v]`, `arc?: ProfileArc`                                                        |
+| `ProfileArc`             | `center: [u, v]`, `counterClockwise`                                                    |
+| `ArcParams`              | `radius`, `startAngle`, `sweepAngle`                                                    |
+| `CylinderSectorParams`   | `radius`, `height`, `startAngle`, `sweepAngle`                                          |
+| `PolyhedronParams`       | `points: [x, y, z][]`, `faces: number[][]`                                              |
+| `SphereParams`           | `radius`                                                                                |
+| `ConeParams`             | `radiusBottom`, `radiusTop`, `height`                                                   |
+| `TorusParams`            | `majorRadius`, `minorRadius`                                                            |
+| `SlotPrismParams`        | `length`, `width`, `height`                                                             |
+| `RoundedBoxParams`       | `width`, `height`, `depth`, `radius`                                                    |
+| `PipeSegmentParams`      | `outerRadius`, `innerRadius`, `height`, `startAngle`, `sweepAngle`                      |
+| `PolysolidParams`        | `path: ProfileParams`, `width`, `height`, `justify?`: `'centre'`, `'left'` or `'right'` |
+| ------------------------ | ------------------------------------------------------------------                      |
+| `RegularPolygonParams`   | `sides`, `radius`                                                                       |
+| `SlotParams`             | `length`, `width`                                                                       |
+| `RoundedRectangleParams` | `width`, `breadth`, `radius`                                                            |
+
+## OG_REGION_TOLERANCE
+
+`1e-6`. The fixed tolerance, in metres, of the 2D region calls.
