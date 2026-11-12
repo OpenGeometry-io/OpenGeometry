@@ -47,8 +47,26 @@ pub(crate) fn boundary_side(
     brep: &BrepEnvelope,
     other: &BrepEnvelope,
 ) -> Result<PointClassification, GeometryError> {
+    let mut sides = Vec::new();
+    for shell in &brep.topology.shells {
+        sides.push(shell_side(brep, &shell.faces, other)?);
+    }
+    Ok(match sides.split_first() {
+        Some((first, rest)) if rest.iter().all(|side| side == first) => *first,
+        _ => PointClassification::Unknown,
+    })
+}
+
+fn shell_side(
+    brep: &BrepEnvelope,
+    faces: &[u32],
+    other: &BrepEnvelope,
+) -> Result<PointClassification, GeometryError> {
     let samples = [0.5, 0.25, 0.75, 0.125, 0.875];
-    for face in &brep.topology.faces {
+    for face in faces
+        .iter()
+        .map(|&face| &brep.topology.faces[face as usize])
+    {
         let surface = brep.geometry.surface(face.surface)?;
         for u in samples {
             for v in samples {

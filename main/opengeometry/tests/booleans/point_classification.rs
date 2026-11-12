@@ -1,4 +1,4 @@
-use opengeometry::brep::{BrepEnvelope, Frame3};
+use opengeometry::brep::{BrepEnvelope, Frame3, GeometryError};
 use opengeometry::operations::modifying::boolean::{boolean_brep, BooleanOp};
 use opengeometry::primitives;
 use opengeometry::query::{classify_point, PointClassification};
@@ -152,4 +152,72 @@ fn each_solid_of_a_body_cut_in_two_classifies_its_own_points() {
             "{point:?}"
         );
     }
+}
+
+fn ball(id: &str, origin: [f64; 3], radius: f64) -> BrepEnvelope {
+    let frame = Frame3 {
+        origin,
+        ..Frame3::IDENTITY
+    };
+    primitives::sphere(id.into(), frame, radius, accuracy(1e-5)).unwrap()
+}
+
+fn cube(id: &str, origin: [f64; 3], size: f64) -> BrepEnvelope {
+    let frame = Frame3 {
+        origin,
+        ..Frame3::IDENTITY
+    };
+    primitives::cuboid(id.into(), frame, [size; 3], accuracy(1e-5)).unwrap()
+}
+
+fn assert_refused(a: &BrepEnvelope, b: &BrepEnvelope) {
+    for (first, second) in [(a, b), (b, a)] {
+        for operation in [
+            BooleanOp::Union,
+            BooleanOp::Intersection,
+            BooleanOp::Subtraction,
+        ] {
+            let Err(error) = boolean_brep(first, second, operation, "refused".into()) else {
+                panic!("{} {operation:?} {} built", first.id, second.id);
+            };
+            assert!(
+                matches!(
+                    &error,
+                    GeometryError::UnresolvedIntersection(message)
+                        if message == "generic boolean containment classification is unresolved"
+                ),
+                "{} {operation:?} {}: {error:?}",
+                first.id,
+                second.id
+            );
+        }
+    }
+}
+
+#[test]
+fn ball_around_the_cavity_of_a_hollow_cube_is_refused_not_measured_wrong() {
+    let outer = cube("outer", [0.0; 3], 4.0);
+    let hollow = boolean_brep(
+        &outer,
+        &cube("cavity", [1.0; 3], 2.0),
+        BooleanOp::Subtraction,
+        "hollow".into(),
+    )
+    .unwrap()
+    .brep;
+    assert_refused(&hollow, &ball("ball", [2.0; 3], 1.9));
+}
+
+#[test]
+fn two_balls_in_one_body_against_a_cube_holding_one_are_refused_not_measured_wrong() {
+    let pair = boolean_brep(
+        &ball("near", [2.0; 3], 0.5),
+        &ball("far", [12.0, 2.0, 2.0], 0.5),
+        BooleanOp::Union,
+        "balls".into(),
+    )
+    .unwrap()
+    .brep;
+    assert_eq!(solid_count(&pair), 2);
+    assert_refused(&pair, &cube("cube", [0.0; 3], 4.0));
 }
