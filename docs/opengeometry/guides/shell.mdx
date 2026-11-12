@@ -1,0 +1,59 @@
+---
+title: Shell
+description: Hollow a solid in place, with walls of one thickness inside every face.
+icon: box-open
+---
+
+`solid.operate(OG_OPERATION_SHELL, { thickness, instances? })` hollows a solid in place. It leaves one closed void, `thickness` inside every face.
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_EXTRUDE,
+  OG_OPERATION_SHELL,
+  OG_PRIMITIVE_PROFILE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const dShape = new Wire(OG_PRIMITIVE_PROFILE, {
+  start: [0, 0],
+  segments: [
+    { to: [0.36, 0] },
+    { to: [0.36, 0.38], arc: { center: [0.36, 0.19], counterClockwise: true } },
+    { to: [0, 0.38] },
+    { to: [0, 0] },
+  ],
+  closed: true,
+});
+const cistern = new Solid(OG_OPERATION_EXTRUDE, { profile: dShape, distance: 0.3 });
+cistern.operate(OG_OPERATION_SHELL, { thickness: 0.01 });
+console.log(cistern.validity().valid);
+```
+
+## What it takes
+
+A cuboid, a cylinder, a sphere, a ring torus, a cone or frustum, a planar profile extrusion, or an extrusion of a line-and-arc profile with or without holes.
+
+The inner walls of a line-and-arc extrusion are its exact inset: lines parallel to the sides, arcs on the same centres, and arcs of radius `thickness` at inward corners.
+
+## Errors
+
+| Code                     | When                                                                                     |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| `InvalidParameter`       | `thickness` is not finite, or not above four times the geometric tolerance               |
+| `UnresolvedIntersection` | The cavity would vanish, the inset is empty or splits, or two inset edges come too close |
+| `SharedShape`            | The shape is shared and `instances: 'all'` is not given                                  |
+| `CoverageGap`            | A solid of another kind, such as a full-turn revolve                                     |
+| `UnsupportedGeometry`    | A solid with approximate geometry                                                        |
+
+Not built: a sheet is not thickened into a solid. `Sheet` has no `operate`.
+
+## Keep the original
+
+The shell changes the solid in place. To keep the solid too, shell a copy: `solid.duplicate()`.

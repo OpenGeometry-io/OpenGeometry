@@ -122,7 +122,7 @@ async function exportLevel(): Promise<void> {
   EXPORT_BUTTON.disabled = true;
   STATUS.textContent = 'Exporting STEP…';
   try {
-    const result = await OpenGeometry.exportStep({ nodes: [LEVEL], name: 'OpenGeometry 2.5 example' });
+    const result = await OpenGeometry.exportStep({ nodes: [LEVEL], name: 'OpenGeometry example' });
     const url = URL.createObjectURL(new Blob([result.text], { type: 'application/step' }));
     const link = document.createElement('a');
     link.href = url;

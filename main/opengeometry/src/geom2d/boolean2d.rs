@@ -1,6 +1,6 @@
 use super::poly2d::{
-    cross2, dedupe_ring, dot2, point_on_edge_t, ring_inside2, segment_cross_t2, signed_area2,
-    winding_number2, Edge2, Pt2,
+    cross2, crossing_margin, dedupe_ring, dot2, edge_box, nearby_boxes, point_on_edge_t,
+    ring_inside2, segment_cross_t2, signed_area2, winding_number2, Edge2, Pt2,
 };
 use crate::brep::GeometryError;
 
@@ -102,17 +102,29 @@ pub(crate) fn boolean_oriented_regions(
     let mut contours = Vec::with_capacity(a.len() + b.len());
     contours.extend_from_slice(a);
     contours.extend_from_slice(b);
+    let spans = |rings: &[Vec<Pt2>]| {
+        rings
+            .iter()
+            .map(|ring| {
+                ring.iter()
+                    .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), point| {
+                        (lo.min(point.z), hi.max(point.z))
+                    })
+            })
+            .collect::<Vec<_>>()
+    };
+    let (a_spans, b_spans) = (spans(a), spans(b));
+    let winding = |point: Pt2, rings: &[Vec<Pt2>], spans: &[(f64, f64)]| {
+        rings
+            .iter()
+            .zip(spans)
+            .filter(|(_, &(lo, hi))| lo <= point.z && point.z < hi)
+            .map(|(ring, _)| winding_number2(point, ring))
+            .sum::<i32>()
+    };
     winding_regions_by(&contours, eps, |point| {
-        let in_a = a
-            .iter()
-            .map(|ring| winding_number2(point, ring))
-            .sum::<i32>()
-            != 0;
-        let in_b = b
-            .iter()
-            .map(|ring| winding_number2(point, ring))
-            .sum::<i32>()
-            != 0;
+        let in_a = winding(point, a, &a_spans) != 0;
+        let in_b = winding(point, b, &b_spans) != 0;
         match operation {
             PlanarBooleanOp::Union => in_a || in_b,
             PlanarBooleanOp::Intersection => in_a && in_b,
@@ -159,21 +171,21 @@ pub(crate) fn regions_from_edges_by(
 }
 
 fn subdivided_edges(edges: &[Edge2], eps: f64) -> Vec<Edge2> {
-    let verts: Vec<Pt2> = edges.iter().flat_map(|&(a, b)| [a, b]).collect();
+    let boxes = edges.iter().map(|&edge| edge_box(edge)).collect::<Vec<_>>();
+    let near = nearby_boxes(&boxes, crossing_margin(edges.iter().copied(), eps));
 
     let mut split: Vec<Edge2> = Vec::new();
     for (i, &(ea, eb)) in edges.iter().enumerate() {
         let rx = eb.x - ea.x;
         let rz = eb.z - ea.z;
         let mut ts: Vec<f64> = vec![0.0, 1.0];
-        for (j, &(fa, fb)) in edges.iter().enumerate() {
-            if i != j {
-                if let Some((_, ta, _)) = segment_cross_t2(ea, eb, fa, fb, eps) {
-                    ts.push(ta);
-                }
+        for j in near.of(i) {
+            let (fa, fb) = edges[j];
+            if let Some((_, ta, _)) = segment_cross_t2(ea, eb, fa, fb, eps) {
+                ts.push(ta);
             }
         }
-        for &v in &verts {
+        for v in near.of(i).flat_map(|j| [edges[j].0, edges[j].1]) {
             if let Some(t) = point_on_edge_t(ea, eb, v, eps) {
                 ts.push(t);
             }
@@ -200,7 +212,10 @@ fn subdivided_edges(edges: &[Edge2], eps: f64) -> Vec<Edge2> {
 
 fn boundary_edges(split: &[Edge2], eps: f64, filled: impl Fn(Pt2) -> bool) -> Vec<Edge2> {
     let mut boundary: Vec<Edge2> = Vec::new();
-    for &(a, b) in split {
+    let boxes = split.iter().map(|&edge| edge_box(edge)).collect::<Vec<_>>();
+    let most = 1.0e-4;
+    let near = nearby_boxes(&boxes, 4.0 * most);
+    for (index, &(a, b)) in split.iter().enumerate() {
         let dx = b.x - a.x;
         let dz = b.z - a.z;
         let len = dx.hypot(dz);
@@ -211,7 +226,10 @@ fn boundary_edges(split: &[Edge2], eps: f64, filled: impl Fn(Pt2) -> bool) -> Ve
         let nz = dx / len;
         let mx = (a.x + b.x) / 2.0;
         let mz = (a.z + b.z) / 2.0;
-        let probe = probe_reach(Pt2::new(mx, mz), len, 1.0e-4, split, eps);
+        let mut nearby = near.of(index).collect::<Vec<_>>();
+        nearby.insert(nearby.partition_point(|&other| other < index), index);
+        let nearby = nearby.iter().map(|&other| split[other]).collect::<Vec<_>>();
+        let probe = probe_reach(Pt2::new(mx, mz), len, most, &nearby, eps);
         let left = filled(Pt2::new(mx + nx * probe, mz + nz * probe));
         let right = filled(Pt2::new(mx - nx * probe, mz - nz * probe));
         if left == right {

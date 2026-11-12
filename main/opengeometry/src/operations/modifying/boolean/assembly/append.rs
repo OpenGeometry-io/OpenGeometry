@@ -7,6 +7,7 @@ use crate::operations::modifying::boolean::operands::CylinderInput;
 use crate::operations::modifying::boolean::types::{
     BooleanOp, BooleanReport, BooleanResult, FaceMapping,
 };
+use std::collections::HashMap;
 
 struct IdOffsets {
     surface: u32,
@@ -251,6 +252,22 @@ pub(crate) fn analytic_face_mappings<'a>(
     out: &BrepEnvelope,
     inputs: impl IntoIterator<Item = &'a BrepEnvelope>,
 ) -> Vec<FaceMapping> {
+    let mut results: HashMap<(&str, &str, &str, u32), Vec<u32>> = HashMap::new();
+    for result in &out.topology.faces {
+        for candidate in &result.provenance.sources {
+            let faces = results
+                .entry((
+                    &candidate.entity,
+                    &candidate.body,
+                    &candidate.key,
+                    candidate.face,
+                ))
+                .or_default();
+            if faces.last() != Some(&result.id) {
+                faces.push(result.id);
+            }
+        }
+    }
     inputs
         .into_iter()
         .flat_map(|input| {
@@ -261,20 +278,10 @@ pub(crate) fn analytic_face_mappings<'a>(
                     key: face.key.clone(),
                     face: face.id,
                 };
-                let result_faces = out
-                    .topology
-                    .faces
-                    .iter()
-                    .filter(|result| {
-                        result.provenance.sources.iter().any(|candidate| {
-                            candidate.entity == source.entity
-                                && candidate.body == source.body
-                                && candidate.key == source.key
-                                && candidate.face == source.face
-                        })
-                    })
-                    .map(|result| result.id)
-                    .collect();
+                let result_faces = results
+                    .get(&(&*source.entity, &*source.body, &*source.key, source.face))
+                    .cloned()
+                    .unwrap_or_default();
                 FaceMapping {
                     source,
                     result_faces,

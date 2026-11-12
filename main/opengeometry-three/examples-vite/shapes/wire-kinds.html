@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Wire Kinds Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OpenGeometry regular polygon, slot and rounded rectangle wires for Three.js." />
+    <meta name="author" content="Vishwajeet Mane" />
+    <link rel="stylesheet" href="../theme.css" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Wire Kinds</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>Wire Kinds</h3>
+      <p class="og-control-summary">
+        A regular polygon, a slot and a rounded rectangle, each extruded into a prism.
+      </p>
+      <p id="status" class="og-control-summary" role="status" aria-live="polite">Loading kernel…</p>
+    </aside>
+
+    <div id="app"></div>
+
+    <script>
+      if (location.protocol === 'file:') document.querySelector('#status').textContent = 'Open this page through the Vite server.';
+      window.addEventListener('error', (event) => { document.querySelector('#status').textContent = `Error: ${event.message}`; }, true);
+      window.addEventListener('unhandledrejection', (event) => { document.querySelector('#status').textContent = `Error: ${String(event.reason)}`; });
+    </script>
+    <script type="module" src="./wire-kinds.ts"></script>
+  </body>
+</html>

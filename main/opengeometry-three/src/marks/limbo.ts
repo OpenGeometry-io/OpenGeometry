@@ -1,5 +1,6 @@
 import type { Body } from '../bodies/body';
 import { call } from '../kernel/kernel-session';
+import { setShown } from '../rendering/lod/host-drawn';
 import { bodyKey, reindexShape, runtime, type Runtime } from '../runtime/runtime-state';
 import { node, worldGraph } from '../world-graph/world-graph-client';
 
@@ -29,12 +30,12 @@ export function revive(body: Body): void {
     call('OGMark.rollback', () => worldGraph().nodeByHandle(body.handle, body.generation));
     state.limbo.delete(body);
     body.inLimbo = false;
-    body.visible = true;
+    setShown(state, body, true);
     entry.parent?.add(body);
     const previous = body.lastInfo.shapeId;
     body.lastInfo = node(body.ogId, 'OGMark.rollback');
     reindexShape(state, body, previous);
-  } catch { body.visible = false; }
+  } catch { setShown(state, body, false); }
 }
 
 export function finalizeNow(body: Body): void {
@@ -43,7 +44,7 @@ export function finalizeNow(body: Body): void {
 }
 
 function hide(state: Runtime, body: Body): void {
-  body.visible = false;
+  setShown(state, body, false);
   state.displayed.delete(body);
   const parent = body.parent;
   if (state.flushing || state.renderPassActive) {

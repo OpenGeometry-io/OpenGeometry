@@ -1,6 +1,8 @@
 use super::{changed, check_copy, created, serialise, OGWorldGraph};
 use crate::bindings::{errors, params};
+use crate::brep::{BodyType, BrepEnvelope, GeometryError};
 use crate::world_graph::CopyOptions;
+use std::sync::Arc;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -8,13 +10,20 @@ use wasm_bindgen::JsValue;
 impl OGWorldGraph {
     pub fn node(&self, og_id: &str) -> Result<String, JsValue> {
         let node = self.inner.node(og_id).map_err(errors::json)?;
+        let mut handles = self.handles.borrow_mut();
+        if handles.len() > 2 * self.inner.node_count() {
+            handles.clear();
+        }
+        handles.insert((node.handle, node.generation), node.og_id.clone());
+        drop(handles);
         let shape = if node.shape.is_some() {
             Some(self.inner.shape(og_id).map_err(errors::json)?)
         } else {
             None
         };
         let body_type = shape
-            .map(|value| value.brep.body_type())
+            .zip(node.shape.as_deref())
+            .map(|(value, shape_id)| self.body_type(shape_id, &value.brep))
             .transpose()
             .map_err(|error| errors::json(error.into()))?
             .map(|kind| format!("{kind:?}"));
@@ -33,6 +42,14 @@ impl OGWorldGraph {
 
     #[wasm_bindgen(js_name = nodeByHandle)]
     pub fn node_by_handle(&self, handle: u32, generation: u32) -> Result<String, JsValue> {
+        let cached = self.handles.borrow().get(&(handle, generation)).cloned();
+        if let Some(og_id) = cached {
+            if let Ok(node) = self.inner.node(&og_id) {
+                if node.handle == handle && node.generation == generation {
+                    return self.node(&og_id);
+                }
+            }
+        }
         let node = self
             .inner
             .node_by_handle(handle, generation)
@@ -106,5 +123,27 @@ impl OGWorldGraph {
 
     pub fn dispose(&mut self, og_id: &str) -> Result<String, JsValue> {
         changed(self.inner.dispose(og_id).map_err(errors::json)?)
+    }
+}
+
+impl OGWorldGraph {
+    fn body_type(
+        &self,
+        shape_id: &str,
+        brep: &Arc<BrepEnvelope>,
+    ) -> Result<BodyType, GeometryError> {
+        let mut cache = self.body_types.borrow_mut();
+        if let Some((cached, kind)) = cache.get(shape_id) {
+            if cached.as_ptr() == Arc::as_ptr(brep) {
+                return Ok(*kind);
+            }
+        }
+        let kind = brep.body_type()?;
+        if cache.len() >= self.prune_body_types_at.get() {
+            cache.retain(|_, (cached, _)| cached.strong_count() > 0);
+            self.prune_body_types_at.set(2 * cache.len().max(32));
+        }
+        cache.insert(shape_id.to_string(), (Arc::downgrade(brep), kind));
+        Ok(kind)
     }
 }

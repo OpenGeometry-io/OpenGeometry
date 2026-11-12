@@ -112,6 +112,20 @@ assert.throws(
   () => GRAPH.nodeByHandle(INFO.handle, INFO.generation),
   (error) => JSON.parse(String(error)).code === 'Disposed',
 );
+GRAPH.createPrimitive(ENCODE({ kind: 'Cuboid', width: 2, height: 2, depth: 2 }), ENCODE({ ogId: 'host' }));
+GRAPH.createPrimitive(ENCODE(UNIT_CUBE), ENCODE({ ogId: 'tool' }));
+const HOST = JSON.parse(GRAPH.node('host'));
+GRAPH.operate('host', ENCODE('Subtract'), ENCODE(['tool']), ENCODE('Node'));
+const OPERATED = JSON.parse(GRAPH.nodeByHandle(HOST.handle, HOST.generation));
+assert.equal(OPERATED.bodyType, 'Solid');
+assert.equal(OPERATED.shapeRevision, HOST.shapeRevision + 1);
+GRAPH.createPrimitive(ENCODE(UNIT_CUBE), ENCODE({ ogId: 'cube' }));
+const REBORN = JSON.parse(GRAPH.node('cube'));
+assert.throws(
+  () => GRAPH.nodeByHandle(INFO.handle, INFO.generation),
+  (error) => JSON.parse(String(error)).code === 'Disposed',
+);
+assert.equal(JSON.parse(GRAPH.nodeByHandle(REBORN.handle, REBORN.generation)).ogId, 'cube');
 TESSELLATOR.free();
 GRAPH.free();
 console.log('WASM bindings passed');

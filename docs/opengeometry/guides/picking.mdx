@@ -1,0 +1,42 @@
+---
+title: Picking
+description: Turn a Three.js raycast hit into a body, a face and an edge of the kernel.
+icon: arrow-pointer
+---
+
+Raycast your scene with Three.js as usual. Then pass the hit to `OpenGeometry.resolveHit`:
+
+```ts
+import * as THREE from 'three';
+import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const box = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 }, { ogId: 'box' });
+const scene = new THREE.Scene();
+scene.add(box);
+scene.updateMatrixWorld();
+OpenGeometry.flush({ geometry: 'sync' });
+
+const raycaster = new THREE.Raycaster(new THREE.Vector3(0, 0.5, 5), new THREE.Vector3(0, 0, -1));
+const [hit] = raycaster.intersectObject(scene, true);
+const picked = hit ? OpenGeometry.resolveHit(hit) : undefined;
+console.log(picked);
+```
+
+`resolveHit` returns `{ ogId, shapeRevision, faceId?, edgeId? }`, or `undefined` when the hit is not on a body.
+
+- `faceId` is set for a hit on the surface. Find the face with `body.getBrep().topology.faces`.
+- `edgeId` is set for a hit on the outline.
+- `shapeRevision` tells you which revision of the shape was hit. After an edit, the ids can refer to other faces.
+
+## Outlines
+
+A raycast hits a body's outline only when `pickOutline` is on. It is on for wires and off for sheets and solids. Turn it on with `body.setAppearance({ pickOutline: true })`. Set `raycaster.params.Line.threshold` to the pick width that you want.
+
+## Copies of the display
+
+`body.clone()` makes a display copy for Three.js only. It is not a body, so `resolveHit` returns `undefined` for a hit on it. Call its `dispose()` when you take it out of the scene.

@@ -24,3 +24,22 @@ export function onNumberInput(control: NumberControl, accept: (value: number) =>
   control.range.addEventListener('input', () => { commit(control.range.value); });
   control.number.addEventListener('input', () => { commit(control.number.value); });
 }
+
+export function latestOnly(task: () => Promise<void>): () => void {
+  let running = false;
+  let queued = false;
+  const run = (): void => {
+    if (running) {
+      queued = true;
+      return;
+    }
+    running = true;
+    void task().finally(() => {
+      running = false;
+      if (!queued) return;
+      queued = false;
+      run();
+    });
+  };
+  return run;
+}
