@@ -235,6 +235,16 @@ fn torus_family() -> Vec<Case> {
         "poking",
         &poking,
     ));
+    let poking_off_seam = operands(|| {
+        let host = primitives::torus("host".into(), Frame3::IDENTITY, 3.0, 1.0, fine())?;
+        let ring = primitives::torus("ring".into(), at([0.0, 3.0, 0.7]), 0.5, 0.2, fine())?;
+        Ok((host, ring))
+    });
+    cases.extend(every_operation(
+        "booleans.torus.poking-ring-off-seam",
+        "poking-off-seam",
+        &poking_off_seam,
+    ));
     cases.extend(ring_hosts());
     cases
 }

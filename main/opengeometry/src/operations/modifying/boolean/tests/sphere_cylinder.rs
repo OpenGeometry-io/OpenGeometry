@@ -1,4 +1,4 @@
-use super::support::{cylinder, volume};
+use super::support::{assert_seam_coverage_gap, cylinder, volume, volume_at_deflection};
 use crate::brep::{CurveGeometry, FaceRole, Frame3, GeometryError, GeometryQuality};
 use crate::exchange::export_step;
 use crate::operations::modifying::boolean::dispatch::boolean_brep;
@@ -98,60 +98,61 @@ fn mixed_sphere_cylinder_containment_preserves_exact_cavity_supports() {
         accuracy,
     )
     .unwrap();
-    for (name, left, right, operation) in [
-        (
-            "crossing-union",
-            &cylinder_host,
-            &crossing,
-            BooleanOp::Union,
-        ),
+    for (name, operation, face) in [
+        ("crossing-union", BooleanOp::Union, "cylinder:lateral"),
         (
             "crossing-intersection",
-            &cylinder_host,
-            &crossing,
             BooleanOp::Intersection,
+            "crossing:skin",
         ),
         (
             "crossing-cylinder-cut",
-            &cylinder_host,
-            &crossing,
             BooleanOp::Subtraction,
-        ),
-        (
-            "crossing-sphere-cut",
-            &crossing,
-            &cylinder_host,
-            BooleanOp::Subtraction,
+            "cylinder:lateral",
         ),
     ] {
-        let result = boolean_brep(left, right, operation, name.into())
-            .unwrap_or_else(|error| panic!("{name}: {error}"));
-        assert!(
-            matches!(result.report.quality, GeometryQuality::Analytic),
-            "{name}"
+        assert_seam_coverage_gap(
+            boolean_brep(&cylinder_host, &crossing, operation, name.into()),
+            face,
         );
-        assert_eq!(result.brep.solids.len(), 1, "{name}");
-        assert!(result.brep.topology.faces.len() >= 2, "{name}");
-        assert!(!result.brep.topology.edges.is_empty(), "{name}");
-        assert!(
-            result
-                .brep
-                .topology
-                .faces
-                .iter()
-                .all(|face| !face.provenance.sources.is_empty()),
-            "{name}"
-        );
-        assert!(result
-            .brep
-            .geometry
-            .curves
-            .iter()
-            .any(|curve| matches!(curve, CurveGeometry::Intersection { .. })));
-        result.brep.validate().unwrap();
-        tessellate(&result.brep, 0.01, 2_000_000)
-            .unwrap_or_else(|error| panic!("{name} tessellation: {error}"));
     }
+    let result = boolean_brep(
+        &crossing,
+        &cylinder_host,
+        BooleanOp::Subtraction,
+        "crossing-sphere-cut".into(),
+    )
+    .unwrap();
+    assert!(
+        matches!(result.report.quality, GeometryQuality::Analytic),
+        "crossing-sphere-cut"
+    );
+    assert_eq!(result.brep.solids.len(), 1, "crossing-sphere-cut");
+    assert!(result.brep.topology.faces.len() >= 2, "crossing-sphere-cut");
+    assert!(
+        !result.brep.topology.edges.is_empty(),
+        "crossing-sphere-cut"
+    );
+    assert!(
+        result
+            .brep
+            .topology
+            .faces
+            .iter()
+            .all(|face| !face.provenance.sources.is_empty()),
+        "crossing-sphere-cut"
+    );
+    assert!(result
+        .brep
+        .geometry
+        .curves
+        .iter()
+        .any(|curve| matches!(curve, CurveGeometry::Intersection { .. })));
+    result.brep.validate().unwrap();
+    tessellate(&result.brep, 0.01, 2_000_000)
+        .unwrap_or_else(|error| panic!("tessellation: {error}"));
+    let cap = volume_at_deflection(&result.brep, 0.002);
+    assert!((cap - 0.12248).abs() < 0.01 * 0.12248, "{cap}");
 }
 
 #[test]

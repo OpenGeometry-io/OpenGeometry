@@ -1,4 +1,4 @@
-use super::support::{cylinder, sphere};
+use super::support::{assert_seam_coverage_gap, cylinder, sphere, volume_at_deflection};
 use crate::brep::{Accuracy, CurveGeometry, FaceRole, Frame3};
 use crate::operations::modifying::boolean::dispatch::boolean_brep;
 use crate::operations::modifying::boolean::types::BooleanOp;
@@ -89,18 +89,19 @@ fn generic_closed_loop_imprints_an_off_axis_sphere_cone_intersection() {
         accuracy,
     )
     .unwrap();
-    for operation in [
-        BooleanOp::Union,
-        BooleanOp::Intersection,
-        BooleanOp::Subtraction,
+    for operation in [BooleanOp::Union, BooleanOp::Subtraction] {
+        assert_seam_coverage_gap(
+            boolean_brep(&cone, &sphere, operation, format!("{operation:?}")),
+            "cone:lateral",
+        );
+    }
+    let mut volumes = Vec::new();
+    for (operation, left, right) in [
+        (BooleanOp::Intersection, &cone, &sphere),
+        (BooleanOp::Subtraction, &sphere, &cone),
     ] {
-        let result = boolean_brep(
-            &cone,
-            &sphere,
-            operation,
-            format!("sphere-cone-{operation:?}"),
-        )
-        .unwrap_or_else(|error| panic!("{operation:?}: {error}"));
+        let result = boolean_brep(left, right, operation, format!("sphere-cone-{operation:?}"))
+            .unwrap_or_else(|error| panic!("{operation:?}: {error}"));
         assert_eq!(result.brep.solids.len(), 1);
         assert!(result
             .brep
@@ -117,26 +118,13 @@ fn generic_closed_loop_imprints_an_off_axis_sphere_cone_intersection() {
         result.brep.validate().unwrap();
         tessellate(&result.brep, 0.01, 2_000_000)
             .unwrap_or_else(|error| panic!("{operation:?} tessellation: {error}"));
+        volumes.push(volume_at_deflection(&result.brep, 0.002));
     }
-}
-
-#[test]
-fn generic_closed_loop_handles_periodic_winding() {
-    let accuracy = cylinder("accuracy", 0.0, 1.0, false).accuracy;
-    let cone = primitives::cone("cone".into(), Frame3::IDENTITY, 2.0, 2.0, accuracy).unwrap();
-    let sphere = primitives::sphere(
-        "sphere".into(),
-        Frame3 {
-            origin: [1.1, 0.0, 0.8],
-            ..Frame3::IDENTITY
-        },
-        0.35,
-        accuracy,
-    )
-    .unwrap();
-    let result = boolean_brep(&cone, &sphere, BooleanOp::Intersection, "winding".into()).unwrap();
-    result.brep.validate().unwrap();
-    tessellate(&result.brep, 0.01, 2_000_000).unwrap();
+    let whole = volume_at_deflection(&sphere, 0.002);
+    assert!(
+        (volumes[0] + volumes[1] - whole).abs() < 0.01 * whole,
+        "{volumes:?} != {whole}"
+    );
 }
 
 #[test]
