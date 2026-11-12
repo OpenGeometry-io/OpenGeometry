@@ -197,7 +197,8 @@ fn add_lateral_face(
                 uv_line([lo, 0.0], [0.0, 1.0]),
             ),
         ],
-    )
+    )?;
+    Ok(())
 }
 
 fn add_sector_caps(
@@ -258,7 +259,8 @@ fn add_sector_caps(
         SurfaceGeometry::Plane { frame: top_frame },
         [[-radius, radius]; 2],
         top_uses,
-    )
+    )?;
+    Ok(())
 }
 
 fn add_radial_faces(
@@ -328,7 +330,8 @@ fn add_radial_faces(
         SurfaceGeometry::Plane { frame: end_frame },
         [[0.0, height], [0.0, radius]],
         end_uses,
-    )
+    )?;
+    Ok(())
 }
 
 fn tangent(frame: Frame3, angle: f64) -> Point3 {

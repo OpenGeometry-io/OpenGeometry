@@ -297,7 +297,8 @@ fn add_cap_faces(
         [bounds[0], [-bounds[1][1], -bounds[1][0]]],
         bottom_outer,
         bottom_holes,
-    )
+    )?;
+    Ok(())
 }
 
 fn cap_uses(

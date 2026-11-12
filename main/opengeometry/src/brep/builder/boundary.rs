@@ -15,7 +15,7 @@ pub(crate) fn dimensions(values: &[f64]) -> Result<(), GeometryError> {
     Ok(())
 }
 
-pub(crate) fn plane_boundary(
+pub fn plane_boundary(
     builder: &Builder,
     frame: Frame3,
     edge: u32,
@@ -50,16 +50,10 @@ pub(crate) fn plane_boundary(
     Ok(boundary(edge, from, to, sense, pcurve))
 }
 
-pub(crate) fn uv_line(origin: [f64; 2], direction: [f64; 2]) -> PcurveGeometry {
+pub fn uv_line(origin: [f64; 2], direction: [f64; 2]) -> PcurveGeometry {
     PcurveGeometry::Line2 { origin, direction }
 }
-pub(crate) fn boundary(
-    edge: u32,
-    from: u32,
-    to: u32,
-    sense: Orientation,
-    pcurve: PcurveGeometry,
-) -> Use {
+pub fn boundary(edge: u32, from: u32, to: u32, sense: Orientation, pcurve: PcurveGeometry) -> Use {
     Use {
         edge,
         from,
