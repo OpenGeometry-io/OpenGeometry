@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  Solid, OG_OPERATION_INTERSECT, OG_OPERATION_SUBTRACT, OG_OPERATION_UNION, OG_PRIMITIVE_CUBOID,
+  OGError, Solid, OG_OPERATION_INTERSECT, OG_OPERATION_SUBTRACT, OG_OPERATION_UNION, OG_PRIMITIVE_CUBOID,
   OG_PRIMITIVE_POLYHEDRON, OG_TRANSFORM_ROTATE, OG_TRANSFORM_TRANSLATE,
 } from '../../../dist/index.js';
 import { boot } from './support.mjs';
@@ -67,4 +67,21 @@ test('a cuboid and a cube turned 30 degrees about its height union and intersect
   assert.deepEqual(union, ['boolean_planar_polyhedra']);
   const meet = operated(slab('turned-meet-slab'), OG_OPERATION_INTERSECT, turnedCube('turned-meet-cube'), 0.5);
   assert.deepEqual(meet, ['boolean_planar_polyhedra']);
+});
+
+test('a block standing on the floor wholly inside a gable roof subtracts to nothing', async () => {
+  await boot();
+  const block = new Solid(OG_PRIMITIVE_CUBOID, { width: 0.4, height: 0.3, depth: 0.4 }, { ogId: 'inside-block' });
+  block.transform(OG_TRANSFORM_TRANSLATE, { offset: [2, 0, 1] });
+  const roof = gableRoof('inside-roof');
+  try {
+    assert.throws(
+      () => block.operate(OG_OPERATION_SUBTRACT, { tools: [roof] }),
+      (error) => error instanceof OGError && error.code === 'EmptyResult',
+    );
+    assert(Math.abs(block.measure().volume - 0.048) <= block.measure().errorBound);
+  } finally {
+    roof.dispose();
+    block.dispose();
+  }
 });

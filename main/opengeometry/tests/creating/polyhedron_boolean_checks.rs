@@ -110,11 +110,14 @@ impl Pair {
     }
 
     pub(super) fn assert_empty_intersection(&self) {
-        let operation = BooleanOp::Intersection;
+        self.assert_empty(BooleanOp::Intersection, "boolean_planar_polyhedra");
+    }
+
+    pub(super) fn assert_empty(&self, operation: BooleanOp, handler: &str) {
         let (result, handlers) =
-            boolean_brep_outcome_with_handlers(&self.a, &self.b, operation, "touching".into());
+            boolean_brep_outcome_with_handlers(&self.a, &self.b, operation, "empty".into());
         let result = result.unwrap_or_else(|error| panic!("{operation:?}: {error:?}"));
-        assert_eq!(handlers, ["boolean_planar_polyhedra"]);
+        assert_eq!(handlers, [handler]);
         result.brep.validate().unwrap();
         let topology = &result.brep.topology;
         assert!(topology.vertices.is_empty() && topology.edges.is_empty());

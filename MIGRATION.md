@@ -25,7 +25,7 @@ It is written for people and for coding assistants alike: each section says what
 - Two of these solids that touch on a face, one standing on the other, now unite into one solid. 3.0 threw.
 - Two planar solids that touch only along an edge or at a corner give the same result as in 3.0: the union keeps both solids, and the intersection throws `EmptyResult`, as for two separate solids.
 - An intersection of two planar solids that touch only on a face now throws `EmptyResult` too, because nothing is left. 3.0 threw `CoverageGap` or `UnresolvedIntersection`.
-- Subtraction: pairs that built in 3.0 build the same bodies, and the report's `handlers` is still `['subtract_planar_polyhedra']`. Subtracting a body that only stands on a face of the host now returns the host. 3.0 threw `InvalidTopology`.
+- Subtraction: pairs that built in 3.0 build the same bodies, and the report's `handlers` is still `['subtract_planar_polyhedra']`. Subtracting a body that only stands on a face of the host now returns the host. 3.0 threw `InvalidTopology`. When the host lies wholly inside the tool and touches it, on a face, along an edge or at a corner, the subtraction now throws `EmptyResult`, because nothing is left. 3.0 threw `CoverageGap` or `UnresolvedIntersection`.
 - A union or intersection of two planar solids that is still refused throws `CoverageGap` with `details.families` equal to `['layered planar profile extrusion', 'layered planar profile extrusion']`. 3.0 gave `['canonical aligned cuboid', 'canonical aligned cuboid']`. Code that matches the old pair must match the new one.
 
 ### Check your result

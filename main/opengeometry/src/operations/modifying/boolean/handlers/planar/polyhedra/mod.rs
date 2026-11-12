@@ -9,6 +9,7 @@ use crate::geom2d::{
     RingRegion,
 };
 use crate::math::{dot, scale, sub, Point3};
+use crate::operations::modifying::boolean::handlers::containment::analytic_containment_boolean;
 use crate::operations::modifying::boolean::handlers::disjoint::separate_boolean;
 use crate::operations::modifying::boolean::operands::brep_face_source;
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
@@ -88,7 +89,12 @@ fn planar_polyhedra(
         };
     }
     if pieces.is_empty() {
-        return Err(coverage());
+        return match operation {
+            BooleanOp::Subtraction => {
+                analytic_containment_boolean(host, cutter, false, operation, id)
+            }
+            _ => Err(coverage()),
+        };
     }
     if operation != BooleanOp::Subtraction {
         pieces = merged_coplanar(

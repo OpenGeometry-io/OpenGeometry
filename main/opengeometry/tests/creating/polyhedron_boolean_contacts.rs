@@ -200,3 +200,72 @@ fn mass_roofs_touching_along_an_eave_intersect_empty() {
 fn plate_roofs_touching_along_an_eave_intersect_empty() {
     Pair::new(eave_slab(true, 0.0), eave_slab(true, 7.0)).assert_empty_intersection();
 }
+
+fn gable_on_a_wall_top(length: f64, span: f64, ridge: f64) -> Primitive {
+    let points = [
+        [0.0, ridge, span / 2.0],
+        [length, ridge, span / 2.0],
+        [length, 3.2, 0.0],
+        [0.0, 3.2, 0.0],
+        [0.0, 3.0, 0.0],
+        [length, 3.0, 0.0],
+        [length, 3.0, span / 2.0],
+        [0.0, 3.0, span / 2.0],
+        [0.0, 3.2, span],
+        [length, 3.2, span],
+        [length, 3.0, span],
+        [0.0, 3.0, span],
+    ];
+    let faces: [&[u32]; 10] = [
+        &[0, 1, 2, 3],
+        &[4, 5, 6, 7],
+        &[1, 0, 8, 9],
+        &[10, 11, 7, 6],
+        &[2, 1, 6, 5],
+        &[3, 2, 5, 4],
+        &[0, 3, 4, 7],
+        &[8, 0, 7, 11],
+        &[9, 8, 11, 10],
+        &[1, 9, 10, 6],
+    ];
+    polyhedron(&points, &faces)
+}
+
+#[test]
+fn roof_wholly_inside_a_roof_on_the_same_wall_top_subtracts_to_nothing() {
+    let (main_ridge, wing_ridge) = (5.3006226146291295, 3.9002075382097097);
+    let main = 8.0 * (6.0 * 0.2 + 3.0 * (main_ridge - 3.2));
+    let wing = 3.0 * (2.0 * 0.2 + (wing_ridge - 3.2));
+    let wing_place = [
+        turned(90.0, [0.0, 0.0, 0.0]),
+        Transform::Translate {
+            offset: [3.0, 0.0, 4.5],
+        },
+    ];
+    let main_roof = || gable_on_a_wall_top(8.0, 6.0, main_ridge);
+    let wing_roof = || gable_on_a_wall_top(3.0, 2.0, wing_ridge);
+    let pair = Pair::placed([(wing_roof(), &wing_place), (main_roof(), &[])]);
+    pair.assert_empty(BooleanOp::Subtraction, "subtract_planar_polyhedra");
+    pair.built(BooleanOp::Union, 1).assert_volume(main);
+    pair.built(BooleanOp::Intersection, 1).assert_volume(wing);
+    Pair::placed([(main_roof(), &[]), (wing_roof(), &wing_place)])
+        .built(BooleanOp::Subtraction, 1)
+        .assert_volume(main - wing);
+}
+
+#[test]
+fn box_on_the_floor_inside_an_l_roof_subtracts_to_nothing() {
+    let block = || {
+        hexahedron(
+            [0.8, 0.0, 0.8],
+            [[0.4, 0.0, 0.0], [0.0, 0.5, 0.0], [0.0, 0.0, 0.4]],
+        )
+    };
+    let pair = Pair::new(block(), l_roof());
+    pair.assert_empty(BooleanOp::Subtraction, "subtract_planar_polyhedra");
+    pair.built(BooleanOp::Union, 1).assert_volume(16.0 / 3.0);
+    pair.built(BooleanOp::Intersection, 1).assert_volume(0.08);
+    Pair::new(l_roof(), block())
+        .built(BooleanOp::Subtraction, 1)
+        .assert_volume(16.0 / 3.0 - 0.08);
+}
