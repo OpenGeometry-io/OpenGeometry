@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { OpenGeometry } from '../../../dist/index.js';
 import { boot, failsWith, listen } from './support.mjs';
@@ -35,6 +36,11 @@ function area(regions) {
     - region.holes.reduce((holes, ring) => holes + Math.abs(ringArea(ring)), 0), 0);
 }
 
+function length(edge) {
+  if (edge.kind === 'arc') return edge.radius * Math.abs(edge.sweep_angle);
+  return Math.hypot(edge.to[0] - edge.from[0], edge.to[1] - edge.from[1]);
+}
+
 function arcs(regions) {
   return regions.flatMap((region) => [region.outer, ...region.holes].flat()).filter((edge) => edge.kind === 'arc');
 }
@@ -46,6 +52,9 @@ function near(a, b, tolerance = 1e-9) {
 const SQUARE_LOT = [[0, 0], [20, 0], [20, 20], [0, 20]];
 const HOLE = [[9, 9], [11, 9], [11, 11], [9, 11]];
 const L_LOT = [[0, 0], [10, 0], [10, 5], [5, 5], [5, 10], [0, 10]];
+const S_BALCONY = JSON.parse(readFileSync(
+  new URL('../../../opengeometry/tests/fixtures/regions/s-balcony-slab.json', import.meta.url), 'utf8',
+));
 
 test('an envelope inset is exact, with each hole corner rounded by its own distance', () => {
   const y = 2;
@@ -81,6 +90,60 @@ test('the ring height is ignored, and a typed array gives the same result as a l
   const low = OpenGeometry.offsetRingVariable(flat(L_LOT, 0), new Array(6).fill(1));
   const high = OpenGeometry.offsetRingVariable(new Float64Array(flat(L_LOT, 7)), new Float64Array(6).fill(1));
   assert.deepEqual(high, low);
+});
+
+test('the S balcony slab insets by 1.2 m to the same seven edges, its two arcs on their own centres', () => {
+  const regions = OpenGeometry.insetCurvedRegion2D(S_BALCONY, 1.2);
+  const [inset] = regions;
+  assert(inset && regions.length === 1);
+  assert.equal(inset.holes.length, 0);
+  assert.equal(inset.outer.length, S_BALCONY.outer.length);
+  const rounded = arcs(regions);
+  assert.equal(rounded.length, 2);
+  for (const [source, radius] of arcs([S_BALCONY]).map((arc, index) => [arc, [4.8, 7.2][index]])) {
+    assert(rounded.some((arc) => near(arc.radius, radius)
+      && near(arc.center[0], source.center[0]) && near(arc.center[1], source.center[1])));
+  }
+  const perimeter = S_BALCONY.outer.reduce((sum, edge) => sum + length(edge), 0);
+  assert(near(area(regions), area([S_BALCONY]) - 1.2 * perimeter + 4 * 1.2 * 1.2));
+});
+
+test('a curved inset past the half width is empty, and a bad region or distance is refused', () => {
+  assert.deepEqual(OpenGeometry.insetCurvedRegion2D(S_BALCONY, 8), []);
+  for (const distance of [0, -1.2, Number.NaN, Number.POSITIVE_INFINITY, wire('1.2')]) {
+    assert.throws(() => OpenGeometry.insetCurvedRegion2D(S_BALCONY, distance), failsWith('InvalidParameter'));
+  }
+  for (const region of [wire([S_BALCONY]), wire(null), wire({ ...S_BALCONY, colour: 'red' })]) {
+    assert.throws(() => OpenGeometry.insetCurvedRegion2D(region, 1.2), failsWith('InvalidParameter'));
+  }
+  const open = { outer: S_BALCONY.outer.slice(0, 4), holes: [] };
+  assert.throws(() => OpenGeometry.insetCurvedRegion2D(open, 1.2), failsWith('UnresolvedIntersection'));
+});
+
+test('a ring with an arc offsets by its own distance per edge, the arc staying on its centre', () => {
+  const ring = wire({
+    outer: [
+      { kind: 'line', from: [2, 2], to: [-2, 2] },
+      { kind: 'line', from: [-2, 2], to: [-2, -2] },
+      { kind: 'line', from: [-2, -2], to: [2, -2] },
+      { kind: 'arc', center: [2, 0], radius: 2, start_angle: -Math.PI / 2, sweep_angle: Math.PI },
+    ],
+    holes: [],
+  });
+  const regions = OpenGeometry.offsetCurvedRingVariable(ring, [0.1, 0.2, 0.1, 0.3]);
+  assert.equal(regions.length, 1);
+  assert(arcs(regions).some((arc) => near(arc.radius, 1.7) && near(arc.center[0], 2) && near(arc.center[1], 0)));
+  const cap = 0.045 * Math.PI / 2 - 0.05 * Math.sqrt(0.08) - 0.045 * Math.asin(1 / 3);
+  assert(near(area(regions), 3.8 * 3.8 + Math.PI * 1.7 * 1.7 / 2 - 2 * cap));
+  for (const [distances, holeDistances] of [
+    [[0.1, 0.2, 0.1, 2.5], []], [[0.1, 0.2, 0.1], []], [[0.1, 0.2, 0.1, 0.3], [[1]]],
+    [wire('0.1'), []], [[0.1, 0.2, 0.1, 0.3], wire([['x']])],
+  ]) {
+    assert.throws(
+      () => OpenGeometry.offsetCurvedRingVariable(ring, distances, holeDistances), failsWith('InvalidParameter'),
+    );
+  }
+  assert.throws(() => OpenGeometry.offsetCurvedRingVariable(wire(null), [1]), failsWith('InvalidParameter'));
 });
 
 test('a routed duct run strokes to width times length, mitred at the default limit of 4 and bevelled at 1', () => {

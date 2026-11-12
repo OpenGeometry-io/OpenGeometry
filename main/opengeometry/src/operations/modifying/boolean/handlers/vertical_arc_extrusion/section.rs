@@ -13,7 +13,13 @@ struct FaceBoundary {
 
 pub(super) fn canonical_arc_start(start: f64, sweep: f64) -> f64 {
     let lower = start.min(start + sweep);
-    lower.rem_euclid(std::f64::consts::TAU) + start - lower
+    let wrapped = lower.rem_euclid(std::f64::consts::TAU);
+    let wrapped = if std::f64::consts::TAU - wrapped <= 1e-12 {
+        0.0
+    } else {
+        wrapped
+    };
+    wrapped + start - lower
 }
 
 pub(super) fn face_profile(

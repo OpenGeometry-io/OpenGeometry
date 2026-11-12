@@ -1,0 +1,96 @@
+# OpenGeometry
+
+> OpenGeometry is an open-source CAD kernel for the browser: B-rep solids, booleans, extrude, sweep, revolve and STEP export, in Rust and WebAssembly with a TypeScript SDK for Three.js.
+
+Package: `opengeometry` on npm. These docs describe version 3.0. Check `node_modules/opengeometry/package.json` and `index.d.ts` before you use an example.
+
+Points and vectors are `[x, y, z]` arrays, units are metres and Y is up. Await `OpenGeometry.create` once before the first body. Code that uses `Cuboid`, `Vector3` or `setPlacement` is written for 2.0 and does not work with 3.0.
+
+## Get started
+
+- [What is OpenGeometry?](https://docs.opengeometry.io/opengeometry/what-is-opengeometry.md): An open-source CAD kernel for the browser, written in Rust, compiled to WebAssembly, with a TypeScript SDK for Three.js.
+- [Installation](https://docs.opengeometry.io/opengeometry/installation.md): Install opengeometry and three, and serve the WebAssembly kernel and the display worker.
+- [Quickstart](https://docs.opengeometry.io/opengeometry/quickstart.md): Make a Vite app, cut a door opening into a wall, show it in Three.js and export it as STEP.
+- [Use a coding agent](https://docs.opengeometry.io/opengeometry/agents.md): Give a coding assistant the OpenGeometry 3.0 rules it gets wrong most often, and the sources it can trust.
+- [Troubleshooting](https://docs.opengeometry.io/opengeometry/troubleshooting.md): The common problems when you start with OpenGeometry 3.0, what causes them and how to fix them.
+
+## Core concepts
+
+- [Architecture](https://docs.opengeometry.io/opengeometry/concepts/architecture.md): How the Rust kernel, the TypeScript SDK, the display worker and your Three.js scene fit together.
+- [Bodies](https://docs.opengeometry.io/opengeometry/concepts/bodies.md): Wires, sheets and solids, the shapes they hold, and the difference between a copy and an instance.
+- [Coordinates and planes](https://docs.opengeometry.io/opengeometry/concepts/coordinates-and-planes.md): Units, axes, the plane option of a primitive, and where a profile point lands in the world.
+- [Display](https://docs.opengeometry.io/opengeometry/concepts/display.md): How a body gets its mesh, level of detail, smooth edges, appearance, and when to call flush or settled.
+- [History](https://docs.opengeometry.io/opengeometry/concepts/history.md): Undo a group of edits with a mark, and run edits as a transaction that rolls back if it throws.
+- [Errors and limits](https://docs.opengeometry.io/opengeometry/concepts/errors.md): The OGError codes, the events the runtime sends, what a fatal error means, and the limits of 3.0.
+
+## Guides / Make bodies
+
+- [Primitives](https://docs.opengeometry.io/opengeometry/guides/primitives.md): Make wires and solids from parameters, on the default plane or on a plane of your own.
+- [Extrude](https://docs.opengeometry.io/opengeometry/guides/extrude.md): Raise a closed wire along its plane normal into a solid, with holes.
+- [Sweep](https://docs.opengeometry.io/opengeometry/guides/sweep.md): Move a profile along a path of lines and arcs into a solid, an open sheet, or a closed ring.
+- [Revolve](https://docs.opengeometry.io/opengeometry/guides/revolve.md): Turn a closed line-and-arc profile a full turn about an axis in its plane.
+
+## Guides / Edit bodies
+
+- [Booleans](https://docs.opengeometry.io/opengeometry/guides/booleans.md): Subtract, unite and intersect solids, read the boolean report, and handle refused cuts.
+- [Shell](https://docs.opengeometry.io/opengeometry/guides/shell.md): Hollow a solid in place, with walls of one thickness inside every face.
+- [Rebuild and mirror](https://docs.opengeometry.io/opengeometry/guides/rebuild-and-mirror.md): Give a body new parameters in place, or rebuild it as its reflection across a plane.
+- [Transforms and assemblies](https://docs.opengeometry.io/opengeometry/guides/transforms-and-assemblies.md): Move, turn, scale and place bodies, group them in assemblies, and make copies and instances.
+
+## Guides / Read and export
+
+- [Measure and validate](https://docs.opengeometry.io/opengeometry/guides/measure-and-validate.md): Read volume and area within a stated error bound, classify points, read bounds and the B-rep, and check that a body is valid.
+- [Picking](https://docs.opengeometry.io/opengeometry/guides/picking.md): Turn a Three.js raycast hit into a body, a face and an edge of the kernel.
+- [Export STEP](https://docs.opengeometry.io/opengeometry/guides/export-step.md): Write bodies and assemblies to a STEP file in millimetres or metres, with Y or Z up, and read the export report.
+- [IFC exchange body](https://docs.opengeometry.io/opengeometry/guides/ifc-exchange-body.md): Read a solid's exact geometry as an IFC exchange body, in world metres with Z up, for your IFC writer.
+
+## Guides / 2D
+
+- [Regions and offsets](https://docs.opengeometry.io/opengeometry/guides/regions-and-offsets.md): 2D booleans on point and line-and-arc regions, exact insets with one distance per edge, and polyline strokes.
+
+## Guides / Integrate
+
+- [Use your Three.js scene](https://docs.opengeometry.io/opengeometry/guides/use-your-threejs-scene.md): Put bodies in your own scene, connect your camera for level of detail, and draw bodies through your own instanced or batched layers.
+- [Run in Node](https://docs.opengeometry.io/opengeometry/guides/run-in-node.md): Load the kernel in Node, mesh bodies without a renderer, and write STEP files from a script or a test.
+
+## Documentation
+
+- [Examples](https://docs.opengeometry.io/opengeometry/examples.md): Runnable example pages for OpenGeometry 3.0, and how to run them from a clone of the repository.
+- [Migrate from 2.0](https://docs.opengeometry.io/opengeometry/migrate-from-2-0.md): What changed between OpenGeometry 2.0 and 3.0, and where the full step-by-step guide is.
+- [Changelog](https://docs.opengeometry.io/opengeometry/changelog.md): What changed in each OpenGeometry release, newest first.
+
+## API Reference / API Reference
+
+- [API reference](https://docs.opengeometry.io/opengeometry/api/overview.md): Every export of the opengeometry 3.0 package, and the page that describes it.
+
+## API Reference / Runtime
+
+- [OpenGeometry](https://docs.opengeometry.io/opengeometry/api/opengeometry.md): The runtime statics - start the kernel, listen to events, reset, history, export and the 2D calls.
+- [Display](https://docs.opengeometry.io/opengeometry/api/display.md): The statics that control display meshes, level of detail and host-drawn bodies, and the HostGroup type.
+- [Picking](https://docs.opengeometry.io/opengeometry/api/picking.md): resolveHit turns a Three.js raycast hit into a body, a face and an edge.
+
+## API Reference / Bodies
+
+- [Body methods](https://docs.opengeometry.io/opengeometry/api/body.md): The methods and fields that Wire, Solid and Sheet share, with the types Measure, Validity, MirrorPlane, PointClassification and BodyEventMap.
+- [Wire](https://docs.opengeometry.io/opengeometry/api/wire.md): A body of lines and arcs, open or closed, with no faces.
+- [Solid](https://docs.opengeometry.io/opengeometry/api/solid.md): A body of closed faces around a volume, with booleans, shell and the boolean report.
+- [Sheet](https://docs.opengeometry.io/opengeometry/api/sheet.md): A body of faces that enclose no volume, made by an open-ended sweep.
+- [SystemAssembly](https://docs.opengeometry.io/opengeometry/api/system-assembly.md): A node that groups bodies and other assemblies, with its own placement.
+
+## API Reference / History
+
+- [OGMark](https://docs.opengeometry.io/opengeometry/api/og-mark.md): A point in the document's history that you can roll back to.
+
+## API Reference / Export
+
+- [Export](https://docs.opengeometry.io/opengeometry/api/export.md): exportStep writes STEP files; exportIfcBody returns the IFC exchange body of a solid, with the types AnalyticExchangeBodyV2 and IfcPreparedValue.
+
+## API Reference / 2D
+
+- [Regions](https://docs.opengeometry.io/opengeometry/api/regions.md): 2D region booleans and the curved inset, with the types OffsetRegion, CurvedRegion2D and CurvedRegionEdge.
+- [Offsets](https://docs.opengeometry.io/opengeometry/api/offsets.md): Variable insets of point and curved rings, polyline strokes and one-sided offsets, with the types OffsetHole, OffsetPath2D and OffsetPolylineOptions.
+
+## API Reference / Errors and constants
+
+- [OGError](https://docs.opengeometry.io/opengeometry/api/og-error.md): The error class every call throws, with the types ErrorDetails and OperateErrorDetails.
+- [Constants](https://docs.opengeometry.io/opengeometry/api/constants.md): The kind constants for primitives, operations and transforms, the typed parameter helpers and their types, and the region tolerance.

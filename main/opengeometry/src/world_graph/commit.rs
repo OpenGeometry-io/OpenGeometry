@@ -133,12 +133,8 @@ impl WorldGraph {
         }
         for (id, edit) in edits.nodes {
             match edit {
-                Some(node) => {
-                    self.nodes.insert(id, node);
-                }
-                None => {
-                    self.nodes.remove(&id);
-                }
+                Some(node) => self.insert_node(id, node),
+                None => self.remove_node(&id),
             }
         }
         self.shapes.next_id = edits.next_shape_id;
