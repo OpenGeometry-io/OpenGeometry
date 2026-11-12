@@ -29,7 +29,7 @@ pub(super) use generic::{
     generic_single_closed_loop_boolean, generic_two_sided_cutter_band_subtraction,
     prismatic_curved_boolean,
 };
-pub(super) use planar::{subtract_layered_extrusions, subtract_planar_polyhedra};
+pub(super) use planar::{boolean_planar_polyhedra, subtract_layered_extrusions};
 pub(super) use planar_extrusions::boolean_planar_extrusions;
 pub(super) use rectilinear::boolean_rectilinear;
 pub(super) use sphere_box::sphere_box_boolean;

@@ -20,6 +20,7 @@ pub(crate) enum HandlerId {
     BooleanRectilinear,
     SubtractLayeredExtrusions,
     SubtractPlanarPolyhedra,
+    BooleanPlanarPolyhedra,
     BooleanSpheres,
     SubtractVerticalArcExtrusion,
     GenericTwoSidedCutterBandSubtraction,
@@ -55,6 +56,7 @@ impl HandlerId {
             Self::BooleanRectilinear => "boolean_rectilinear",
             Self::SubtractLayeredExtrusions => "subtract_layered_extrusions",
             Self::SubtractPlanarPolyhedra => "subtract_planar_polyhedra",
+            Self::BooleanPlanarPolyhedra => "boolean_planar_polyhedra",
             Self::BooleanSpheres => "boolean_spheres",
             Self::SubtractVerticalArcExtrusion => "subtract_vertical_arc_extrusion",
             Self::GenericTwoSidedCutterBandSubtraction => {
