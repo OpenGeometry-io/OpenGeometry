@@ -10,6 +10,7 @@ mod tests;
 pub use classification::PointClassification;
 pub use classify::classify_point;
 pub(super) use classify::classify_point_in_shell;
-pub(super) use face_trim::face_contains_uv;
+pub(crate) use classify::Classifier;
+pub(super) use face_trim::{face_contains_uv, FaceTrim};
 pub use measure::{validity, Validity};
 pub use orientation::validate_orientation;

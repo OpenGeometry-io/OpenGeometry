@@ -8,7 +8,7 @@ import {
 import * as TESTING from '../../../dist/testing.js';
 import { boot, cuboid, listen } from './support.mjs';
 
-const RENDERER = { getDrawingBufferSize: (target) => target.set(1000, 1000) };
+const RENDERER = { info: { render: { frame: 0 } }, getDrawingBufferSize: (target) => target.set(1000, 1000) };
 const P = 2 ** -10;
 const TIMERS = Reflect.get(NODE_TEST, 'mock').timers;
 
@@ -30,10 +30,27 @@ function ortho(target) {
 
 async function frame(scene, camera) {
   scene.updateMatrixWorld(true);
+  RENDERER.info.render.frame++;
   scene.traverseVisible((object) => {
     if (object instanceof THREE.Mesh) Reflect.apply(object.onBeforeRender, object, [RENDERER, scene, camera]);
   });
   await Promise.resolve();
+}
+
+async function hostFrame(scene, camera) {
+  scene.updateMatrixWorld(true);
+  RENDERER.info.render.frame++;
+  Reflect.apply(OpenGeometry.observeCamera, OpenGeometry, [RENDERER, camera]);
+  await Promise.resolve();
+}
+
+function countingRenderer() {
+  const renderer = {
+    reads: 0,
+    info: { render: { frame: 1 } },
+    getDrawingBufferSize: (target) => { renderer.reads++; return target.set(1000, 1000); },
+  };
+  return renderer;
 }
 
 function computeLog() {
@@ -301,4 +318,51 @@ test('overlapping settled calls leave no temporary target behind', async () => {
   } finally {
     body.dispose();
   }
+});
+
+test('one frame of 1,000 bodies observes the camera once', async () => {
+  await fresh();
+  const bodies = Array.from({ length: 1000 }, (_, index) => cuboid(`observed-cube-${String(index)}`));
+  const renderer = countingRenderer();
+  const camera = ortho(1.5 * P);
+  try {
+    for (const { surface } of bodies) Reflect.apply(surface.onBeforeRender, surface, [renderer, null, camera]);
+    assert.equal(renderer.reads, 1);
+    renderer.info.render.frame++;
+    for (const { surface } of bodies) Reflect.apply(surface.onBeforeRender, surface, [renderer, null, camera]);
+    assert.equal(renderer.reads, 2);
+  } finally {
+    for (const body of bodies) body.dispose();
+  }
+});
+
+test('a host call with no body hooks moves the LOD target', async () => {
+  await fresh();
+  TIMERS.enable({ apis: ['setTimeout', 'Date'] });
+  const scene = new THREE.Scene();
+  const body = cuboid('host-observed-cube');
+  scene.add(body);
+  const camera = ortho(1.5 * P);
+  try {
+    await hostFrame(scene, camera);
+    assert.equal(body.record?.bucket, P);
+    await hostFrame(scene, aim(camera, 4.00001 * P));
+    assert.equal(TESTING.runtime().lod.stale, true);
+    TIMERS.tick(151);
+    assert.equal(body.record?.bucket, 4 * P);
+  } finally {
+    TIMERS.reset();
+    body.dispose();
+  }
+});
+
+test('a new runtime observes a frame its reset predecessor already saw', async () => {
+  await fresh();
+  const renderer = countingRenderer();
+  Reflect.apply(OpenGeometry.observeCamera, OpenGeometry, [renderer, ortho(P)]);
+  OpenGeometry.reset();
+  assert.equal(TESTING.runtime().lod.lastSeen, undefined);
+  Reflect.apply(OpenGeometry.observeCamera, OpenGeometry, [renderer, ortho(P)]);
+  assert.equal(renderer.reads, 2);
+  assert.notEqual(TESTING.runtime().lod.lastSeen, undefined);
 });

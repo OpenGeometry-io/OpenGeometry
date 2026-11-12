@@ -9,6 +9,7 @@ use crate::operations::modifying::boolean::{
     multi_tool_boolean, BooleanOp, BooleanResult, MultiToolOutcome,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -123,7 +124,15 @@ impl WorldGraph {
         tools: &[String],
         shape_id: &ShapeId,
     ) -> Result<Vec<BrepEnvelope>, GraphError> {
+        let mut listed = BTreeSet::new();
+        if !tools.iter().all(|tool| listed.insert(tool)) {
+            return Err(GraphError::code(
+                ErrorCode::DuplicateNode,
+                "tool is listed twice",
+            ));
+        }
         let mut mapped = Vec::with_capacity(tools.len());
+        let mut mapped_shapes = BTreeSet::new();
         for tool in tools {
             let tool_node = self.node(tool)?;
             if tool == target || tool_node.shape.as_ref() == Some(shape_id) {
@@ -141,11 +150,17 @@ impl WorldGraph {
                     "tool has a relative scale",
                 ));
             }
-            mapped.push(if is_identity(transform) {
+            let mut brep = if is_identity(transform) {
                 (*shape.brep).clone()
             } else {
                 placed(&shape.brep, transform.frame, 1.0)?
-            });
+            };
+            if !mapped_shapes.insert(tool_node.shape.clone()) {
+                for face in &mut brep.topology.faces {
+                    face.key = format!("{tool}:{}", face.key);
+                }
+            }
+            mapped.push(brep);
         }
         Ok(mapped)
     }

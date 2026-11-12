@@ -1,0 +1,45 @@
+---
+title: OGMark
+description: A point in the document's history that you can roll back to.
+icon: bookmark
+---
+
+`class OGMark`
+
+Make a mark with `OpenGeometry.mark()`. Do not call the constructor.
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, type OGMark } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const mark: OGMark = OpenGeometry.mark();
+new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 });
+mark.rollback();
+mark.release();
+console.log(OpenGeometry.markStats());
+```
+
+## rollback
+
+`rollback(): void`
+
+Takes the document back to the mark. The mark stays live. Marks made after it are released.
+
+## release
+
+`release(): void`
+
+Ends the mark and frees the history that only it kept.
+
+Both throw `InvalidMark` on a released mark.
+
+## Related statics
+
+- `OpenGeometry.markStats()` returns `{ liveMarks, retainedRevisions }`.
+- `OpenGeometry.transaction(fn, { dryRun? })` runs `fn` between a mark and its release, and rolls back if `fn` throws.
+
+See [History](/opengeometry/concepts/history).

@@ -1,0 +1,88 @@
+---
+title: Measure and validate
+description: Read volume and area within a stated error bound, classify points, read bounds and the B-rep, and check that a body is valid.
+icon: ruler-combined
+---
+
+## Volume and area
+
+`body.measure({ deflection? })` returns `{ volume, area, errorBound, areaErrorBound, deflection }`, in the body's own coordinates. A scale in the placement is not applied.
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CYLINDER, type Measure } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const leg = new Solid(OG_PRIMITIVE_CYLINDER, { radius: 0.1, height: 0.7 });
+const size: Measure = leg.measure({ deflection: 0.001 });
+const exact = Math.PI * 0.1 * 0.1 * 0.7;
+console.log(Math.abs(size.volume - exact) <= size.errorBound);
+```
+
+The values are approximate, with a stated bound:
+
+- `|volume − exact| ≤ errorBound`.
+- `|area − exact| ≤ areaErrorBound`.
+- A body with only flat faces measures exactly, within `1e-10` of its size.
+- A smaller `deflection` gives a smaller bound and a slower call. The default is `0.01`.
+- A bound is `Infinity` when a triangle is too coarse to bound. `JSON.stringify` writes it as `null`.
+
+A `deflection` that is not a positive finite number throws `InvalidParameter`. A mesh of more than 2 000 000 triangles throws `LimitExceeded`. The call does not change the document.
+
+## Validity
+
+`body.validity()` returns `{ valid, closed, bodyType }`, and `error: { code, message }` when the body is not valid.
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, type Validity } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const box = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1, depth: 1 });
+const check: Validity = box.validity();
+console.log(check);
+```
+
+A valid closed solid gives `{ valid: true, closed: true, bodyType: 'Solid' }`. `closed` is true when every shell of a sheet or a solid is closed, and when every wire of a wire body is closed.
+
+## Point classification
+
+`body.classifyPoint([x, y, z])` says where a point is, in the body's own coordinates: `'Inside'`, `'Outside'`, `'Boundary'` or `'Unknown'`.
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CYLINDER, type PointClassification } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const leg = new Solid(OG_PRIMITIVE_CYLINDER, { radius: 0.1, height: 0.7 });
+const middle: PointClassification = leg.classifyPoint([0, 0.35, 0]);
+const top: PointClassification = leg.classifyPoint([0, 0.7, 0]);
+console.log(middle, top);
+```
+
+- A point within `1e-8` of the surface is `'Boundary'`.
+- A body is `'Inside'` if any of its solids holds the point.
+- A wire or a sheet throws `InvalidOperand`.
+- Known limit: on a cylinder, cone or frustum that was mirrored, a point outside the body can read `'Inside'`.
+- For a world point, first call `OpenGeometry.flush()`, then `body.worldToLocal(new THREE.Vector3(x, y, z))`.
+
+## Other queries
+
+| Call                          | Returns                                                                            |
+| ----------------------------- | ---------------------------------------------------------------------------------- |
+| `getBounds()`                 | `[minX, minY, minZ, maxX, maxY, maxZ]` in the world, or `null`                     |
+| `getBrep()`                   | The B-rep in the body's own coordinates: `topology` with faces, edges and vertices |
+| `getWorldBrep()`              | The same B-rep, placed in the world. It makes no body                              |
+| `faceNormalAt(faceId, point)` | The face's unit normal at a point, in the body's own coordinates                   |
+| `solid.getReport()`           | The report of the last boolean, or `null`                                          |
+
+To turn a normal into the world, call `OpenGeometry.flush()`, then use `new THREE.Vector3(...normal).transformDirection(body.matrixWorld)`.

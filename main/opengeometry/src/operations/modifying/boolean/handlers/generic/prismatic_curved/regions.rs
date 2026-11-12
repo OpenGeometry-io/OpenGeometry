@@ -95,10 +95,12 @@ fn check_tangency(a: &[CurveRegion2], b: &[CurveRegion2], reach: f64) -> Result<
     for first in edges(a) {
         for second in edges(b) {
             let touch = match (circle(first), circle(second)) {
-                (Some(circle), None) => line_touch(&circle, second, reach)
-                    .filter(|point| !own_joint(*point, &circle, second, b, reach)),
-                (None, Some(circle)) => line_touch(&circle, first, reach)
-                    .filter(|point| !own_joint(*point, &circle, first, a, reach)),
+                (Some(circle), None) => line_touch(&circle, second, reach).filter(|point| {
+                    !own_joint(*point, &circle, second, b, reach) && !at_end(*point, first, reach)
+                }),
+                (None, Some(circle)) => line_touch(&circle, first, reach).filter(|point| {
+                    !own_joint(*point, &circle, first, a, reach) && !at_end(*point, second, reach)
+                }),
                 (Some(left), Some(right)) => circle_touch(&left, &right, reach),
                 (None, None) => None,
             };
@@ -134,6 +136,12 @@ fn own_joint(
                 near(own.center, touched.center) && (own.radius - touched.radius).abs() <= reach
             }) && (near(point, edge.point(0.0)) || near(point, edge.point(1.0)))
         })
+}
+
+fn at_end(point: Pt2, arc: &CurveEdge2, reach: f64) -> bool {
+    [arc.point(0.0), arc.point(1.0)]
+        .iter()
+        .any(|end| (point.x - end.x).hypot(point.z - end.z) <= reach)
 }
 
 fn circle(edge: &CurveEdge2) -> Option<Circle> {

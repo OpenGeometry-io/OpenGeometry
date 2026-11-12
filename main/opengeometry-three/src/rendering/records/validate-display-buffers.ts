@@ -16,6 +16,7 @@ function isDisplayBuffers(value: unknown): value is DisplayBuffers {
   return field('positions') instanceof Float32Array && field('normals') instanceof Float32Array
     && field('indices') instanceof Uint32Array && field('faceRanges') instanceof Uint32Array
     && field('outline') instanceof Float32Array && field('edgeIds') instanceof Uint32Array
+    && field('smoothEdges') instanceof Uint8Array
     && field('origin') instanceof Float64Array && SCALARS.every((key) => typeof field(key) === 'number');
 }
 

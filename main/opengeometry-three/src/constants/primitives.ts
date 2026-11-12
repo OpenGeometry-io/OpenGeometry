@@ -1,5 +1,7 @@
 import type {
   ArcParams, ConeParams, CylinderSectorParams, PolyhedronParams, ProfileParams, SphereParams, TorusParams,
+  SlotPrismParams, RoundedBoxParams, PipeSegmentParams, PolysolidParams,
+  RegularPolygonParams, SlotParams, RoundedRectangleParams,
 } from '../dto/primitives';
 
 export const OG_PRIMITIVE_RECTANGLE = 'Rectangle' as const;
@@ -14,6 +16,13 @@ export const OG_PRIMITIVE_CONE = 'Cone' as const;
 export const OG_PRIMITIVE_TORUS = 'Torus' as const;
 export const OG_PRIMITIVE_PROFILE = 'Profile' as const;
 export const OG_PRIMITIVE_ARC = 'Arc' as const;
+export const OG_PRIMITIVE_SLOT_PRISM = 'SlotPrism' as const;
+export const OG_PRIMITIVE_ROUNDED_BOX = 'RoundedBox' as const;
+export const OG_PRIMITIVE_PIPE_SEGMENT = 'PipeSegment' as const;
+export const OG_PRIMITIVE_POLYSOLID = 'Polysolid' as const;
+export const OG_PRIMITIVE_REGULAR_POLYGON = 'RegularPolygon' as const;
+export const OG_PRIMITIVE_SLOT = 'Slot' as const;
+export const OG_PRIMITIVE_ROUNDED_RECTANGLE = 'RoundedRectangle' as const;
 
 export const OG_PRIMITIVE_PARAMS_RECTANGLE = (
   value: { width: number; breadth: number },
@@ -35,3 +44,10 @@ export const OG_PRIMITIVE_PARAMS_POLYHEDRON = (value: PolyhedronParams): Polyhed
 export const OG_PRIMITIVE_PARAMS_SPHERE = (value: SphereParams): SphereParams => value;
 export const OG_PRIMITIVE_PARAMS_CONE = (value: ConeParams): ConeParams => value;
 export const OG_PRIMITIVE_PARAMS_TORUS = (value: TorusParams): TorusParams => value;
+export const OG_PRIMITIVE_PARAMS_SLOT_PRISM = (value: SlotPrismParams): SlotPrismParams => value;
+export const OG_PRIMITIVE_PARAMS_ROUNDED_BOX = (value: RoundedBoxParams): RoundedBoxParams => value;
+export const OG_PRIMITIVE_PARAMS_PIPE_SEGMENT = (value: PipeSegmentParams): PipeSegmentParams => value;
+export const OG_PRIMITIVE_PARAMS_POLYSOLID = (value: PolysolidParams): PolysolidParams => value;
+export const OG_PRIMITIVE_PARAMS_REGULAR_POLYGON = (value: RegularPolygonParams): RegularPolygonParams => value;
+export const OG_PRIMITIVE_PARAMS_SLOT = (value: SlotParams): SlotParams => value;
+export const OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE = (value: RoundedRectangleParams): RoundedRectangleParams => value;

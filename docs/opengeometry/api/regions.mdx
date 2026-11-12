@@ -1,0 +1,70 @@
+---
+title: Regions
+description: 2D region booleans and the curved inset, with the types OffsetRegion, CurvedRegion2D and CurvedRegionEdge.
+icon: vector-square
+---
+
+## booleanRegions2D
+
+`static booleanRegions2D(a: readonly OffsetRegion[], b: readonly OffsetRegion[], operation: 'union' | 'intersection' | 'subtraction'): OffsetRegion[]`
+
+Booleans of point regions. Results come back at the input height, wound the same way, each ring starting at its smallest x.
+
+## booleanCurvedRegions2D
+
+`static booleanCurvedRegions2D(a: readonly CurvedRegion2D[], b: readonly CurvedRegion2D[], operation): CurvedRegion2D[]`
+
+The same, for regions of line and arc edges.
+
+## insetCurvedRegion2D
+
+`static insetCurvedRegion2D(region: CurvedRegion2D, distance: number): CurvedRegion2D[]`
+
+Insets one region by a distance above zero; holes grow by the same distance. Each arc keeps its centre, and a reflex corner rounds to an arc of the distance. An inset past the half width is an empty list.
+
+```ts
+import { OpenGeometry, type CurvedRegion2D, type CurvedRegionEdge } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const side = (from: [number, number], to: [number, number]): CurvedRegionEdge => ({
+  kind: 'line',
+  from,
+  to,
+});
+const room: CurvedRegion2D = {
+  outer: [side([0, 0], [0, 4]), side([0, 4], [5, 4]), side([5, 4], [5, 0]), side([5, 0], [0, 0])],
+  holes: [],
+};
+const finish = OpenGeometry.insetCurvedRegion2D(room, 0.1);
+console.log(finish.length, finish[0]?.outer.length);
+```
+
+## Types
+
+### OffsetRegion
+
+`{ outer: { x, y, z }[]; holes: { x, y, z }[][] }`. All points are at one height.
+
+### CurvedRegion2D
+
+`{ outer: CurvedRegionEdge[]; holes: CurvedRegionEdge[][] }`.
+
+### CurvedRegionEdge
+
+| Kind     | Fields                                                   | Meaning                   |
+| -------- | -------------------------------------------------------- | ------------------------- |
+| `'line'` | `from: [x, z]`, `to: [x, z]`                             | A straight edge           |
+| `'arc'`  | `center: [x, z]`, `radius`, `start_angle`, `sweep_angle` | An arc. Angles in radians |
+
+## Rules
+
+- Outer rings run clockwise in XZ, and holes counter-clockwise.
+- The tolerance is `OG_REGION_TOLERANCE`, `1e-6` m.
+- A plain ring is not a region and throws `InvalidParameter`.
+- More than 100 000 points or edges across both operands throws `LimitExceeded`.
+
+See [Regions and offsets](/opengeometry/guides/regions-and-offsets).

@@ -8,10 +8,12 @@ mod rebuild;
 mod shapes;
 
 use crate::bindings::{errors, panic, params};
-use crate::brep::Accuracy;
+use crate::brep::{Accuracy, BodyType, BrepEnvelope};
 use crate::world_graph::{ChangeSet, CopyOptions, CreateOptions, GraphError, MarkId, WorldGraph};
 use serde::Serialize;
+use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
+use std::sync::Weak;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -49,6 +51,9 @@ pub struct OGWorldGraph {
     inner: WorldGraph,
     marks: BTreeMap<u32, MarkId>,
     next_mark: u32,
+    body_types: RefCell<BTreeMap<String, (Weak<BrepEnvelope>, BodyType)>>,
+    prune_body_types_at: Cell<usize>,
+    handles: RefCell<BTreeMap<(u32, u32), String>>,
 }
 
 #[wasm_bindgen]
@@ -62,6 +67,9 @@ impl OGWorldGraph {
             inner,
             marks: BTreeMap::new(),
             next_mark: 0,
+            body_types: RefCell::new(BTreeMap::new()),
+            prune_body_types_at: Cell::new(64),
+            handles: RefCell::new(BTreeMap::new()),
         })
     }
 }

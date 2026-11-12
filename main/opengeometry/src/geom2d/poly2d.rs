@@ -127,7 +127,7 @@ pub(super) fn segment_cross_t2(
     let r = Pt2::new(a2.x - a1.x, a2.z - a1.z);
     let s = Pt2::new(b2.x - b1.x, b2.z - b1.z);
     let denom = cross2(r, s);
-    if denom.abs() < eps {
+    if denom.abs() <= eps * r.x.hypot(r.z).min(s.x.hypot(s.z)) {
         return None;
     }
     let qp = Pt2::new(b1.x - a1.x, b1.z - a1.z);
@@ -161,7 +161,7 @@ pub(crate) fn winding_number2(p: Pt2, ring: &[Pt2]) -> i32 {
     wn
 }
 
-pub(super) type Edge2 = (Pt2, Pt2);
+pub(crate) type Edge2 = (Pt2, Pt2);
 
 pub(super) fn point_on_edge_t(a: Pt2, b: Pt2, p: Pt2, eps: f64) -> Option<f64> {
     let rx = b.x - a.x;
@@ -178,5 +178,85 @@ pub(super) fn point_on_edge_t(a: Pt2, b: Pt2, p: Pt2, eps: f64) -> Option<f64> {
         Some(t)
     } else {
         None
+    }
+}
+
+pub(crate) struct Nearby {
+    pub(super) lists: Option<Vec<Vec<usize>>>,
+    count: usize,
+}
+
+impl Nearby {
+    pub(crate) fn of(&self, index: usize) -> impl Iterator<Item = usize> + '_ {
+        let (listed, all) = match &self.lists {
+            Some(lists) => (lists[index].as_slice(), 0..0),
+            None => (&[][..], 0..self.count),
+        };
+        listed
+            .iter()
+            .copied()
+            .chain(all.filter(move |&other| other != index))
+    }
+}
+
+pub(crate) fn nearby_boxes(boxes: &[[f64; 4]], margin: f64) -> Nearby {
+    Nearby {
+        lists: margin
+            .is_finite()
+            .then(|| swept_boxes(boxes, margin))
+            .flatten(),
+        count: boxes.len(),
+    }
+}
+
+fn swept_boxes(boxes: &[[f64; 4]], margin: f64) -> Option<Vec<Vec<usize>>> {
+    let budget = 64 * boxes.len() + 4096;
+    let mut pairs = 0;
+    let mut order = (0..boxes.len()).collect::<Vec<_>>();
+    order.sort_by(|&first, &second| boxes[first][0].total_cmp(&boxes[second][0]));
+    let mut active: Vec<usize> = Vec::new();
+    let mut near = vec![Vec::new(); boxes.len()];
+    for index in order {
+        let [lo_x, _, lo_z, hi_z] = boxes[index];
+        active.retain(|&other| boxes[other][1] + margin >= lo_x);
+        for &other in &active {
+            if boxes[other][2] <= hi_z + margin && lo_z <= boxes[other][3] + margin {
+                pairs += 2;
+                if pairs > budget {
+                    return None;
+                }
+                near[index].push(other);
+                near[other].push(index);
+            }
+        }
+        active.push(index);
+    }
+    for list in &mut near {
+        list.sort_unstable();
+    }
+    Some(near)
+}
+
+pub(super) fn edge_box((a, b): Edge2) -> [f64; 4] {
+    [a.x.min(b.x), a.x.max(b.x), a.z.min(b.z), a.z.max(b.z)]
+}
+
+pub(crate) fn crossing_margin(edges: impl Iterator<Item = Edge2>, eps: f64) -> f64 {
+    let (length, extent) = edges.fold((0.0_f64, 0.0_f64), |(length, extent), (a, b)| {
+        (
+            length.max((b.x - a.x).abs() + (b.z - a.z).abs()),
+            extent
+                .max(a.x.abs())
+                .max(a.z.abs())
+                .max(b.x.abs())
+                .max(b.z.abs()),
+        )
+    });
+    let margin = eps
+        + 64.0 * f64::EPSILON * (length * length * (4.0 * extent + length) / eps + length + extent);
+    if margin.is_finite() && 16.0 * f64::EPSILON * length * length < 0.5 * eps {
+        margin
+    } else {
+        f64::INFINITY
     }
 }

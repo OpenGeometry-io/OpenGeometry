@@ -1,0 +1,106 @@
+---
+title: Use your Three.js scene
+description: Put bodies in your own scene, connect your camera for level of detail, and draw bodies through your own instanced or batched layers.
+icon: cubes
+---
+
+OpenGeometry makes no scene, camera, renderer or controls. Your app owns them. Bodies are `THREE.Group` objects that you add like any other.
+
+## Connect the camera
+
+Tell the kernel which camera draws each frame, and when it moves. Level of detail then follows the camera:
+
+```ts
+import * as THREE from 'three';
+import { OpenGeometry, Solid, OG_PRIMITIVE_TORUS } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const ring = new Solid(OG_PRIMITIVE_TORUS, { majorRadius: 1, minorRadius: 0.2 });
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2), ring);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(3, 3, 3);
+camera.lookAt(0, 0, 0);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+document.body.append(renderer.domElement);
+
+renderer.domElement.addEventListener('pointermove', (event) => {
+  if (event.buttons !== 0) OpenGeometry.setCameraMotion(true);
+});
+renderer.setAnimationLoop(() => {
+  OpenGeometry.observeCamera(renderer, camera);
+  renderer.render(scene, camera);
+});
+```
+
+- `observeCamera(renderer, camera)` uses the first camera seen per renderer frame.
+- `setCameraMotion(true)` lets the kernel use coarser meshes while the camera moves. Call it from your controls' change event.
+
+## Draw bodies through your own layers
+
+Large scenes often draw many bodies through one `InstancedMesh` or `BatchedMesh`. The kernel must still know which bodies are on screen, because it makes meshes only for displayed bodies.
+
+1. Hand the drawing to your layer: `OpenGeometry.setHostDrawn(bodies, true)`. Each body's `visible` becomes `false`, so Three.js skips it and everything under it. The kernel keeps the body's own visibility apart.
+2. Make a group of those bodies: `const group = OpenGeometry.hostGroup(bodies)`.
+3. In the layer's `onBeforeRender`, call `group.drawn()`. It counts every member as displayed for this render pass, at a cost that does not grow with the number of members.
+4. After each body's `geometrychanged` event, build your layer from `body.surface.geometry` and `body.surface.matrixWorld`.
+5. When a body leaves the layer, call `OpenGeometry.setHostDrawn([body], false)`. Its `visible` goes back to its own visibility.
+
+```ts
+import * as THREE from 'three';
+import { OpenGeometry, Solid, OG_PRIMITIVE_CUBOID } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const chairs = [0, 1, 2].map(
+  (index) =>
+    new Solid(
+      OG_PRIMITIVE_CUBOID,
+      { width: 0.5, height: 0.9, depth: 0.5 },
+      { ogId: `chair-${index}` },
+    ),
+);
+const scene = new THREE.Scene();
+scene.add(...chairs);
+OpenGeometry.setHostDrawn(chairs, true);
+const group = OpenGeometry.hostGroup(chairs);
+
+const layer = new THREE.InstancedMesh(
+  new THREE.BufferGeometry(),
+  new THREE.MeshStandardMaterial(),
+  chairs.length,
+);
+layer.onBeforeRender = () => group.drawn();
+scene.add(layer);
+scene.updateMatrixWorld();
+OpenGeometry.flush({ geometry: 'sync', bodies: chairs });
+console.log(
+  chairs.map((chair) => chair.visible),
+  chairs[0]?.surface.geometry.getAttribute('position').count,
+);
+```
+
+- `group.set(bodies)` replaces the members. `group.dispose()` ends the group.
+- For a few bodies, `OpenGeometry.markDisplayed(bodies)` does the same as `group.drawn()` without a group.
+- Do not set `visible` on a host-drawn body. A dispose, a rollback or a reset changes its own visibility instead.
+- `markDisplayed` skips a body with `visible = false` that is not host-drawn.
+
+## Placement events
+
+Each body dispatches `placementchanged` when a flush moves it. A layer that copies world matrices listens to it.
+
+## Moving a surface mesh yourself
+
+A body's `surface` and `outline` meshes are static: their `matrixAutoUpdate` is `false`. If your code writes their `position`, `rotation`, `quaternion` or `scale`, call `updateMatrix()` on that mesh after the write. To move a body, use `transform`.
+
+## Free memory
+
+`OpenGeometry.releaseIdleGeometry()` frees cached display meshes of bodies that do not show them. Call it after a large part of the model leaves the view.
