@@ -433,6 +433,7 @@ fn finish_profile_batch_result(
         .unwrap_or(0)
         .checked_add(1)
         .ok_or_else(|| GeometryError::LimitExceeded("boolean revision overflow".into()))?;
+    out.orient_loops()?;
     out.validate()?;
     Ok(BooleanResult {
         report: BooleanReport {
