@@ -40,7 +40,7 @@ function fieldChecks(kind: (typeof KINDS)[number]): Record<string, Check> {
     case 'tessellate':
       return {
         kind: isKind, request: isFiniteNumber, shapeId: isShapeId, revision: isFiniteNumber, bucket: isFiniteNumber,
-        priority: isFiniteNumber, maxTriangles: isFiniteNumber, generation: isFiniteNumber,
+        priority: isFiniteNumber, maxTriangles: isFiniteNumber, generation: isFiniteNumber, smoothAngle: isSmoothAngle,
       };
     case 'cancel':
       return { kind: isKind, shapeId: isShapeId, generation: isFiniteNumber };
@@ -52,6 +52,10 @@ function fieldChecks(kind: (typeof KINDS)[number]): Record<string, Check> {
 function requestOf(data: unknown): number | undefined {
   const request: unknown = typeof data === 'object' && data !== null ? Reflect.get(data, 'request') : undefined;
   return isFiniteNumber(request) ? request : undefined;
+}
+
+function isSmoothAngle(value: unknown): boolean {
+  return value === undefined || (isFiniteNumber(value) && value >= 0 && value < 90);
 }
 
 function isKind(): boolean {

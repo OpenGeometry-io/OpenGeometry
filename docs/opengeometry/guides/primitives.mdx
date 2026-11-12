@@ -1,0 +1,275 @@
+---
+title: Primitives
+description: Make wires and solids from parameters, on the default plane or on a plane of your own.
+icon: shapes
+---
+
+A primitive is a body made from a few parameters. Pass the kind as the first argument of `new Wire` or `new Solid`.
+
+## Wires
+
+| Kind                             | Parameters                           | Notes                                                                                                           |
+| -------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `OG_PRIMITIVE_RECTANGLE`         | `{ width, breadth }`                 | Centred on the plane origin. `width` along u, `breadth` along v                                                 |
+| `OG_PRIMITIVE_CIRCLE`            | `{ radius }`                         | Centred on the plane origin                                                                                     |
+| `OG_PRIMITIVE_POLYLINE`          | `{ points, closed? }`                | `points` are `[x, y, z]` in the body's own space                                                                |
+| `OG_PRIMITIVE_PROFILE`           | `{ start, segments, closed }`        | Lines and arcs, points as `[u, v]` in the plane                                                                 |
+| `OG_PRIMITIVE_ARC`               | `{ radius, startAngle, sweepAngle }` | Centred on the plane origin. The sweep is not zero and less than a turn                                         |
+| `OG_PRIMITIVE_REGULAR_POLYGON`   | `{ sides, radius }`                  | A closed polyline through `sides` corners (3 to 1024) on a circle of `radius`, the first on +u                  |
+| `OG_PRIMITIVE_SLOT`              | `{ length, width }`                  | The outline of `OG_PRIMITIVE_SLOT_PRISM`: two lines and two arcs, centred on the plane origin                   |
+| `OG_PRIMITIVE_ROUNDED_RECTANGLE` | `{ width, breadth, radius }`         | A rectangle with rounded corners, placed like the rectangle. `radius` below half the width and half the breadth |
+
+A regular polygon, a slot and a rounded rectangle are closed wires, so each is an extrude profile or hole:
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_EXTRUDE,
+  OG_PRIMITIVE_PARAMS_REGULAR_POLYGON,
+  OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE,
+  OG_PRIMITIVE_PARAMS_SLOT,
+  OG_PRIMITIVE_REGULAR_POLYGON,
+  OG_PRIMITIVE_ROUNDED_RECTANGLE,
+  OG_PRIMITIVE_SLOT,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const hexagon = new Wire(
+  OG_PRIMITIVE_REGULAR_POLYGON,
+  OG_PRIMITIVE_PARAMS_REGULAR_POLYGON({ sides: 6, radius: 0.2 }),
+);
+const plate = new Wire(
+  OG_PRIMITIVE_ROUNDED_RECTANGLE,
+  OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE({ width: 1, breadth: 0.6, radius: 0.05 }),
+);
+const slot = new Wire(OG_PRIMITIVE_SLOT, OG_PRIMITIVE_PARAMS_SLOT({ length: 0.3, width: 0.1 }));
+const nut = new Solid(OG_OPERATION_EXTRUDE, { profile: hexagon, distance: 0.1 });
+const panel = new Solid(OG_OPERATION_EXTRUDE, { profile: plate, holes: [slot], distance: 0.02 });
+console.log(nut.ogId, panel.ogId);
+```
+
+### Profile
+
+A profile starts at `start`. Each segment goes to its `to` point:
+
+- `{ to }` is a line.
+- `{ to, arc: { center, counterClockwise } }` is an arc about `center`. `to` must be on the arc's circle.
+
+A closed profile must end at its start. Use it as an extrude profile or hole, a sweep profile, or a revolve profile.
+
+```ts
+import {
+  OpenGeometry,
+  Wire,
+  OG_PRIMITIVE_PARAMS_PROFILE,
+  OG_PRIMITIVE_PROFILE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const slot = new Wire(
+  OG_PRIMITIVE_PROFILE,
+  OG_PRIMITIVE_PARAMS_PROFILE({
+    start: [0, 0],
+    segments: [
+      { to: [2, 0] },
+      { to: [2, 1], arc: { center: [2, 0.5], counterClockwise: true } },
+      { to: [0, 1] },
+      { to: [0, 0], arc: { center: [0, 0.5], counterClockwise: true } },
+    ],
+    closed: true,
+  }),
+);
+console.log(slot.validity().closed);
+```
+
+A profile refuses repeated points, an arc whose end is not on its circle, segments that cross, and a closed profile that does not end at its start. Each throws `InvalidParameter`.
+
+## Solids
+
+| Kind                           | Parameters                                                     | Notes                                                                                                          |
+| ------------------------------ | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `OG_PRIMITIVE_CUBOID`          | `{ width, height, depth }`                                     | Standing on the plane, centred on the origin in u and v. `height` along the normal                             |
+| `OG_PRIMITIVE_CYLINDER`        | `{ radius, height }`                                           | Standing on the plane, axis along the normal                                                                   |
+| `OG_PRIMITIVE_CYLINDER_SECTOR` | `{ radius, height, startAngle, sweepAngle }`                   | Angles in radians from the plane's x direction                                                                 |
+| `OG_PRIMITIVE_SPHERE`          | `{ radius }`                                                   | Centred on the plane origin                                                                                    |
+| `OG_PRIMITIVE_CONE`            | `{ radiusBottom, radiusTop, height }`                          | A cone or frustum. One radius may be 0. Nearly equal radii make a cylinder                                     |
+| `OG_PRIMITIVE_TORUS`           | `{ majorRadius, minorRadius }`                                 | A ring torus lying on the plane. The minor radius must be below the major one                                  |
+| `OG_PRIMITIVE_POLYHEDRON`      | `{ points, faces }`                                            | Planar faces as rings of point indices, counter-clockwise seen from outside                                    |
+| `OG_PRIMITIVE_SLOT_PRISM`      | `{ length, width, height }`                                    | A stadium standing on the plane, centred in u and v. `length` between the arc centres along u, `width` along v |
+| `OG_PRIMITIVE_ROUNDED_BOX`     | `{ width, height, depth, radius }`                             | A cuboid with its four upright edges rounded. `radius` below half the width and half the depth                 |
+| `OG_PRIMITIVE_PIPE_SEGMENT`    | `{ outerRadius, innerRadius, height, startAngle, sweepAngle }` | A ring sector, placed and angled like the cylinder sector. The sweep is below one full turn                    |
+| `OG_PRIMITIVE_POLYSOLID`       | `{ path, width, height, justify? }`                            | A wall of constant width along a path of legs and tangent arcs. See below                                      |
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  OG_PRIMITIVE_CONE,
+  OG_PRIMITIVE_PARAMS_CONE,
+  OG_PRIMITIVE_PARAMS_SPHERE,
+  OG_PRIMITIVE_PARAMS_TORUS,
+  OG_PRIMITIVE_SPHERE,
+  OG_PRIMITIVE_TORUS,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const knob = new Solid(OG_PRIMITIVE_SPHERE, OG_PRIMITIVE_PARAMS_SPHERE({ radius: 0.03 }));
+const pedestal = new Solid(
+  OG_PRIMITIVE_CONE,
+  OG_PRIMITIVE_PARAMS_CONE({ radiusBottom: 0.25, radiusTop: 0.15, height: 0.7 }),
+);
+const ring = new Solid(
+  OG_PRIMITIVE_TORUS,
+  OG_PRIMITIVE_PARAMS_TORUS({ majorRadius: 0.2, minorRadius: 0.02 }),
+);
+console.log(knob.ogId, pedestal.ogId, ring.ogId);
+```
+
+A size that is not finite, or not above four times the geometric tolerance, throws `InvalidParameter`.
+
+Not built: horn, spindle and lemon tori, whose minor radius is equal to or above the major one.
+
+A slot, a rounded box and a pipe segment are straight extrusions of lines and arcs, so they cut and join like any arc-edged solid:
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  OG_PRIMITIVE_PARAMS_PIPE_SEGMENT,
+  OG_PRIMITIVE_PARAMS_ROUNDED_BOX,
+  OG_PRIMITIVE_PARAMS_SLOT_PRISM,
+  OG_PRIMITIVE_PIPE_SEGMENT,
+  OG_PRIMITIVE_ROUNDED_BOX,
+  OG_PRIMITIVE_SLOT_PRISM,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const slot = new Solid(
+  OG_PRIMITIVE_SLOT_PRISM,
+  OG_PRIMITIVE_PARAMS_SLOT_PRISM({ length: 0.6, width: 0.2, height: 0.05 }),
+);
+const plinth = new Solid(
+  OG_PRIMITIVE_ROUNDED_BOX,
+  OG_PRIMITIVE_PARAMS_ROUNDED_BOX({ width: 1.2, height: 0.1, depth: 0.6, radius: 0.08 }),
+);
+const bend = new Solid(
+  OG_PRIMITIVE_PIPE_SEGMENT,
+  OG_PRIMITIVE_PARAMS_PIPE_SEGMENT({
+    outerRadius: 0.3,
+    innerRadius: 0.25,
+    height: 0.2,
+    startAngle: 0,
+    sweepAngle: Math.PI / 2,
+  }),
+);
+console.log(slot.ogId, plinth.ogId, bend.ogId);
+```
+
+## Polysolid
+
+A polysolid is a wall of constant `width` and `height` along a path. The path has the fields of a profile, in plane coordinates `[u, v]`. The wall stands on the plane where the path is, and rises along the normal. It is not centred.
+
+`justify` is `'centre'` (the default), `'left'` or `'right'` of the path direction. Corners between two legs are mitred, and bevelled above a mitre limit of 4. `closed: true` makes a ring wall; an open path has square ends.
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  OG_PRIMITIVE_POLYSOLID,
+  OG_PRIMITIVE_PARAMS_POLYSOLID,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const wall = new Solid(
+  OG_PRIMITIVE_POLYSOLID,
+  OG_PRIMITIVE_PARAMS_POLYSOLID({
+    path: { start: [0, 0], segments: [{ to: [3, 0] }, { to: [3, 2] }], closed: false },
+    width: 0.2,
+    height: 1,
+    justify: 'left',
+  }),
+);
+console.log(wall.measure().volume);
+```
+
+A segment with `arc` bends the wall around the arc's centre. Each arc must join the segments before and after it tangentially: the path keeps its direction through the joint. A joint where an arc meets a leg or another arc at an angle throws `InvalidParameter` that names the joint, for example `joint 1 between segment 0 and segment 1 is not tangent`. A closed path of arcs needs two segments, such as two half circles:
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  OG_PRIMITIVE_POLYSOLID,
+  OG_PRIMITIVE_PARAMS_POLYSOLID,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const curvedWall = new Solid(
+  OG_PRIMITIVE_POLYSOLID,
+  OG_PRIMITIVE_PARAMS_POLYSOLID({
+    path: {
+      start: [0, 0],
+      segments: [{ to: [2, 0] }, { to: [3, 1], arc: { center: [2, 1], counterClockwise: true } }],
+      closed: false,
+    },
+    width: 0.2,
+    height: 1,
+  }),
+);
+console.log(curvedWall.measure({ deflection: 1e-4 }).volume);
+```
+
+A path with fewer than two points, a segment of zero length, or a path that crosses itself throws `InvalidParameter`. A straight leg next to another straight leg must be at least half the width long. An arc needs room on the inside of its bend: with `'centre'`, its radius must be above half the width; with `'left'` or `'right'`, it must be above the full width when the wall lies on the inside of the bend. In a path with arcs, a wall that would overlap itself, for example two arms closer together than the width, throws `InvalidParameter` that names the two segments.
+
+With `'left'` or `'right'`, a straight corner sharper than the mitre limit is built in two ways. In a path with arcs, the wall keeps the path's corner and bevels its far side. In a path of straight legs only, the shifted centre line is bevelled, so the corner on the path side is cut too.
+
+## Typed parameters
+
+`OG_PRIMITIVE_PARAMS_<KIND>(params)` returns its argument unchanged. It only gives the object a type, so your editor checks the field names. The entry exports the types too, such as `ProfileParams`, `ArcParams`, `SphereParams`, `ConeParams` and `TorusParams`.
+
+## On another plane
+
+Pass `plane` in the options. A cylinder on an upright plane lies along Z:
+
+```ts
+import { OpenGeometry, Solid, OG_PRIMITIVE_CYLINDER } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const pipe = new Solid(
+  OG_PRIMITIVE_CYLINDER,
+  { radius: 0.05, height: 2 },
+  { plane: { origin: [0, 1, 0], normal: [0, 0, 1], xDirection: [1, 0, 0] } },
+);
+console.log(pipe.getBounds());
+```
+
+See [Coordinates and planes](/opengeometry/concepts/coordinates-and-planes).

@@ -2,13 +2,16 @@ use crate::support::{assert_valid_closed, assert_volume};
 use opengeometry::brep::{BrepEnvelope, Frame3};
 use opengeometry::operations::modifying::boolean::{boolean_brep_with_handlers, BooleanOp};
 use opengeometry::primitives;
+use opengeometry::primitives::{ProfileSegment, SegmentArc};
+use opengeometry::world_graph::Primitive;
 use opengeometry::world_graph::{EditScope, ErrorCode, ModifyingOperation, WorldGraph};
 use opengeometry_test_support::accuracy::accuracy;
 use opengeometry_test_support::scenes::prismatic::{
-    box_and_leg, box_and_pocket, d_shape_area, pan_and_inset, pan_volume, BOX_VOLUME, LEG_HEIGHT,
-    LEG_RADIUS,
+    box_and_leg, box_and_pocket, d_shape_area, extrude_profile, pan_and_inset, pan_volume,
+    BOX_VOLUME, LEG_HEIGHT, LEG_RADIUS,
 };
 use opengeometry_test_support::volume::{self, VolumeEstimate};
+use opengeometry_test_support::world_graph::graph;
 use serde_json::json;
 use std::f64::consts::PI;
 
@@ -145,4 +148,192 @@ fn an_intersection_of_a_stacked_leg_empty_in_every_layer_is_the_separate_empty_r
         )
         .unwrap_err();
     assert_eq!(error.error_code(), ErrorCode::EmptyResult, "{error:?}");
+}
+
+const INNER: f64 = 2.9;
+const OUTER: f64 = 3.1;
+const HEIGHT: f64 = 3.0;
+
+fn line(to: [f64; 2]) -> ProfileSegment {
+    ProfileSegment { to, arc: None }
+}
+
+fn quarter_ring() -> Primitive {
+    Primitive::Profile {
+        start: [INNER, 0.0],
+        segments: vec![
+            line([OUTER, 0.0]),
+            ProfileSegment {
+                to: [0.0, OUTER],
+                arc: Some(SegmentArc {
+                    center: [0.0, 0.0],
+                    counter_clockwise: true,
+                }),
+            },
+            line([0.0, INNER]),
+            ProfileSegment {
+                to: [INNER, 0.0],
+                arc: Some(SegmentArc {
+                    center: [0.0, 0.0],
+                    counter_clockwise: false,
+                }),
+            },
+        ],
+        closed: true,
+    }
+}
+
+fn rectangle(low: [f64; 2], high: [f64; 2]) -> Primitive {
+    Primitive::Profile {
+        start: low,
+        segments: vec![
+            line([high[0], low[1]]),
+            line(high),
+            line([low[0], high[1]]),
+            line(low),
+        ],
+        closed: true,
+    }
+}
+
+fn ring_overlap(reach: f64) -> f64 {
+    let square = OUTER * OUTER;
+    (reach * (square - reach * reach).sqrt() + square * (reach / OUTER).asin()) / 2.0
+        - INNER * reach
+}
+
+fn ring_area() -> f64 {
+    PI / 4.0 * (OUTER * OUTER - INNER * INNER)
+}
+
+fn ring_and(tool: Primitive) -> WorldGraph {
+    let mut world = graph();
+    extrude_profile(&mut world, "ring", quarter_ring(), [0.0, 0.0, 0.0], HEIGHT);
+    extrude_profile(&mut world, "tool", tool, [0.0, 0.0, 0.0], HEIGHT);
+    world
+}
+
+#[test]
+fn a_prism_whose_sides_run_on_along_the_tangents_at_the_arcs_ends_unions_with_the_ring() {
+    for reach in [0.5, 0.9] {
+        let mut world = ring_and(rectangle([INNER, -2.0], [OUTER, reach]));
+        let measured =
+            operate_with_prismatic_handler(&mut world, "ring", ModifyingOperation::Union, "tool");
+        let tangent = (OUTER - INNER) * (2.0 + reach);
+        assert_volume(
+            measured,
+            HEIGHT * (ring_area() + tangent - ring_overlap(reach)),
+            &format!("reach {reach}"),
+        );
+    }
+}
+
+#[test]
+fn a_prism_whose_side_runs_on_along_the_tangent_at_the_inner_arcs_end_unions_with_the_ring() {
+    let mut world = ring_and(rectangle([-0.2, INNER], [0.05, INNER + 2.0]));
+    let measured =
+        operate_with_prismatic_handler(&mut world, "ring", ModifyingOperation::Union, "tool");
+    assert_volume(
+        measured,
+        HEIGHT * (ring_area() + 0.25 * 2.0 - ring_overlap(0.05)),
+        "side",
+    );
+}
+
+fn ring_at(centre: [f64; 2], inner: f64, outer: f64) -> Primitive {
+    let at = |radius: f64, angle: f64| {
+        [
+            centre[0] + radius * angle.cos(),
+            centre[1] + radius * angle.sin(),
+        ]
+    };
+    let arc = |to| ProfileSegment {
+        to,
+        arc: Some(SegmentArc {
+            center: centre,
+            counter_clockwise: true,
+        }),
+    };
+    let mut segments = vec![
+        line(at(outer, 0.0)),
+        arc(at(outer, PI / 2.0)),
+        line(at(inner, PI / 2.0)),
+    ];
+    segments.push(ProfileSegment {
+        to: at(inner, 0.0),
+        arc: Some(SegmentArc {
+            center: centre,
+            counter_clockwise: false,
+        }),
+    });
+    Primitive::Profile {
+        start: at(inner, 0.0),
+        segments,
+        closed: true,
+    }
+}
+
+fn parallel_jamb_box(centre: [f64; 2], angle: f64, half: f64, near: f64, far: f64) -> Primitive {
+    let (radial, side) = ([angle.cos(), angle.sin()], [-angle.sin(), angle.cos()]);
+    let corner = |reach: f64, offset: f64| {
+        [
+            centre[0] + reach * radial[0] + offset * side[0],
+            centre[1] + reach * radial[1] + offset * side[1],
+        ]
+    };
+    let points = [
+        corner(near, -half),
+        corner(far, -half),
+        corner(far, half),
+        corner(near, half),
+    ];
+    Primitive::Profile {
+        start: points[0],
+        segments: points[1..]
+            .iter()
+            .chain(std::iter::once(&points[0]))
+            .map(|&to| line(to))
+            .collect(),
+        closed: true,
+    }
+}
+
+#[test]
+fn two_boxes_through_a_curved_wall_that_ends_on_the_cylinder_seam_cut_both_holes() {
+    let (centre, inner, outer, thickness) = ([0.0, -10.0], 3.8425, 4.1575, 0.315);
+    let hole = |angle: f64, half: f64| {
+        let near = (inner * inner - half * half).sqrt() - thickness;
+        parallel_jamb_box(centre, angle, half, near, outer + thickness)
+    };
+    let mut world = graph();
+    extrude_profile(
+        &mut world,
+        "ring",
+        ring_at(centre, inner, outer),
+        [0.0; 3],
+        3.0,
+    );
+    extrude_profile(
+        &mut world,
+        "door",
+        hole(PI / 2.0 - 0.375, 0.5),
+        [0.0; 3],
+        2.15,
+    );
+    extrude_profile(
+        &mut world,
+        "window",
+        hole(PI / 2.0 - 1.0, 0.8),
+        [0.0, 0.85, 0.0],
+        1.3,
+    );
+    world
+        .operate(
+            "ring",
+            ModifyingOperation::Subtract,
+            &["door".to_string(), "window".to_string()],
+            EditScope::Node,
+        )
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    assert_valid_closed(&world.brep("ring").unwrap(), 1, "ring");
 }

@@ -6,7 +6,9 @@ use super::shape_store::Shape;
 use crate::brep::{placed, BrepEnvelope};
 use crate::math::Point3;
 use crate::query::{classify_point, PointClassification};
-use crate::tessellation::display::{display_buffers, DisplayBuffers};
+use crate::tessellation::display::{
+    display_buffers_with_smooth_angle, DisplayBuffers, SMOOTH_ANGLE,
+};
 use std::sync::Arc;
 
 impl WorldGraph {
@@ -99,12 +101,27 @@ impl WorldGraph {
         bucket: f64,
         max_triangles: usize,
     ) -> Result<DisplayBuffers, GraphError> {
+        self.buffers_with_smooth_angle(shape_id, bucket, max_triangles, SMOOTH_ANGLE)
+    }
+
+    pub fn buffers_with_smooth_angle(
+        &self,
+        shape_id: &str,
+        bucket: f64,
+        max_triangles: usize,
+        smooth_angle: f64,
+    ) -> Result<DisplayBuffers, GraphError> {
         let shape = self
             .shapes
             .shapes
             .get(shape_id)
             .ok_or_else(|| GraphError::code(ErrorCode::InvalidOperand, "shape is not live"))?;
-        Ok(display_buffers(&shape.brep, bucket, max_triangles)?)
+        Ok(display_buffers_with_smooth_angle(
+            &shape.brep,
+            bucket,
+            max_triangles,
+            smooth_angle,
+        )?)
     }
 
     pub(crate) fn edge_keys(&self, og_id: &str) -> Result<&[String], GraphError> {
@@ -140,9 +157,9 @@ impl WorldGraph {
     }
 
     pub fn node_by_handle(&self, handle: u32, generation: u32) -> Result<&Node, GraphError> {
-        self.nodes
-            .values()
-            .find(|node| node.handle == handle && node.generation == generation)
+        self.handles
+            .get(&(handle, generation))
+            .and_then(|og_id| self.nodes.get(og_id))
             .ok_or_else(|| GraphError::code(ErrorCode::Disposed, "node handle is stale"))
     }
 }

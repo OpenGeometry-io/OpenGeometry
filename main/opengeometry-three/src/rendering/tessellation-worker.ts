@@ -46,10 +46,12 @@ function run(job: TessellateMessage): void {
     return;
   }
   try {
-    const buffers = validateDisplayBuffers(tessellator.buffers(slot, job.bucket, job.maxTriangles));
+    const angle = job.smoothAngle;
+    const buffers = validateDisplayBuffers(tessellator.buffers(slot, job.bucket, job.maxTriangles, angle));
     reply({ request: job.request, ok: true, buffers }, [
       buffers.positions.buffer, buffers.normals.buffer, buffers.indices.buffer,
-      buffers.faceRanges.buffer, buffers.outline.buffer, buffers.edgeIds.buffer, buffers.origin.buffer,
+      buffers.faceRanges.buffer, buffers.outline.buffer, buffers.edgeIds.buffer, buffers.smoothEdges.buffer,
+      buffers.origin.buffer,
     ]);
   } catch (cause) {
     reply({ request: job.request, error: error(cause) });

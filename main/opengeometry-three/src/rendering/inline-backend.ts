@@ -14,8 +14,8 @@ export class InlineBackend implements TessellationProvider {
   }
 
   compute(value: TessellationRequest): DisplayBuffers {
-    const { shapeId, bucket, maxTriangles } = value;
-    const buffers = call('tessellation', (): unknown => this.graph.buffers(shapeId, bucket, maxTriangles));
+    const { shapeId, bucket, maxTriangles, smoothAngle } = value;
+    const buffers = call('tessellation', (): unknown => this.graph.buffers(shapeId, bucket, maxTriangles, smoothAngle));
     return validateDisplayBuffers(buffers);
   }
 

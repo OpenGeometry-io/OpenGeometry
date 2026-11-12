@@ -1,0 +1,79 @@
+---
+title: Export
+description: exportStep writes STEP files; exportIfcBody returns the IFC exchange body of a solid, with the types AnalyticExchangeBodyV2 and IfcPreparedValue.
+icon: file-export
+---
+
+## exportStep
+
+`static exportStep(options): Promise<{ text: string; report: StepExportReport }>`
+
+| Option      | Type                                   | Default          |
+| ----------- | -------------------------------------- | ---------------- |
+| `nodes`     | `(Body \| SystemAssembly \| string)[]` | required         |
+| `unit`      | `'millimetre' \| 'metre'`              | `'millimetre'`   |
+| `upAxis`    | `'Z' \| 'Y'`                           | `'Z'`            |
+| `name`      | `string`                               | none             |
+| `timestamp` | `string`                               | the current time |
+
+### The report
+
+| Field                                                   | Meaning                                               |
+| ------------------------------------------------------- | ----------------------------------------------------- |
+| `unit`, `upAxis`, `timestamp`                           | The settings that were used                           |
+| `products`, `solids`, `faces`, `edges`, `cavityShells`  | What was written                                      |
+| `entities`, `bytes`                                     | The size of the file                                  |
+| `fittedCurves`, `pcurvelessEdges`, `collapsedChartUses` | Approximations in the file                            |
+| `exchangeErrorBound`, `geometricTolerance`              | The accuracy of the file                              |
+| `validationLevel`                                       | How the file was checked                              |
+| `bodies`                                                | One entry per body: its `ogId`, shape and counts      |
+| `skipped`                                               | `{ ogId, reason }` for each node that was not written |
+
+A wire or a sheet on its own throws `InvalidOperand`. A selection with no solid throws `EmptyResult`. See [Export STEP](/opengeometry/guides/export-step).
+
+## exportIfcBody
+
+`static exportIfcBody(node: Body | SystemAssembly): AnalyticExchangeBodyV2`
+
+Returns the exact geometry of one solid, in world metres with Z up. A sheet, a wire or an assembly throws.
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  OG_PRIMITIVE_CYLINDER,
+  type AnalyticExchangeBodyV2,
+  type IfcPreparedValue,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const column = new Solid(OG_PRIMITIVE_CYLINDER, { radius: 0.2, height: 3 });
+const body: AnalyticExchangeBodyV2 = OpenGeometry.exportIfcBody(column);
+const first: IfcPreparedValue | undefined = body.entities[0]?.attributes[0];
+console.log(body.schema_version, body.representation_type, first?.kind);
+```
+
+### AnalyticExchangeBodyV2
+
+| Field                                                             | Value                                                             |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `schema_version`                                                  | `2`                                                               |
+| `length_unit`                                                     | `'metre'`                                                         |
+| `up_axis`                                                         | `'Z'`                                                             |
+| `coordinate_space`                                                | `'world'`                                                         |
+| `representation_type`                                             | `'AdvancedBrep'`, or `'CSG'` for a solid with a cavity            |
+| `quality`                                                         | `{ kind: 'Analytic' }`, or `{ kind: 'Approximate', max_error }`   |
+| `geometric_tolerance`, `exchange_error_bound`, `validation_level` | The accuracy of the body                                          |
+| `entities`                                                        | `{ id, entity_type, attributes }` for each IFC entity to write    |
+| `solids`                                                          | The ids of the solid entities                                     |
+| `faces`                                                           | For each face: its `face` id, `key`, `entity` id and `provenance` |
+
+### IfcPreparedValue
+
+One attribute value: `Ref`, `List`, `Real`, `Integer`, `Text`, `Enum`, `Bool`, `Null` or `Derived`, as `{ kind, ... }`.
+
+See [IFC exchange body](/opengeometry/guides/ifc-exchange-body).

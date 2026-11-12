@@ -1,0 +1,36 @@
+---
+title: Picking
+description: resolveHit turns a Three.js raycast hit into a body, a face and an edge.
+icon: arrow-pointer
+---
+
+## resolveHit
+
+`static resolveHit(hit: THREE.Intersection): { ogId, shapeRevision, faceId?, edgeId? } | undefined`
+
+| Field           | Type     | Meaning                                      |
+| --------------- | -------- | -------------------------------------------- |
+| `ogId`          | `string` | The body that was hit                        |
+| `shapeRevision` | `number` | The revision of the shape whose mesh was hit |
+| `faceId`        | `number` | The B-rep face, for a hit on the surface     |
+| `edgeId`        | `number` | The B-rep edge, for a hit on the outline     |
+
+It returns `undefined` for a hit on an object that is not a body, or on a body with no mesh yet.
+
+```ts
+import * as THREE from 'three';
+import { OpenGeometry } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+function pick(raycaster: THREE.Raycaster, scene: THREE.Scene): string | undefined {
+  const [hit] = raycaster.intersectObject(scene, true);
+  return hit ? OpenGeometry.resolveHit(hit)?.ogId : undefined;
+}
+console.log(pick(new THREE.Raycaster(), new THREE.Scene()));
+```
+
+See [Picking](/opengeometry/guides/picking).

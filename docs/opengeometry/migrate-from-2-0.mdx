@@ -1,0 +1,108 @@
+---
+title: Migrate from 2.0
+description: What changed between OpenGeometry 2.0 and 3.0, and where the full step-by-step guide is.
+icon: arrow-right-arrow-left
+---
+
+OpenGeometry 3.0 has a new API. Code written for 2.0 does not run on 3.0 without changes. Version 2.5 was not published: from 2.0, move straight to 3.0.
+
+The full guide is [MIGRATION.md](https://github.com/OpenGeometry-io/OpenGeometry/blob/main/MIGRATION.md) in the repository. It gives each change with code before and after, a table of replacements, every change of behaviour, and the checks to run at the end.
+
+## The main changes
+
+| 2.0                                                     | 3.0                                                                                                |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| One class per shape: `Cuboid`, `Cylinder`, `Polygon`, … | Three body classes: `new Wire(kind, params)`, `new Solid(kind, params)`, `new Sheet(kind, params)` |
+| `Vector3` objects                                       | `[x, y, z]` arrays                                                                                 |
+| `setPlacement`, positions on the object                 | `body.transform(kind, params)`                                                                     |
+| Free functions such as `booleanRegions2D`               | Statics: `OpenGeometry.booleanRegions2D`, `OpenGeometry.offsetRingVariable`, …                     |
+| `solid.prepareIfcExchange()`                            | `OpenGeometry.exportIfcBody(solid)`                                                                |
+| `new Sweep({ capStart: false, capEnd: false })`         | `new Sheet(OG_OPERATION_SWEEP, { profile, path, caps: false })`                                    |
+| `AnalyticSolid({ kind: 'arcEdgedExtrusion' })`          | An `OG_PRIMITIVE_PROFILE` wire, then `OG_OPERATION_EXTRUDE`                                        |
+| `solid.shell(thickness)` returned a new solid           | `solid.operate(OG_OPERATION_SHELL, { thickness })` hollows in place                                |
+
+## Removed
+
+These 2.0 features are not in 3.0, and have no replacement: IFC file text, STL and PDF export, projection, loft, triangulation as a public call, and curves other than lines, circles, arcs and polylines, such as the elliptical arc. Take that code out, or stay on 2.0. 3.0 has no spline, no ellipse and no elliptical arc.
+
+The 2.0 wedge and the 2.0 `Curve` class are gone too. Build a wedge as a five-face `OG_PRIMITIVE_POLYHEDRON`, and a 2.0 `Curve` as an `OG_PRIMITIVE_POLYLINE` wire through its points, as the next section shows.
+
+## Wedges and the 2.0 curve
+
+A wedge is a five-face polyhedron: two triangles and three rectangles. Give its points and its faces to `OG_PRIMITIVE_POLYHEDRON`. Each face is a ring of point indices, counter-clockwise seen from outside.
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  OG_PRIMITIVE_PARAMS_POLYHEDRON,
+  OG_PRIMITIVE_POLYHEDRON,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const ramp = new Solid(
+  OG_PRIMITIVE_POLYHEDRON,
+  OG_PRIMITIVE_PARAMS_POLYHEDRON({
+    points: [
+      [0, 0, 0],
+      [2, 0, 0],
+      [2, 0, 1],
+      [0, 0, 1],
+      [0, 1, 0],
+      [0, 1, 1],
+    ],
+    faces: [
+      [0, 1, 2, 3],
+      [0, 3, 5, 4],
+      [0, 4, 1],
+      [3, 2, 5],
+      [1, 4, 5, 2],
+    ],
+  }),
+);
+console.log(ramp.validity().valid);
+```
+
+This ramp is 2 m long, 1 m wide and 1 m high at its tall end. You can also extrude a closed triangle: a closed `OG_PRIMITIVE_POLYLINE` wire as the profile of `OG_OPERATION_EXTRUDE`.
+
+The 2.0 `Curve` was a polyline through its control points. In 3.0, make an `OG_PRIMITIVE_POLYLINE` wire through the same points.
+
+```ts
+import {
+  OpenGeometry,
+  Wire,
+  OG_PRIMITIVE_PARAMS_POLYLINE,
+  OG_PRIMITIVE_POLYLINE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const curve = new Wire(
+  OG_PRIMITIVE_POLYLINE,
+  OG_PRIMITIVE_PARAMS_POLYLINE({
+    points: [
+      [0, 0, 0],
+      [1, 0, 0.5],
+      [2, 0, 0.5],
+      [3, 0, 0],
+    ],
+  }),
+);
+console.log(curve.bodyType);
+```
+
+## How to move
+
+1. Install 3.0 and run your type check. A call to a 2.0 class or function fails at compile time.
+2. For each failure, find the call in MIGRATION.md under "Replace this with that".
+3. Read "Different behaviour", because some calls keep their name and change what they return.
+4. Run the "Check your result" steps.
+
+The [API reference](/opengeometry/api/overview) lists every 3.0 export.

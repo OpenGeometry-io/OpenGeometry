@@ -1,0 +1,94 @@
+---
+title: Sweep
+description: Move a profile along a path of lines and arcs into a solid, an open sheet, or a closed ring.
+icon: bezier-curve
+---
+
+`OG_OPERATION_SWEEP` moves a closed profile along a path. The parameters are `{ profile, path, caps? }`. Both are wires.
+
+| Path                                                     | Result                           |
+| -------------------------------------------------------- | -------------------------------- |
+| Open polyline                                            | Straight runs with mitred joints |
+| `OG_PRIMITIVE_ARC`, or an open profile with arc segments | One exact bend per arc           |
+| Closed polyline, closed profile, or circle               | A closed ring with no end faces  |
+
+Place the profile across the start of the path. Its plane normal should point along the path.
+
+## A bend
+
+The profile is a rectangle at the start of a quarter arc. The arc gives one exact bend with two cylindrical walls:
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_SWEEP,
+  OG_PRIMITIVE_ARC,
+  OG_PRIMITIVE_PARAMS_ARC,
+  OG_PRIMITIVE_RECTANGLE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const path = new Wire(
+  OG_PRIMITIVE_ARC,
+  OG_PRIMITIVE_PARAMS_ARC({ radius: 0.6, startAngle: 0, sweepAngle: Math.PI / 2 }),
+);
+const profile = new Wire(
+  OG_PRIMITIVE_RECTANGLE,
+  { width: 0.4, breadth: 0.25 },
+  { plane: { origin: [0.6, 0, 0], normal: [0, 0, -1], xDirection: [1, 0, 0] } },
+);
+const duct = new Solid(OG_OPERATION_SWEEP, { profile, path });
+console.log(duct.getBrep().topology.faces.length);
+```
+
+This prints `6`. A circle profile on the same path gives torus faces: a pipe elbow.
+
+## An open sheet
+
+With `caps: false` the ends stay open. The result has no volume, so it is a `Sheet`:
+
+```ts
+import {
+  OpenGeometry,
+  Sheet,
+  Wire,
+  OG_OPERATION_PARAMS_SWEEP,
+  OG_OPERATION_SWEEP,
+  OG_PRIMITIVE_POLYLINE,
+  OG_PRIMITIVE_RECTANGLE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const profile = new Wire(OG_PRIMITIVE_RECTANGLE, { width: 0.7, breadth: 0.4 });
+const path = new Wire(OG_PRIMITIVE_POLYLINE, {
+  points: [
+    [0, 0, 0],
+    [0, 3, 0],
+    [3, 3, 0],
+  ],
+});
+const duct = new Sheet(
+  OG_OPERATION_SWEEP,
+  OG_OPERATION_PARAMS_SWEEP({ profile, path, caps: false }),
+);
+console.log(duct.bodyType, duct.getBrep().topology.faces.length);
+```
+
+This prints `Sheet 8`: eight side faces and no end faces. A sheet shows its surface from the front only. STEP export refuses it, and `Sheet` has no `operate`.
+
+## Rules
+
+- `caps` is `true` when you leave it out.
+- An arc in an open profile path should meet its lines tangentially.
+- A sweep that would cut through itself throws `SweepSelfIntersection`.
+- `new Solid` with `caps: false`, or `new Sheet` without it, throws `BodyTypeMismatch`.

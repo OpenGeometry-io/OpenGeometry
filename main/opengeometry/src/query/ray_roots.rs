@@ -1,4 +1,4 @@
-use crate::brep::{BrepEnvelope, GeometryError, SurfaceGeometry};
+use crate::brep::{GeometryError, PatchBounds, SurfaceGeometry};
 use crate::math::{dot, isolate_candidates, quadratic, Interval, Point3, QuadraticRoots};
 
 pub(super) fn support_roots(
@@ -186,11 +186,11 @@ fn polynomial_value(coefficients: &[f64], value: f64) -> f64 {
 }
 
 pub(super) fn ray_box_domain(
-    brep: &BrepEnvelope,
+    bounds: Option<PatchBounds>,
     origin: Point3,
     direction: Point3,
 ) -> Result<Option<Interval>, GeometryError> {
-    let Some(bounds) = brep.bounds_unchecked()? else {
+    let Some(bounds) = bounds else {
         return Ok(None);
     };
     let mut lo: f64 = 0.0;

@@ -1,0 +1,38 @@
+---
+title: Architecture
+description: How the Rust kernel, the TypeScript SDK, the display worker and your Three.js scene fit together.
+icon: sitemap
+---
+
+OpenGeometry has three parts. You call only the SDK.
+
+| Part           | What it does                                                                                               |
+| -------------- | ---------------------------------------------------------------------------------------------------------- |
+| Kernel         | Rust, compiled to WebAssembly. Holds every shape as an exact B-rep and runs the modelling and the exports. |
+| SDK            | TypeScript. Gives you `Wire`, `Solid`, `Sheet`, `SystemAssembly` and the `OpenGeometry` statics.           |
+| Display worker | A web worker that turns shapes into Three.js meshes, so the page stays responsive. It can also run inline. |
+
+## One document
+
+`OpenGeometry.create` starts one kernel with one document. Every body you make goes into it. `OpenGeometry.reset()` empties it.
+
+The document is a graph of nodes. A node is a body or an assembly, with a placement and an optional parent. A body points to a shape. Two instances can point to the same shape.
+
+## Exact shapes, display meshes
+
+The kernel keeps exact geometry: planes, cylinders, cones, spheres, tori, lines, circles and arcs. Booleans, measurements and STEP export use this exact geometry.
+
+The meshes that you see are a separate, approximate copy, made for display only. The kernel makes them when the scene asks, at the level of detail that the camera needs. See [Display](/opengeometry/concepts/display).
+
+## Your scene stays yours
+
+Every body is a `THREE.Group` with two children: a `surface` mesh and an `outline` line set. You add bodies to your own scene, with your own camera, lights and renderer. OpenGeometry makes no scene, no camera and no controls.
+
+## Calls are synchronous
+
+Making and editing bodies is synchronous: a `new Solid(...)` or an `operate(...)` has finished when the call returns. Only `create`, `settled` and `exportStep` return promises.
+
+## Next
+
+- [Bodies](/opengeometry/concepts/bodies): wires, sheets, solids, shapes and instances.
+- [Coordinates and planes](/opengeometry/concepts/coordinates-and-planes): units, axes and where a profile lands.

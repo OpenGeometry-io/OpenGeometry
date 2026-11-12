@@ -1,0 +1,146 @@
+---
+title: Regions and offsets
+description: 2D booleans on point and line-and-arc regions, exact insets with one distance per edge, and polyline strokes.
+icon: vector-square
+---
+
+The 2D calls work in the XZ plane, the ground plane seen from above. They are statics of `OpenGeometry` and need no body.
+
+## Region shapes
+
+A region is an outer ring and a list of hole rings. There are two kinds:
+
+| Type             | A ring is                                                                                                             |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `OffsetRegion`   | `{ x, y, z }` points, all at one height                                                                               |
+| `CurvedRegion2D` | `CurvedRegionEdge` items: `{ kind: 'line', from, to }` or `{ kind: 'arc', center, radius, start_angle, sweep_angle }` |
+
+Edge points are `[x, z]`. Arc angles are in radians. Outer rings run clockwise in XZ and holes counter-clockwise.
+
+```ts
+import { OpenGeometry, type CurvedRegion2D } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const plot: CurvedRegion2D = {
+  outer: [
+    { kind: 'line', from: [0, 0], to: [0, 2] },
+    { kind: 'line', from: [0, 2], to: [2, 2] },
+    { kind: 'arc', center: [2, 1], radius: 1, start_angle: Math.PI / 2, sweep_angle: -Math.PI },
+    { kind: 'line', from: [2, 0], to: [0, 0] },
+  ],
+  holes: [],
+};
+const setback = OpenGeometry.offsetCurvedRingVariable(plot, [0.1, 0.25, 0.25, 0.25]);
+const arc = setback[0]?.outer.find((edge) => edge.kind === 'arc');
+console.log(setback.length, arc?.kind === 'arc' ? arc.radius : 0);
+```
+
+This prints `1 0.75`. The west side moves in 0.1 m and the other edges 0.25 m. The arc keeps its centre, so its radius goes from 1 to 0.75.
+
+## Booleans
+
+`OpenGeometry.booleanRegions2D(a, b, operation)` and `OpenGeometry.booleanCurvedRegions2D(a, b, operation)` take two lists of regions. `operation` is `'union'`, `'intersection'` or `'subtraction'`.
+
+```ts
+import { OpenGeometry, OG_REGION_TOLERANCE, type OffsetRegion } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const square = (x: number): OffsetRegion => ({
+  outer: [
+    { x, y: 0, z: 0 },
+    { x, y: 0, z: 1 },
+    { x: x + 1, y: 0, z: 1 },
+    { x: x + 1, y: 0, z: 0 },
+  ],
+  holes: [],
+});
+const left: OffsetRegion[] = OpenGeometry.booleanRegions2D(
+  [square(0)],
+  [square(0.5)],
+  'subtraction',
+);
+console.log(left.length, left[0]?.outer.length, OG_REGION_TOLERANCE);
+```
+
+- Results come back at the input height, wound the same way. Each planar ring starts at its smallest x.
+- The tolerance is fixed at `OG_REGION_TOLERANCE`, `1e-6` m.
+- A plain ring is not a region and throws `InvalidParameter`.
+- More than 100 000 points or edges across both operands throws `LimitExceeded`.
+
+## Insets and offsets
+
+| Call                                                          | What it does                                                                                          |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `offsetRingVariable(ring, distances, holes?)`                 | Insets a closed point ring by one distance per edge. Each hole `{ ring, distances }` grows by its own |
+| `offsetCurvedRingVariable(region, distances, holeDistances?)` | Insets one `CurvedRegion2D` by one distance per edge, with one list per hole                          |
+| `insetCurvedRegion2D(region, distance)`                       | Insets one `CurvedRegion2D` by one distance, holes grown by the same                                  |
+| `offsetPolylineRegions(path, width, closed, miterLimit?)`     | Strokes a path into regions. Mitres up to `miterLimit`, default 4, and bevels past it                 |
+| `offsetPolyline(path, distance, options?)`                    | Offsets a path to one side. Returns `{ edges, bevelled, closed }`                                     |
+
+Rings and paths are flat `[x, y, z, ...]` lists or a `Float64Array`; `y` is ignored. The region calls return `CurvedRegion2D[]` with exact lines and arcs. An inside corner of an inset is one arc of the setback.
+
+```ts
+import { OpenGeometry, type CurvedRegion2D, type OffsetPath2D } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const flat = (points: [number, number][]): number[] => points.flatMap(([x, z]) => [x, 0, z]);
+const lot = flat([
+  [0, 0],
+  [10, 0],
+  [10, 5],
+  [5, 5],
+  [5, 10],
+  [0, 10],
+]);
+const inset: CurvedRegion2D[] = OpenGeometry.offsetRingVariable(lot, [2, 2, 2, 2, 2, 2]);
+const corner = inset[0]?.outer.find((edge) => edge.kind === 'arc');
+const duct: CurvedRegion2D[] = OpenGeometry.offsetPolylineRegions(
+  flat([
+    [0, 0],
+    [4, 0],
+    [4, 3],
+  ]),
+  0.3,
+  false,
+);
+const side: OffsetPath2D = OpenGeometry.offsetPolyline(
+  flat([
+    [0, 0],
+    [5, 0],
+  ]),
+  1,
+);
+console.log(
+  inset.length,
+  corner?.kind === 'arc' ? corner.radius : 0,
+  duct.length,
+  side.edges.length,
+);
+```
+
+This prints `1 2 1 1`.
+
+## Rules for `offsetCurvedRingVariable`
+
+- One distance per edge, finite and not negative. A distance of 0 keeps its edge.
+- Where two edges meet tangentially and get different distances, the inset joins them with an extra arc.
+- An arc stays on its centre. A convex arc moves to `r − d`; a concave arc, or an arc of a hole, to `r + d`.
+- A distance larger than an arc's radius, a wrong count, or a negative or non-finite distance throws `InvalidParameter`.
+- A result that collapses is an empty list.
+
+## Rules for `offsetPolyline`
+
+- `acuteThresholdDegrees` defaults to 35 and `bevel` to `true`.
+- When `closed` is left out, a path whose ends meet is closed.

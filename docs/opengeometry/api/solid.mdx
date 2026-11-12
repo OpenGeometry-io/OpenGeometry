@@ -1,0 +1,77 @@
+---
+title: Solid
+description: A body of closed faces around a volume, with booleans, shell and the boolean report.
+icon: cube
+---
+
+`class Solid extends Body`
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  OG_OPERATION_UNION,
+  OG_PRIMITIVE_CUBOID,
+  OG_PRIMITIVE_CYLINDER,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const base = new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 0.2, depth: 1 });
+const post = new Solid(
+  OG_PRIMITIVE_CYLINDER,
+  { radius: 0.1, height: 1 },
+  { plane: { origin: [0, 0.1, 0] } },
+);
+base.operate(OG_OPERATION_UNION, { tools: [post] });
+console.log(base.getReport()?.report.operation);
+```
+
+## Constructor
+
+`new Solid(kind: string, params: Record<string, unknown>, options?: BodyOptions)`
+
+| `kind`                         | `params`                                                       |
+| ------------------------------ | -------------------------------------------------------------- |
+| `OG_PRIMITIVE_CUBOID`          | `{ width, height, depth }`                                     |
+| `OG_PRIMITIVE_CYLINDER`        | `{ radius, height }`                                           |
+| `OG_PRIMITIVE_CYLINDER_SECTOR` | `{ radius, height, startAngle, sweepAngle }`                   |
+| `OG_PRIMITIVE_SPHERE`          | `{ radius }`                                                   |
+| `OG_PRIMITIVE_CONE`            | `{ radiusBottom, radiusTop, height }`                          |
+| `OG_PRIMITIVE_TORUS`           | `{ majorRadius, minorRadius }`                                 |
+| `OG_PRIMITIVE_POLYHEDRON`      | `{ points, faces }`                                            |
+| `OG_OPERATION_EXTRUDE`         | `{ profile, holes?, distance }`                                |
+| `OG_OPERATION_SWEEP`           | `{ profile, path, caps? }`                                     |
+| `OG_OPERATION_REVOLVE`         | `{ profile, axis? }`                                           |
+| `OG_PRIMITIVE_SLOT_PRISM`      | `{ length, width, height }`                                    |
+| `OG_PRIMITIVE_ROUNDED_BOX`     | `{ width, height, depth, radius }`                             |
+| `OG_PRIMITIVE_PIPE_SEGMENT`    | `{ outerRadius, innerRadius, height, startAngle, sweepAngle }` |
+| `OG_PRIMITIVE_POLYSOLID`       | `{ path, width, height, justify? }`                            |
+
+`profile`, `holes` and `path` are wires. A sweep with `caps: false` makes a sheet, so `new Solid` throws `BodyTypeMismatch` for it.
+
+## operate
+
+`operate(kind, { tools: Solid[]; instances?: 'all' } | { thickness: number; instances?: 'all' }): void`
+
+| `kind`                   | Options                     | See                                       |
+| ------------------------ | --------------------------- | ----------------------------------------- |
+| `OG_OPERATION_SUBTRACT`  | `{ tools, instances? }`     | [Booleans](/opengeometry/guides/booleans) |
+| `OG_OPERATION_UNION`     | `{ tools, instances? }`     | [Booleans](/opengeometry/guides/booleans) |
+| `OG_OPERATION_INTERSECT` | `{ tools, instances? }`     | [Booleans](/opengeometry/guides/booleans) |
+| `OG_OPERATION_SHELL`     | `{ thickness, instances? }` | [Shell](/opengeometry/guides/shell)       |
+
+Changes the solid in place. A refused call throws and leaves the solid as it was.
+
+## getReport
+
+`getReport(): ShapeReport | null`
+
+The report of the last boolean or shell: `{ report, handlers, revision }`. `report` has `operation`, `quality`, `contacts`, `coincident` and `face_mappings`. It is `null` before the first `operate`, and after a `rebuild` or a `mirror`.
+
+## Copies
+
+`duplicate(options?)` and `instance(options?)` return a `Solid`. Everything else is on [Body methods](/opengeometry/api/body).

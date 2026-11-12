@@ -3,53 +3,112 @@ use crate::brep::{
     SurfaceGeometry, UV,
 };
 use crate::math::{dot, norm};
+use std::borrow::Cow;
+
+pub(crate) struct FaceTrim {
+    band: Option<[Option<f64>; 2]>,
+    outer: Option<Vec<UV>>,
+    holes: Vec<Option<Vec<UV>>>,
+}
+
+impl FaceTrim {
+    pub(crate) fn new(brep: &BrepEnvelope, face: &Face) -> Result<Self, GeometryError> {
+        let surface = brep.geometry.surface(face.surface)?;
+        let band = has_band(surface, face)
+            .then(|| band_limits(brep, face).ok())
+            .flatten();
+        Ok(Self {
+            band,
+            outer: trim_samples(brep, face, face.trim.outer).ok(),
+            holes: face
+                .trim
+                .holes
+                .iter()
+                .map(|hole| trim_samples(brep, face, *hole).ok())
+                .collect(),
+        })
+    }
+
+    pub(crate) fn contains(
+        &self,
+        brep: &BrepEnvelope,
+        face: &Face,
+        uv: UV,
+    ) -> Result<Option<bool>, GeometryError> {
+        let surface = brep.geometry.surface(face.surface)?;
+        let uv = lift_to_face(surface, face, uv);
+        let jet = surface.derivatives(uv)?;
+        let metric = norm(jet.du).min(norm(jet.dv));
+        let uv_tolerance = if metric > 0.0 {
+            brep.accuracy.geometric / metric
+        } else {
+            return Ok(None);
+        };
+        if !face.trim.uv_bounds[0].contains(uv[0]) || !face.trim.uv_bounds[1].contains(uv[1]) {
+            return Ok(Some(false));
+        }
+        if has_band(surface, face) {
+            let limits = match self.band {
+                Some(limits) => limits,
+                None => band_limits(brep, face)?,
+            };
+            if let [Some(outer), Some(inner)] = limits {
+                let lo = outer.min(inner);
+                let hi = outer.max(inner);
+                if (uv[1] - lo).abs() <= uv_tolerance || (uv[1] - hi).abs() <= uv_tolerance {
+                    return Ok(None);
+                }
+                return Ok(Some(uv[1] > lo && uv[1] < hi));
+            }
+        }
+        let outer = polygon(&self.outer, brep, face, face.trim.outer)?;
+        let Some(mut inside) = in_loop(uv, &outer, uv_tolerance) else {
+            return Ok(None);
+        };
+        if !inside {
+            return Ok(Some(false));
+        }
+        for (stored, hole) in self.holes.iter().zip(&face.trim.holes) {
+            let polygon = polygon(stored, brep, face, *hole)?;
+            match in_loop(uv, &polygon, uv_tolerance) {
+                None => return Ok(None),
+                Some(true) => inside = false,
+                Some(false) => {}
+            }
+        }
+        Ok(Some(inside))
+    }
+}
 
 pub(crate) fn face_contains_uv(
     brep: &BrepEnvelope,
     face: &Face,
     uv: UV,
 ) -> Result<Option<bool>, GeometryError> {
-    let surface = brep.geometry.surface(face.surface)?;
-    let uv = lift_to_face(surface, face, uv);
-    let jet = surface.derivatives(uv)?;
-    let metric = norm(jet.du).min(norm(jet.dv));
-    let uv_tolerance = if metric > 0.0 {
-        brep.accuracy.geometric / metric
-    } else {
-        return Ok(None);
-    };
-    if !face.trim.uv_bounds[0].contains(uv[0]) || !face.trim.uv_bounds[1].contains(uv[1]) {
-        return Ok(Some(false));
+    FaceTrim::new(brep, face)?.contains(brep, face, uv)
+}
+
+fn has_band(surface: &SurfaceGeometry, face: &Face) -> bool {
+    matches!(surface, SurfaceGeometry::Cylinder { .. }) && face.trim.holes.len() == 1
+}
+
+fn band_limits(brep: &BrepEnvelope, face: &Face) -> Result<[Option<f64>; 2], GeometryError> {
+    Ok([
+        periodic_cylinder_band_limit(brep, face, face.trim.outer)?,
+        periodic_cylinder_band_limit(brep, face, face.trim.holes[0])?,
+    ])
+}
+
+fn polygon<'a>(
+    stored: &'a Option<Vec<UV>>,
+    brep: &BrepEnvelope,
+    face: &Face,
+    loop_id: u32,
+) -> Result<Cow<'a, [UV]>, GeometryError> {
+    match stored {
+        Some(points) => Ok(Cow::Borrowed(points)),
+        None => trim_samples(brep, face, loop_id).map(Cow::Owned),
     }
-    if matches!(surface, SurfaceGeometry::Cylinder { .. }) && face.trim.holes.len() == 1 {
-        if let (Some(outer), Some(inner)) = (
-            periodic_cylinder_band_limit(brep, face, face.trim.outer)?,
-            periodic_cylinder_band_limit(brep, face, face.trim.holes[0])?,
-        ) {
-            let lo = outer.min(inner);
-            let hi = outer.max(inner);
-            if (uv[1] - lo).abs() <= uv_tolerance || (uv[1] - hi).abs() <= uv_tolerance {
-                return Ok(None);
-            }
-            return Ok(Some(uv[1] > lo && uv[1] < hi));
-        }
-    }
-    let outer = trim_samples(brep, face, face.trim.outer)?;
-    let Some(mut inside) = in_loop(uv, &outer, uv_tolerance) else {
-        return Ok(None);
-    };
-    if !inside {
-        return Ok(Some(false));
-    }
-    for hole in &face.trim.holes {
-        let polygon = trim_samples(brep, face, *hole)?;
-        match in_loop(uv, &polygon, uv_tolerance) {
-            None => return Ok(None),
-            Some(true) => inside = false,
-            Some(false) => {}
-        }
-    }
-    Ok(Some(inside))
 }
 
 fn lift_to_face(surface: &SurfaceGeometry, face: &Face, mut uv: UV) -> UV {
@@ -178,7 +237,9 @@ fn in_loop(point: UV, polygon: &[UV], tolerance: f64) -> Option<bool> {
     for index in 0..polygon.len() {
         let a = polygon[index];
         let b = polygon[(index + 1) % polygon.len()];
-        if segment_distance_2d(point, a, b) <= tolerance {
+        if !clear_of_segment(point, a, b, tolerance)
+            && segment_distance_2d(point, a, b) <= tolerance
+        {
             return None;
         }
         if (a[1] > point[1]) != (b[1] > point[1]) {
@@ -189,6 +250,18 @@ fn in_loop(point: UV, polygon: &[UV], tolerance: f64) -> Option<bool> {
         }
     }
     Some(inside)
+}
+
+fn clear_of_segment(point: UV, a: UV, b: UV, tolerance: f64) -> bool {
+    let scale = [point, a, b]
+        .iter()
+        .flatten()
+        .fold(0.0_f64, |largest, value| largest.max(value.abs()));
+    let reach = 2.0 * tolerance + 1e-14 * scale;
+    (0..2).any(|axis| {
+        let gap = (a[axis].min(b[axis]) - point[axis]).max(point[axis] - a[axis].max(b[axis]));
+        gap > reach
+    })
 }
 
 fn segment_distance_2d(point: UV, a: UV, b: UV) -> f64 {

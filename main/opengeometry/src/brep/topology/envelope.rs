@@ -83,8 +83,7 @@ impl BrepEnvelope {
         self.enclosure(|_| true)
     }
 
-    pub(crate) fn boundary_bounds(&self) -> Result<Option<PatchBounds>, GeometryError> {
-        self.validate()?;
+    pub(crate) fn boundary_bounds_unchecked(&self) -> Result<Option<PatchBounds>, GeometryError> {
         self.enclosure(|surface| !matches!(surface, SurfaceGeometry::Plane { .. }))
     }
 

@@ -1,6 +1,6 @@
 use super::clip::piece_box;
 use super::face_view::FaceView;
-use super::{intersect_breps, intersect_faces};
+use super::{intersect_breps, intersect_breps_until_branch, intersect_faces, FacePairIntersection};
 use crate::brep::{
     coarse_accuracy, Accuracy, Curve, CurveGeometry, Frame3, GeometryStore, IntersectionDefinition,
     IntersectionSide, PcurveGeometry, Surface, SurfaceGeometry, TraceAnchor,
@@ -303,4 +303,78 @@ fn piece_box_encloses_an_axial_peak_between_its_end_samples() {
         piece[0].contains(peak[0]) && piece[1].contains(peak[1]),
         "{piece:?} misses {peak:?}"
     );
+}
+
+fn faces_of(pairs: &[FacePairIntersection]) -> Vec<[u32; 2]> {
+    pairs.iter().map(|pair| pair.faces).collect()
+}
+
+#[test]
+fn the_until_branch_body_graph_ends_at_the_first_branching_pair_of_a_cuboid_and_a_tilted_cylinder()
+{
+    let (sin, cos) = 10.0_f64.to_radians().sin_cos();
+    let tilted = Frame3 {
+        origin: [0.5, -0.1, 0.0],
+        x: [1.0, 0.0, 0.0],
+        y: [0.0, cos, sin],
+        z: [0.0, -sin, cos],
+    };
+    let block = Frame3 {
+        origin: [-0.5, -0.5, 0.0],
+        ..Frame3::IDENTITY
+    };
+    let host = primitives::cuboid("host".into(), block, [1.0, 1.0, 0.5], Accuracy::STANDARD);
+    let leg = primitives::cylinder("leg".into(), tilted, 0.1, 0.7, Accuracy::STANDARD);
+    let (host, leg) = (host.unwrap(), leg.unwrap());
+    let full = intersect_breps(&host, &leg).unwrap();
+    let until = intersect_breps_until_branch(&host, &leg).unwrap();
+    let first = full
+        .pairs
+        .iter()
+        .position(|pair| pair.graph.coincident || !pair.graph.branches.is_empty())
+        .unwrap();
+    assert!(first + 1 < full.pairs.len());
+    assert_eq!(faces_of(&until.pairs), faces_of(&full.pairs[..=first]));
+}
+
+#[test]
+fn the_until_branch_body_graph_returns_the_full_error_of_a_pair_before_any_branch() {
+    let at = |z| Frame3 {
+        origin: [0.0, 0.0, z],
+        ..Frame3::IDENTITY
+    };
+    let lower = primitives::sphere("lower".into(), at(0.3), 0.2, Accuracy::STANDARD).unwrap();
+    let upper = primitives::sphere("upper".into(), at(0.6), 0.1, Accuracy::STANDARD).unwrap();
+    let full = intersect_breps(&lower, &upper).err().unwrap();
+    let until = intersect_breps_until_branch(&lower, &upper).err().unwrap();
+    assert_eq!(until, full);
+    assert!(format!("{full:?}").contains("face pair 0:0"), "{full:?}");
+}
+
+#[test]
+fn a_face_pair_query_and_both_body_graphs_still_refuse_an_invalid_body() {
+    let valid = primitives::cuboid(
+        "valid".into(),
+        Frame3::IDENTITY,
+        [1.0; 3],
+        Accuracy::STANDARD,
+    )
+    .unwrap();
+    let mut nameless = valid.clone();
+    nameless.id = String::new();
+    let refusal = nameless.validate().err().unwrap();
+    let pair = intersect_faces(
+        FaceView {
+            brep: &nameless,
+            face: 0,
+        },
+        FaceView {
+            brep: &valid,
+            face: 0,
+        },
+    );
+    assert_eq!(pair.err().unwrap(), refusal);
+    assert_eq!(intersect_breps(&valid, &nameless).err().unwrap(), refusal);
+    let until = intersect_breps_until_branch(&valid, &nameless);
+    assert_eq!(until.err().unwrap(), refusal);
 }

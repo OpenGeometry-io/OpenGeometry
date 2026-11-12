@@ -1,0 +1,58 @@
+---
+title: OGError
+description: The error class every call throws, with the types ErrorDetails and OperateErrorDetails.
+icon: triangle-exclamation
+---
+
+`class OGError extends Error`
+
+```ts
+import { OGError, OpenGeometry, Solid, OG_PRIMITIVE_CUBOID, type ErrorDetails } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+try {
+  new Solid(OG_PRIMITIVE_CUBOID, { width: 1, height: 1 });
+} catch (error) {
+  if (error instanceof OGError) {
+    const details: ErrorDetails = error.details;
+    console.log(error.code, error.call, JSON.stringify(error), details);
+  }
+}
+```
+
+## Fields
+
+| Field     | Type           | Meaning                                           |
+| --------- | -------------- | ------------------------------------------------- |
+| `code`    | `string`       | A stable name, such as `InvalidParameter`         |
+| `call`    | `string`       | The call that failed, such as `Solid.constructor` |
+| `message` | `string`       | A text for people. Do not parse it                |
+| `details` | `ErrorDetails` | More data for some codes. `{}` when there is none |
+| `name`    | `'OGError'`    |                                                   |
+
+The codes are listed on [Errors and limits](/opengeometry/concepts/errors#codes).
+
+## Methods
+
+- `toJSON()` returns `{ code, call, message, details }`, so `JSON.stringify` keeps every field.
+- `OGError.fromJSON(value)` makes an `OGError` from that object, for example after it crossed a worker or a network.
+
+## ErrorDetails
+
+`Partial<OperateErrorDetails> & Record<string, unknown>`.
+
+## OperateErrorDetails
+
+The details of a refused `operate`:
+
+| Field       | Type               | Meaning                                                       |
+| ----------- | ------------------ | ------------------------------------------------------------- |
+| `handlers`  | `string[]`         | The methods that took part                                    |
+| `attempted` | `string[]`         | Every method that was tried                                   |
+| `families`  | `[string, string]` | The pair of surface families that the kernel could not handle |
+| `toolIndex` | `number`           | The index of the tool that failed                             |
+| `ogIds`     | `string[]`         | The bodies involved                                           |
