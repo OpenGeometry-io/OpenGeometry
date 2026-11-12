@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
 import path from 'node:path';
 import ts from 'typescript';
@@ -11,6 +11,7 @@ const README = {
 const MIGRATION = {
   label: 'MIGRATION.md', file: path.join(REPOSITORY_ROOT, '..', 'MIGRATION.md'), prefix: 'migration-block',
 };
+const DOCS_ROOT = path.join(REPOSITORY_ROOT, '..', 'docs', 'opengeometry');
 const TS_BLOCK = /^```ts\n([\s\S]*?)^```$/gm;
 const TS_OPENER = /^[ \t]*(?:`{3,}|~{3,})[ \t]*(?:typescript|tsx|ts)(?![\w-])/gim;
 const QUICK_START_PAGE = path.join(
@@ -41,6 +42,19 @@ function tsBlocks(source) {
   return blocks;
 }
 
+function docsPages(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) return docsPages(file);
+    return entry.name.endsWith('.mdx') ? [file] : [];
+  });
+}
+
+const DOCS = docsPages(DOCS_ROOT).map((file) => {
+  const page = path.relative(DOCS_ROOT, file).replace(/\.mdx$/, '');
+  return { label: `docs/opengeometry/${page}.mdx`, file, prefix: `docs-${page.replaceAll('/', '-')}-block` };
+});
+
 function blockHost(blocks) {
   const host = ts.createCompilerHost(OPTIONS);
   return {
@@ -63,6 +77,15 @@ function diagnosticText(diagnostic) {
   return `${where}TS${String(diagnostic.code)}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
 }
 
+function typeCheck(blocks) {
+  const program = ts.createProgram([...blocks.keys()], OPTIONS, blockHost(blocks));
+  return [
+    ...program.getOptionsDiagnostics(),
+    ...program.getGlobalDiagnostics(),
+    ...blockDiagnostics(program, [...blocks.keys()]),
+  ].map(diagnosticText);
+}
+
 function blockDiagnostics(program, names) {
   return names.flatMap((name) => {
     const file = program.getSourceFile(name);
@@ -75,15 +98,17 @@ for (const source of [README, MIGRATION]) {
   test(`every ts block in ${source.label} type-checks against the built package`, () => {
     const blocks = tsBlocks(source);
     assert(blocks.size > 0, `${source.label} has no ts block`);
-    const program = ts.createProgram([...blocks.keys()], OPTIONS, blockHost(blocks));
-    const diagnostics = [
-      ...program.getOptionsDiagnostics(),
-      ...program.getGlobalDiagnostics(),
-      ...blockDiagnostics(program, [...blocks.keys()]),
-    ];
-    assert.deepEqual(diagnostics.map(diagnosticText), []);
+    assert.deepEqual(typeCheck(blocks), []);
   });
+}
 
+test('every ts block in the docs pages type-checks against the built package', () => {
+  assert(DOCS.length > 0, `no docs pages under ${DOCS_ROOT}`);
+  const blocks = new Map(DOCS.flatMap((source) => [...tsBlocks(source)]));
+  assert.deepEqual(typeCheck(blocks), []);
+});
+
+for (const source of [README, MIGRATION, ...DOCS]) {
   test(`every ts fence in ${source.label} is one the type check reads`, () => {
     const openers = [...documentText(source).matchAll(TS_OPENER)].length;
     assert.equal(openers, tsBlocks(source).size);

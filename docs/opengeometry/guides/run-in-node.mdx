@@ -1,0 +1,57 @@
+---
+title: Run in Node
+description: Load the kernel in Node, mesh bodies without a renderer, and write STEP files from a script or a test.
+icon: terminal
+---
+
+Node has no `Worker` and cannot fetch a `file:` address. Pass the compiled module to `create`. Tessellation then runs inline.
+
+```js
+import { readFileSync } from 'node:fs';
+import { OpenGeometry } from 'opengeometry';
+
+const wasm = readFileSync(new URL(import.meta.resolve('opengeometry/opengeometry_bg.wasm')));
+await OpenGeometry.create({ wasmModule: new WebAssembly.Module(wasm) });
+```
+
+## Write a STEP file
+
+Modelling, queries and export need no display:
+
+```js
+import { readFileSync, writeFileSync } from 'node:fs';
+import { OpenGeometry, Solid, OG_PRIMITIVE_CYLINDER } from 'opengeometry';
+
+const wasm = readFileSync(new URL(import.meta.resolve('opengeometry/opengeometry_bg.wasm')));
+await OpenGeometry.create({ wasmModule: new WebAssembly.Module(wasm) });
+
+const post = new Solid(OG_PRIMITIVE_CYLINDER, { radius: 0.1, height: 2.4 });
+const { text } = await OpenGeometry.exportStep({ nodes: [post] });
+writeFileSync('post.step', text);
+```
+
+## Get a mesh
+
+In Node nothing renders, so nothing asks for geometry. Walk the scene, then flush:
+
+```js
+import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
+import { OpenGeometry, Solid, OG_PRIMITIVE_SPHERE } from 'opengeometry';
+
+const wasm = readFileSync(new URL(import.meta.resolve('opengeometry/opengeometry_bg.wasm')));
+await OpenGeometry.create({ wasmModule: new WebAssembly.Module(wasm) });
+
+const ball = new Solid(OG_PRIMITIVE_SPHERE, { radius: 1 });
+const scene = new THREE.Scene();
+scene.add(ball);
+scene.updateMatrixWorld();
+OpenGeometry.flush({ geometry: 'sync' });
+console.log(ball.surface.geometry.getAttribute('position').count);
+```
+
+The mesh is in `body.surface.geometry`. After an edit, `OpenGeometry.flush({ geometry: 'sync', bodies: [body] })` meshes only that body.
+
+## Tests
+
+Call `OpenGeometry.reset()` between tests. It frees every body and leaves an empty document. A body from before the reset throws `Disposed`.

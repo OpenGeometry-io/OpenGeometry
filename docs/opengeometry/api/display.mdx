@@ -1,0 +1,75 @@
+---
+title: Display
+description: The statics that control display meshes, level of detail and host-drawn bodies, and the HostGroup type.
+icon: display
+---
+
+See [Display](/opengeometry/concepts/display) for how display works, and [Use your Three.js scene](/opengeometry/guides/use-your-threejs-scene) for host-drawn layers.
+
+## flush
+
+`static flush(options?: { geometry?: 'sync'; bodies?: readonly Body[] }): void`
+
+- No options: applies pending placements and the meshes that are ready. Meshes nothing new.
+- `{ geometry: 'sync' }`: also meshes every displayed body that waits for its mesh, before it returns.
+- `{ geometry: 'sync', bodies }`: meshes and places only those bodies.
+
+Hidden bodies, bodies with no shape and bodies disposed while a mark is live are skipped. A fully disposed body, or one from a reset runtime, throws `Disposed` before anything is meshed. `bodies` without `geometry: 'sync'`, a `bodies` that is not an array, or an item that is not a wire, sheet or solid throws `InvalidParameter`.
+
+## settled
+
+`static settled(options?: { deflection?: number }): Promise<{ failed: { ogId: string; error: unknown }[] }>`
+
+Resolves when every displayed body has its mesh. `failed` lists the bodies whose mesh failed. If nothing was rendered, it resolves at once. `deflection` asks for meshes at that deflection, in world metres, while it waits.
+
+## markDisplayed
+
+`static markDisplayed(bodies: readonly Body[]): void`
+
+Counts the bodies as displayed for the current render pass. Call it from the `onBeforeRender` of a layer that draws them. It works for a body hidden by layer, skips a body with `visible = false`, and checks `bodies` as `flush({ bodies })` does.
+
+## setHostDrawn
+
+`static setHostDrawn(bodies: readonly Body[], hostDrawn: boolean): void`
+
+`true` hands the drawing of the bodies to your app: each `visible` becomes `false`, and the kernel keeps the body's own visibility apart. `false` gives the drawing back and sets `visible` to that visibility. Do not set `visible` on a host-drawn body. A `hostDrawn` that is not a boolean throws `InvalidParameter`.
+
+## hostGroup
+
+`static hostGroup(bodies: readonly Body[]): HostGroup`
+
+Returns a `HostGroup` of the bodies.
+
+### HostGroup
+
+| Method        | What it does                                                                                                |
+| ------------- | ----------------------------------------------------------------------------------------------------------- |
+| `drawn()`     | Counts every member as displayed for the current render pass, at a cost that does not grow with the members |
+| `set(bodies)` | Replaces the members. On a disposed group, or one from a reset runtime, it throws `Disposed`                |
+| `dispose()`   | Ends the group. `drawn()` then does nothing                                                                 |
+
+A body may be in several groups. A member that is disposed leaves its groups. A group that is dropped without `dispose()` ends when it is garbage collected.
+
+## setDisplayDeflection
+
+`static setDisplayDeflection(world?: number): void`
+
+Sets one mesh deflection, in world metres, for every body. Call it with no value to let the camera choose again. A value that is not positive throws `InvalidParameter`.
+
+## releaseIdleGeometry
+
+`static releaseIdleGeometry(): { records: number; bytes: number }`
+
+Frees the display meshes cached for bodies that do not show them. Returns how many were freed and their size.
+
+## setCameraMotion
+
+`static setCameraMotion(moving: boolean): void`
+
+`true` tells the kernel that the camera moves now, so it can use coarser meshes until the camera stops.
+
+## observeCamera
+
+`static observeCamera(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void`
+
+Uses the first camera seen per renderer frame for level of detail. Call it before each render, or from the `onBeforeRender` of a layer whose drawables are not bodies.

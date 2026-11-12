@@ -95,12 +95,8 @@ impl WorldGraph {
             })?;
             for (id, before) in entry.nodes {
                 match before {
-                    Some(node) => {
-                        self.nodes.insert(id, node);
-                    }
-                    None => {
-                        self.nodes.remove(&id);
-                    }
+                    Some(node) => self.insert_node(id, node),
+                    None => self.remove_node(&id),
                 }
             }
             for (id, before) in entry.shapes {

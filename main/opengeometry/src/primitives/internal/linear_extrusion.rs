@@ -3,6 +3,7 @@ use crate::brep::{
     dimensions, padded_uv_bounds, plane_boundary, unit, Accuracy, BrepEnvelope, Builder,
     CurveGeometry, Frame3, GeometryError, Orientation, SurfaceGeometry, Use,
 };
+use crate::geom2d::{crossing_margin, nearby_boxes, Nearby, Pt2};
 use crate::math::{norm, scale, sub, Interval};
 use crate::primitives::profile::{
     loops_touch, orient_profile_loop, profile_point_inside, validate_profile_loop,
@@ -33,8 +34,9 @@ pub fn linear_extrusion(
             )));
         }
     }
+    let near = hole_neighbours(&holes, accuracy.geometric);
     for first in 0..holes.len() {
-        for second in (first + 1)..holes.len() {
+        for second in near.of(first).filter(|&second| second > first) {
             if loops_touch(&holes[first], &holes[second], accuracy.geometric)
                 || profile_point_inside(holes[first][0], &holes[second])
                 || profile_point_inside(holes[second][0], &holes[first])
@@ -259,4 +261,28 @@ fn add_side_faces(
         }
     }
     Ok(())
+}
+
+fn hole_neighbours(holes: &[Vec<[f64; 2]>], tolerance: f64) -> Nearby {
+    let boxes = holes
+        .iter()
+        .map(|hole| {
+            let (xs, ys) = (
+                hole.iter().map(|point| point[0]),
+                hole.iter().map(|point| point[1]),
+            );
+            [
+                xs.clone().fold(f64::INFINITY, f64::min),
+                xs.fold(f64::NEG_INFINITY, f64::max),
+                ys.clone().fold(f64::INFINITY, f64::min),
+                ys.fold(f64::NEG_INFINITY, f64::max),
+            ]
+        })
+        .collect::<Vec<_>>();
+    let edges = holes.iter().flat_map(|hole| {
+        hole.iter()
+            .zip(hole.iter().cycle().skip(1))
+            .map(|(from, to)| (Pt2::new(from[0], from[1]), Pt2::new(to[0], to[1])))
+    });
+    nearby_boxes(&boxes, crossing_margin(edges, tolerance))
 }

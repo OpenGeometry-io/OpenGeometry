@@ -9,6 +9,7 @@ pub struct Tessellation {
     pub triangle_face_ids: Vec<u32>,
     pub outline_positions: Vec<f64>,
     pub outline_edge_ids: Vec<u32>,
+    pub smooth_edges: Vec<u8>,
     pub revision: u64,
     pub achieved_deflection: f64,
 }
@@ -21,6 +22,7 @@ impl Tessellation {
             triangle_face_ids: Vec::new(),
             outline_positions: Vec::new(),
             outline_edge_ids: Vec::new(),
+            smooth_edges: Vec::new(),
             revision,
             achieved_deflection: deflection,
         }
@@ -88,5 +90,6 @@ impl Tessellation {
             + self.triangle_face_ids.len() * 4
             + self.outline_positions.len() * 8
             + self.outline_edge_ids.len() * 4
+            + self.smooth_edges.len()
     }
 }

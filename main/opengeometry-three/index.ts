@@ -1,9 +1,11 @@
 export { OpenGeometry } from './src/opengeometry';
 export { OGMark } from './src/marks/og-mark';
+export type { HostGroup } from './src/rendering/geometry/host-group';
 export { SystemAssembly } from './src/bodies/system-assembly';
 export { Wire } from './src/bodies/wire';
 export { Solid } from './src/bodies/solid';
 export { Sheet } from './src/bodies/sheet';
+export type { BodyEventMap } from './src/bodies/body';
 export type { PointClassification } from './src/bodies/node-methods';
 export type { Measure, Validity } from './src/dto/measure';
 export type { MirrorPlane } from './src/dto/mirror';
@@ -14,7 +16,8 @@ export type { AnalyticExchangeBodyV2, IfcPreparedValue } from './src/dto/ifc-bod
 export * from './src/constants/index';
 export type {
   ArcParams, ConeParams, CylinderSectorParams, PolyhedronParams, ProfileArc, ProfileParams, ProfileSegment,
-  SphereParams, TorusParams,
+  SphereParams, TorusParams, SlotPrismParams, RoundedBoxParams, PipeSegmentParams, PolysolidParams,
+  RegularPolygonParams, SlotParams, RoundedRectangleParams,
 } from './src/dto/primitives';
 export type {
   CurvedRegion2D, CurvedRegionEdge, OffsetHole, OffsetPath2D, OffsetPolylineOptions, OffsetRegion,

@@ -1,3 +1,4 @@
+import { dropMember } from '../rendering/lod/host-groups';
 import { bodyKey, reindexShape, releaseShapeIfEmpty, runtime } from '../runtime/runtime-state';
 import type { Body } from './body';
 
@@ -11,6 +12,9 @@ export function register(body: Body): void {
 export function unregister(body: Body): void {
   const state = runtime();
   state.displayed.delete(body);
+  dropMember(state, body);
+  state.displayBounds.delete(body);
+  state.lod.stale = true;
   state.limbo.delete(body);
   state.bodies.delete(bodyKey(body.handle, body.generation));
   state.pickTargets.delete(body.surface);

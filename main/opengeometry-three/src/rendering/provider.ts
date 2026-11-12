@@ -6,6 +6,7 @@ export type TessellationRequest = {
   bucket: number;
   priority: number;
   maxTriangles: number;
+  smoothAngle?: number | undefined;
   generation: number;
 };
 

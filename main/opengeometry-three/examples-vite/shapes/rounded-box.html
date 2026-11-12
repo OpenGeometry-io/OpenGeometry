@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>OpenGeometry Rounded Box Example</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OpenGeometry rounded box example for Three.js." />
+    <meta name="author" content="Vishwajeet Mane" />
+    <link rel="stylesheet" href="../theme.css" />
+  </head>
+  <body class="og-example-page">
+    <div class="og-badge-title-card">
+      <a href="../index.html" class="og-badge-title-link">Back</a>
+      <span class="og-badge-title">Rounded Box</span>
+    </div>
+
+    <aside class="og-controls">
+      <h3>Rounded Box</h3>
+      <p class="og-control-summary">
+        A box with its four upright edges rounded. The radius stays below half the width and depth.
+      </p>
+
+      <label class="og-control-row" data-control="width">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Width</span>
+          <code class="og-control-value" data-value>1.2</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.2" max="3" step="0.05" value="1.2" />
+          <input data-number type="number" min="0.2" max="3" step="0.05" value="1.2" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="height">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Height</span>
+          <code class="og-control-value" data-value>0.6</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.05" max="2" step="0.05" value="0.6" />
+          <input data-number type="number" min="0.05" max="2" step="0.05" value="0.6" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="depth">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Depth</span>
+          <code class="og-control-value" data-value>0.8</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.2" max="3" step="0.05" value="0.8" />
+          <input data-number type="number" min="0.2" max="3" step="0.05" value="0.8" />
+        </div>
+      </label>
+
+      <label class="og-control-row" data-control="radius">
+        <div class="og-control-header">
+          <span class="og-control-label-chip">Radius</span>
+          <code class="og-control-value" data-value>0.15</code>
+        </div>
+        <div class="og-control-range">
+          <input data-range type="range" min="0.01" max="0.5" step="0.01" value="0.15" />
+          <input data-number type="number" min="0.01" max="0.5" step="0.01" value="0.15" />
+        </div>
+      </label>
+      <p id="status" class="og-control-summary" role="status" aria-live="polite">Loading kernel…</p>
+    </aside>
+
+    <div id="app"></div>
+
+    <script>
+      if (location.protocol === 'file:') document.querySelector('#status').textContent = 'Open this page through the Vite server.';
+      window.addEventListener('error', (event) => { document.querySelector('#status').textContent = `Error: ${event.message}`; }, true);
+      window.addEventListener('unhandledrejection', (event) => { document.querySelector('#status').textContent = `Error: ${String(event.reason)}`; });
+    </script>
+    <script type="module" src="./rounded-box.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,462 @@
+[
+  {
+    "export": "OpenGeometry",
+    "kind": "value",
+    "page": "opengeometry/api/opengeometry"
+  },
+  {
+    "export": "OGMark",
+    "kind": "value",
+    "page": "opengeometry/api/og-mark"
+  },
+  {
+    "export": "HostGroup",
+    "kind": "type",
+    "page": "opengeometry/api/display"
+  },
+  {
+    "export": "SystemAssembly",
+    "kind": "value",
+    "page": "opengeometry/api/system-assembly"
+  },
+  {
+    "export": "Wire",
+    "kind": "value",
+    "page": "opengeometry/api/wire"
+  },
+  {
+    "export": "Solid",
+    "kind": "value",
+    "page": "opengeometry/api/solid"
+  },
+  {
+    "export": "Sheet",
+    "kind": "value",
+    "page": "opengeometry/api/sheet"
+  },
+  {
+    "export": "BodyEventMap",
+    "kind": "type",
+    "page": "opengeometry/api/body"
+  },
+  {
+    "export": "PointClassification",
+    "kind": "type",
+    "page": "opengeometry/api/body"
+  },
+  {
+    "export": "Measure",
+    "kind": "type",
+    "page": "opengeometry/api/body"
+  },
+  {
+    "export": "Validity",
+    "kind": "type",
+    "page": "opengeometry/api/body"
+  },
+  {
+    "export": "MirrorPlane",
+    "kind": "type",
+    "page": "opengeometry/api/body"
+  },
+  {
+    "export": "OGError",
+    "kind": "value",
+    "page": "opengeometry/api/og-error"
+  },
+  {
+    "export": "ErrorDetails",
+    "kind": "type",
+    "page": "opengeometry/api/og-error"
+  },
+  {
+    "export": "OperateErrorDetails",
+    "kind": "type",
+    "page": "opengeometry/api/og-error"
+  },
+  {
+    "export": "AnalyticExchangeBodyV2",
+    "kind": "type",
+    "page": "opengeometry/api/export"
+  },
+  {
+    "export": "IfcPreparedValue",
+    "kind": "type",
+    "page": "opengeometry/api/export"
+  },
+  {
+    "export": "ArcParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "ConeParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "CylinderSectorParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "PolyhedronParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "ProfileArc",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "ProfileParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "ProfileSegment",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "SphereParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "TorusParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "SlotPrismParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "RoundedBoxParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "PipeSegmentParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "PolysolidParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "RegularPolygonParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "SlotParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "RoundedRectangleParams",
+    "kind": "type",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "CurvedRegion2D",
+    "kind": "type",
+    "page": "opengeometry/api/regions"
+  },
+  {
+    "export": "CurvedRegionEdge",
+    "kind": "type",
+    "page": "opengeometry/api/regions"
+  },
+  {
+    "export": "OffsetHole",
+    "kind": "type",
+    "page": "opengeometry/api/offsets"
+  },
+  {
+    "export": "OffsetPath2D",
+    "kind": "type",
+    "page": "opengeometry/api/offsets"
+  },
+  {
+    "export": "OffsetPolylineOptions",
+    "kind": "type",
+    "page": "opengeometry/api/offsets"
+  },
+  {
+    "export": "OffsetRegion",
+    "kind": "type",
+    "page": "opengeometry/api/regions"
+  },
+  {
+    "export": "OG_PRIMITIVE_RECTANGLE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_CIRCLE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_POLYLINE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_CUBOID",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_CYLINDER",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_CYLINDER_SECTOR",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_POLYHEDRON",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_SPHERE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_CONE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_TORUS",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PROFILE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_ARC",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_SLOT_PRISM",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_ROUNDED_BOX",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PIPE_SEGMENT",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_POLYSOLID",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_REGULAR_POLYGON",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_SLOT",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_ROUNDED_RECTANGLE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_RECTANGLE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_CIRCLE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_POLYLINE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_CUBOID",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_CYLINDER",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_PROFILE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_ARC",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_CYLINDER_SECTOR",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_POLYHEDRON",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_SPHERE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_CONE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_TORUS",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_SLOT_PRISM",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_ROUNDED_BOX",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_PIPE_SEGMENT",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_POLYSOLID",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_REGULAR_POLYGON",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_SLOT",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_PRIMITIVE_PARAMS_ROUNDED_RECTANGLE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_OPERATION_EXTRUDE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_OPERATION_SWEEP",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_OPERATION_REVOLVE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_OPERATION_UNION",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_OPERATION_SUBTRACT",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_OPERATION_INTERSECT",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_OPERATION_SHELL",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_OPERATION_PARAMS_EXTRUDE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_OPERATION_PARAMS_SWEEP",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_OPERATION_PARAMS_REVOLVE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_TRANSFORM_TRANSLATE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_TRANSFORM_ROTATE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_TRANSFORM_SCALE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_TRANSFORM_PLACE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  },
+  {
+    "export": "OG_REGION_TOLERANCE",
+    "kind": "value",
+    "page": "opengeometry/api/constants"
+  }
+]

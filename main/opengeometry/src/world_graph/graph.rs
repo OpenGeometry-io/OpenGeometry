@@ -5,7 +5,7 @@ use super::node::{MarkId, Node};
 use super::shape_store::{Shape, ShapeId, ShapeStore};
 use crate::brep::{Accuracy, Similarity3};
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 pub(super) struct JournalEntry {
     pub(super) nodes: BTreeMap<String, Option<Node>>,
@@ -21,6 +21,7 @@ pub struct WorldGraph {
     pub(super) accuracy: Accuracy,
     pub(super) shapes: ShapeStore,
     pub(super) nodes: BTreeMap<String, Node>,
+    pub(super) handles: HashMap<(u32, u32), String>,
     pub(super) revision: u64,
     pub(super) changes: Vec<ChangeSet>,
     pub(super) journal: Vec<JournalEntry>,
@@ -40,6 +41,7 @@ impl WorldGraph {
             accuracy,
             shapes: ShapeStore::default(),
             nodes: BTreeMap::new(),
+            handles: HashMap::new(),
             revision: 0,
             changes: Vec::new(),
             journal: Vec::new(),
@@ -66,6 +68,20 @@ impl WorldGraph {
 
     pub fn node_count(&self) -> usize {
         self.nodes.len()
+    }
+
+    pub(super) fn insert_node(&mut self, og_id: String, node: Node) {
+        let key = (node.handle, node.generation);
+        if let Some(previous) = self.nodes.insert(og_id.clone(), node) {
+            self.handles.remove(&(previous.handle, previous.generation));
+        }
+        self.handles.insert(key, og_id);
+    }
+
+    pub(super) fn remove_node(&mut self, og_id: &str) {
+        if let Some(previous) = self.nodes.remove(og_id) {
+            self.handles.remove(&(previous.handle, previous.generation));
+        }
     }
 }
 

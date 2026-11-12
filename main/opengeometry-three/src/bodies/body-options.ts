@@ -16,4 +16,5 @@ export type Appearance = {
   outline: boolean;
   pickOutline: boolean;
   deflection?: number;
+  smoothAngle?: number;
 };

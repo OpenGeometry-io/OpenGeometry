@@ -5,6 +5,7 @@ export type DisplayBuffers = {
   faceRanges: Uint32Array;
   outline: Float32Array;
   edgeIds: Uint32Array;
+  smoothEdges: Uint8Array;
   origin: Float64Array;
   revision: number;
   bucket: number;

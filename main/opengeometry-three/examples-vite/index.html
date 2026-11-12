@@ -3,25 +3,47 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OpenGeometry 2.5 Example</title>
+    <title>OpenGeometry Example</title>
     <link rel="stylesheet" href="./theme.css" />
   </head>
   <body>
     <main id="app">
       <div id="viewport" aria-label="Interactive OpenGeometry model"></div>
-      <div id="controls">
-        <a class="example-link" href="./sweep.html">Sweep example</a>
-        <a class="example-link" href="./boolean.html">Boolean example</a>
-        <a class="example-link" href="./operations/analytic-boolean-operations.html">Analytic Boolean example</a>
-        <a class="example-link" href="./opening.html">Opening example</a>
-        <a class="example-link" href="./shapes/cuboid.html">Cuboid example</a>
-        <a class="example-link" href="./shapes/cylinder.html">Cylinder example</a>
-        <a class="example-link" href="./operations/step-export.html">STEP export example</a>
-        <button id="reset-view" type="button">Reset view</button>
-        <button id="toggle-edges" type="button" aria-pressed="false">Show edges</button>
-        <button id="export-step" type="button">Export STEP</button>
-        <span id="status" role="status" aria-live="polite">Loading kernel…</span>
+      <div class="og-badge-title-card">
+        <span class="og-badge-title">OpenGeometry</span>
+        <span class="og-control-label-chip">3.0 examples</span>
       </div>
+      <aside id="controls" class="og-controls">
+        <h3>Showcase</h3>
+        <p class="og-control-summary">A small room built from kernel solids: a floor slab, an extruded wall with a door opening cut by a Boolean subtraction, and a swept rail on shared post instances.</p>
+        <div class="og-actions">
+          <button id="reset-view" type="button">Reset view</button>
+          <button id="toggle-edges" type="button" aria-pressed="false">Show edges</button>
+          <button id="export-step" type="button">Export STEP</button>
+        </div>
+        <p id="status" class="og-control-summary" role="status" aria-live="polite">Loading kernel…</p>
+        <nav class="og-example-nav" aria-label="Examples">
+          <h4>Shapes</h4>
+          <a class="example-link" href="./shapes/cuboid.html">Cuboid</a>
+          <a class="example-link" href="./shapes/cylinder.html">Cylinder</a>
+          <a class="example-link" href="./shapes/rounded-profile.html">Rounded section</a>
+          <a class="example-link" href="./shapes/slot-prism.html">Slot prism</a>
+          <a class="example-link" href="./shapes/rounded-box.html">Rounded box</a>
+          <a class="example-link" href="./shapes/pipe-segment.html">Pipe segment</a>
+          <a class="example-link" href="./shapes/polysolid.html">Polysolid wall</a>
+          <a class="example-link" href="./shapes/wire-kinds.html">Wire kinds</a>
+          <h4>Sweeps</h4>
+          <a class="example-link" href="./sweep.html">Sweep frames</a>
+          <a class="example-link" href="./operations/sweep-arc-path.html">Arc path sweep</a>
+          <h4>Booleans</h4>
+          <a class="example-link" href="./boolean.html">Solid Boolean</a>
+          <a class="example-link" href="./operations/analytic-boolean-operations.html">Analytic Boolean</a>
+          <a class="example-link" href="./opening.html">Wall opening</a>
+          <a class="example-link" href="./operations/curved-meets-straight.html">Curved meets straight</a>
+          <h4>Export</h4>
+          <a class="example-link" href="./operations/step-export.html">STEP export</a>
+        </nav>
+      </aside>
     </main>
     <script>
       if (location.protocol === 'file:') document.querySelector('#status').textContent = 'Use the local Vite server. Open http://127.0.0.1:5100/ after starting it.';
