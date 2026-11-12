@@ -1,4 +1,5 @@
 mod keep;
+mod merge;
 mod sections;
 
 use super::facets::{coverage, finish, PlanarFacets};
@@ -8,17 +9,29 @@ use crate::geom2d::{
     RingRegion,
 };
 use crate::math::{dot, scale, sub, Point3};
+use crate::operations::modifying::boolean::handlers::disjoint::separate_boolean;
 use crate::operations::modifying::boolean::operands::brep_face_source;
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
 use crate::query::{Classifier, PointClassification};
-use keep::{boundary_probe_side, cutter_frame, cutter_keeps, host_keeps, piece_role, turns_cutter};
+use keep::{cutter_frame, open_boundary_gap, piece_role, turns_cutter, Keeper};
+use merge::merged_coplanar;
 use sections::{
-    convex_faces, convex_section_polygon, planar_faces, planar_section_segments,
+    convex_faces, convex_section_polygon, local_ring, planar_faces, planar_section_segments,
     ring_vertex_candidates, split_planar_ring, PlanarFace, PlanarFacet,
 };
 use std::cell::RefCell;
 
 pub(crate) fn boolean_planar_polyhedra(
+    host: &BrepEnvelope,
+    cutter: &BrepEnvelope,
+    operation: BooleanOp,
+    id: String,
+) -> Result<BooleanResult, GeometryError> {
+    planar_polyhedra(host, cutter, operation, id)
+        .map_err(|error| open_boundary_gap(operation, error))
+}
+
+fn planar_polyhedra(
     host: &BrepEnvelope,
     cutter: &BrepEnvelope,
     operation: BooleanOp,
@@ -37,13 +50,14 @@ pub(crate) fn boolean_planar_polyhedra(
         None
     };
     check_not_nested(host, cutter)?;
+    let keeper = Keeper::new(operation);
     let mut pieces = Vec::new();
     for face in &host_faces {
         let base = face_rings(face);
         let regions = if let Some(convex_faces) = &convex_cutter_faces {
             convex_host_regions(cutter, convex_faces, face, &base, accuracy)?
         } else {
-            classified_host_regions(cutter, &cutter_faces, face, &base, accuracy, operation)?
+            classified_host_regions(cutter, &cutter_faces, face, &base, accuracy, &keeper)?
         };
         for region in regions {
             let role = piece_role(operation, false, &region, &base, accuracy.geometric);
@@ -60,15 +74,28 @@ pub(crate) fn boolean_planar_polyhedra(
             face,
             &base,
             accuracy,
-            operation,
+            &keeper,
         )?;
         for region in regions {
             let role = piece_role(operation, true, &region, &base, accuracy.geometric);
             pieces.push(cutter_piece(cutter, face, operation, &region, role));
         }
     }
+    if operation != BooleanOp::Subtraction && !keeper.shares_volume_or_face() {
+        return match operation {
+            BooleanOp::Intersection => separate_boolean(host, cutter, operation, id, Vec::new()),
+            _ => Err(coverage()),
+        };
+    }
     if pieces.is_empty() {
         return Err(coverage());
+    }
+    if operation != BooleanOp::Subtraction {
+        pieces = merged_coplanar(
+            pieces,
+            [(host, &host_faces), (cutter, &cutter_faces)],
+            accuracy,
+        )?;
     }
     let facets = welded_facets(pieces, id, accuracy)?;
     let mut result = finish(facets, host, cutter, operation)?;
@@ -137,16 +164,6 @@ fn check_not_nested(host: &BrepEnvelope, cutter: &BrepEnvelope) -> Result<(), Ge
     Ok(())
 }
 
-fn local_ring(points: &[Point3], frame: Frame3) -> Vec<Pt2> {
-    points
-        .iter()
-        .map(|point| {
-            let local = frame.local(*point);
-            Pt2::new(local[0], local[1])
-        })
-        .collect::<Vec<_>>()
-}
-
 fn convex_host_regions(
     cutter: &BrepEnvelope,
     convex_faces: &[PlanarFace],
@@ -154,7 +171,14 @@ fn convex_host_regions(
     base: &[Vec<Pt2>],
     accuracy: Accuracy,
 ) -> Result<Vec<RingRegion>, GeometryError> {
-    let section = convex_section_polygon(cutter, convex_faces, face.frame, accuracy.intersection);
+    let touches_from_outside = cutter.topology.vertices.iter().all(|vertex| {
+        dot(face.frame.z, sub(vertex.position, face.frame.origin)) >= -accuracy.intersection
+    });
+    let section = if touches_from_outside {
+        Vec::new()
+    } else {
+        convex_section_polygon(cutter, convex_faces, face.frame, accuracy.intersection)
+    };
     let cut = if section.is_empty() {
         Vec::new()
     } else {
@@ -174,7 +198,7 @@ fn classified_host_regions(
     face: &PlanarFace,
     base: &[Vec<Pt2>],
     accuracy: Accuracy,
-    operation: BooleanOp,
+    keeper: &Keeper,
 ) -> Result<Vec<RingRegion>, GeometryError> {
     let mut edges =
         planar_section_segments(cutter, cutter_faces, face.frame, accuracy.intersection)?;
@@ -204,14 +228,12 @@ fn classified_host_regions(
                 position,
                 scale(
                     face.frame.z,
-                    boundary_probe_side(operation)
-                        * accuracy.geometric.max(accuracy.intersection)
-                        * 4.0,
+                    keeper.probe_side() * accuracy.geometric.max(accuracy.intersection) * 4.0,
                 ),
             )),
             other => other,
         };
-        match classification.map(|place| host_keeps(operation, place)) {
+        match classification.map(|place| keeper.host(place)) {
             Ok(Some(keep)) => keep,
             Ok(None) => {
                 *failure.borrow_mut() = Some(coverage());
@@ -275,7 +297,7 @@ fn cutter_face_regions(
     face: &PlanarFace,
     cutter_region: &[Vec<Pt2>],
     accuracy: Accuracy,
-    operation: BooleanOp,
+    keeper: &Keeper,
 ) -> Result<Vec<RingRegion>, GeometryError> {
     let mut edges = planar_section_segments(host, host_faces, face.frame, accuracy.intersection)?;
     let coplanar = coplanar_rings(host_faces, face, accuracy);
@@ -303,7 +325,7 @@ fn cutter_face_regions(
         }
         match classifier
             .classify(face.frame.point([point.x, point.z, 0.0]))
-            .map(|place| cutter_keeps(operation, place))
+            .map(|place| keeper.cutter(place))
         {
             Ok(Some(keep)) => keep,
             Ok(None) => {

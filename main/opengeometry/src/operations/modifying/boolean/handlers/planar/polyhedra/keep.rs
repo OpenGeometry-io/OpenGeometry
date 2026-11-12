@@ -1,10 +1,50 @@
-use crate::brep::{FaceRole, Frame3};
+use crate::brep::{FaceRole, Frame3, GeometryError};
 use crate::geom2d::{signed_area2, Pt2, RingRegion};
 use crate::math::scale;
+use crate::operations::modifying::boolean::handlers::planar::facets::coverage;
 use crate::operations::modifying::boolean::types::BooleanOp;
 use crate::query::PointClassification;
+use std::cell::Cell;
 
-pub(super) fn host_keeps(operation: BooleanOp, place: PointClassification) -> Option<bool> {
+pub(super) struct Keeper {
+    operation: BooleanOp,
+    shared: Cell<bool>,
+}
+
+impl Keeper {
+    pub(super) fn new(operation: BooleanOp) -> Self {
+        Self {
+            operation,
+            shared: Cell::new(false),
+        }
+    }
+
+    pub(super) fn probe_side(&self) -> f64 {
+        boundary_probe_side(self.operation)
+    }
+
+    pub(super) fn host(&self, place: PointClassification) -> Option<bool> {
+        self.note(place);
+        host_keeps(self.operation, place)
+    }
+
+    pub(super) fn cutter(&self, place: PointClassification) -> Option<bool> {
+        self.note(place);
+        cutter_keeps(self.operation, place)
+    }
+
+    pub(super) fn shares_volume_or_face(&self) -> bool {
+        self.shared.get()
+    }
+
+    fn note(&self, place: PointClassification) {
+        if place == PointClassification::Inside {
+            self.shared.set(true);
+        }
+    }
+}
+
+fn host_keeps(operation: BooleanOp, place: PointClassification) -> Option<bool> {
     match place {
         PointClassification::Outside => Some(operation != BooleanOp::Intersection),
         PointClassification::Inside => Some(operation == BooleanOp::Intersection),
@@ -12,7 +52,7 @@ pub(super) fn host_keeps(operation: BooleanOp, place: PointClassification) -> Op
     }
 }
 
-pub(super) fn boundary_probe_side(operation: BooleanOp) -> f64 {
+fn boundary_probe_side(operation: BooleanOp) -> f64 {
     if operation == BooleanOp::Union {
         -1.0
     } else {
@@ -20,7 +60,7 @@ pub(super) fn boundary_probe_side(operation: BooleanOp) -> f64 {
     }
 }
 
-pub(super) fn cutter_keeps(operation: BooleanOp, place: PointClassification) -> Option<bool> {
+fn cutter_keeps(operation: BooleanOp, place: PointClassification) -> Option<bool> {
     match place {
         PointClassification::Inside => Some(operation != BooleanOp::Union),
         PointClassification::Outside => Some(operation == BooleanOp::Union),
@@ -79,5 +119,17 @@ pub(super) fn piece_role(
         FaceRole::Preserved
     } else {
         FaceRole::Split
+    }
+}
+
+pub(super) fn open_boundary_gap(operation: BooleanOp, error: GeometryError) -> GeometryError {
+    match error {
+        GeometryError::InvalidTopology(message)
+            if operation != BooleanOp::Subtraction
+                && message == "layered planar Boolean has an open boundary" =>
+        {
+            coverage()
+        }
+        other => other,
     }
 }

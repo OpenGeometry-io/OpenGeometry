@@ -103,11 +103,18 @@ impl Pair {
         let union = self.built(BooleanOp::Union, 2);
         assert_eq!(union.handlers, ["generic_non_intersecting_boolean"]);
         union.assert_volume(a.value + b.value);
+        self.assert_empty_intersection();
+        let difference = self.built(BooleanOp::Subtraction, 1);
+        assert_eq!(difference.handlers, ["subtract_planar_polyhedra"]);
+        difference.assert_volume(a.value);
+    }
+
+    pub(super) fn assert_empty_intersection(&self) {
         let operation = BooleanOp::Intersection;
         let (result, handlers) =
             boolean_brep_outcome_with_handlers(&self.a, &self.b, operation, "touching".into());
         let result = result.unwrap_or_else(|error| panic!("{operation:?}: {error:?}"));
-        assert_eq!(handlers, ["generic_non_intersecting_boolean"]);
+        assert_eq!(handlers, ["boolean_planar_polyhedra"]);
         result.brep.validate().unwrap();
         let topology = &result.brep.topology;
         assert!(topology.vertices.is_empty() && topology.edges.is_empty());
@@ -117,9 +124,6 @@ impl Pair {
         assert_eq!(value["topology"]["shells"], json!([]));
         let report = serde_json::to_value(&result.report).unwrap();
         assert_eq!(report["operation"], json!(operation));
-        let difference = self.built(BooleanOp::Subtraction, 1);
-        assert_eq!(difference.handlers, ["subtract_planar_polyhedra"]);
-        difference.assert_volume(a.value);
     }
 
     pub(super) fn assert_identities(

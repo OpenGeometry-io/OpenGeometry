@@ -157,3 +157,46 @@ fn box_standing_on_a_turned_cuboid_subtracts_to_the_unchanged_host() {
     ]);
     pair.built(BooleanOp::Subtraction, 1).assert_volume(1.0);
 }
+
+fn eave_slab(plate: bool, shift: f64) -> Primitive {
+    let (ridge, eave, sole) = (5.3006226146291295, 2.8498962308951454, 2.6498962308951453);
+    let inner = if plate { 5.100622614629129 } else { sole };
+    let points = [
+        [-0.5, ridge, 3.0],
+        [8.5, ridge, 3.0],
+        [8.5, eave, -0.5],
+        [-0.5, eave, -0.5],
+        [-0.5, sole, -0.5],
+        [8.5, sole, -0.5],
+        [8.5, inner, 3.0],
+        [-0.5, inner, 3.0],
+        [-0.5, eave, 6.5],
+        [8.5, eave, 6.5],
+        [8.5, sole, 6.5],
+        [-0.5, sole, 6.5],
+    ]
+    .map(|[x, y, z]| [x, y, z + shift]);
+    let faces: [&[u32]; 10] = [
+        &[0, 1, 2, 3],
+        &[4, 5, 6, 7],
+        &[1, 0, 8, 9],
+        &[10, 11, 7, 6],
+        &[2, 1, 6, 5],
+        &[3, 2, 5, 4],
+        &[0, 3, 4, 7],
+        &[8, 0, 7, 11],
+        &[9, 8, 11, 10],
+        &[1, 9, 10, 6],
+    ];
+    polyhedron(&points, &faces)
+}
+
+#[test]
+fn mass_roofs_touching_along_an_eave_intersect_empty() {
+    Pair::new(eave_slab(false, 0.0), eave_slab(false, 7.0)).assert_empty_intersection();
+}
+
+#[test]
+fn plate_roofs_touching_along_an_eave_intersect_empty() {
+    Pair::new(eave_slab(true, 0.0), eave_slab(true, 7.0)).assert_empty_intersection();
+}
