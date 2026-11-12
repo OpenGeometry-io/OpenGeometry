@@ -1,0 +1,65 @@
+---
+title: Bodies
+description: Wires, sheets and solids, the shapes they hold, and the difference between a copy and an instance.
+icon: cube
+---
+
+A body is a node in the document that holds a shape. There are three kinds.
+
+| Class   | `bodyType` | What it is                                | Made by                                                                          |
+| ------- | ---------- | ----------------------------------------- | -------------------------------------------------------------------------------- |
+| `Wire`  | `'Wire'`   | Lines and arcs, open or closed. No faces. | Rectangle, circle, polyline, profile, arc                                        |
+| `Sheet` | `'Sheet'`  | Faces that enclose no volume.             | A sweep with `caps: false`                                                       |
+| `Solid` | `'Solid'`  | Closed faces around a volume.             | Cuboid, cylinder, sphere and the other solid primitives; extrude, sweep, revolve |
+
+The constructor takes a kind, its parameters and options:
+
+```ts
+import { OpenGeometry, Solid, Wire, OG_OPERATION_EXTRUDE, OG_PRIMITIVE_CIRCLE } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const circle = new Wire(OG_PRIMITIVE_CIRCLE, { radius: 0.5 }, { ogId: 'post-profile' });
+const post = new Solid(OG_OPERATION_EXTRUDE, { profile: circle, distance: 2.4 }, { ogId: 'post' });
+console.log(circle.bodyType, post.bodyType, post.ogId);
+```
+
+## Identity
+
+Each body has an `ogId`. Pass your own in the options, or let the SDK make one. Use it to find the body again, for example in a picking result or a STEP report.
+
+## Inputs stay separate
+
+An operation reads its inputs when you call it. The result does not follow them later:
+
+- The wire that you extruded stays a separate body. Changing it later does not change the solid.
+- The tools of an `operate` call stay separate, live solids. Moving or disposing a tool later does not change the target.
+- A body is drawn only if you add it to the scene.
+
+## Shapes, copies and instances
+
+A body points to a shape. Two ways make a second body from the first:
+
+| Call               | Shape      | An edit of one body                                          |
+| ------------------ | ---------- | ------------------------------------------------------------ |
+| `body.duplicate()` | A new copy | Changes that body only                                       |
+| `body.instance()`  | Shared     | Throws `SharedShape`, unless you pass `{ instances: 'all' }` |
+
+`getInstanceCount()` gives the number of bodies that share the shape. `makeUnique()` gives a body its own copy, so you can edit it alone. Instances are cheap: the kernel stores the shape and its display mesh once.
+
+## Edits
+
+Shape edits change the body in place and give its shape a new revision:
+
+- `solid.operate(...)`: booleans and shell.
+- `body.rebuild(kind, params)`: new parameters. A wire stays a wire and a solid stays a solid. An earlier `operate` result is gone, so call `operate` again after it.
+- `body.mirror(plane)`: a reflection across a plane.
+
+## Dispose
+
+Call `dispose()` on a body or an assembly that you no longer need. A disposed body throws `Disposed` on every call. If a [mark](/opengeometry/concepts/history) is live, a rollback can bring the body back.
+
+`clone()` gives a display copy for Three.js only, with no kernel shape. `copy()` throws; use `duplicate()`.

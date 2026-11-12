@@ -8,7 +8,7 @@ import { ensureGeometry, graph, runtime } from '../../../dist/testing.js';
 import { boot, cuboid, nextTask } from './support.mjs';
 
 const LIVE = 300;
-const RENDERER = { getDrawingBufferSize: (target) => target.set(1000, 1000) };
+const RENDERER = { info: { render: { frame: 0 } }, getDrawingBufferSize: (target) => target.set(1000, 1000) };
 const BODY = Object.getPrototypeOf(Solid.prototype);
 
 async function fresh() {
@@ -227,6 +227,7 @@ function camera() {
 async function frame(scene, view) {
   scene.updateMatrixWorld(true);
   const mesh = scene.children[0]?.surface;
+  RENDERER.info.render.frame++;
   if (mesh) Reflect.apply(mesh.onBeforeRender, mesh, [RENDERER, scene, view]);
   await nextTask();
 }

@@ -1,0 +1,82 @@
+---
+title: Display
+description: How a body gets its mesh, level of detail, smooth edges, appearance, and when to call flush or settled.
+icon: display
+---
+
+A body is a `THREE.Group` with two children:
+
+- `surface`: a `THREE.Mesh` with a `MeshStandardMaterial`. The scene needs a light.
+- `outline`: a `THREE.LineSegments` with the body's edges.
+
+## Rendering asks for geometry
+
+The kernel makes a display mesh only for a body that is displayed. A body is displayed when it is drawn, or when `updateMatrixWorld` walks it:
+
+- **Drawn:** its `surface` or `outline` runs `onBeforeRender`. The new mesh is installed after that render, so the next frame shows it.
+- **Walked:** `scene.updateMatrixWorld()` reaches it. The mesh is installed at once.
+- **Marked:** you call `OpenGeometry.markDisplayed(bodies)` for bodies that your own layers draw. See [Use your Three.js scene](/opengeometry/guides/use-your-threejs-scene).
+
+A body that is neither drawn nor walked for a full render pass is not displayed. It gets no new mesh until it is displayed again.
+
+So render in a loop. Or render once, `await OpenGeometry.settled()`, and render again:
+
+```ts
+import * as THREE from 'three';
+import { OpenGeometry, Solid, OG_PRIMITIVE_SPHERE } from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const ball = new Solid(OG_PRIMITIVE_SPHERE, { radius: 1 });
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2), ball);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+camera.position.set(3, 2, 3);
+camera.lookAt(0, 0, 0);
+const renderer = new THREE.WebGLRenderer();
+renderer.render(scene, camera);
+const { failed } = await OpenGeometry.settled();
+renderer.render(scene, camera);
+console.log(failed.length);
+```
+
+`settled` resolves when every displayed body has its mesh. `failed` lists the bodies whose mesh failed, with the error. If nothing was rendered, `settled` returns at once.
+
+## Mesh now
+
+`OpenGeometry.flush({ geometry: 'sync' })` meshes every displayed body on the calling thread before it returns. Add `bodies` to mesh only those. Use it in tests, in Node, or when one edited body must be current before the next frame. See [`flush`](/opengeometry/api/display#flush).
+
+## Level of detail
+
+The kernel picks the mesh detail from the camera. A body that is small on the screen gets a coarser mesh. While the camera moves, the kernel accepts a coarser mesh; when it stops, it refines.
+
+- `OpenGeometry.observeCamera(renderer, camera)`: tell the kernel which camera draws each frame.
+- `OpenGeometry.setCameraMotion(true)`: tell the kernel that the camera moves, for example from your controls.
+- `OpenGeometry.setDisplayDeflection(world)`: set a fixed deflection in world metres for every body. Call it with no value to go back to the camera.
+- `appearance.deflection`: set a fixed deflection for one body.
+
+Deflection is the largest distance between the mesh and the exact surface.
+
+## Smooth edges
+
+The outline leaves out smooth edges. An edge is smooth when its two faces are tangent-continuous, or when two planes fold by less than the smooth angle. The default smooth angle is 20°. Planar faces average their normals across smooth edges, so a polygon that approximates a curve shades as one curve.
+
+Set `appearance.smoothAngle` to change the angle for one body, in degrees from 0 up to but not including 90. `0` keeps every fold line.
+
+## Appearance
+
+Pass `appearance` in the options, or call `setAppearance` later:
+
+| Field         | Default                                     | Meaning                               |
+| ------------- | ------------------------------------------- | ------------------------------------- |
+| `color`       | `0x2563eb` for a wire, `0x6699dd` otherwise | A number, as in Three.js              |
+| `opacity`     | `1`                                         | 0 to 1                                |
+| `outline`     | `false` for a solid, `true` otherwise       | Show the outline                      |
+| `pickOutline` | `true` for a wire, `false` otherwise        | Raycasts hit the outline              |
+| `deflection`  | none                                        | A fixed mesh deflection for this body |
+| `smoothAngle` | 20                                          | The smooth-edge angle in degrees      |
+
+Do not change a body's materials yourself. Use `setAppearance`.

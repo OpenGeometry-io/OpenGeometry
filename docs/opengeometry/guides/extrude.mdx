@@ -1,0 +1,77 @@
+---
+title: Extrude
+description: Raise a closed wire along its plane normal into a solid, with holes.
+icon: arrow-up-from-bracket
+---
+
+`OG_OPERATION_EXTRUDE` raises a closed wire into a solid. The parameters are `{ profile, holes?, distance }`:
+
+- `profile`: a closed wire, such as a rectangle, a circle, a closed polyline or a closed profile.
+- `holes`: closed wires inside the profile, on the same plane.
+- `distance`: the height, along the profile's plane normal.
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_EXTRUDE,
+  OG_OPERATION_PARAMS_EXTRUDE,
+  OG_PRIMITIVE_CIRCLE,
+  OG_PRIMITIVE_RECTANGLE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const plate = new Wire(OG_PRIMITIVE_RECTANGLE, { width: 2, breadth: 1 });
+const bolt = new Wire(OG_PRIMITIVE_CIRCLE, { radius: 0.1 }, { plane: { origin: [0.6, 0, 0] } });
+const slab = new Solid(
+  OG_OPERATION_EXTRUDE,
+  OG_OPERATION_PARAMS_EXTRUDE({ profile: plate, holes: [bolt], distance: 0.05 }),
+);
+console.log(slab.getBrep().topology.faces.length);
+```
+
+## A line-and-arc profile
+
+A closed `OG_PRIMITIVE_PROFILE` extrudes into exact planes and cylinders. This is a quarter ring sector, 3 m high:
+
+```ts
+import {
+  OpenGeometry,
+  Solid,
+  Wire,
+  OG_OPERATION_EXTRUDE,
+  OG_PRIMITIVE_PROFILE,
+} from 'opengeometry';
+
+await OpenGeometry.create(
+  { wasmURL: '/opengeometry_bg.wasm' },
+  { workerURL: '/tessellation-worker.js' },
+);
+
+const profile = new Wire(OG_PRIMITIVE_PROFILE, {
+  start: [1, 0],
+  segments: [
+    { to: [2, 0] },
+    { to: [0, 2], arc: { center: [0, 0], counterClockwise: true } },
+    { to: [0, 1] },
+    { to: [1, 0], arc: { center: [0, 0], counterClockwise: false } },
+  ],
+  closed: true,
+});
+const sector = new Solid(OG_OPERATION_EXTRUDE, { profile, distance: 3 });
+console.log(sector.validity().valid);
+```
+
+A curved wall is the same kind of profile, extruded up. Openings in it are booleans. See [Booleans](/opengeometry/guides/booleans).
+
+## Rules
+
+- The profile must be closed. An open wire throws `InvalidParameter`.
+- A hole that encloses the whole profile throws `InvalidParameter`.
+- The extrude goes along the profile's plane normal. On the default ground plane that is +Y.
+- The wires stay separate bodies. Changing one later does not change the solid.

@@ -10,6 +10,7 @@ mod loop_minimum;
 mod measure;
 mod mesh;
 mod planar_face;
+mod smooth;
 mod snapshot_store;
 mod tessellate;
 #[cfg(test)]
@@ -20,4 +21,4 @@ mod trimmed_face;
 pub use measure::{measure, Measure};
 pub use mesh::Tessellation;
 pub use snapshot_store::SnapshotStore;
-pub use tessellate::tessellate;
+pub use tessellate::{tessellate, tessellate_with_smooth_angle};

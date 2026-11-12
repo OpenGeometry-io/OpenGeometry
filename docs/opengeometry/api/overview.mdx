@@ -1,0 +1,46 @@
+---
+title: API reference
+description: Every export of the opengeometry 3.0 package, and the page that describes it.
+icon: code
+---
+
+The package has one entry, `opengeometry`. Its types are in `index.d.ts` in the installed package.
+
+```ts
+import { OpenGeometry, Solid, Wire, OG_PRIMITIVE_CUBOID } from 'opengeometry';
+import type { Measure } from 'opengeometry';
+```
+
+## Classes and values
+
+| Export           | Page                                                | What it is                                      |
+| ---------------- | --------------------------------------------------- | ----------------------------------------------- |
+| `OpenGeometry`   | [OpenGeometry](/opengeometry/api/opengeometry)      | The runtime: start, events, history, export, 2D |
+| `Wire`           | [Wire](/opengeometry/api/wire)                      | Lines and arcs                                  |
+| `Solid`          | [Solid](/opengeometry/api/solid)                    | Closed faces around a volume                    |
+| `Sheet`          | [Sheet](/opengeometry/api/sheet)                    | Faces that enclose no volume                    |
+| `SystemAssembly` | [SystemAssembly](/opengeometry/api/system-assembly) | A group of nodes                                |
+| `OGMark`         | [OGMark](/opengeometry/api/og-mark)                 | A point in history                              |
+| `OGError`        | [OGError](/opengeometry/api/og-error)               | The error every call throws                     |
+| `OG_*` constants | [Constants](/opengeometry/api/constants)            | Kinds, typed parameter helpers, tolerance       |
+
+The methods that `Wire`, `Solid` and `Sheet` share are on [Body methods](/opengeometry/api/body). The display statics are on [Display](/opengeometry/api/display), and picking on [Picking](/opengeometry/api/picking).
+
+## Types
+
+| Type                                                                                                                                                                                                                                                                                                 | Page                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `BodyEventMap`, `PointClassification`, `Measure`, `Validity`, `MirrorPlane`                                                                                                                                                                                                                          | [Body methods](/opengeometry/api/body)   |
+| `HostGroup`                                                                                                                                                                                                                                                                                          | [Display](/opengeometry/api/display)     |
+| `ErrorDetails`, `OperateErrorDetails`                                                                                                                                                                                                                                                                | [OGError](/opengeometry/api/og-error)    |
+| `AnalyticExchangeBodyV2`, `IfcPreparedValue`                                                                                                                                                                                                                                                         | [Export](/opengeometry/api/export)       |
+| `OffsetRegion`, `CurvedRegion2D`, `CurvedRegionEdge`                                                                                                                                                                                                                                                 | [Regions](/opengeometry/api/regions)     |
+| `OffsetHole`, `OffsetPath2D`, `OffsetPolylineOptions`                                                                                                                                                                                                                                                | [Offsets](/opengeometry/api/offsets)     |
+| `ProfileParams`, `ProfileSegment`, `ProfileArc`, `ArcParams`, `CylinderSectorParams`, `PolyhedronParams`, `SphereParams`, `ConeParams`, `TorusParams`, `SlotPrismParams`, `RoundedBoxParams`, `PipeSegmentParams`, `PolysolidParams`, `RegularPolygonParams`, `SlotParams`, `RoundedRectangleParams` | [Constants](/opengeometry/api/constants) |
+
+## Conventions
+
+- Points and vectors are `[x, y, z]`. Units are metres. Y is up.
+- Kinds are string constants, such as `OG_PRIMITIVE_CUBOID`, which is `'Cuboid'`.
+- Every failure throws an `OGError`.
+- `index.d.ts` also declares internal members, such as `handle` and `install`. They are not part of the API; do not call them.

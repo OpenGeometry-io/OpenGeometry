@@ -1,8 +1,9 @@
 use crate::bindings::{errors, OGWorldGraph};
 use crate::geom2d::{
-    boolean_curved_regions, boolean_oriented_regions, offset_path, offset_polyline_regions,
-    offset_ring_variable, signed_area2, CurveEdge2, CurveRegion2, OffsetError, OffsetHole,
-    OffsetOptions, PlanarBooleanOp, Pt2, RingRegion,
+    boolean_curved_regions, boolean_oriented_regions, inset_curved_region, inset_tolerance,
+    offset_curved_ring_variable, offset_path, offset_polyline_regions, offset_ring_variable,
+    signed_area2, CurveEdge2, CurveRegion2, OffsetError, OffsetHole, OffsetOptions,
+    PlanarBooleanOp, Pt2, RingRegion,
 };
 use crate::world_graph::{ErrorCode, GraphError};
 use serde::de::DeserializeOwned;
@@ -73,6 +74,16 @@ impl OGWorldGraph {
         serde_json::to_string(&regions).map_err(errors::serialization)
     }
 
+    #[wasm_bindgen(js_name = insetCurvedRegion2D)]
+    pub fn inset_curved_region_2d(
+        &self,
+        region_json: &str,
+        distance: f64,
+    ) -> Result<String, JsValue> {
+        let regions = curved_inset(region_json, distance).map_err(errors::json)?;
+        serde_json::to_string(&regions).map_err(errors::serialization)
+    }
+
     #[wasm_bindgen(js_name = offsetRingVariable)]
     pub fn offset_ring_variable(
         &self,
@@ -81,6 +92,18 @@ impl OGWorldGraph {
         holes_json: &str,
     ) -> Result<String, JsValue> {
         let regions = offset_ring(&ring, &distances, holes_json).map_err(errors::json)?;
+        serde_json::to_string(&regions).map_err(errors::serialization)
+    }
+
+    #[wasm_bindgen(js_name = offsetCurvedRingVariable)]
+    pub fn offset_curved_ring_variable(
+        &self,
+        region_json: &str,
+        distances: Vec<f64>,
+        hole_distances_json: &str,
+    ) -> Result<String, JsValue> {
+        let regions =
+            curved_ring(region_json, &distances, hole_distances_json).map_err(errors::json)?;
         serde_json::to_string(&regions).map_err(errors::serialization)
     }
 
@@ -206,6 +229,22 @@ fn offset_ring(
     .map_err(offset_error)
 }
 
+fn curved_ring(
+    region_json: &str,
+    distances: &[f64],
+    hole_distances_json: &str,
+) -> Result<Vec<CurveRegion2>, GraphError> {
+    let region: CurveRegion2 = parsed(region_json)?;
+    let hole_distances: Vec<Vec<f64>> = parsed(hole_distances_json)?;
+    check_size(
+        region.outer.len() + region.holes.iter().map(Vec::len).sum::<usize>(),
+        "offset region edges",
+    )?;
+    let tolerance = inset_tolerance(&region, REGION_TOLERANCE);
+    offset_curved_ring_variable(&region, distances, &hole_distances, tolerance)
+        .map_err(offset_error)
+}
+
 fn flat_ring(flat: &[f64], label: &str) -> Result<Vec<Pt2>, GraphError> {
     if flat.len() % 3 != 0 || !flat.iter().all(|value| value.is_finite()) {
         return Err(GraphError::code(
@@ -264,6 +303,22 @@ fn curved_regions(
         "Boolean region edges",
     )?;
     boolean_curved_regions(&a, &b, operation, REGION_TOLERANCE).map_err(GraphError::from)
+}
+
+fn curved_inset(region_json: &str, distance: f64) -> Result<Vec<CurveRegion2>, GraphError> {
+    if !distance.is_finite() || distance <= 0.0 {
+        return Err(GraphError::code(
+            ErrorCode::InvalidParameter,
+            "inset distance must be a finite number above zero",
+        ));
+    }
+    let region: CurveRegion2 = parsed(region_json)?;
+    check_size(
+        region.outer.len() + region.holes.iter().map(Vec::len).sum::<usize>(),
+        "inset region edges",
+    )?;
+    let tolerance = inset_tolerance(&region, REGION_TOLERANCE);
+    inset_curved_region(&region, distance, tolerance).map_err(GraphError::from)
 }
 
 fn operation_of(text: &str) -> Result<PlanarBooleanOp, GraphError> {
