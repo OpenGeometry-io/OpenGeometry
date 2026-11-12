@@ -322,3 +322,32 @@ fn box_strictly_inside_a_gable_roof_with_turned_points_subtracts_to_nothing() {
             .assert_volume(3.92);
     }
 }
+
+fn scaled(primitive: Primitive, factor: f64) -> Primitive {
+    let Primitive::Polyhedron { points, faces } = primitive else {
+        panic!("not a polyhedron");
+    };
+    let points = points
+        .into_iter()
+        .map(|point: Point3| point.map(|value| value * factor))
+        .collect();
+    Primitive::Polyhedron { points, faces }
+}
+
+#[test]
+fn box_just_above_the_floor_inside_a_large_gable_roof_subtracts_to_nothing() {
+    let block = || {
+        hexahedron(
+            [150.0, 2.0e-4, 80.0],
+            [[100.0, 0.0, 0.0], [0.0, 30.0, 0.0], [0.0, 0.0, 40.0]],
+        )
+    };
+    let roof = || scaled(gable_roof(), 100.0);
+    let pair = Pair::new(block(), roof());
+    pair.assert_empty(BooleanOp::Subtraction, "generic_non_intersecting_boolean");
+    pair.built(BooleanOp::Union, 1).assert_volume(4.0e6);
+    pair.built(BooleanOp::Intersection, 1).assert_volume(1.2e5);
+    Pair::new(roof(), block())
+        .built(BooleanOp::Subtraction, 1)
+        .assert_volume(3.88e6);
+}

@@ -1,5 +1,4 @@
-use crate::brep::{unit, Accuracy, BrepEnvelope, FaceRole, GeometryError, Surface};
-use crate::math::{scale, sub, Point3};
+use crate::brep::{Accuracy, BrepEnvelope, FaceRole, GeometryError, Surface};
 use crate::operations::modifying::boolean::assembly::{
     append_analytic_input, finish_analytic_result, reverse_face,
 };
@@ -44,21 +43,10 @@ pub(crate) fn analytic_containment_boolean(
     finish_analytic_result(out, a, b, true, operation, false)
 }
 
-pub(crate) fn interior_sample(brep: &BrepEnvelope) -> Result<Point3, GeometryError> {
-    let bounds = brep.bounds()?.ok_or_else(|| {
-        GeometryError::InvalidTopology("cannot classify an empty solid boundary".into())
-    })?;
-    let model_scale = bounds
-        .axes
-        .iter()
-        .map(|axis| axis.width())
-        .fold(brep.accuracy.geometric, f64::max);
-    let offsets = [
-        (model_scale * 1.0e-6).max(32.0 * brep.accuracy.geometric),
-        16.0 * brep.accuracy.geometric,
-        8.0 * brep.accuracy.geometric,
-        4.0 * brep.accuracy.geometric,
-    ];
+pub(crate) fn boundary_side(
+    brep: &BrepEnvelope,
+    other: &BrepEnvelope,
+) -> Result<PointClassification, GeometryError> {
     let samples = [0.5, 0.25, 0.75, 0.125, 0.875];
     for face in &brep.topology.faces {
         let surface = brep.geometry.surface(face.surface)?;
@@ -71,18 +59,15 @@ pub(crate) fn interior_sample(brep: &BrepEnvelope) -> Result<Point3, GeometryErr
                 if face_contains_uv(brep, face, uv)? != Some(true) {
                     continue;
                 }
-                let boundary = surface.point_at(uv)?;
-                let outward = scale(unit(surface.normal_at(uv)?)?, face.sense.multiplier());
-                for offset in offsets {
-                    let candidate = sub(boundary, scale(outward, offset));
-                    if classify_point(brep, candidate)? == PointClassification::Inside {
-                        return Ok(candidate);
-                    }
+                let place = classify_point(other, surface.point_at(uv)?)?;
+                if matches!(
+                    place,
+                    PointClassification::Inside | PointClassification::Outside
+                ) {
+                    return Ok(place);
                 }
             }
         }
     }
-    Err(GeometryError::UnresolvedIntersection(
-        "could not certify an interior classification sample".into(),
-    ))
+    Ok(PointClassification::Unknown)
 }
