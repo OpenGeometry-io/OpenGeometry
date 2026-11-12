@@ -269,3 +269,56 @@ fn box_on_the_floor_inside_an_l_roof_subtracts_to_nothing() {
         .built(BooleanOp::Subtraction, 1)
         .assert_volume(16.0 / 3.0 - 0.08);
 }
+
+fn turned_points(primitive: Primitive, (axis, degrees): (Point3, f64)) -> Primitive {
+    let Primitive::Polyhedron { points, faces } = primitive else {
+        panic!("not a polyhedron");
+    };
+    let length = axis.iter().map(|value| value * value).sum::<f64>().sqrt();
+    let axis = axis.map(|value| value / length);
+    let (sin, cos) = degrees.to_radians().sin_cos();
+    let points = points
+        .into_iter()
+        .map(|point: Point3| {
+            let along = (0..3).map(|i| axis[i] * point[i]).sum::<f64>();
+            let across = [
+                axis[1] * point[2] - axis[2] * point[1],
+                axis[2] * point[0] - axis[0] * point[2],
+                axis[0] * point[1] - axis[1] * point[0],
+            ];
+            std::array::from_fn(|i| {
+                point[i] * cos + across[i] * sin + axis[i] * along * (1.0 - cos)
+            })
+        })
+        .collect();
+    Primitive::Polyhedron { points, faces }
+}
+
+#[test]
+fn box_strictly_inside_a_gable_roof_with_turned_points_subtracts_to_nothing() {
+    for turn in [
+        ([1.0, 2.0, 3.0], 37.0),
+        (
+            [-0.5252771006644055, 0.9494761331925581, 0.9087649454590425],
+            207.2570567402658,
+        ),
+    ] {
+        let block = || {
+            turned_points(
+                hexahedron(
+                    [1.0, 0.1, 0.8],
+                    [[1.0, 0.0, 0.0], [0.0, 0.2, 0.0], [0.0, 0.0, 0.4]],
+                ),
+                turn,
+            )
+        };
+        let roof = || turned_points(gable_roof(), turn);
+        let pair = Pair::new(block(), roof());
+        pair.assert_empty(BooleanOp::Subtraction, "generic_non_intersecting_boolean");
+        pair.built(BooleanOp::Union, 1).assert_volume(4.0);
+        pair.built(BooleanOp::Intersection, 1).assert_volume(0.08);
+        Pair::new(roof(), block())
+            .built(BooleanOp::Subtraction, 1)
+            .assert_volume(3.92);
+    }
+}
