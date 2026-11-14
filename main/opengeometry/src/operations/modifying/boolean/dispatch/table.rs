@@ -8,9 +8,10 @@ use crate::operations::modifying::boolean::handlers::{
     generic_non_intersecting_boolean, generic_single_closed_loop_boolean,
     generic_two_sided_cutter_band_subtraction, prismatic_curved_boolean, sphere_box_boolean,
     sphere_conic_containment, sphere_cylinder_boolean, sphere_torus_containment,
-    subtract_half_space_from_arc_extrusion, subtract_layered_extrusions, subtract_planar_polyhedra,
-    subtract_vertical_arc_extrusion, torus_box_containment, torus_conic_containment,
-    torus_containment_boolean, torus_cylinder_containment,
+    subtract_arc_extrusion_from_planar_solid, subtract_half_space_from_arc_extrusion,
+    subtract_layered_extrusions, subtract_planar_polyhedra, subtract_vertical_arc_extrusion,
+    torus_box_containment, torus_conic_containment, torus_containment_boolean,
+    torus_cylinder_containment,
 };
 use crate::operations::modifying::boolean::operands::all_planar;
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
@@ -262,6 +263,11 @@ fn maybe_half_space_arc_extrusion(
     operation: BooleanOp,
     id: String,
 ) -> Result<Option<BooleanResult>, GeometryError> {
+    if all_planar(a) {
+        return maybe_arc_extrusion_cut(b, a, operation, || {
+            subtract_arc_extrusion_from_planar_solid(a, b, id)
+        });
+    }
     maybe_arc_extrusion_cut(a, b, operation, || {
         subtract_half_space_from_arc_extrusion(a, b, id)
     })

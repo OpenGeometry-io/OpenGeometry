@@ -13,7 +13,8 @@ mod tests;
 mod two_sided_cutter_band;
 
 pub(crate) use half_space_extrusion::{
-    subtract_half_space_from_arc_extrusion, subtract_half_spaces_from_arc_extrusion,
+    subtract_arc_extrusion_from_planar_solid, subtract_half_space_from_arc_extrusion,
+    subtract_half_spaces_from_arc_extrusion,
 };
 pub(crate) use multiple_closed_loops::generic_multiple_closed_loops_boolean;
 pub(crate) use non_intersecting::generic_non_intersecting_boolean;

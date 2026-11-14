@@ -1,8 +1,9 @@
 use super::arc_extrusions_half_space::{
-    along_x, cut_ellipses, extrusion, half_round_edges, slanted_cuboid, slanted_prism, HANDLER,
+    along_x, cut_ellipses, extrusion, half_round_edges, slanted_block, slanted_cuboid,
+    slanted_prism, HANDLER,
 };
 use super::support::volume_at_deflection;
-use crate::brep::{fine_accuracy, BrepEnvelope, Frame3, SurfaceGeometry};
+use crate::brep::{fine_accuracy, BrepEnvelope, SurfaceGeometry};
 use crate::operations::modifying::boolean::dispatch::boolean_brep_with_handlers;
 use crate::operations::modifying::boolean::types::BooleanOp;
 use crate::primitives;
@@ -11,24 +12,6 @@ use std::f64::consts::PI;
 
 fn rod() -> BrepEnvelope {
     primitives::cylinder("rod".into(), along_x([0.0; 3]), 0.1, 4.0, fine_accuracy()).unwrap()
-}
-
-fn slanted_slab(degrees: f64) -> BrepEnvelope {
-    let t = degrees.to_radians();
-    let x = [t.cos(), t.sin(), 0.0];
-    let y = [-t.sin(), t.cos(), 0.0];
-    primitives::cuboid(
-        "slanted-slab".into(),
-        Frame3 {
-            origin: [3.0 - 5.0 * y[0], -5.0 * y[1], -1.0],
-            x,
-            y,
-            z: [0.0, 0.0, 1.0],
-        },
-        [0.25, 10.0, 2.0],
-        fine_accuracy(),
-    )
-    .unwrap()
 }
 
 fn assert_notch(host: &BrepEnvelope, tool: &BrepEnvelope, radii: &[f64], degrees: f64) -> f64 {
@@ -82,7 +65,7 @@ fn slanted_cuboid_minus_a_rod_keeps_a_blind_round_hole_with_an_ellipse_rim() {
 #[test]
 fn slanted_slab_minus_a_rod_keeps_a_through_hole_with_two_ellipse_rims() {
     for degrees in [30.0, 45.0, 60.0] {
-        let removed = assert_notch(&slanted_slab(degrees), &rod(), &[0.1], degrees);
+        let removed = assert_notch(&slanted_block(degrees, 0.25), &rod(), &[0.1], degrees);
         let expected = PI * 0.01 * 0.25 / degrees.to_radians().cos();
         assert!((removed - expected).abs() <= 2e-3 * expected, "{removed}");
     }

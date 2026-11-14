@@ -150,7 +150,10 @@ fn cap_faces(host: &BrepEnvelope, frame: Frame3) -> Result<[u32; 2], GeometryErr
     }
 }
 
-fn loop_halfedges(host: &BrepEnvelope, start: u32) -> Result<Vec<&HalfEdge>, GeometryError> {
+pub(super) fn loop_halfedges(
+    host: &BrepEnvelope,
+    start: u32,
+) -> Result<Vec<&HalfEdge>, GeometryError> {
     let mut halfedges = Vec::new();
     let mut current = start;
     loop {
@@ -166,7 +169,7 @@ fn loop_halfedges(host: &BrepEnvelope, start: u32) -> Result<Vec<&HalfEdge>, Geo
     }
 }
 
-fn face_loops(host: &BrepEnvelope, face: u32) -> Vec<u32> {
+pub(super) fn face_loops(host: &BrepEnvelope, face: u32) -> Vec<u32> {
     let trim = &host.topology.faces[face as usize].trim;
     std::iter::once(trim.outer)
         .chain(trim.holes.iter().copied())

@@ -121,6 +121,10 @@ pub(super) fn slanted_prism(degrees: f64) -> BrepEnvelope {
 }
 
 pub(super) fn slanted_cuboid(degrees: f64) -> BrepEnvelope {
+    slanted_block(degrees, 10.0)
+}
+
+pub(super) fn slanted_block(degrees: f64, depth: f64) -> BrepEnvelope {
     let t = degrees.to_radians();
     let x = [t.cos(), t.sin(), 0.0];
     let y = [-t.sin(), t.cos(), 0.0];
@@ -132,7 +136,7 @@ pub(super) fn slanted_cuboid(degrees: f64) -> BrepEnvelope {
             y,
             z: [0.0, 0.0, 1.0],
         },
-        [10.0, 10.0, 2.0],
+        [depth, 10.0, 2.0],
         fine_accuracy(),
     )
     .unwrap()

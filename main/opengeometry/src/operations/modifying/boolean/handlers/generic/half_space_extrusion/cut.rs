@@ -5,10 +5,10 @@ use crate::operations::modifying::boolean::operands::brep_face_source;
 use crate::primitives::ProfileEdge;
 use std::f64::consts::TAU;
 
-struct Plane {
-    point: Point3,
-    outward: Point3,
-    face: u32,
+pub(super) struct Plane {
+    pub(super) point: Point3,
+    pub(super) outward: Point3,
+    pub(super) face: u32,
 }
 
 pub(super) fn extent<'a>(edges: impl IntoIterator<Item = &'a ProfileEdge>, f: Affine) -> [f64; 2] {
@@ -89,11 +89,11 @@ pub(super) fn cut_cap(
     Err(gap())
 }
 
-fn profile(prism: &Prism) -> impl Iterator<Item = &ProfileEdge> {
+pub(super) fn profile(prism: &Prism) -> impl Iterator<Item = &ProfileEdge> {
     prism.loops.iter().flatten().map(|span| &span.edge)
 }
 
-fn plane_at_cap(prism: &Prism, plane: &Plane, cap: Affine) -> Affine {
+pub(super) fn plane_at_cap(prism: &Prism, plane: &Plane, cap: Affine) -> Affine {
     let frame = prism.frame;
     let rise = dot(plane.outward, frame.z);
     Affine {
@@ -105,7 +105,10 @@ fn plane_at_cap(prism: &Prism, plane: &Plane, cap: Affine) -> Affine {
     }
 }
 
-fn convex_planes(cutter: &BrepEnvelope, clearance: f64) -> Result<Vec<Plane>, GeometryError> {
+pub(super) fn convex_planes(
+    cutter: &BrepEnvelope,
+    clearance: f64,
+) -> Result<Vec<Plane>, GeometryError> {
     if cutter.solids.len() != 1 || cutter.topology.shells.len() != 1 {
         return Err(gap());
     }

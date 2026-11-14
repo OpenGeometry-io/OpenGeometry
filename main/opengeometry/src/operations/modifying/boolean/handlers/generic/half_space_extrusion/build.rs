@@ -24,7 +24,7 @@ struct CapEdge {
     conic: Option<Conic>,
 }
 
-struct Ring {
+pub(super) struct Ring {
     vertices: [Vec<u32>; 2],
     edges: [Vec<CapEdge>; 2],
     generators: Vec<u32>,
@@ -43,12 +43,30 @@ pub(super) fn build(
     accuracy: Accuracy,
 ) -> Result<BrepEnvelope, GeometryError> {
     let mut builder = Builder::new(id, accuracy)?;
-    let rings = prism
+    let rings = add_rings(&mut builder, prism)?;
+    add_sides(&mut builder, prism, &rings, FaceRole::Split, false)?;
+    add_cap(&mut builder, prism, &rings, 1)?;
+    add_cap(&mut builder, prism, &rings, 0)?;
+    builder.finish_solid()
+}
+
+pub(super) fn add_rings(builder: &mut Builder, prism: &Prism) -> Result<Vec<Ring>, GeometryError> {
+    prism
         .loops
         .iter()
-        .map(|spans| add_ring(&mut builder, prism, spans))
-        .collect::<Result<Vec<_>, _>>()?;
-    for (spans, ring) in prism.loops.iter().zip(&rings) {
+        .map(|spans| add_ring(builder, prism, spans))
+        .collect()
+}
+
+pub(super) fn add_sides(
+    builder: &mut Builder,
+    prism: &Prism,
+    rings: &[Ring],
+    role: FaceRole,
+    reversed: bool,
+) -> Result<Vec<u32>, GeometryError> {
+    let mut faces = Vec::new();
+    for (spans, ring) in prism.loops.iter().zip(rings) {
         for (index, span) in spans.iter().enumerate() {
             let side = Side {
                 span,
@@ -56,15 +74,14 @@ pub(super) fn build(
                 index,
                 next: (index + 1) % spans.len(),
             };
-            match span.edge {
-                ProfileEdge::Line { .. } => add_plane_side(&mut builder, prism, &side)?,
-                ProfileEdge::Arc { .. } => add_cylinder_side(&mut builder, prism, &side)?,
-            }
+            let provenance = face_provenance(vec![span.source.clone()], role, reversed);
+            faces.push(match span.edge {
+                ProfileEdge::Line { .. } => add_plane_side(builder, prism, &side, provenance)?,
+                ProfileEdge::Arc { .. } => add_cylinder_side(builder, prism, &side, provenance)?,
+            });
         }
     }
-    add_cap(&mut builder, prism, &rings, 1)?;
-    add_cap(&mut builder, prism, &rings, 0)?;
-    builder.finish_solid()
+    Ok(faces)
 }
 
 fn cap_point(prism: &Prism, cap: usize, q: [f64; 2]) -> Point3 {
@@ -232,7 +249,7 @@ fn side_steps(side: &Side<'_>) -> [(u32, u32, u32, Orientation); 4] {
     ]
 }
 
-fn add_face(
+pub(super) fn add_face(
     builder: &mut Builder,
     label: &str,
     surface: SurfaceGeometry,
@@ -258,7 +275,8 @@ fn add_plane_side(
     builder: &mut Builder,
     prism: &Prism,
     side: &Side<'_>,
-) -> Result<(), GeometryError> {
+    provenance: FaceProvenance,
+) -> Result<u32, GeometryError> {
     let (from, to) = side.span.edge.endpoints();
     let along = unit(prism.frame.vector([to[0] - from[0], to[1] - from[1], 0.0]))?;
     let frame = Frame3 {
@@ -284,9 +302,8 @@ fn add_plane_side(
         SurfaceGeometry::Plane { frame },
         bounds,
         vec![uses],
-        face_provenance(vec![side.span.source.clone()], FaceRole::Split, false),
-    )?;
-    Ok(())
+        provenance,
+    )
 }
 
 fn cylinder_pcurve(conic: &Conic, surface: u32) -> PcurveGeometry {
@@ -308,7 +325,8 @@ fn add_cylinder_side(
     builder: &mut Builder,
     prism: &Prism,
     side: &Side<'_>,
-) -> Result<(), GeometryError> {
+    provenance: FaceProvenance,
+) -> Result<u32, GeometryError> {
     let ProfileEdge::Arc {
         center,
         radius,
@@ -361,20 +379,20 @@ fn add_cylinder_side(
         },
         bounds,
         vec![uses],
-        face_provenance(vec![side.span.source.clone()], FaceRole::Split, false),
+        provenance,
     )?;
     if sweep_angle < 0.0 {
         builder.brep.topology.faces[face as usize].sense = Orientation::Reverse;
     }
-    Ok(())
+    Ok(face)
 }
 
-fn add_cap(
+pub(super) fn add_cap(
     builder: &mut Builder,
     prism: &Prism,
     rings: &[Ring],
     cap: usize,
-) -> Result<(), GeometryError> {
+) -> Result<u32, GeometryError> {
     let Cap {
         point,
         normal,
@@ -391,7 +409,7 @@ fn add_cap(
         y: cross(*normal, x),
         z: *normal,
     };
-    let loops = cap_loops(builder, frame, rings, cap)?;
+    let loops = cap_loops(builder, frame, rings, cap, cap == 1)?;
     let local = |axis: Point3| Affine {
         k: dot(axis, sub(prism.frame.origin, *point)) + dot(axis, prism.frame.z) * height.k,
         g: [
@@ -416,15 +434,15 @@ fn add_cap(
         bounds,
         loops,
         face_provenance(vec![cap_ref.source.clone()], cap_ref.role, cap_ref.reversed),
-    )?;
-    Ok(())
+    )
 }
 
-fn cap_loops(
+pub(super) fn cap_loops(
     builder: &Builder,
     frame: Frame3,
     rings: &[Ring],
     cap: usize,
+    along: bool,
 ) -> Result<Vec<Vec<Use>>, GeometryError> {
     let mut loops = Vec::with_capacity(rings.len());
     for ring in rings {
@@ -434,7 +452,7 @@ fn cap_loops(
             let next = (index + 1) % count;
             let edge = &ring.edges[cap][index];
             let vertices = &ring.vertices[cap];
-            uses.push(if cap == 1 {
+            uses.push(if along {
                 plane_boundary(
                     builder,
                     frame,
@@ -454,7 +472,7 @@ fn cap_loops(
                 )?
             });
         }
-        if cap == 0 {
+        if !along {
             uses.reverse();
         }
         loops.push(uses);
