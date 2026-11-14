@@ -1,6 +1,6 @@
 use super::support::volume_at_deflection;
 use crate::brep::{
-    fine_accuracy, BrepEnvelope, CurveGeometry, EdgeGeometry, Frame3, SurfaceGeometry,
+    fine_accuracy, BrepEnvelope, CurveGeometry, EdgeGeometry, FaceRole, Frame3, SurfaceGeometry,
 };
 use crate::math::{dot, Point3};
 use crate::operations::modifying::boolean::batch::subtract_planar_cutters_with_handlers;
@@ -334,4 +334,67 @@ fn a_gutter_mitred_at_both_ends_in_one_batch_keeps_its_cylinders() {
     let area = PI * (0.1f64.powi(2) - 0.09f64.powi(2)) / 2.0;
     let volume = volume_at_deflection(&result.brep, 1e-4).abs();
     assert!((volume - 2.3 * area).abs() <= 1e-3 * 2.3 * area, "{volume}");
+}
+
+fn cut_end_edges(brep: &BrepEnvelope) -> Vec<(CurveGeometry, [f64; 2])> {
+    let face = brep
+        .topology
+        .faces
+        .iter()
+        .find(|face| face.provenance.role == FaceRole::Cut)
+        .unwrap();
+    let start = brep.topology.loops[face.trim.outer as usize].start_halfedge;
+    let mut halfedge = start;
+    let mut edges = Vec::new();
+    loop {
+        let current = &brep.topology.halfedges[halfedge as usize];
+        let EdgeGeometry::Curve { curve, range } =
+            &brep.topology.edges[current.edge as usize].geometry
+        else {
+            panic!("collapsed edge on the cut end");
+        };
+        edges.push((
+            brep.geometry.curves[*curve as usize].clone(),
+            [range.lo, range.hi],
+        ));
+        halfedge = current.next.unwrap();
+        if halfedge == start {
+            return edges;
+        }
+    }
+}
+
+#[test]
+fn the_mitre_end_is_bounded_by_exact_half_ellipses_on_the_bisector_and_the_gutter_cylinders() {
+    let [host, _] = corner_gutters();
+    let cutter = prism_cutter(
+        "mitre-x",
+        vec![[-2.0, -2.0], [2.0, 2.0], [-2.0, 2.0], [-6.0, -2.0]],
+    );
+    let (result, _) =
+        boolean_brep_with_handlers(&host, &cutter, BooleanOp::Subtraction, "mitre".into()).unwrap();
+    let edges = cut_end_edges(&result.brep);
+    let mut spans = Vec::new();
+    for (curve, [lo, hi]) in &edges {
+        let CurveGeometry::Ellipse { minor_radius, .. } = curve else {
+            assert!(matches!(curve, CurveGeometry::Line { .. }), "{curve:?}");
+            continue;
+        };
+        for step in 0..=8 {
+            let point = curve
+                .elementary_point(lo + (hi - lo) * f64::from(step) / 8.0)
+                .unwrap();
+            assert!(dot(point, [1.0, -1.0, 0.0]).abs() <= 1e-12, "{point:?}");
+            assert!(((point[1] + 0.15).hypot(point[2]) - minor_radius).abs() <= 1e-12);
+            assert!(point[2] <= 1e-12, "{point:?}");
+        }
+        spans.push((*minor_radius, hi - lo));
+    }
+    assert_eq!(edges.len(), 4);
+    spans.sort_by(|a, b| a.0.total_cmp(&b.0));
+    for ((radius, span), expected) in spans.iter().zip([0.09, 0.1]) {
+        assert!((radius - expected).abs() <= 1e-12);
+        assert!((span - PI).abs() <= 1e-12, "{span}");
+    }
+    assert_eq!(spans.len(), 2);
 }
