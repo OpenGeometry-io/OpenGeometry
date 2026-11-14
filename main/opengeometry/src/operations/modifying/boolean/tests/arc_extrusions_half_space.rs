@@ -10,9 +10,9 @@ use crate::primitives::{self, ProfileEdge};
 use crate::query::{classify_point, PointClassification};
 use std::f64::consts::PI;
 
-const HANDLER: &str = "subtract_half_space_from_arc_extrusion";
+pub(super) const HANDLER: &str = "subtract_half_space_from_arc_extrusion";
 
-fn along_x(origin: Point3) -> Frame3 {
+pub(super) fn along_x(origin: Point3) -> Frame3 {
     Frame3::from_axis(origin, [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]).unwrap()
 }
 
@@ -20,7 +20,7 @@ fn along_y(origin: Point3) -> Frame3 {
     Frame3::from_axis(origin, [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]).unwrap()
 }
 
-fn half_round_edges() -> Vec<ProfileEdge> {
+pub(super) fn half_round_edges() -> Vec<ProfileEdge> {
     vec![
         ProfileEdge::Arc {
             center: [0.0, 0.0],
@@ -91,11 +91,11 @@ fn ogee_edges() -> Vec<ProfileEdge> {
     ]
 }
 
-fn extrusion(frame: Frame3, edges: Vec<ProfileEdge>, length: f64) -> BrepEnvelope {
+pub(super) fn extrusion(frame: Frame3, edges: Vec<ProfileEdge>, length: f64) -> BrepEnvelope {
     primitives::arc_edged_extrusion("gutter".into(), frame, edges, length, fine_accuracy()).unwrap()
 }
 
-fn prism_cutter(id: &str, ring: Vec<[f64; 2]>) -> BrepEnvelope {
+pub(super) fn prism_cutter(id: &str, ring: Vec<[f64; 2]>) -> BrepEnvelope {
     primitives::linear_extrusion(
         id.into(),
         Frame3 {
@@ -110,7 +110,7 @@ fn prism_cutter(id: &str, ring: Vec<[f64; 2]>) -> BrepEnvelope {
     .unwrap()
 }
 
-fn slanted_prism(degrees: f64) -> BrepEnvelope {
+pub(super) fn slanted_prism(degrees: f64) -> BrepEnvelope {
     let t = degrees.to_radians();
     let along = [-t.sin(), t.cos()];
     let at = |s: f64, away: f64| [3.0 + s * along[0] + away, s * along[1]];
@@ -120,7 +120,7 @@ fn slanted_prism(degrees: f64) -> BrepEnvelope {
     )
 }
 
-fn slanted_cuboid(degrees: f64) -> BrepEnvelope {
+pub(super) fn slanted_cuboid(degrees: f64) -> BrepEnvelope {
     let t = degrees.to_radians();
     let x = [t.cos(), t.sin(), 0.0];
     let y = [-t.sin(), t.cos(), 0.0];
@@ -138,7 +138,7 @@ fn slanted_cuboid(degrees: f64) -> BrepEnvelope {
     .unwrap()
 }
 
-fn cut_ellipses(brep: &BrepEnvelope) -> Vec<(Point3, f64, f64)> {
+pub(super) fn cut_ellipses(brep: &BrepEnvelope) -> Vec<(Point3, f64, f64)> {
     brep.topology
         .edges
         .iter()
