@@ -13,21 +13,11 @@ use std::f64::consts::PI;
 const HANDLER: &str = "subtract_half_space_from_arc_extrusion";
 
 fn along_x(origin: Point3) -> Frame3 {
-    Frame3 {
-        origin,
-        x: [0.0, 1.0, 0.0],
-        y: [0.0, 0.0, 1.0],
-        z: [1.0, 0.0, 0.0],
-    }
+    Frame3::from_axis(origin, [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]).unwrap()
 }
 
 fn along_y(origin: Point3) -> Frame3 {
-    Frame3 {
-        origin,
-        x: [-1.0, 0.0, 0.0],
-        y: [0.0, 0.0, 1.0],
-        z: [0.0, 1.0, 0.0],
-    }
+    Frame3::from_axis(origin, [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]).unwrap()
 }
 
 fn half_round_edges() -> Vec<ProfileEdge> {

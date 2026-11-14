@@ -5,8 +5,9 @@ use opengeometry_test_support::scenes::acceptance::{attempt_rail_minus_wall, rec
 use opengeometry_test_support::scenes::coverage_gap::rail_minus_wall_clearance;
 use opengeometry_test_support::scenes::prismatic::box_and_leg;
 
-const GENERIC_HANDLERS: [&str; 6] = [
+const GENERIC_HANDLERS: [&str; 7] = [
     "subtract_vertical_arc_extrusion",
+    "subtract_half_space_from_arc_extrusion",
     "generic_two_sided_cutter_band_subtraction",
     "generic_multiple_closed_loops_boolean",
     "generic_single_closed_loop_boolean",
