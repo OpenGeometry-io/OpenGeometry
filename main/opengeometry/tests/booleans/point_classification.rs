@@ -322,3 +322,88 @@ fn ball_inside_the_second_of_two_cubes_becomes_that_cubes_cavity() {
     let expected = 128.0 - 4.0 / 3.0 * std::f64::consts::PI;
     assert!((measured.value - expected).abs() <= measured.error_bound);
 }
+
+fn hollow_ball(id: &str) -> BrepEnvelope {
+    boolean_brep(
+        &ball("outer", [4.0; 3], 2.0),
+        &ball("inner", [4.0; 3], 1.0),
+        BooleanOp::Subtraction,
+        id.into(),
+    )
+    .unwrap()
+    .brep
+}
+
+fn assert_cube_minus(cutter: &BrepEnvelope, host: &BrepEnvelope, places: &[([f64; 3], bool)]) {
+    let result = boolean_brep(host, cutter, BooleanOp::Subtraction, "hollowed".into())
+        .unwrap()
+        .brep;
+    result.validate().unwrap();
+    assert_eq!(solid_count(&result), 2);
+    for (point, inside) in places {
+        let place = if *inside {
+            PointClassification::Inside
+        } else {
+            PointClassification::Outside
+        };
+        assert_eq!(classify_point(&result, *point).unwrap(), place, "{point:?}");
+    }
+    let [measured, host, cutter] =
+        [&result, host, cutter].map(|body| volume::estimate(body, 0.001));
+    let bound = measured.error_bound + host.error_bound + cutter.error_bound;
+    assert!((measured.value - (host.value - cutter.value)).abs() <= bound);
+}
+
+#[test]
+fn cube_minus_a_hollow_ball_inside_it_keeps_the_core_as_a_second_solid() {
+    assert_cube_minus(
+        &hollow_ball("hollow"),
+        &cube("cube", [0.0; 3], 8.0),
+        &[([4.0; 3], true), ([4.0, 4.0, 5.5], false), ([1.0; 3], true)],
+    );
+}
+
+#[test]
+fn hollow_ball_around_the_cavity_of_a_cube_leaves_that_cavity_in_the_core() {
+    let host = boolean_brep(
+        &cube("cube", [0.0; 3], 8.0),
+        &ball("cavity", [4.0; 3], 0.5),
+        BooleanOp::Subtraction,
+        "host".into(),
+    )
+    .unwrap()
+    .brep;
+    assert_cube_minus(
+        &hollow_ball("hollow"),
+        &host,
+        &[
+            ([4.0; 3], false),
+            ([4.0, 4.0, 4.75], true),
+            ([4.0, 4.0, 5.5], false),
+            ([1.0; 3], true),
+        ],
+    );
+}
+
+#[test]
+fn ball_in_the_hollow_of_a_cutter_becomes_a_cavity_of_the_core() {
+    let cutter = boolean_brep(
+        &hollow_ball("hollow"),
+        &ball("seed", [4.0; 3], 0.5),
+        BooleanOp::Union,
+        "cutter".into(),
+    )
+    .unwrap()
+    .brep;
+    assert_eq!(solid_count(&cutter), 2);
+    assert_cube_minus(
+        &cutter,
+        &cube("cube", [0.0; 3], 8.0),
+        &[
+            ([4.0; 3], false),
+            ([4.0, 4.0, 4.75], true),
+            ([4.0, 4.0, 5.5], false),
+            ([1.0; 3], true),
+        ],
+    );
+}

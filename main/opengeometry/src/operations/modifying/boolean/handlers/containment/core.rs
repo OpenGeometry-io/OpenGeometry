@@ -30,22 +30,25 @@ pub(crate) fn analytic_containment_boolean(
             let face_offset = out.topology.faces.len() as u32;
             let solids = out.solids.len();
             append_analytic_input(&mut out, b)?;
-            let cavities = out.solids.split_off(solids);
-            if cavities.is_empty() || cavities.iter().any(|solid| !solid.cavity_shells.is_empty()) {
-                return Err(GeometryError::UnresolvedIntersection(
-                    "containment cavity of a hollow cutter is unresolved".into(),
-                ));
-            }
-            for (cavity, solid) in cavities.into_iter().zip(&b.solids) {
-                let faces = &b.topology.shells[solid.outer_shell as usize].faces;
-                let home = enclosing_solid(a, b, faces)?;
-                out.solids[home].cavity_shells.push(cavity.outer_shell);
-            }
             for face in face_offset..out.topology.faces.len() as u32 {
                 reverse_face(&mut out, face);
                 out.topology.faces[face as usize].provenance.role = FaceRole::Cut;
                 out.topology.faces[face as usize].provenance.reversed = true;
             }
+            let cutters = out.solids.split_off(solids);
+            let outers = out
+                .solids
+                .iter()
+                .map(|solid| solid.outer_shell)
+                .chain(cutters.iter().flat_map(|solid| solid.cavity_shells.clone()))
+                .collect::<Vec<_>>();
+            let holes = out
+                .solids
+                .iter()
+                .flat_map(|solid| solid.cavity_shells.clone())
+                .chain(cutters.iter().map(|solid| solid.outer_shell))
+                .collect::<Vec<_>>();
+            out.solids = nest_shells(&out, &outers, holes)?;
         }
         BooleanOp::Subtraction => {}
     }
@@ -85,42 +88,59 @@ fn shell_side(
     Ok(side.unwrap_or(PointClassification::Unknown))
 }
 
-fn enclosing_solid(
-    a: &BrepEnvelope,
-    b: &BrepEnvelope,
-    faces: &[u32],
-) -> Result<usize, GeometryError> {
-    let home = first_sample(b, faces, |point| {
-        for (index, solid) in a.solids.iter().enumerate() {
-            if solid_place(a, solid, point)? == PointClassification::Inside {
-                return Ok(Some(index));
-            }
-        }
-        Ok(None)
-    })?;
-    home.ok_or_else(|| {
-        GeometryError::UnresolvedIntersection("containment cavity has no enclosing solid".into())
-    })
+fn nest_shells(
+    brep: &BrepEnvelope,
+    outers: &[u32],
+    holes: Vec<u32>,
+) -> Result<Vec<SolidRegion>, GeometryError> {
+    let depths = outers
+        .iter()
+        .map(|&shell| Ok(enclosing_outers(brep, outers, shell)?.len()))
+        .collect::<Result<Vec<_>, GeometryError>>()?;
+    let mut solids = outers
+        .iter()
+        .map(|&outer_shell| SolidRegion {
+            outer_shell,
+            cavity_shells: Vec::new(),
+        })
+        .collect::<Vec<_>>();
+    for hole in holes {
+        let home = enclosing_outers(brep, outers, hole)?
+            .into_iter()
+            .max_by_key(|&index| depths[index])
+            .ok_or_else(|| {
+                GeometryError::UnresolvedIntersection(
+                    "containment cavity has no enclosing solid".into(),
+                )
+            })?;
+        solids[home].cavity_shells.push(hole);
+    }
+    Ok(solids)
 }
 
-fn solid_place(
+fn enclosing_outers(
     brep: &BrepEnvelope,
-    solid: &SolidRegion,
-    point: Point3,
-) -> Result<PointClassification, GeometryError> {
+    outers: &[u32],
+    shell: u32,
+) -> Result<Vec<usize>, GeometryError> {
     let faces = |shell: u32| &brep.topology.shells[shell as usize].faces;
-    let outer = classify_point_in_shell(brep, faces(solid.outer_shell), point)?;
-    if outer != PointClassification::Inside {
-        return Ok(outer);
-    }
-    for cavity in &solid.cavity_shells {
-        match classify_point_in_shell(brep, faces(*cavity), point)? {
-            PointClassification::Outside => {}
-            PointClassification::Inside => return Ok(PointClassification::Outside),
-            other => return Ok(other),
+    let found = first_sample(brep, faces(shell), |point| {
+        let mut enclosing = Vec::new();
+        for (index, &outer) in outers.iter().enumerate() {
+            if outer == shell {
+                continue;
+            }
+            match classify_point_in_shell(brep, faces(outer), point)? {
+                PointClassification::Inside => enclosing.push(index),
+                PointClassification::Outside => {}
+                _ => return Ok(None),
+            }
         }
-    }
-    Ok(PointClassification::Inside)
+        Ok(Some(enclosing))
+    })?;
+    found.ok_or_else(|| {
+        GeometryError::UnresolvedIntersection("containment shell nesting is unresolved".into())
+    })
 }
 
 fn first_sample<T>(
