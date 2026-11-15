@@ -186,24 +186,36 @@ fn translate(world: &mut WorldGraph, og_id: &str, offset: [f64; 3]) {
         .unwrap();
 }
 
+fn tilted_cylinder(world: &mut WorldGraph, og_id: &str, offset: [f64; 3]) {
+    world
+        .create_primitive(
+            Primitive::Cylinder {
+                radius: 0.1,
+                height: 0.7,
+            },
+            named(og_id),
+        )
+        .unwrap();
+    world
+        .transform(
+            og_id,
+            Transform::Rotate {
+                axis: [1.0, 0.0, 0.0],
+                degrees: 10.0,
+                pivot: Some([0.0, 0.35, 0.0]),
+            },
+        )
+        .unwrap();
+    translate(world, og_id, offset);
+}
+
 #[test]
 fn multi_tool_operate_failure_carries_handlers_tool_index_and_og_ids() {
     let mut world = graph();
     unit_cuboid(&mut world, "target", 2.0);
     unit_cuboid(&mut world, "tool-1", 2.0);
     translate(&mut world, "tool-1", [1.0, 0.0, 0.0]);
-    unit_cuboid(&mut world, "tool-2", 1.0);
-    translate(&mut world, "tool-2", [1.5, 0.5, 0.0]);
-    world
-        .transform(
-            "tool-2",
-            Transform::Rotate {
-                axis: [0.0, 1.0, 0.0],
-                degrees: 30.0,
-                pivot: Some([1.5, 0.5, 0.0]),
-            },
-        )
-        .unwrap();
+    tilted_cylinder(&mut world, "tool-2", [2.0, 1.6, 0.0]);
     let mut step_one = graph();
     unit_cuboid(&mut step_one, "target", 2.0);
     unit_cuboid(&mut step_one, "tool-1", 2.0);
@@ -238,9 +250,7 @@ fn multi_tool_operate_failure_carries_handlers_tool_index_and_og_ids() {
                 "separate_boolean",
                 "boolean_boxes",
                 "separate_boolean",
-                "boolean_boxes",
-                "boolean_planar_extrusions",
-                "boolean_rectilinear",
+                "cylinder_box_boolean",
                 "subtract_vertical_arc_extrusion",
                 "subtract_half_space_from_arc_extrusion",
                 "generic_two_sided_cutter_band_subtraction",

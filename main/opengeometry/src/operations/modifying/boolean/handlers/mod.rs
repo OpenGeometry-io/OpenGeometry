@@ -30,7 +30,7 @@ pub(super) use generic::{
     prismatic_curved_boolean, subtract_arc_extrusion_from_planar_solid,
     subtract_half_space_from_arc_extrusion, subtract_half_spaces_from_arc_extrusion,
 };
-pub(super) use planar::{subtract_layered_extrusions, subtract_planar_polyhedra};
+pub(super) use planar::{boolean_planar_polyhedra, subtract_layered_extrusions};
 pub(super) use planar_extrusions::boolean_planar_extrusions;
 pub(super) use rectilinear::boolean_rectilinear;
 pub(super) use sphere_box::sphere_box_boolean;
