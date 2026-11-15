@@ -382,3 +382,28 @@ fn canonical_fast_dispatch_covers_all_fifteen_unordered_family_pairs() {
     }
     assert_eq!(count, 15);
 }
+
+#[test]
+fn planes_parallel_up_to_rounding_are_apart_or_coincident() {
+    let intersect = |gap: f64, tilt: f64| {
+        let mut store = GeometryStore::new();
+        store.surfaces = vec![
+            SurfaceGeometry::Plane {
+                frame: Frame3::IDENTITY,
+            },
+            SurfaceGeometry::Plane {
+                frame: Frame3::from_axis([0.0, 0.0, gap], [tilt, 0.0, 1.0], [1.0, 0.0, 0.0])
+                    .unwrap(),
+            },
+        ];
+        intersect_surfaces(&mut store, 0, 1, fine_accuracy()).unwrap()
+    };
+    for tilt in [1.0e-16, 1.0e-12] {
+        let apart = intersect(0.1, tilt);
+        assert!(apart.curves.is_empty() && apart.contacts.is_empty() && !apart.coincident);
+        assert!(intersect(0.0, tilt).coincident);
+    }
+    let crossing = intersect(0.0, 1.0e-9);
+    assert_eq!(crossing.curves.len(), 1);
+    assert!(!crossing.coincident);
+}

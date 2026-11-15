@@ -406,3 +406,13 @@ pub(super) fn split_planar_ring(
     }
     split
 }
+
+pub(super) fn local_ring(points: &[Point3], frame: Frame3) -> Vec<Pt2> {
+    points
+        .iter()
+        .map(|point| {
+            let local = frame.local(*point);
+            Pt2::new(local[0], local[1])
+        })
+        .collect::<Vec<_>>()
+}

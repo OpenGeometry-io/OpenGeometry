@@ -1,8 +1,11 @@
-use opengeometry::brep::{BrepEnvelope, Frame3};
+use opengeometry::brep::{BrepEnvelope, Frame3, GeometryError};
 use opengeometry::operations::modifying::boolean::{boolean_brep, BooleanOp};
 use opengeometry::primitives;
 use opengeometry::query::{classify_point, PointClassification};
+use opengeometry::world_graph::{CreatingOperation, Primitive};
 use opengeometry_test_support::accuracy::accuracy;
+use opengeometry_test_support::volume;
+use opengeometry_test_support::world_graph::{graph, named};
 
 #[test]
 fn analytic_ray_classification_covers_all_surface_families() {
@@ -152,4 +155,255 @@ fn each_solid_of_a_body_cut_in_two_classifies_its_own_points() {
             "{point:?}"
         );
     }
+}
+
+fn ball(id: &str, origin: [f64; 3], radius: f64) -> BrepEnvelope {
+    let frame = Frame3 {
+        origin,
+        ..Frame3::IDENTITY
+    };
+    primitives::sphere(id.into(), frame, radius, accuracy(1e-5)).unwrap()
+}
+
+fn cube(id: &str, origin: [f64; 3], size: f64) -> BrepEnvelope {
+    let frame = Frame3 {
+        origin,
+        ..Frame3::IDENTITY
+    };
+    primitives::cuboid(id.into(), frame, [size; 3], accuracy(1e-5)).unwrap()
+}
+
+fn assert_refused(a: &BrepEnvelope, b: &BrepEnvelope) {
+    for (first, second) in [(a, b), (b, a)] {
+        for operation in [
+            BooleanOp::Union,
+            BooleanOp::Intersection,
+            BooleanOp::Subtraction,
+        ] {
+            let Err(error) = boolean_brep(first, second, operation, "refused".into()) else {
+                panic!("{} {operation:?} {} built", first.id, second.id);
+            };
+            assert!(
+                matches!(
+                    &error,
+                    GeometryError::UnresolvedIntersection(message)
+                        if message == "generic boolean containment classification is unresolved"
+                ),
+                "{} {operation:?} {}: {error:?}",
+                first.id,
+                second.id
+            );
+        }
+    }
+}
+
+#[test]
+fn ball_around_the_cavity_of_a_hollow_cube_is_refused_not_measured_wrong() {
+    let outer = cube("outer", [0.0; 3], 4.0);
+    let hollow = boolean_brep(
+        &outer,
+        &cube("cavity", [1.0; 3], 2.0),
+        BooleanOp::Subtraction,
+        "hollow".into(),
+    )
+    .unwrap()
+    .brep;
+    assert_refused(&hollow, &ball("ball", [2.0; 3], 1.9));
+}
+
+#[test]
+fn two_balls_in_one_body_against_a_cube_holding_one_are_refused_not_measured_wrong() {
+    let pair = boolean_brep(
+        &ball("near", [2.0; 3], 0.5),
+        &ball("far", [12.0, 2.0, 2.0], 0.5),
+        BooleanOp::Union,
+        "balls".into(),
+    )
+    .unwrap()
+    .brep;
+    assert_eq!(solid_count(&pair), 2);
+    assert_refused(&pair, &cube("cube", [0.0; 3], 4.0));
+}
+
+#[test]
+fn cube_minus_two_balls_inside_it_keeps_both_balls_as_cavities() {
+    let pair = boolean_brep(
+        &ball("left", [2.0, 4.0, 4.0], 0.5),
+        &ball("right", [6.0, 4.0, 4.0], 0.5),
+        BooleanOp::Union,
+        "balls".into(),
+    )
+    .unwrap()
+    .brep;
+    let cube = cube("cube", [0.0; 3], 8.0);
+    let result = boolean_brep(&cube, &pair, BooleanOp::Subtraction, "hollowed".into())
+        .unwrap()
+        .brep;
+    assert_eq!(solid_count(&result), 1);
+    for (point, place) in [
+        ([2.0, 4.0, 4.0], PointClassification::Outside),
+        ([6.0, 4.0, 4.0], PointClassification::Outside),
+        ([4.0, 4.0, 4.0], PointClassification::Inside),
+    ] {
+        assert_eq!(classify_point(&result, point).unwrap(), place, "{point:?}");
+    }
+    let measured = volume::estimate(&result, 0.001);
+    let expected = 512.0 - 2.0 * std::f64::consts::PI / 6.0;
+    assert!((measured.value - expected).abs() <= measured.error_bound);
+}
+
+#[test]
+fn open_tube_inside_a_cube_is_refused() {
+    let mut world = graph();
+    world
+        .create_primitive(Primitive::Circle { radius: 0.3 }, named("profile"))
+        .unwrap();
+    world
+        .create_primitive(
+            Primitive::Polyline {
+                points: vec![[0.0; 3], [0.0, 1.0, 0.0]],
+                closed: false,
+            },
+            named("path"),
+        )
+        .unwrap();
+    world
+        .create_operation(
+            CreatingOperation::Sweep {
+                profile: "profile".into(),
+                path: "path".into(),
+                caps: Some(false),
+            },
+            named("tube"),
+        )
+        .unwrap();
+    let tube = world.placed_brep("tube").unwrap().as_ref().clone();
+    let cube = cube("cube", [-2.0, -1.5, -2.0], 4.0);
+    for (first, second) in [(&cube, &tube), (&tube, &cube)] {
+        for operation in [
+            BooleanOp::Union,
+            BooleanOp::Intersection,
+            BooleanOp::Subtraction,
+        ] {
+            assert!(
+                boolean_brep(first, second, operation, "sheet".into()).is_err(),
+                "{} {operation:?} {}",
+                first.id,
+                second.id
+            );
+        }
+    }
+}
+
+#[test]
+fn ball_inside_the_second_of_two_cubes_becomes_that_cubes_cavity() {
+    let cubes = boolean_brep(
+        &cube("first", [0.0; 3], 4.0),
+        &cube("second", [10.0, 0.0, 0.0], 4.0),
+        BooleanOp::Union,
+        "cubes".into(),
+    )
+    .unwrap()
+    .brep;
+    assert_eq!(solid_count(&cubes), 2);
+    let ball = ball("ball", [12.0, 2.0, 2.0], 1.0);
+    let result = boolean_brep(&cubes, &ball, BooleanOp::Subtraction, "hollowed".into())
+        .unwrap()
+        .brep;
+    result.validate().unwrap();
+    let solids = serde_json::to_value(&result).unwrap()["solids"].clone();
+    assert_eq!(solids[0]["cavity_shells"].as_array().unwrap().len(), 0);
+    assert_eq!(solids[1]["cavity_shells"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        classify_point(&result, [12.0, 2.0, 2.0]).unwrap(),
+        PointClassification::Outside
+    );
+    let measured = volume::estimate(&result, 0.001);
+    let expected = 128.0 - 4.0 / 3.0 * std::f64::consts::PI;
+    assert!((measured.value - expected).abs() <= measured.error_bound);
+}
+
+fn hollow_ball(id: &str) -> BrepEnvelope {
+    boolean_brep(
+        &ball("outer", [4.0; 3], 2.0),
+        &ball("inner", [4.0; 3], 1.0),
+        BooleanOp::Subtraction,
+        id.into(),
+    )
+    .unwrap()
+    .brep
+}
+
+fn assert_cube_minus(cutter: &BrepEnvelope, host: &BrepEnvelope, places: &[([f64; 3], bool)]) {
+    let result = boolean_brep(host, cutter, BooleanOp::Subtraction, "hollowed".into())
+        .unwrap()
+        .brep;
+    result.validate().unwrap();
+    assert_eq!(solid_count(&result), 2);
+    for (point, inside) in places {
+        let place = if *inside {
+            PointClassification::Inside
+        } else {
+            PointClassification::Outside
+        };
+        assert_eq!(classify_point(&result, *point).unwrap(), place, "{point:?}");
+    }
+    let [measured, host, cutter] =
+        [&result, host, cutter].map(|body| volume::estimate(body, 0.001));
+    let bound = measured.error_bound + host.error_bound + cutter.error_bound;
+    assert!((measured.value - (host.value - cutter.value)).abs() <= bound);
+}
+
+#[test]
+fn cube_minus_a_hollow_ball_inside_it_keeps_the_core_as_a_second_solid() {
+    assert_cube_minus(
+        &hollow_ball("hollow"),
+        &cube("cube", [0.0; 3], 8.0),
+        &[([4.0; 3], true), ([4.0, 4.0, 5.5], false), ([1.0; 3], true)],
+    );
+}
+
+#[test]
+fn hollow_ball_around_the_cavity_of_a_cube_leaves_that_cavity_in_the_core() {
+    let host = boolean_brep(
+        &cube("cube", [0.0; 3], 8.0),
+        &ball("cavity", [4.0; 3], 0.5),
+        BooleanOp::Subtraction,
+        "host".into(),
+    )
+    .unwrap()
+    .brep;
+    assert_cube_minus(
+        &hollow_ball("hollow"),
+        &host,
+        &[
+            ([4.0; 3], false),
+            ([4.0, 4.0, 4.75], true),
+            ([4.0, 4.0, 5.5], false),
+            ([1.0; 3], true),
+        ],
+    );
+}
+
+#[test]
+fn ball_in_the_hollow_of_a_cutter_becomes_a_cavity_of_the_core() {
+    let cutter = boolean_brep(
+        &hollow_ball("hollow"),
+        &ball("seed", [4.0; 3], 0.5),
+        BooleanOp::Union,
+        "cutter".into(),
+    )
+    .unwrap()
+    .brep;
+    assert_eq!(solid_count(&cutter), 2);
+    assert_cube_minus(
+        &cutter,
+        &cube("cube", [0.0; 3], 8.0),
+        &[
+            ([4.0; 3], false),
+            ([4.0, 4.0, 4.75], true),
+            ([4.0, 4.0, 5.5], false),
+            ([1.0; 3], true),
+        ],
+    );
 }

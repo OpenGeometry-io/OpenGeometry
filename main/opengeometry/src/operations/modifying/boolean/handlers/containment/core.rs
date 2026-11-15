@@ -1,10 +1,12 @@
-use crate::brep::{unit, Accuracy, BrepEnvelope, FaceRole, GeometryError, Surface};
-use crate::math::{scale, sub, Point3};
+use crate::brep::{Accuracy, BrepEnvelope, FaceRole, GeometryError, SolidRegion, Surface};
+use crate::math::Point3;
 use crate::operations::modifying::boolean::assembly::{
     append_analytic_input, finish_analytic_result, reverse_face,
 };
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
-use crate::query::{classify_point, face_contains_uv, PointClassification};
+use crate::query::{
+    classify_point, classify_point_in_shell, face_contains_uv, PointClassification,
+};
 
 pub(crate) fn analytic_containment_boolean(
     a: &BrepEnvelope,
@@ -26,41 +28,131 @@ pub(crate) fn analytic_containment_boolean(
         BooleanOp::Subtraction if b_inside_a => {
             append_analytic_input(&mut out, a)?;
             let face_offset = out.topology.faces.len() as u32;
+            let solids = out.solids.len();
             append_analytic_input(&mut out, b)?;
-            let cavity = out
-                .solids
-                .pop()
-                .ok_or_else(|| GeometryError::InvalidTopology("missing cutter solid".into()))?
-                .outer_shell;
-            out.solids[0].cavity_shells.push(cavity);
             for face in face_offset..out.topology.faces.len() as u32 {
                 reverse_face(&mut out, face);
                 out.topology.faces[face as usize].provenance.role = FaceRole::Cut;
                 out.topology.faces[face as usize].provenance.reversed = true;
             }
+            let cutters = out.solids.split_off(solids);
+            let outers = out
+                .solids
+                .iter()
+                .map(|solid| solid.outer_shell)
+                .chain(cutters.iter().flat_map(|solid| solid.cavity_shells.clone()))
+                .collect::<Vec<_>>();
+            let holes = out
+                .solids
+                .iter()
+                .flat_map(|solid| solid.cavity_shells.clone())
+                .chain(cutters.iter().map(|solid| solid.outer_shell))
+                .collect::<Vec<_>>();
+            out.solids = nest_shells(&out, &outers, holes)?;
         }
         BooleanOp::Subtraction => {}
     }
     finish_analytic_result(out, a, b, true, operation, false)
 }
 
-pub(crate) fn interior_sample(brep: &BrepEnvelope) -> Result<Point3, GeometryError> {
-    let bounds = brep.bounds()?.ok_or_else(|| {
-        GeometryError::InvalidTopology("cannot classify an empty solid boundary".into())
+pub(crate) fn boundary_side(
+    brep: &BrepEnvelope,
+    other: &BrepEnvelope,
+) -> Result<PointClassification, GeometryError> {
+    let mut sides = Vec::new();
+    for solid in &brep.solids {
+        for shell in std::iter::once(&solid.outer_shell).chain(&solid.cavity_shells) {
+            let faces = &brep.topology.shells[*shell as usize].faces;
+            sides.push(shell_side(brep, faces, other)?);
+        }
+    }
+    Ok(match sides.split_first() {
+        Some((first, rest)) if rest.iter().all(|side| side == first) => *first,
+        _ => PointClassification::Unknown,
+    })
+}
+
+fn shell_side(
+    brep: &BrepEnvelope,
+    faces: &[u32],
+    other: &BrepEnvelope,
+) -> Result<PointClassification, GeometryError> {
+    let side = first_sample(brep, faces, |point| {
+        let place = classify_point(other, point)?;
+        Ok(matches!(
+            place,
+            PointClassification::Inside | PointClassification::Outside
+        )
+        .then_some(place))
     })?;
-    let model_scale = bounds
-        .axes
+    Ok(side.unwrap_or(PointClassification::Unknown))
+}
+
+fn nest_shells(
+    brep: &BrepEnvelope,
+    outers: &[u32],
+    holes: Vec<u32>,
+) -> Result<Vec<SolidRegion>, GeometryError> {
+    let depths = outers
         .iter()
-        .map(|axis| axis.width())
-        .fold(brep.accuracy.geometric, f64::max);
-    let offsets = [
-        (model_scale * 1.0e-6).max(32.0 * brep.accuracy.geometric),
-        16.0 * brep.accuracy.geometric,
-        8.0 * brep.accuracy.geometric,
-        4.0 * brep.accuracy.geometric,
-    ];
+        .map(|&shell| Ok(enclosing_outers(brep, outers, shell)?.len()))
+        .collect::<Result<Vec<_>, GeometryError>>()?;
+    let mut solids = outers
+        .iter()
+        .map(|&outer_shell| SolidRegion {
+            outer_shell,
+            cavity_shells: Vec::new(),
+        })
+        .collect::<Vec<_>>();
+    for hole in holes {
+        let home = enclosing_outers(brep, outers, hole)?
+            .into_iter()
+            .max_by_key(|&index| depths[index])
+            .ok_or_else(|| {
+                GeometryError::UnresolvedIntersection(
+                    "containment cavity has no enclosing solid".into(),
+                )
+            })?;
+        solids[home].cavity_shells.push(hole);
+    }
+    Ok(solids)
+}
+
+fn enclosing_outers(
+    brep: &BrepEnvelope,
+    outers: &[u32],
+    shell: u32,
+) -> Result<Vec<usize>, GeometryError> {
+    let faces = |shell: u32| &brep.topology.shells[shell as usize].faces;
+    let found = first_sample(brep, faces(shell), |point| {
+        let mut enclosing = Vec::new();
+        for (index, &outer) in outers.iter().enumerate() {
+            if outer == shell {
+                continue;
+            }
+            match classify_point_in_shell(brep, faces(outer), point)? {
+                PointClassification::Inside => enclosing.push(index),
+                PointClassification::Outside => {}
+                _ => return Ok(None),
+            }
+        }
+        Ok(Some(enclosing))
+    })?;
+    found.ok_or_else(|| {
+        GeometryError::UnresolvedIntersection("containment shell nesting is unresolved".into())
+    })
+}
+
+fn first_sample<T>(
+    brep: &BrepEnvelope,
+    faces: &[u32],
+    mut found: impl FnMut(Point3) -> Result<Option<T>, GeometryError>,
+) -> Result<Option<T>, GeometryError> {
     let samples = [0.5, 0.25, 0.75, 0.125, 0.875];
-    for face in &brep.topology.faces {
+    for face in faces
+        .iter()
+        .map(|&face| &brep.topology.faces[face as usize])
+    {
         let surface = brep.geometry.surface(face.surface)?;
         for u in samples {
             for v in samples {
@@ -71,18 +163,11 @@ pub(crate) fn interior_sample(brep: &BrepEnvelope) -> Result<Point3, GeometryErr
                 if face_contains_uv(brep, face, uv)? != Some(true) {
                     continue;
                 }
-                let boundary = surface.point_at(uv)?;
-                let outward = scale(unit(surface.normal_at(uv)?)?, face.sense.multiplier());
-                for offset in offsets {
-                    let candidate = sub(boundary, scale(outward, offset));
-                    if classify_point(brep, candidate)? == PointClassification::Inside {
-                        return Ok(candidate);
-                    }
+                if let Some(value) = found(surface.point_at(uv)?)? {
+                    return Ok(Some(value));
                 }
             }
         }
     }
-    Err(GeometryError::UnresolvedIntersection(
-        "could not certify an interior classification sample".into(),
-    ))
+    Ok(None)
 }
