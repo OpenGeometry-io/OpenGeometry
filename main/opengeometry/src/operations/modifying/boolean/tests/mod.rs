@@ -1,3 +1,5 @@
+mod arc_extrusions_half_space;
+mod arc_extrusions_notch;
 mod arc_extrusions_openings;
 mod arc_extrusions_splits;
 mod arched_band;

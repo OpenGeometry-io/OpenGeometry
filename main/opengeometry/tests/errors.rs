@@ -252,6 +252,7 @@ fn multi_tool_operate_failure_carries_handlers_tool_index_and_og_ids() {
                 "separate_boolean",
                 "cylinder_box_boolean",
                 "subtract_vertical_arc_extrusion",
+                "subtract_half_space_from_arc_extrusion",
                 "generic_two_sided_cutter_band_subtraction",
                 "generic_multiple_closed_loops_boolean",
                 "generic_single_closed_loop_boolean",
