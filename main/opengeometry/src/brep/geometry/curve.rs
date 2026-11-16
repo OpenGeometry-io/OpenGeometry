@@ -1,5 +1,5 @@
 use super::turned::{narrowed, turned_axis};
-use super::wrap::Wrap;
+use super::wrap::{Wrap, WRAP_SPLITS};
 use crate::brep::bounds::PatchBounds;
 use crate::brep::error::GeometryError;
 use crate::brep::frame::{checked, Frame3};
@@ -96,7 +96,12 @@ impl CurveGeometry {
             }
             Self::Wrapped { wrap, curve } => {
                 let (speed, acceleration) = curve.derivative_bounds(range)?;
-                let (first, second) = wrap.derivative_bounds(curve.elementary_bounds(range)?)?;
+                let (first, second) = wrap.derivative_bounds_parts(
+                    &|r| curve.elementary_bounds(r),
+                    &halves,
+                    range,
+                    WRAP_SPLITS,
+                )?;
                 (first * speed, second * speed * speed + first * acceleration)
             }
         })
@@ -169,7 +174,9 @@ impl CurveGeometry {
                 major_radius: a,
                 minor_radius: b,
             } => conic_bounds(frame, [*a, *b], range),
-            Self::Wrapped { wrap, curve } => wrap.enclose(curve.elementary_bounds(range)?),
+            Self::Wrapped { wrap, curve } => {
+                wrap.enclose_parts(&|r| curve.elementary_bounds(r), &halves, range, WRAP_SPLITS)
+            }
             Self::Intersection { definition } => Err(GeometryError::MissingReference {
                 kind: "intersection".into(),
                 index: *definition,
@@ -238,4 +245,18 @@ fn conic_bounds(
         }
     }
     Ok(bounds)
+}
+
+fn halves(range: Interval) -> [Interval; 2] {
+    let mid = 0.5 * (range.lo + range.hi);
+    [
+        Interval {
+            lo: range.lo,
+            hi: mid,
+        },
+        Interval {
+            lo: mid,
+            hi: range.hi,
+        },
+    ]
 }

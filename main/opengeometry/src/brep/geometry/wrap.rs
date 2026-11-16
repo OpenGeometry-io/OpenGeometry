@@ -5,6 +5,8 @@ use crate::brep::frame::{checked, Frame3};
 use crate::math::{add, cross, scale, Interval, Point3};
 use serde::{Deserialize, Serialize};
 
+pub(crate) const WRAP_SPLITS: usize = 6;
+
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Wrap {
@@ -229,6 +231,44 @@ impl Wrap {
             (hi / s, lo / s)
         };
         Ok(Some((e, Interval::new(lo - pad(lo), hi + pad(hi))?)))
+    }
+
+    pub(crate) fn enclose_parts<D: Copy>(
+        &self,
+        flat: &dyn Fn(D) -> Result<PatchBounds, GeometryError>,
+        halves: &dyn Fn(D) -> [D; 2],
+        domain: D,
+        depth: usize,
+    ) -> Result<PatchBounds, GeometryError> {
+        match self.enclose(flat(domain)?) {
+            Err(GeometryError::SingularParameterization) if depth > 0 => {
+                let [a, b] =
+                    halves(domain).map(|part| self.enclose_parts(flat, halves, part, depth - 1));
+                let (a, b) = (a?, b?);
+                Ok(PatchBounds {
+                    axes: std::array::from_fn(|i| a.axes[i].hull(b.axes[i])),
+                })
+            }
+            other => other,
+        }
+    }
+
+    pub(crate) fn derivative_bounds_parts<D: Copy>(
+        &self,
+        flat: &dyn Fn(D) -> Result<PatchBounds, GeometryError>,
+        halves: &dyn Fn(D) -> [D; 2],
+        domain: D,
+        depth: usize,
+    ) -> Result<(f64, f64), GeometryError> {
+        match self.derivative_bounds(flat(domain)?) {
+            Err(GeometryError::SingularParameterization) if depth > 0 => {
+                let [a, b] = halves(domain)
+                    .map(|part| self.derivative_bounds_parts(flat, halves, part, depth - 1));
+                let (a, b) = (a?, b?);
+                Ok((a.0.max(b.0), a.1.max(b.1)))
+            }
+            other => other,
+        }
     }
 
     pub(crate) fn enclose(&self, flat: PatchBounds) -> Result<PatchBounds, GeometryError> {

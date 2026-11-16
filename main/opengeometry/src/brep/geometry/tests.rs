@@ -415,3 +415,57 @@ fn partial_cylinder_and_cone_patches_on_a_skew_frame_get_their_exact_box() {
         }
     }
 }
+
+#[test]
+fn a_wrapped_patch_round_a_cone_apex_bounds_in_parts() {
+    let w = cone_wrap(0.5);
+    let apex = -w.radius / 0.5f64.sin();
+    let surface = SurfaceGeometry::Wrapped {
+        wrap: w,
+        surface: Box::new(SurfaceGeometry::Cylinder {
+            frame: Frame3 {
+                origin: [0.0, apex, w.radius],
+                x: [1.0, 0.0, 0.0],
+                y: [0.0, 1.0, 0.0],
+                z: [0.0, 0.0, 1.0],
+            },
+            radius: 3.0,
+        }),
+    };
+    let domain = [
+        Interval::new(
+            0.3 - std::f64::consts::FRAC_PI_2,
+            1.5 * std::f64::consts::PI - 0.3,
+        )
+        .unwrap(),
+        Interval::new(0.0, 0.5).unwrap(),
+    ];
+    assert!(matches!(
+        w.enclose(
+            SurfaceGeometry::Cylinder {
+                frame: Frame3::IDENTITY,
+                radius: 1.0
+            }
+            .enclose(domain)
+            .map(|_| PatchBounds {
+                axes: [
+                    Interval::new(-3.0, 3.0).unwrap(),
+                    Interval::new(apex - 3.0, apex + 3.0).unwrap(),
+                    domain[1],
+                ]
+            })
+            .unwrap()
+        ),
+        Err(GeometryError::SingularParameterization)
+    ));
+    let bounds = surface.enclose(domain).unwrap();
+    for i in 0..=16 {
+        for j in 0..=2 {
+            let uv = [
+                domain[0].lo + domain[0].width() * i as f64 / 16.0,
+                0.25 * j as f64,
+            ];
+            assert!(bounds.contains(surface.point_at(uv).unwrap()));
+        }
+    }
+}
