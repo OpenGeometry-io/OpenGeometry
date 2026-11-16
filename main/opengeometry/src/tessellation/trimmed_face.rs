@@ -1,4 +1,4 @@
-use super::delaunay::Triangulation;
+use super::delaunay::{straight_run_corners, Triangulation};
 use super::grid::Rect;
 use super::mesh::Tessellation;
 use super::trim::{
@@ -206,12 +206,8 @@ fn general_curved_trimmed_face(
 ) -> Result<(), GeometryError> {
     let mut uv = Vec::new();
     let mut points = Vec::new();
-    let mut holes = Vec::new();
     let mut boundary_edges = BTreeSet::new();
-    for (loop_index, ring) in loops.iter().enumerate() {
-        if loop_index > 0 {
-            holes.push(uv.len());
-        }
+    for ring in loops {
         let start = uv.len();
         for &(coordinate, point) in ring {
             uv.push(coordinate);
@@ -225,8 +221,7 @@ fn general_curved_trimmed_face(
     }
     let surface = brep.geometry.surface(face.surface)?;
     let metric = uv_metric(surface, &uv[..loops[0].len()])?;
-    let mut triangulation =
-        Triangulation::new(earcut_triangles(&uv, &holes)?, metric, &boundary_edges);
+    let mut triangulation = triangulate(brep, &mut uv, loops, metric, &boundary_edges)?;
     triangulation.flip(&uv, triangulation.free_edges());
     let mut queue = triangulation.free_edges();
     while let Some((a, b)) = queue.pop() {
@@ -268,6 +263,63 @@ fn general_curved_trimmed_face(
         )?;
     }
     Ok(())
+}
+
+fn snap_axis_noise(ring: &mut [[f64; 2]], tolerance: [f64; 2]) {
+    let count = ring.len();
+    for index in 0..count {
+        let previous = ring[(index + count - 1) % count];
+        for axis in 0..2 {
+            if (ring[index][axis] - previous[axis]).abs() <= tolerance[axis] {
+                ring[index][axis] = previous[axis];
+            }
+        }
+    }
+}
+
+fn triangulate<'a>(
+    brep: &BrepEnvelope,
+    uv: &mut [[f64; 2]],
+    loops: &[Vec<([f64; 2], Point3)>],
+    metric: [f64; 2],
+    boundary_edges: &'a BTreeSet<(usize, usize)>,
+) -> Result<Triangulation<'a>, GeometryError> {
+    let tolerance = metric.map(|scale| brep.accuracy.geometric / scale);
+    let mut rings = Vec::with_capacity(loops.len());
+    for ring in loops {
+        let start = rings
+            .last()
+            .map_or(0, |range: &std::ops::Range<usize>| range.end);
+        rings.push(start..start + ring.len());
+        snap_axis_noise(&mut uv[start..start + ring.len()], tolerance);
+    }
+    let corners = rings
+        .iter()
+        .map(|ring| straight_run_corners(uv, ring.clone(), metric))
+        .collect::<Vec<_>>();
+    let kept = corners.concat();
+    let mut kept_holes = Vec::with_capacity(corners.len());
+    for ring in &corners[..corners.len() - 1] {
+        kept_holes.push(kept_holes.last().copied().unwrap_or(0) + ring.len());
+    }
+    let kept_uv = kept.iter().map(|&index| uv[index]).collect::<Vec<_>>();
+    let triangles = earcut_triangles(&kept_uv, &kept_holes)?
+        .into_iter()
+        .map(|triangle| triangle.map(|index| kept[index]))
+        .collect();
+    let mut triangulation = Triangulation::new(triangles, metric, boundary_edges);
+    for (ring, corners) in rings.iter().zip(&corners) {
+        let next = |index: usize| ring.start + (index - ring.start + 1) % ring.len();
+        for (k, &corner) in corners.iter().enumerate() {
+            let end = corners[(k + 1) % corners.len()];
+            let (mut current, mut index) = (corner, next(corner));
+            while index != end && index != corner {
+                triangulation.insert_on_boundary(uv, current, end, index);
+                (current, index) = (index, next(index));
+            }
+        }
+    }
+    Ok(triangulation)
 }
 
 fn uv_metric(surface: &SurfaceGeometry, outer: &[[f64; 2]]) -> Result<[f64; 2], GeometryError> {

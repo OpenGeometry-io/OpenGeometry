@@ -1,4 +1,4 @@
-use super::super::delaunay::Triangulation;
+use super::super::delaunay::{straight_run_corners, Triangulation};
 use std::collections::BTreeSet;
 use std::f64::consts::TAU;
 
@@ -104,4 +104,30 @@ fn a_split_keeps_the_triangulation_whole_and_delaunay() {
         .map(|&x| signed_area(&uv, x))
         .sum::<f64>();
     assert!((after - before).abs() < 1e-12);
+}
+
+#[test]
+fn samples_along_straight_runs_are_inserted_on_the_boundary() {
+    let uv = vec![
+        [0.0, 0.0],
+        [1.0, 0.0],
+        [2.0, 0.0],
+        [3.0, 0.0],
+        [3.0, 1.0],
+        [3.0, 2.0],
+        [0.0, 2.0],
+        [0.0, 1.0],
+    ];
+    let corners = straight_run_corners(&uv, 0..uv.len(), [1.0, 1.0]);
+    assert_eq!(corners, vec![0, 3, 5, 6]);
+    let fixed = ring_edges(uv.len());
+    let mut triangulation = Triangulation::new(vec![[0, 3, 5], [0, 5, 6]], [1.0, 1.0], &fixed);
+    for (from, to, m) in [(0, 3, 1), (1, 3, 2), (3, 5, 4), (6, 0, 7)] {
+        triangulation.insert_on_boundary(&uv, from, to, m);
+    }
+    let triangles = triangulation.triangles;
+    assert_eq!(triangles.len(), uv.len() - 2);
+    assert!(triangles.iter().all(|&t| signed_area(&uv, t) > 0.0));
+    let area = triangles.iter().map(|&t| signed_area(&uv, t)).sum::<f64>();
+    assert!((area - 6.0).abs() < 1e-12);
 }

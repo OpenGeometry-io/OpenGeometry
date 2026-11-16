@@ -2,6 +2,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::f64::consts::PI;
 
 const ANGLE_MARGIN: f64 = 1e-12;
+const COLLINEAR: f64 = 1e-9;
 
 type Pt = [f64; 2];
 type Edge = (usize, usize);
@@ -62,18 +63,51 @@ impl<'a> Triangulation<'a> {
             if !self.is_free(a, b) || !should_flip(point(a), point(b), point(r), point(s)) {
                 continue;
             }
-            self.triangles[t] = [a, s, r];
-            self.triangles[u] = [s, b, r];
-            self.owners.remove(&(a, b));
-            self.owners.remove(&(b, a));
-            self.owners.insert((a, s), t);
-            self.owners.insert((s, r), t);
-            self.owners.insert((b, r), u);
-            self.owners.insert((r, s), u);
+            self.exchange([t, u], a, b, r, s);
             stack.extend([(a, s), (s, b), (b, r), (r, a)]);
             created.push((r, s));
         }
         created
+    }
+
+    pub(super) fn insert_on_boundary(
+        &mut self,
+        uv: &[Pt],
+        from: usize,
+        to: usize,
+        m: usize,
+    ) -> Vec<Edge> {
+        let (a, b, t) = match (self.owners.get(&(from, to)), self.owners.get(&(to, from))) {
+            (Some(&t), _) => (from, to, t),
+            (_, Some(&t)) => (to, from, t),
+            _ => return Vec::new(),
+        };
+        let r = opposite(self.triangles[t], a, b);
+        let t2 = self.triangles.len();
+        self.triangles[t] = [a, m, r];
+        self.triangles.push([m, b, r]);
+        self.owners.remove(&(a, b));
+        for (edge, owner) in [
+            ((a, m), t),
+            ((m, r), t),
+            ((m, b), t2),
+            ((b, r), t2),
+            ((r, m), t2),
+        ] {
+            self.owners.insert(edge, owner);
+        }
+        self.flip(uv, vec![(b, r), (r, a)])
+    }
+
+    fn exchange(&mut self, [t, u]: [usize; 2], a: usize, b: usize, r: usize, s: usize) {
+        self.triangles[t] = [a, s, r];
+        self.triangles[u] = [s, b, r];
+        self.owners.remove(&(a, b));
+        self.owners.remove(&(b, a));
+        self.owners.insert((a, s), t);
+        self.owners.insert((s, r), t);
+        self.owners.insert((b, r), u);
+        self.owners.insert((r, s), u);
     }
 
     pub(super) fn split(&mut self, uv: &[Pt], a: usize, b: usize, m: usize) -> Vec<Edge> {
@@ -116,6 +150,43 @@ impl<'a> Triangulation<'a> {
     }
 }
 
+pub(super) fn straight_run_corners(
+    uv: &[Pt],
+    ring: std::ops::Range<usize>,
+    metric: [f64; 2],
+) -> Vec<usize> {
+    let count = ring.len();
+    let point = |offset: usize| {
+        let p = uv[ring.start + offset % count];
+        [p[0] * metric[0], p[1] * metric[1]]
+    };
+    let bends = |offset: usize| {
+        let (previous, here, next) = (point(offset + count - 1), point(offset), point(offset + 1));
+        sine(previous, next, here).abs() > COLLINEAR
+            || (here[0] - previous[0]) * (next[0] - here[0])
+                + (here[1] - previous[1]) * (next[1] - here[1])
+                <= 0.0
+    };
+    let Some(first) = (0..count).find(|&offset| bends(offset)) else {
+        return ring.collect();
+    };
+    let mut corners = vec![first];
+    for step in 1..count {
+        let offset = first + step;
+        let last = corners[corners.len() - 1];
+        let (previous, here, next) = (point(last), point(offset), point(offset + 1));
+        let ahead = (here[0] - previous[0]) * (next[0] - here[0])
+            + (here[1] - previous[1]) * (next[1] - here[1]);
+        if sine(previous, next, here).abs() > COLLINEAR || ahead <= 0.0 {
+            corners.push(offset % count);
+        }
+    }
+    corners
+        .into_iter()
+        .map(|offset| ring.start + offset)
+        .collect()
+}
+
 fn opposite(triangle: [usize; 3], a: usize, b: usize) -> usize {
     (0..3)
         .map(|k| triangle[k])
@@ -124,12 +195,13 @@ fn opposite(triangle: [usize; 3], a: usize, b: usize) -> usize {
 }
 
 fn should_flip(a: Pt, b: Pt, r: Pt, s: Pt) -> bool {
+    convex(a, b, r, s) && angle(a, r, b) + angle(a, s, b) > PI + ANGLE_MARGIN
+}
+
+fn convex(a: Pt, b: Pt, r: Pt, s: Pt) -> bool {
     let side_a = sine(r, s, a);
     let side_b = sine(r, s, b);
-    if side_a.abs() <= ANGLE_MARGIN || side_b.abs() <= ANGLE_MARGIN || side_a * side_b > 0.0 {
-        return false;
-    }
-    angle(a, r, b) + angle(a, s, b) > PI + ANGLE_MARGIN
+    side_a.abs() > COLLINEAR && side_b.abs() > COLLINEAR && side_a * side_b < 0.0
 }
 
 fn sine(from: Pt, to: Pt, p: Pt) -> f64 {
