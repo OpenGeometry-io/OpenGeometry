@@ -1,3 +1,4 @@
+mod delaunay;
 mod display;
 mod seams;
 mod short_loops;
