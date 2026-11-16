@@ -1,4 +1,4 @@
-use super::super::delaunay::delaunay_flips;
+use super::super::delaunay::Triangulation;
 use std::collections::BTreeSet;
 use std::f64::consts::TAU;
 
@@ -41,9 +41,12 @@ fn inside_circumcircle(p: [[f64; 2]; 3], q: [f64; 2]) -> bool {
 fn flips_turn_a_fan_of_needles_into_a_delaunay_triangulation() {
     let count = 24;
     let uv = ring(count);
-    let mut triangles = (1..count - 1).map(|k| [0, k, k + 1]).collect::<Vec<_>>();
-    let area = triangles.iter().map(|&t| signed_area(&uv, t)).sum::<f64>();
-    delaunay_flips(&mut triangles, &uv, [1.0, 4.0], &ring_edges(count));
+    let fan = (1..count - 1).map(|k| [0, k, k + 1]).collect::<Vec<_>>();
+    let area = fan.iter().map(|&t| signed_area(&uv, t)).sum::<f64>();
+    let fixed = ring_edges(count);
+    let mut triangulation = Triangulation::new(fan, [1.0, 4.0], &fixed);
+    triangulation.flip(&uv, triangulation.free_edges());
+    let triangles = triangulation.triangles;
     let scaled = uv.iter().map(|p| [p[0], 4.0 * p[1]]).collect::<Vec<_>>();
     assert!((triangles.iter().map(|&t| signed_area(&uv, t)).sum::<f64>() - area).abs() < 1e-12);
     for &t in &triangles {
@@ -59,8 +62,46 @@ fn flips_turn_a_fan_of_needles_into_a_delaunay_triangulation() {
 fn flips_remove_a_flat_triangle_along_a_straight_boundary() {
     let uv = vec![[0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [1.0, 1.0]];
     let fixed = BTreeSet::from([(0, 1), (1, 2), (2, 3), (0, 3)]);
-    let mut triangles = vec![[0, 1, 2], [0, 2, 3]];
-    delaunay_flips(&mut triangles, &uv, [1.0, 1.0], &fixed);
+    let mut triangulation = Triangulation::new(vec![[0, 1, 2], [0, 2, 3]], [1.0, 1.0], &fixed);
+    triangulation.flip(&uv, triangulation.free_edges());
+    let triangles = triangulation.triangles;
     assert!(triangles.iter().all(|&t| signed_area(&uv, t) > 0.0));
     assert!(triangles.iter().all(|t| t.contains(&1) && t.contains(&3)));
+}
+
+#[test]
+fn a_split_keeps_the_triangulation_whole_and_delaunay() {
+    let count = 12;
+    let mut uv = ring(count);
+    let fixed = ring_edges(count);
+    let fan = (1..count - 1).map(|k| [0, k, k + 1]).collect::<Vec<_>>();
+    let mut triangulation = Triangulation::new(fan, [1.0, 4.0], &fixed);
+    triangulation.flip(&uv, triangulation.free_edges());
+    let area = |t: &Triangulation| {
+        t.triangles
+            .iter()
+            .map(|&x| signed_area(&uv, x))
+            .sum::<f64>()
+    };
+    let before = area(&triangulation);
+    let (a, b) = triangulation.free_edges()[0];
+    uv.push([(uv[a][0] + uv[b][0]) * 0.5, (uv[a][1] + uv[b][1]) * 0.5]);
+    let touched = triangulation.split(&uv, a, b, count);
+    assert!(!triangulation.has_edge(a, b));
+    assert!(touched.iter().all(|&(p, q)| triangulation.has_edge(p, q)));
+    assert_eq!(triangulation.triangles.len(), count);
+    let scaled = uv.iter().map(|p| [p[0], 4.0 * p[1]]).collect::<Vec<_>>();
+    for &t in &triangulation.triangles {
+        assert!(signed_area(&uv, t) > 0.0);
+        let corners = t.map(|index| scaled[index]);
+        for (index, &point) in scaled.iter().enumerate() {
+            assert!(t.contains(&index) || !inside_circumcircle(corners, point));
+        }
+    }
+    let after = triangulation
+        .triangles
+        .iter()
+        .map(|&x| signed_area(&uv, x))
+        .sum::<f64>();
+    assert!((after - before).abs() < 1e-12);
 }
