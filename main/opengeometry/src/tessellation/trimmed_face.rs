@@ -1,3 +1,4 @@
+use super::delaunay::delaunay_flips;
 use super::grid::Rect;
 use super::mesh::Tessellation;
 use super::trim::{
@@ -5,7 +6,7 @@ use super::trim::{
 };
 use crate::brep::{BrepEnvelope, Face, GeometryError, Surface, SurfaceGeometry};
 use crate::geom2d::{point_in_ring2, Pt2};
-use crate::math::{scale, Interval, Point3};
+use crate::math::{norm, scale, Interval, Point3};
 use std::collections::{BTreeSet, HashMap};
 
 const COUNT_ROUNDING: f64 = 1e-9;
@@ -225,7 +226,9 @@ fn general_curved_trimmed_face(
     let boundary_count = uv.len();
     let mut triangles = earcut_triangles(&uv, &holes)?;
     let surface = brep.geometry.surface(face.surface)?;
+    let metric = uv_metric(surface, &uv[..loops[0].len()])?;
     for _ in 0..128 {
+        delaunay_flips(&mut triangles, &uv, metric, &boundary_edges);
         let split_edges = edges_to_split(&triangles, &boundary_edges, surface, &uv, error);
         if split_edges.is_empty() {
             break;
@@ -265,6 +268,18 @@ fn general_curved_trimmed_face(
         )?;
     }
     Ok(())
+}
+
+fn uv_metric(surface: &SurfaceGeometry, outer: &[[f64; 2]]) -> Result<[f64; 2], GeometryError> {
+    let count = outer.len().max(1) as f64;
+    let center = [0, 1].map(|axis| outer.iter().map(|uv| uv[axis]).sum::<f64>() / count);
+    let jet = surface.derivatives(center)?;
+    let metric = [norm(jet.du), norm(jet.dv)];
+    if metric.iter().all(|value| value.is_finite() && *value > 0.0) {
+        Ok(metric)
+    } else {
+        Ok([1.0, 1.0])
+    }
 }
 
 fn earcut_triangles(uv: &[[f64; 2]], holes: &[usize]) -> Result<Vec<[usize; 3]>, GeometryError> {
