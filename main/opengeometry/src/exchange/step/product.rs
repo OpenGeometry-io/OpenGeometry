@@ -1,8 +1,14 @@
 use super::body::BodyEmission;
 use super::entities::{real, refs};
+use super::unit::Scale;
 use crate::exchange::part21::{sanitize_string_literal, Part21Writer};
 
-pub(super) fn emit_context(writer: &mut Part21Writer, unit: &str, bound: f64, scale: f64) -> usize {
+pub(super) fn emit_context(
+    writer: &mut Part21Writer,
+    unit: &str,
+    bound: f64,
+    scale: Scale,
+) -> usize {
     let prefix = if unit == "millimetre" { ".MILLI." } else { "$" };
     let length = writer.add_entity(format!(
         "(LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT({prefix},.METRE.))"

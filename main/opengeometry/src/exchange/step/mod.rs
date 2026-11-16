@@ -4,6 +4,7 @@ mod product;
 mod report;
 #[cfg(test)]
 mod tests;
+mod unit;
 
 pub(crate) use report::{StepBodyInput, StepExportFailure};
 pub use report::{StepBodyReport, StepExportReport, StepReport, StepSkipped};
@@ -13,6 +14,7 @@ use crate::brep::{BrepEnvelope, GeometryError};
 use crate::exchange::part21::Part21Writer;
 use body::{emit_body, BodyEmission};
 use product::{emit_context, emit_products, emit_representations};
+use unit::Scale;
 
 pub fn export_step(brep: &BrepEnvelope, unit: &str) -> Result<(String, StepReport), GeometryError> {
     export_step_in(brep, "metre", unit)
@@ -66,7 +68,7 @@ pub(crate) fn export_bodies(
     timestamp: &str,
     skipped: Vec<StepSkipped>,
 ) -> Result<(String, StepExportReport), StepExportFailure> {
-    let scale = unit_scale(model_unit, unit)?;
+    let scale = Scale::between(model_unit, unit)?;
     if bodies.is_empty() {
         return Err(
             GeometryError::InvalidGeometry("STEP export has no solid bodies".into()).into(),
@@ -122,31 +124,15 @@ pub(crate) fn export_bodies(
     Ok((text, report))
 }
 
-fn unit_scale(model_unit: &str, unit: &str) -> Result<f64, GeometryError> {
-    if !matches!(unit, "metre" | "millimetre") {
-        return Err(GeometryError::InvalidGeometry(
-            "STEP length unit must be metre or millimetre".into(),
-        ));
-    }
-    match (model_unit, unit) {
-        ("metre", "millimetre") => Ok(1000.0),
-        ("millimetre", "metre") => Ok(1e-3),
-        ("metre" | "millimetre", _) => Ok(1.0),
-        _ => Err(GeometryError::InvalidGeometry(
-            "STEP model length unit must be metre or millimetre".into(),
-        )),
-    }
-}
-
 fn add_bodies(
     writer: &mut Part21Writer,
     bodies: &[StepBodyInput<'_>],
-    scale: f64,
+    scale: Scale,
     context2: usize,
 ) -> Result<Vec<BodyEmission>, StepExportFailure> {
     let mut emitted = Vec::with_capacity(bodies.len());
     for (index, input) in bodies.iter().enumerate() {
-        let body = preflight(input.brep, scale)
+        let body = preflight(input.brep, scale.ratio())
             .and_then(|initial_bound| emit_body(writer, input.brep, scale, context2, initial_bound))
             .map_err(|error| StepExportFailure {
                 body_index: Some(index),
@@ -160,7 +146,7 @@ fn add_bodies(
 fn step_body_reports(
     bodies: &[StepBodyInput<'_>],
     emitted: &[BodyEmission],
-    scale: f64,
+    scale: Scale,
 ) -> Vec<StepBodyReport> {
     bodies
         .iter()

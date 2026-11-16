@@ -1,7 +1,8 @@
+use super::entities::real;
 use super::{export_bodies, export_step, export_step_in, StepBodyInput};
 use crate::brep::{
-    coarse_accuracy, BrepEnvelope, Curve, CurveGeometry, EdgeGeometry, Frame3, GeometryError,
-    IntersectionDefinition, IntersectionSide, PcurveGeometry, Surface, TraceAnchor,
+    coarse_accuracy, Accuracy, BrepEnvelope, Curve, CurveGeometry, EdgeGeometry, Frame3,
+    GeometryError, IntersectionDefinition, IntersectionSide, PcurveGeometry, Surface, TraceAnchor,
 };
 use crate::math::Interval;
 use crate::operations::modifying::boolean::{boolean_spheres, BooleanOp};
@@ -194,35 +195,80 @@ fn rejects_unrepresentable_exchange_and_preserves_large_revisions() {
     ));
 }
 
-#[test]
-fn a_body_in_millimetres_exports_unscaled_in_millimetres() {
-    let brep = primitives::cuboid(
+fn millimetre_plate() -> BrepEnvelope {
+    let accuracy = Accuracy {
+        geometric: 1e-5,
+        intersection: 1e-6,
+        tessellation: 10.0,
+        exchange: 1e-3,
+    };
+    primitives::cuboid(
         "plate".into(),
         Frame3::IDENTITY,
-        [100.0, 50.0, 2.0],
-        coarse_accuracy(1e-3),
+        [100.0, 50.0, 9.0],
+        accuracy,
     )
-    .unwrap();
-    let (metres, _) = export_step(&brep, "metre").unwrap();
-    let (mm, report) = export_step_in(&brep, "millimetre", "millimetre").unwrap();
+    .unwrap()
+}
+
+fn corner(x: f64, y: f64, z: f64) -> String {
+    format!("CARTESIAN_POINT('',({},{},{}))", real(x), real(y), real(z))
+}
+
+#[test]
+fn millimetre_body_to_millimetre_file_writes_coordinates_unchanged() {
+    let plate = millimetre_plate();
+    let (mm, report) = export_step_in(&plate, "millimetre", "millimetre").unwrap();
     assert_eq!(report.length_unit, "millimetre");
+    assert!(mm.contains("SI_UNIT(.MILLI.,.METRE.)"));
+    assert!(mm.contains(&corner(100.0, 50.0, 9.0)));
+    let (metres, _) = export_step(&plate, "metre").unwrap();
     assert_eq!(
         mm.replace("SI_UNIT(.MILLI.,.METRE.)", "SI_UNIT($,.METRE.)"),
         metres
     );
-    let (scaled, _) = export_step(&brep, "millimetre").unwrap();
-    assert_ne!(scaled, mm);
-    let (_, to_metres) = export_step_in(&brep, "millimetre", "metre").unwrap();
+}
+
+#[test]
+fn millimetre_body_to_metre_file_scales_by_a_thousandth() {
+    let plate = millimetre_plate();
+    let (metres, report) = export_step_in(&plate, "millimetre", "metre").unwrap();
+    assert_eq!(report.length_unit, "metre");
+    assert!(metres.contains("SI_UNIT($,.METRE.)"));
+    assert!(metres.contains(&corner(0.1, 0.05, 0.009)));
+    let (_, mm) = export_step_in(&plate, "millimetre", "millimetre").unwrap();
     assert_eq!(
-        to_metres.exchange_error_bound,
-        report.exchange_error_bound * 1e-3
+        report.exchange_error_bound,
+        mm.exchange_error_bound / 1000.0
     );
+}
+
+#[test]
+fn metre_body_to_millimetre_file_scales_by_a_thousand() {
+    let plate = primitives::cuboid(
+        "plate".into(),
+        Frame3::IDENTITY,
+        [1.0, 0.5, 0.25],
+        Accuracy::STANDARD,
+    )
+    .unwrap();
+    let (mm, _) = export_step(&plate, "millimetre").unwrap();
+    assert!(mm.contains("SI_UNIT(.MILLI.,.METRE.)"));
+    assert!(mm.contains(&corner(1000.0, 500.0, 250.0)));
+}
+
+#[test]
+fn unknown_file_unit_is_rejected() {
     assert!(matches!(
-        export_step_in(&brep, "millimetre", "inch"),
+        export_step_in(&millimetre_plate(), "millimetre", "inch"),
         Err(GeometryError::InvalidGeometry(_))
     ));
+}
+
+#[test]
+fn unknown_model_unit_is_rejected() {
     assert!(matches!(
-        export_step_in(&brep, "inch", "millimetre"),
+        export_step_in(&millimetre_plate(), "inch", "millimetre"),
         Err(GeometryError::InvalidGeometry(_))
     ));
 }
