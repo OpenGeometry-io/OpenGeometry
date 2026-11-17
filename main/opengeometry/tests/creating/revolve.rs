@@ -194,6 +194,7 @@ fn a_revolve_minus_a_cuboid_is_a_coverage_gap_naming_the_handlers_tried() {
             "separate_boolean",
             "sphere_box_boolean",
             "subtract_vertical_arc_extrusion",
+            "subtract_half_space_from_arc_extrusion",
             "generic_two_sided_cutter_band_subtraction",
             "generic_multiple_closed_loops_boolean",
             "generic_single_closed_loop_boolean",

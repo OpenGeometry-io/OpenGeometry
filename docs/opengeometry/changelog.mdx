@@ -5,6 +5,25 @@ icon: clock-rotate-left
 rss: true
 ---
 
+<Update label="3.0.1" description="2026-11-17">
+
+Some booleans that threw in 3.0.0 now build, and some refused pairs throw a different error.
+
+### Changed
+
+- **Planar union and intersection.** `operate` unites and intersects turned cuboids, sloped polyhedra such as roofs, and polyhedra that are not convex. Coplanar faces of both bodies merge into one face.
+- **Slanted cuts of arc extrusions.** Subtract a slanted cuboid or convex prism, such as a mitre, from an extrusion with arcs or a cylinder. The cut end is an exact ellipse.
+- **Touching solids.** Two planar solids that touch on a face unite into one solid. Their intersection, and a subtraction that leaves nothing, throw `EmptyResult`.
+- **`CoverageGap` details.** A refused planar union or intersection names `['layered planar profile extrusion', 'layered planar profile extrusion']` in `details.families`.
+
+### Fixed
+
+- Subtracting a body wholly inside another gives each of its solids a cavity in the right solid.
+- Some bodies with cavities or several solids gave a wrong result. They now throw `UnresolvedIntersection`.
+- Some contained, hollow, touching or slightly turned pairs that threw `InvalidTopology` or `UnresolvedIntersection` now build.
+
+</Update>
+
 <Update label="3.0.0" description="2026-11-10">
 
 3.0 is a new API. Code written for 2.0 does not run without changes. Follow [Migrate from 2.0](/opengeometry/migrate-from-2-0).
