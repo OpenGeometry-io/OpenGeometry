@@ -74,12 +74,16 @@ export class OpenGeometry {
   static exportStep(options: {
     nodes: (Body | SystemAssembly | string)[];
     unit?: 'metre' | 'millimetre';
+    modelUnit?: 'metre' | 'millimetre';
     upAxis?: 'Y' | 'Z';
     name?: string;
     timestamp?: string;
   }): Promise<StepExport> { return exportStep(options); }
 
-  static exportIfcBody(node: Body | SystemAssembly): AnalyticExchangeBodyV2 { return exportIfcBody(node); }
+  static exportIfcBody(
+    node: Body | SystemAssembly,
+    options: { modelUnit?: 'metre' | 'millimetre' } = {},
+  ): AnalyticExchangeBodyV2 { return exportIfcBody(node, options); }
 
   static booleanRegions2D(
     a: readonly OffsetRegion[],

@@ -1,9 +1,9 @@
-use super::unit::Scale;
 use crate::brep::{
     CurveGeometry, Frame3, GeometryError, Orientation, PcurveGeometry, SurfaceGeometry,
 };
 use crate::exchange::fit_curve::FittedIntersectionCurve;
 use crate::exchange::part21::Part21Writer;
+use crate::exchange::unit::Scale;
 use crate::math::{dot, norm};
 
 pub(super) struct PcurveOnSurface<'a> {

@@ -1,7 +1,7 @@
 use super::body::BodyEmission;
 use super::entities::{real, refs};
-use super::unit::Scale;
 use crate::exchange::part21::{sanitize_string_literal, Part21Writer};
+use crate::exchange::unit::Scale;
 
 pub(super) fn emit_context(
     writer: &mut Part21Writer,

@@ -4,17 +4,16 @@ mod product;
 mod report;
 #[cfg(test)]
 mod tests;
-mod unit;
 
 pub(crate) use report::{StepBodyInput, StepExportFailure};
 pub use report::{StepBodyReport, StepExportReport, StepReport, StepSkipped};
 
 use super::preflight::preflight;
+use super::unit::Scale;
 use crate::brep::{BrepEnvelope, GeometryError};
 use crate::exchange::part21::Part21Writer;
 use body::{emit_body, BodyEmission};
 use product::{emit_context, emit_products, emit_representations};
-use unit::Scale;
 
 pub fn export_step(brep: &BrepEnvelope, unit: &str) -> Result<(String, StepReport), GeometryError> {
     export_step_in(brep, "metre", unit)

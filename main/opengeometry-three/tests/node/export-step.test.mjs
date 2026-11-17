@@ -39,3 +39,18 @@ test('a body from a reset runtime rejects with Disposed', async () => {
   cuboid('reset-export');
   assert(failsWith('Disposed')(await rejection(OpenGeometry.exportStep({ nodes: [stale] }))));
 });
+
+test('exportStep of a millimetre model to millimetres writes the metre digits', async () => {
+  await boot();
+  const body = cuboid('step-millimetre', 100);
+  const timestamp = '2026-01-01T00:00:00';
+  const millimetre = await OpenGeometry.exportStep({
+    nodes: [body], unit: 'millimetre', modelUnit: 'millimetre', timestamp,
+  });
+  const metre = await OpenGeometry.exportStep({ nodes: [body], unit: 'metre', modelUnit: 'metre', timestamp });
+  assert.equal(millimetre.report.unit, 'millimetre');
+  assert.equal(millimetre.text.replace('SI_UNIT(.MILLI.,.METRE.)', 'SI_UNIT($,.METRE.)'), metre.text);
+  const inch = Reflect.apply(OpenGeometry.exportStep, OpenGeometry, [{ nodes: [body], modelUnit: 'inch' }]);
+  assert(failsWith('InvalidParameter')(await rejection(inch)));
+  body.dispose();
+});

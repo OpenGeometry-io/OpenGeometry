@@ -9,7 +9,8 @@ icon: file-export
 | Option      | Default          | Meaning                                                        |
 | ----------- | ---------------- | -------------------------------------------------------------- |
 | `nodes`     | required         | Bodies, assemblies, or `ogId` strings                          |
-| `unit`      | `'millimetre'`   | `'millimetre'` or `'metre'`                                    |
+| `unit`      | `'millimetre'`   | `'millimetre'` or `'metre'`: the unit of the file              |
+| `modelUnit` | `'metre'`        | `'metre'` or `'millimetre'`: the unit the bodies are built in  |
 | `upAxis`    | `'Z'`            | `'Z'` or `'Y'`. The model is Y up; the file is Z up by default |
 | `name`      | none             | The product name in the file                                   |
 | `timestamp` | the current time | The time in the file header, for files that must not change    |

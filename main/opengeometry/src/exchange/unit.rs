@@ -13,9 +13,7 @@ impl Scale {
             GeometryError::InvalidGeometry("STEP length unit must be metre or millimetre".into())
         })?;
         let times = millimetres_in(model_unit).ok_or_else(|| {
-            GeometryError::InvalidGeometry(
-                "STEP model length unit must be metre or millimetre".into(),
-            )
+            GeometryError::InvalidGeometry("model length unit must be metre or millimetre".into())
         })?;
         Ok(if times >= per {
             Self {

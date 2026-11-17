@@ -5,6 +5,7 @@ mod surfaces;
 mod topology;
 
 use super::preflight::preflight;
+use super::unit::Scale;
 use crate::brep::{placed, BrepEnvelope, FaceProvenance, Frame3, GeometryError, GeometryQuality};
 use entities::{Entities, IfcEntity};
 use serde::{Deserialize, Serialize};
@@ -40,18 +41,27 @@ pub fn export_ifc_body(
     input: &BrepEnvelope,
     conversion: Frame3,
 ) -> Result<AnalyticExchangeBodyV2, GeometryError> {
-    let preflight_bound = preflight(input, 1.0)?;
+    export_ifc_body_in(input, "metre", conversion)
+}
+
+pub fn export_ifc_body_in(
+    input: &BrepEnvelope,
+    model_unit: &str,
+    conversion: Frame3,
+) -> Result<AnalyticExchangeBodyV2, GeometryError> {
+    let scale = Scale::between(model_unit, "metre")?;
+    let preflight_bound = preflight(input, scale.ratio())?;
     check_entity_estimate(input)?;
-    let mut brep = placed(input, conversion, 1.0)?;
+    let mut brep = placed(input, conversion, scale.ratio())?;
     let has_cavities = cavities::reverse_cavities(&mut brep)?;
     let mut entities = Entities::default();
     let surfaces = surfaces::add_surfaces(&mut entities, &brep)?;
     let edges = curves::add_edges(
         &mut entities,
         &brep,
-        input.accuracy.exchange - preflight_bound,
+        (input.accuracy.exchange - preflight_bound) * scale,
     )?;
-    let exchange_error_bound = preflight_bound + edges.fitting_error;
+    let exchange_error_bound = preflight_bound * scale + edges.fitting_error;
     let faces = topology::add_faces(&mut entities, &brep, &surfaces, &edges)?;
     let solids = topology::add_solids(&mut entities, &brep, &faces, has_cavities);
     Ok(AnalyticExchangeBodyV2 {
@@ -62,7 +72,7 @@ pub fn export_ifc_body(
         coordinate_space: "world".into(),
         representation_type: if has_cavities { "CSG" } else { "AdvancedBrep" }.into(),
         quality: input.quality.clone(),
-        geometric_tolerance: input.accuracy.geometric,
+        geometric_tolerance: input.accuracy.geometric * scale,
         exchange_error_bound,
         validation_level: "v2 structure, sampled residuals and bounded analytic entity preparation; receiver schema validation required".into(),
         entities: entities.0,

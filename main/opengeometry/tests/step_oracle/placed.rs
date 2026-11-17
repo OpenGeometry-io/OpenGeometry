@@ -130,6 +130,7 @@ fn world_export_applies_z_up_and_escapes_file_name() {
 fn world_export_handles_far_body_and_rejects_options_without_mutation() {
     let defaults: StepOptions = serde_json::from_str("{}").unwrap();
     assert_eq!(defaults.unit, "millimetre");
+    assert_eq!(defaults.model_unit, "metre");
     assert_eq!(defaults.up_axis, "Z");
     let mut world = graph();
     world
@@ -155,6 +156,10 @@ fn world_export_handles_far_body_and_rejects_options_without_mutation() {
     for options in [
         StepOptions {
             unit: "inch".into(),
+            ..StepOptions::default()
+        },
+        StepOptions {
+            model_unit: "inch".into(),
             ..StepOptions::default()
         },
         StepOptions {
@@ -385,4 +390,37 @@ fn circle_extrusion_and_cylinder_edges_are_circles_of_the_source_radius() {
             assert_eq!(exported.document.count("POLY_LOOP"), 0);
         }
     }
+}
+
+#[test]
+fn world_export_of_a_millimetre_model_to_millimetres_writes_the_metre_digits() {
+    let mut world = graph();
+    world
+        .create_primitive(
+            Primitive::Cuboid {
+                width: 100.0,
+                height: 9.0,
+                depth: 50.0,
+            },
+            named("plate"),
+        )
+        .unwrap();
+    let export = |model_unit: &str, unit: &str| {
+        world
+            .export_step(
+                &["plate".into()],
+                &StepOptions {
+                    unit: unit.into(),
+                    model_unit: model_unit.into(),
+                    ..StepOptions::default()
+                },
+            )
+            .unwrap()
+    };
+    let (millimetre, _) = export("millimetre", "millimetre");
+    let (metre, _) = export("metre", "metre");
+    assert_eq!(
+        millimetre.replace("SI_UNIT(.MILLI.,.METRE.)", "SI_UNIT($,.METRE.)"),
+        metre
+    );
 }

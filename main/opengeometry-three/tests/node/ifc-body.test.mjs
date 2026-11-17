@@ -95,3 +95,20 @@ test('exportIfcBody leaves revision, changes, mark stats and getBrep unchanged',
   assert.equal(state(), before);
   body.dispose();
 });
+
+test('exportIfcBody of a millimetre model writes a thousandth of the metre numbers', async () => {
+  await boot();
+  const body = cuboid('ifc-millimetre', 100);
+  const metre = points(OpenGeometry.exportIfcBody(body));
+  const millimetre = OpenGeometry.exportIfcBody(body, { modelUnit: 'millimetre' });
+  assert.equal(millimetre.length_unit, 'metre');
+  assert.equal(points(millimetre).length, metre.length);
+  points(millimetre).forEach((point, i) => point.forEach((value, axis) => {
+    assert(Math.abs(value - metre[i][axis] / 1000) <= 1e-15);
+  }));
+  assert.throws(
+    () => Reflect.apply(OpenGeometry.exportIfcBody, OpenGeometry, [body, { modelUnit: 'inch' }]),
+    failsWith('InvalidParameter'),
+  );
+  body.dispose();
+});
