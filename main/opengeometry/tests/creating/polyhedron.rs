@@ -7,7 +7,7 @@ use opengeometry_test_support::part21::Document;
 use opengeometry_test_support::volume;
 use opengeometry_test_support::world_graph::{graph, named};
 
-const HIP_FACES: [&[u32]; 5] = [
+pub(super) const HIP_FACES: [&[u32]; 5] = [
     &[0, 1, 2, 3],
     &[1, 0, 4, 5],
     &[2, 1, 5],
@@ -22,7 +22,7 @@ const EAVES: [Point3; 4] = [
     [0.0, 0.0, 2.0],
 ];
 
-fn polyhedron(points: &[Point3], faces: &[&[u32]]) -> Primitive {
+pub(super) fn polyhedron(points: &[Point3], faces: &[&[u32]]) -> Primitive {
     Primitive::Polyhedron {
         points: points.to_vec(),
         faces: faces.iter().map(|ring| ring.to_vec()).collect(),
@@ -34,15 +34,15 @@ fn roof(ridge: [Point3; 2]) -> Primitive {
     polyhedron(&points, &HIP_FACES)
 }
 
-fn hip_roof() -> Primitive {
+pub(super) fn hip_roof() -> Primitive {
     roof([[1.0, 1.0, 1.0], [3.0, 1.0, 1.0]])
 }
 
-fn gable_roof() -> Primitive {
+pub(super) fn gable_roof() -> Primitive {
     roof([[0.0, 1.0, 1.0], [4.0, 1.0, 1.0]])
 }
 
-fn l_roof() -> Primitive {
+pub(super) fn l_roof() -> Primitive {
     let points = [
         [0.0, 0.0, 0.0],
         [4.0, 0.0, 0.0],

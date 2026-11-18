@@ -4,6 +4,40 @@ All notable changes to the `opengeometry` package are in this file. The format f
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-11-17
+
+Some booleans that threw in 3.0.0 now build, and some refused pairs throw a different error.
+See "3.0 to 3.0.1" in [MIGRATION.md](./MIGRATION.md) for each case.
+
+### Changed
+
+- `operate` builds the union and the intersection of two planar solids that are not both
+  axis-aligned boxes: a turned cuboid, a polyhedron with sloped faces such as a roof, or a
+  polyhedron that is not convex. Faces of both bodies that lie in one plane and face the same
+  way become one face. The report's `handlers` is `['boolean_planar_polyhedra']`.
+- `OG_OPERATION_SUBTRACT` cuts an extrusion whose profile has arcs, or a cylinder, with a
+  slanted cuboid or convex prism, such as a mitre. The cut end is an exact ellipse, and two
+  mitres work in one call. A cuboid or convex prism minus a slanted rod also builds.
+- Two planar solids that touch on a face unite into one solid. Their intersection, and a
+  subtraction that leaves nothing, throw `EmptyResult`.
+- A union or intersection of two planar solids that is still refused throws `CoverageGap` with
+  `details.families` equal to `['layered planar profile extrusion', 'layered planar profile extrusion']`,
+  not `['canonical aligned cuboid', 'canonical aligned cuboid']`. Code that matches the old pair
+  must match the new one.
+
+### Fixed
+
+- Subtracting a body that lies wholly inside another made a cavity for only one of its solids
+  and could put it in the wrong solid. Each solid now gets its cavity in the solid that holds it.
+- A body with a cavity or several solids whose shells lie on different sides of the other body
+  gave a wrong result for some pairs. It now throws `UnresolvedIntersection`.
+- Subtracting a hollow body that lies wholly inside another threw `InvalidTopology`, and
+  subtracting a body that only stands on a face of the host threw `InvalidTopology`. Both build.
+- A pair where one solid lay inside the other, very close to its face, threw
+  `UnresolvedIntersection`. It builds.
+- Flat faces that are parallel up to rounding, as after turning a polyhedron about a slanted
+  axis, made some booleans throw `UnresolvedIntersection`. They build.
+
 ## [3.0.0] - 2026-11-10
 
 3.0 is a new API. Code written for 2.0 does not run without changes. Version 2.5 was not

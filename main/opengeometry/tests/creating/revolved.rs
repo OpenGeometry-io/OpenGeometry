@@ -183,6 +183,7 @@ fn torus_minus_a_crossing_cuboid_is_a_coverage_gap_naming_the_torus_and_cuboid()
             "separate_boolean",
             "torus_box_containment",
             "subtract_vertical_arc_extrusion",
+            "subtract_half_space_from_arc_extrusion",
             "generic_two_sided_cutter_band_subtraction",
             "generic_multiple_closed_loops_boolean",
             "generic_single_closed_loop_boolean",

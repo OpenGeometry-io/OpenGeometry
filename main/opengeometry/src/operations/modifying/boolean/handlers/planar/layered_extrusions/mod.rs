@@ -10,7 +10,7 @@ use crate::math::{cross, dot, scale, sub, Point3};
 use crate::operations::modifying::boolean::operands::{
     all_planar, brep_face_source, full_planar_extrusion,
 };
-use crate::operations::modifying::boolean::types::BooleanResult;
+use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
 use crate::query::face_contains_uv;
 use regions::{contours, layer_boundaries, layer_regions, LayerBoundaries};
 
@@ -97,7 +97,7 @@ pub(crate) fn subtract_layered_extrusions(
         &boundaries.vertices,
         &[(host, FaceRole::Split)],
     )?;
-    finish(facets, host, cutter)
+    finish(facets, host, cutter, BooleanOp::Subtraction)
 }
 
 fn check_layer_alignment(host: &BrepEnvelope, frame: Frame3) -> Result<(), GeometryError> {
