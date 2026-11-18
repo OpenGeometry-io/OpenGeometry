@@ -6,6 +6,8 @@ use crate::math::{
     Interval, Sign,
 };
 
+const PARALLEL_SINE: f64 = 1.0e-11;
+
 pub(super) fn plane_plane(
     a: Frame3,
     b: Frame3,
@@ -14,7 +16,7 @@ pub(super) fn plane_plane(
     let tangent = cross(a.z, b.z);
     let length = norm(tangent);
     let delta = sub(b.origin, a.origin);
-    if length == 0.0 {
+    if length <= PARALLEL_SINE {
         return Ok(if dot(a.z, delta).abs() <= accuracy.intersection {
             GeometryResult::Coincident
         } else {
