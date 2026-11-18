@@ -6,10 +6,11 @@ use opengeometry_test_support::stored;
 use opengeometry_test_support::volume;
 use sha2::{Digest, Sha256};
 
-const SPECIALIZED: [&str; 4] = [
+const SPECIALIZED: [&str; 5] = [
     "separate_boolean",
     "boolean_spheres",
     "subtract_vertical_arc_extrusion",
+    "subtract_half_space_from_arc_extrusion",
     "generic_two_sided_cutter_band_subtraction",
 ];
 
