@@ -2,11 +2,11 @@ use crate::brep::{BrepEnvelope, GeometryError};
 use crate::intersection::intersect_breps_until_branch;
 use crate::math::{norm, sub};
 use crate::operations::modifying::boolean::handlers::containment::{
-    analytic_containment_boolean, interior_sample,
+    analytic_containment_boolean, boundary_side,
 };
 use crate::operations::modifying::boolean::handlers::disjoint::separate_boolean;
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
-use crate::query::{classify_point, PointClassification};
+use crate::query::PointClassification;
 
 pub(crate) fn generic_non_intersecting_boolean(
     a: &BrepEnvelope,
@@ -42,8 +42,8 @@ pub(crate) fn generic_non_intersecting_boolean(
         }
     }
 
-    let a_in_b = classify_point(b, interior_sample(a)?)?;
-    let b_in_a = classify_point(a, interior_sample(b)?)?;
+    let a_in_b = boundary_side(a, b)?;
+    let b_in_a = boundary_side(b, a)?;
     if matches!(
         a_in_b,
         PointClassification::Unknown | PointClassification::Boundary

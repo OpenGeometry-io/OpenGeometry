@@ -1,6 +1,6 @@
 {
   "faces": 8,
   "handlers": [
-    "prismatic_curved_boolean"
+    "subtract_half_space_from_arc_extrusion"
   ]
 }

@@ -10,7 +10,7 @@ mod torus_cylinder;
 mod torus_torus;
 
 pub(crate) use self::core::analytic_containment_boolean;
-pub(super) use self::core::interior_sample;
+pub(super) use self::core::boundary_side;
 pub(crate) use conic_box::conic_box_containment;
 pub(crate) use conic_conic::conic_containment_boolean;
 pub(crate) use cylinder_conic::cylinder_conic_containment;
