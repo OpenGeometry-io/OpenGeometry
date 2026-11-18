@@ -199,6 +199,7 @@ pub(super) fn finish(
     mut facets: PlanarFacets,
     a: &BrepEnvelope,
     b: &BrepEnvelope,
+    operation: BooleanOp,
 ) -> Result<BooleanResult, GeometryError> {
     let mut assigned = vec![false; facets.builder.brep.topology.faces.len()];
     let mut outer_shells = Vec::new();
@@ -251,7 +252,7 @@ pub(super) fn finish(
             .cavity_shells
             .push(cavity_shell);
     }
-    finish_planar_result(facets.builder.brep, a, b)
+    finish_planar_result(facets.builder.brep, a, b, operation)
 }
 
 fn shell_volume(brep: &BrepEnvelope, faces: &[u32]) -> Result<f64, GeometryError> {
@@ -344,6 +345,7 @@ fn finish_planar_result(
     mut out: BrepEnvelope,
     a: &BrepEnvelope,
     b: &BrepEnvelope,
+    operation: BooleanOp,
 ) -> Result<BooleanResult, GeometryError> {
     out.revision =
         a.revision.max(b.revision).checked_add(1).ok_or_else(|| {
@@ -354,7 +356,7 @@ fn finish_planar_result(
     let face_mappings = analytic_face_mappings(&out, [a, b]);
     Ok(BooleanResult {
         report: BooleanReport {
-            operation: BooleanOp::Subtraction,
+            operation,
             quality: out.quality.clone(),
             contacts: Vec::new(),
             coincident: true,
