@@ -1,5 +1,7 @@
 use super::entities::{enumeration, real, reference, references, Entities, IfcValue};
-use crate::brep::{BrepEnvelope, Frame3, GeometryError, SurfaceGeometry};
+use crate::brep::{
+    unsupported_conoid, unsupported_wrapped, BrepEnvelope, Frame3, GeometryError, SurfaceGeometry,
+};
 use crate::math::scale;
 
 pub(super) fn add_surfaces(
@@ -39,6 +41,8 @@ pub(super) fn add_surfaces(
                 let height = cone_height(brep, face.surface)?;
                 add_cone(entities, *frame, *semi_angle, height)
             }
+            SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("IFC export")),
+            SurfaceGeometry::Conoid { .. } => return Err(unsupported_conoid("IFC export")),
         };
         surfaces[face.surface as usize] = Some(id);
     }

@@ -8,7 +8,7 @@ use crate::brep::topology::{
 };
 use crate::math::{Interval, Point3};
 
-pub(crate) struct Use {
+pub struct Use {
     pub(super) edge: u32,
     pub(super) from: u32,
     pub(super) to: u32,
@@ -16,16 +16,19 @@ pub(crate) struct Use {
     pub(super) pcurve: PcurveGeometry,
 }
 
-pub(crate) struct Builder {
+pub struct Builder {
     pub(crate) brep: BrepEnvelope,
 }
 impl Builder {
-    pub(crate) fn new(id: String, accuracy: Accuracy) -> Result<Self, GeometryError> {
+    pub fn new(id: String, accuracy: Accuracy) -> Result<Self, GeometryError> {
         Ok(Self {
             brep: BrepEnvelope::new(id, accuracy)?,
         })
     }
-    pub(crate) fn vertex(&mut self, p: Point3) -> u32 {
+    pub fn brep(&self) -> &BrepEnvelope {
+        &self.brep
+    }
+    pub fn vertex(&mut self, p: Point3) -> u32 {
         let id = self.brep.topology.vertices.len() as u32;
         self.brep.topology.vertices.push(Vertex {
             id,
@@ -35,7 +38,7 @@ impl Builder {
         });
         id
     }
-    pub(crate) fn edge(&mut self, curve: CurveGeometry, range: Interval, seam: bool) -> u32 {
+    pub fn edge(&mut self, curve: CurveGeometry, range: Interval, seam: bool) -> u32 {
         let curve_id = self.brep.geometry.curves.len() as u32;
         self.brep.geometry.curves.push(curve);
         self.edge_geometry(
@@ -129,24 +132,29 @@ impl Builder {
         });
         Ok(loop_id)
     }
-    pub(crate) fn face(
+    pub fn face(
         &mut self,
         key: &str,
         surface: SurfaceGeometry,
         bounds: [[f64; 2]; 2],
         uses: Vec<Use>,
-    ) -> Result<(), GeometryError> {
+    ) -> Result<u32, GeometryError> {
         self.face_with_holes(key, surface, bounds, uses, Vec::new())
     }
-    pub(crate) fn face_with_holes(
+    pub fn face_with_holes(
         &mut self,
         key: &str,
         surface: SurfaceGeometry,
         bounds: [[f64; 2]; 2],
-        outer_uses: Vec<Use>,
-        hole_uses: Vec<Vec<Use>>,
-    ) -> Result<(), GeometryError> {
+        mut outer_uses: Vec<Use>,
+        mut hole_uses: Vec<Vec<Use>>,
+    ) -> Result<u32, GeometryError> {
         let surface_id = self.brep.geometry.surfaces.len() as u32;
+        for u in outer_uses.iter_mut().chain(hole_uses.iter_mut().flatten()) {
+            if let PcurveGeometry::ProjectedCurve { surface, .. } = &mut u.pcurve {
+                *surface = surface_id;
+            }
+        }
         self.brep.geometry.surfaces.push(surface);
         let face = self.brep.topology.faces.len() as u32;
         let outer = self.face_loop(face, false, outer_uses)?;
@@ -180,9 +188,21 @@ impl Builder {
                 reversed: false,
             },
         });
+        Ok(face)
+    }
+    pub fn set_face_sense(&mut self, face: u32, sense: Orientation) -> Result<(), GeometryError> {
+        self.brep
+            .topology
+            .faces
+            .get_mut(face as usize)
+            .ok_or(GeometryError::MissingReference {
+                kind: "face".into(),
+                index: face,
+            })?
+            .sense = sense;
         Ok(())
     }
-    pub(crate) fn finish_solid(mut self) -> Result<BrepEnvelope, GeometryError> {
+    pub fn finish_solid(mut self) -> Result<BrepEnvelope, GeometryError> {
         let faces = (0..self.brep.topology.faces.len() as u32).collect();
         self.brep.topology.shells.push(Shell {
             id: 0,
@@ -193,6 +213,7 @@ impl Builder {
             outer_shell: 0,
             cavity_shells: Vec::new(),
         });
+        self.brep.orient_loops()?;
         self.brep.validate()?;
         Ok(self.brep)
     }

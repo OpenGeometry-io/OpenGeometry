@@ -8,7 +8,10 @@ use super::handlers::{
 };
 use super::operands::{all_planar, full_cylinder, unique_sources};
 use super::types::{BooleanOp, BooleanResult};
-use crate::brep::{Accuracy, BrepEnvelope, GeometryError, PatchBounds, SurfaceGeometry};
+use crate::brep::{
+    unsupported_conoid, unsupported_wrapped, Accuracy, BrepEnvelope, GeometryError, PatchBounds,
+    SurfaceGeometry,
+};
 use prismatic_profile::subtract_prismatic_profile_batch;
 
 pub(super) use prismatic_profile::profile_edges;
@@ -55,6 +58,12 @@ fn subtract_planar_cutters_inner(
     id: String,
     trace: &mut Trace,
 ) -> Result<BooleanResult, GeometryError> {
+    if host.geometry.has_wrapped() || cutters.iter().any(|c| c.geometry.has_wrapped()) {
+        return Err(unsupported_wrapped("booleans"));
+    }
+    if host.geometry.has_conoid() || cutters.iter().any(|c| c.geometry.has_conoid()) {
+        return Err(unsupported_conoid("booleans"));
+    }
     let mut nested = Trace::default();
     let result = record_handler(trace, HandlerId::SubtractPlanarCutters, || {
         planar_cutters_boolean(host, cutters, id, &mut nested)
@@ -118,6 +127,7 @@ fn planar_cutters_boolean(
     for cutter in cutters {
         append_analytic_input(&mut combined, cutter)?;
     }
+    combined.orient_loops()?;
     combined.validate()?;
     let result = boolean_rectilinear(host, &combined, BooleanOp::Subtraction, id)?;
     let handlers = &mut trace.handlers;

@@ -1,5 +1,5 @@
 use super::support::{cylinder, sphere};
-use crate::brep::{Accuracy, CurveGeometry, FaceRole, Frame3};
+use crate::brep::{Accuracy, CurveGeometry, FaceRole, Frame3, GeometryError};
 use crate::operations::modifying::boolean::dispatch::boolean_brep;
 use crate::operations::modifying::boolean::types::BooleanOp;
 use crate::primitives;
@@ -121,7 +121,7 @@ fn generic_closed_loop_imprints_an_off_axis_sphere_cone_intersection() {
 }
 
 #[test]
-fn generic_closed_loop_handles_periodic_winding() {
+fn generic_closed_loop_with_periodic_winding_refuses_the_outer_sphere_cap() {
     let accuracy = cylinder("accuracy", 0.0, 1.0, false).accuracy;
     let cone = primitives::cone("cone".into(), Frame3::IDENTITY, 2.0, 2.0, accuracy).unwrap();
     let sphere = primitives::sphere(
@@ -134,9 +134,10 @@ fn generic_closed_loop_handles_periodic_winding() {
         accuracy,
     )
     .unwrap();
-    let result = boolean_brep(&cone, &sphere, BooleanOp::Intersection, "winding".into()).unwrap();
-    result.brep.validate().unwrap();
-    tessellate(&result.brep, 0.01, 2_000_000).unwrap();
+    let Err(err) = boolean_brep(&cone, &sphere, BooleanOp::Intersection, "winding".into()) else {
+        panic!("the intersection keeps the sphere cap outside the cone")
+    };
+    assert!(matches!(err, GeometryError::InvalidTopology(_)), "{err:?}");
 }
 
 #[test]

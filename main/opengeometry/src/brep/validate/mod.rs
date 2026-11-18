@@ -1,5 +1,8 @@
 mod edges;
 mod face_use;
+#[cfg(test)]
+mod tests;
+mod winding;
 
 use super::error::{invalid, missing, positive, GeometryError};
 use super::geometry::{CurveGeometry, Surface};
@@ -10,6 +13,11 @@ use std::collections::HashSet;
 
 impl BrepEnvelope {
     pub fn validate(&self) -> Result<(), GeometryError> {
+        self.validate_structure()?;
+        self.check_loop_winding()
+    }
+
+    pub(crate) fn validate_structure(&self) -> Result<(), GeometryError> {
         self.check_header()?;
         self.check_geometry()?;
         self.check_pcurves()?;

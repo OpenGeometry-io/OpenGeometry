@@ -346,7 +346,8 @@ fn add_two_arc_plane_face(
         SurfaceGeometry::Plane { frame },
         two_arc_plane_bounds(frame, arcs, tolerance),
         uses,
-    )
+    )?;
+    Ok(())
 }
 
 fn set_embedded_provenance(

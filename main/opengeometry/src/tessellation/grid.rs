@@ -1,3 +1,4 @@
+use super::wrapped::second_derivative_bounds;
 use crate::brep::{
     period_lifted_uv, BrepEnvelope, Face, GeometryError, PcurveGeometry, Surface, SurfaceGeometry,
 };
@@ -123,6 +124,9 @@ pub(super) fn grid_size(
             turn_count(u * ((r + a) / (4.0 * error)).sqrt(), u, 3, max_triangles)?,
             turn_count(v * (a / (4.0 * error)).sqrt(), v, 3, max_triangles)?,
         ),
+        SurfaceGeometry::Wrapped { .. } | SurfaceGeometry::Conoid { .. } => {
+            sampled_grid(surface, bounds, error, max_triangles)?
+        }
         SurfaceGeometry::Plane { .. } => {
             return Err(GeometryError::InvalidGeometry(
                 "plane does not use a curved grid".into(),
@@ -139,6 +143,31 @@ pub(super) fn grid_size(
         ));
     }
     Ok([nu, nv])
+}
+
+fn sampled_grid(
+    surface: &SurfaceGeometry,
+    bounds: [Interval; 2],
+    error: f64,
+    max_triangles: usize,
+) -> Result<(usize, usize), GeometryError> {
+    let second = second_derivative_bounds(surface, bounds)?;
+    let periods = surface.charts()[0].periods;
+    let side = |i: usize, minimum: usize| {
+        let width = bounds[i].width();
+        let value = width * (second[i] / (8.0 * error)).sqrt();
+        match periods[i] {
+            Some(_) => turn_count(value, width, minimum, max_triangles),
+            None => count(value, minimum, max_triangles),
+        }
+    };
+    let nu = side(0, 3)?;
+    let nv = side(1, 1)?;
+    if !matches!(surface, SurfaceGeometry::Conoid { .. }) {
+        return Ok((nu, nv));
+    }
+    let twist = bounds[1].width() * second[2] * bounds[0].width() / (4.0 * error * nu as f64);
+    Ok((nu, nv.max(count(twist, 1, max_triangles)?)))
 }
 
 pub(super) fn turn_count(

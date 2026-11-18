@@ -3,6 +3,7 @@ mod seams;
 mod short_loops;
 mod smooth_edges;
 mod support;
+mod wrapped;
 
 use super::cache::TessellationCache;
 use super::tessellate::tessellate;

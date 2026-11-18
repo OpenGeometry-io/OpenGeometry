@@ -13,6 +13,7 @@ fn allowed(keyword: &str) -> bool {
             | "AXIS2_PLACEMENT_3D"
             | "BREP_WITH_VOIDS"
             | "B_SPLINE_CURVE_WITH_KNOTS"
+            | "B_SPLINE_SURFACE_WITH_KNOTS"
             | "CARTESIAN_POINT"
             | "CIRCLE"
             | "CLOSED_SHELL"

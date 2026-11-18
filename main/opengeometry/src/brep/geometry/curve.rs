@@ -1,4 +1,5 @@
 use super::turned::{narrowed, turned_axis};
+use super::wrap::Wrap;
 use crate::brep::bounds::PatchBounds;
 use crate::brep::error::GeometryError;
 use crate::brep::frame::{checked, Frame3};
@@ -23,6 +24,10 @@ pub enum CurveGeometry {
     },
     Intersection {
         definition: u32,
+    },
+    Wrapped {
+        wrap: Wrap,
+        curve: Box<CurveGeometry>,
     },
 }
 
@@ -65,8 +70,37 @@ impl CurveGeometry {
                 }
             }
             Self::Intersection { .. } => {}
+            Self::Wrapped { wrap, curve } => {
+                wrap.validate()?;
+                if matches!(**curve, Self::Wrapped { .. } | Self::Intersection { .. }) {
+                    return Err(GeometryError::InvalidGeometry(
+                        "a wrapped curve must wrap a line, circle or ellipse".into(),
+                    ));
+                }
+                curve.validate()?;
+            }
         };
         Ok(())
+    }
+
+    pub(crate) fn derivative_bounds(&self, range: Interval) -> Result<(f64, f64), GeometryError> {
+        Ok(match self {
+            Self::Line { .. } => (1.0, 0.0),
+            Self::Circle { radius, .. } => (*radius, *radius),
+            Self::Ellipse { major_radius, .. } => (*major_radius, *major_radius),
+            Self::Intersection { definition } => {
+                return Err(GeometryError::MissingReference {
+                    kind: "intersection".into(),
+                    index: *definition,
+                })
+            }
+            Self::Wrapped { wrap, curve } => {
+                let (speed, acceleration) = curve.derivative_bounds(range)?;
+                let z = curve.elementary_bounds(range)?.axes[2];
+                let (first, second) = wrap.derivative_bounds(z.lo.abs().max(z.hi.abs()));
+                (first * speed, second * speed * speed + first * acceleration)
+            }
+        })
     }
 
     pub(crate) fn elementary_point(&self, t: f64) -> Result<Point3, GeometryError> {
@@ -82,6 +116,7 @@ impl CurveGeometry {
                 major_radius: a,
                 minor_radius: b,
             } => frame.point([a * t.cos(), b * t.sin(), 0.0]),
+            Self::Wrapped { wrap, curve } => wrap.point(curve.elementary_point(t)?),
             Self::Intersection { definition } => {
                 return Err(GeometryError::MissingReference {
                     kind: "intersection".into(),
@@ -104,6 +139,9 @@ impl CurveGeometry {
                 major_radius: a,
                 minor_radius: b,
             } => frame.vector([-a * t.sin(), b * t.cos(), 0.0]),
+            Self::Wrapped { wrap, curve } => {
+                wrap.push(curve.elementary_point(t)?, curve.elementary_tangent(t)?)
+            }
             Self::Intersection { definition } => {
                 return Err(GeometryError::MissingReference {
                     kind: "intersection".into(),
@@ -132,6 +170,7 @@ impl CurveGeometry {
                 major_radius: a,
                 minor_radius: b,
             } => conic_bounds(frame, [*a, *b], range),
+            Self::Wrapped { wrap, curve } => wrap.enclose(curve.elementary_bounds(range)?),
             Self::Intersection { definition } => Err(GeometryError::MissingReference {
                 kind: "intersection".into(),
                 index: *definition,
@@ -153,18 +192,12 @@ impl CurveGeometry {
                 "deflection must be finite and positive".into(),
             ));
         }
-        let bound = match self {
-            Self::Line { .. } => 0.0,
-            Self::Circle { radius, .. } => *radius,
-            Self::Ellipse { major_radius, .. } => *major_radius,
-            Self::Intersection { definition } => {
-                return Err(GeometryError::MissingReference {
-                    kind: "intersection".into(),
-                    index: *definition,
-                })
-            }
+        let bound = self.derivative_bounds(range)?.1;
+        let closed = match self {
+            Self::Wrapped { curve, .. } => !matches!(**curve, Self::Line { .. }),
+            _ => true,
         };
-        let minimum = if bound > 0.0 && range.width() >= std::f64::consts::TAU - 1e-12 {
+        let minimum = if closed && bound > 0.0 && range.width() >= std::f64::consts::TAU - 1e-12 {
             3.0
         } else {
             1.0

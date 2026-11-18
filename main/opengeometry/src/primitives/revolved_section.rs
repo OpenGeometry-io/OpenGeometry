@@ -163,7 +163,8 @@ fn add_lower_cap(
                 axis_b: [0.0, -r0],
             },
         )],
-    )
+    )?;
+    Ok(())
 }
 
 fn add_upper_cap(
@@ -188,5 +189,6 @@ fn add_upper_cap(
                 axis_b: [0.0, r1],
             },
         )],
-    )
+    )?;
+    Ok(())
 }

@@ -59,9 +59,12 @@ fn finite_target_domain(
             Interval::new(0.0, std::f64::consts::TAU)?,
             Interval::new(0.0, maximum_radius + margin)?,
         ]),
-        SurfaceGeometry::Sphere { .. } | SurfaceGeometry::Torus { .. } => Err(
-            GeometryError::UnsupportedGeometry("SSI trim surface".into()),
-        ),
+        SurfaceGeometry::Sphere { .. }
+        | SurfaceGeometry::Torus { .. }
+        | SurfaceGeometry::Wrapped { .. }
+        | SurfaceGeometry::Conoid { .. } => Err(GeometryError::UnsupportedGeometry(
+            "SSI trim surface".into(),
+        )),
     }
 }
 
