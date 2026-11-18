@@ -96,19 +96,15 @@ fn cuboid_across_or_along_the_axis_keeps_its_handler() {
 }
 
 #[test]
-fn tilted_cuboid_minus_cylinder_and_their_union_stay_a_coverage_gap() {
+fn tilted_cuboid_and_cylinder_union_stays_a_coverage_gap() {
     let cylinder = host();
     let cuboid = tilted_cuboid(45.0);
-    for (a, b, operation) in [
-        (&cuboid, &cylinder, BooleanOp::Subtraction),
-        (&cylinder, &cuboid, BooleanOp::Union),
-    ] {
-        let (result, handlers) = boolean_brep_outcome_with_handlers(a, b, operation, "out".into());
-        assert!(handlers.is_empty(), "{handlers:?}");
-        assert!(
-            matches!(result, Err(GeometryError::CoverageGap { .. })),
-            "{operation:?}: {:?}",
-            result.map(|_| ())
-        );
-    }
+    let (result, handlers) =
+        boolean_brep_outcome_with_handlers(&cylinder, &cuboid, BooleanOp::Union, "out".into());
+    assert!(handlers.is_empty(), "{handlers:?}");
+    assert!(
+        matches!(result, Err(GeometryError::CoverageGap { .. })),
+        "{:?}",
+        result.map(|_| ())
+    );
 }

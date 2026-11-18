@@ -2,7 +2,10 @@ mod prismatic_profile;
 
 use super::assembly::{analytic_face_mappings, append_analytic_input};
 use super::dispatch::{boolean_brep_outcome_with_trace, record_handler, HandlerId, Trace};
-use super::handlers::{boolean_rectilinear, subtract_vertical_arc_extrusion_batch};
+use super::handlers::{
+    boolean_rectilinear, subtract_half_spaces_from_arc_extrusion,
+    subtract_vertical_arc_extrusion_batch,
+};
 use super::operands::{all_planar, full_cylinder, unique_sources};
 use super::types::{BooleanOp, BooleanResult};
 use crate::brep::{
@@ -112,26 +115,8 @@ fn planar_cutters_boolean(
     {
         return mixed_cutters_boolean(host, cutters, planar, cylinders, id, trace);
     }
-    if host
-        .geometry
-        .surfaces
-        .iter()
-        .any(|surface| matches!(surface, SurfaceGeometry::Cylinder { .. }))
-        && cutters.iter().all(all_planar)
-    {
-        match subtract_vertical_arc_extrusion_batch(
-            host,
-            &cutters.iter().collect::<Vec<_>>(),
-            id.clone(),
-        ) {
-            Ok(result) => {
-                let handlers = &mut trace.handlers;
-                handlers.push(HandlerId::SubtractVerticalArcExtrusionBatch.as_str().into());
-                return Ok(result);
-            }
-            Err(GeometryError::CoverageGap { .. }) => {}
-            Err(error) => return Err(error),
-        }
+    if let Some(result) = arc_extrusion_batch(host, cutters, &id, trace)? {
+        return Ok(result);
     }
     check_disjoint_cutters(cutters, &bounds, accuracy)?;
     let mut combined = BrepEnvelope::new(format!("{id}:cutters"), accuracy)?;
@@ -143,6 +128,49 @@ fn planar_cutters_boolean(
     let handlers = &mut trace.handlers;
     handlers.push(HandlerId::BooleanRectilinear.as_str().into());
     Ok(result)
+}
+
+fn arc_extrusion_batch(
+    host: &BrepEnvelope,
+    cutters: &[BrepEnvelope],
+    id: &str,
+    trace: &mut Trace,
+) -> Result<Option<BooleanResult>, GeometryError> {
+    if host
+        .geometry
+        .surfaces
+        .iter()
+        .any(|surface| matches!(surface, SurfaceGeometry::Cylinder { .. }))
+        && cutters.iter().all(all_planar)
+    {
+        match subtract_vertical_arc_extrusion_batch(
+            host,
+            &cutters.iter().collect::<Vec<_>>(),
+            id.to_string(),
+        ) {
+            Ok(result) => {
+                let handlers = &mut trace.handlers;
+                handlers.push(HandlerId::SubtractVerticalArcExtrusionBatch.as_str().into());
+                return Ok(Some(result));
+            }
+            Err(GeometryError::CoverageGap { .. }) => {}
+            Err(error) => return Err(error),
+        }
+        match subtract_half_spaces_from_arc_extrusion(
+            host,
+            &cutters.iter().collect::<Vec<_>>(),
+            id.to_string(),
+        ) {
+            Ok(result) => {
+                let name = HandlerId::SubtractHalfSpaceFromArcExtrusion.as_str();
+                trace.handlers.extend(cutters.iter().map(|_| name.into()));
+                return Ok(Some(result));
+            }
+            Err(GeometryError::CoverageGap { .. }) => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(None)
 }
 
 fn accuracy_and_bounds(

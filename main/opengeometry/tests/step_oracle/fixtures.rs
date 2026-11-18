@@ -172,7 +172,7 @@ fn exported_matrix_rows(
 fn boolean_matrix_results_export_through_the_oracle_or_pin_an_error() {
     assert_eq!(
         exported_matrix_rows("boolean-matrix", 18, &[], &["cylinder-empty"]),
-        15
+        17
     );
 }
 
