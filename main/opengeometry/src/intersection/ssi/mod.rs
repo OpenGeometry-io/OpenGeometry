@@ -7,8 +7,8 @@ mod tests;
 
 use super::ssi_result::{GeometryResult, SsiCurve, SsiResult};
 use crate::brep::{
-    Accuracy, CurveGeometry, Frame3, GeometryError, GeometryStore, PcurveGeometry, Surface,
-    SurfaceGeometry,
+    unsupported_wrapped, Accuracy, CurveGeometry, Frame3, GeometryError, GeometryStore,
+    PcurveGeometry, Surface, SurfaceGeometry,
 };
 use crate::math::{dot, norm, sub, Interval, Point3};
 use coaxial::{
@@ -104,6 +104,7 @@ fn analytic_intersection(
             major_radius,
             minor_radius,
         } => torus_pairs(*frame, *major_radius, *minor_radius, sb),
+        SurfaceGeometry::Wrapped { .. } => Err(unsupported_wrapped("intersection")),
     }
 }
 
@@ -131,6 +132,7 @@ fn plane_pairs(
             major_radius,
             minor_radius,
         } => plane_torus(plane, *torus, *major_radius, *minor_radius)?,
+        SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
     })
 }
 
@@ -158,6 +160,7 @@ fn sphere_pairs(
             major_radius,
             minor_radius,
         } => coaxial_sphere_torus(sphere, sphere_radius, *torus, *major_radius, *minor_radius)?,
+        SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
     })
 }
 
@@ -193,6 +196,7 @@ fn cylinder_pairs(
             *major_radius,
             *minor_radius,
         )?,
+        SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
     })
 }
 
@@ -220,6 +224,7 @@ fn cone_pairs(
             major_radius,
             minor_radius,
         } => coaxial_cone_torus(cone, semi_angle, *torus, *major_radius, *minor_radius)?,
+        SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
     })
 }
 
@@ -263,6 +268,7 @@ fn torus_pairs(
             *other_major,
             *other_minor,
         )?,
+        SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("intersection")),
     })
 }
 

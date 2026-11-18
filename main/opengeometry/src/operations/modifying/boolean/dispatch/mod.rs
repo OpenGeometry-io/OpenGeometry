@@ -7,7 +7,7 @@ pub(super) use trace::{record_handler, Trace};
 
 use super::handlers::{coincident_boolean, disjoint_boolean};
 use super::types::{BooleanOp, BooleanResult};
-use crate::brep::{BrepEnvelope, GeometryError};
+use crate::brep::{unsupported_wrapped, BrepEnvelope, GeometryError};
 use table::{generic_boolean, specialized_boolean};
 use trace::record_optional;
 
@@ -60,6 +60,9 @@ fn boolean_brep_inner(
 ) -> Result<BooleanResult, GeometryError> {
     a.validate()?;
     b.validate()?;
+    if a.geometry.has_wrapped() || b.geometry.has_wrapped() {
+        return Err(unsupported_wrapped("booleans"));
+    }
     if a.geometry == b.geometry && a.topology == b.topology && a.solids == b.solids {
         return record_handler(trace, HandlerId::CoincidentBoolean, || {
             coincident_boolean(a, b, operation, id)

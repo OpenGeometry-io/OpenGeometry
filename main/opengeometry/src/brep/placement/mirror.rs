@@ -1,5 +1,5 @@
 use super::check_coordinate_precision;
-use crate::brep::error::GeometryError;
+use crate::brep::error::{unsupported_wrapped, GeometryError};
 use crate::brep::frame::{checked, unit, Frame3, UV};
 use crate::brep::geometry::{CurveGeometry, IntersectionDefinition, SurfaceGeometry};
 use crate::brep::pcurve::PcurveGeometry;
@@ -107,8 +107,8 @@ pub fn mirrored(
         .revision
         .checked_add(1)
         .ok_or_else(|| GeometryError::LimitExceeded("BRep revision overflow".into()))?;
-    reflect_surfaces(&mut output.geometry.surfaces, reflection);
-    reflect_curves(&mut output.geometry.curves, reflection);
+    reflect_surfaces(&mut output.geometry.surfaces, reflection)?;
+    reflect_curves(&mut output.geometry.curves, reflection)?;
     for vertex in &mut output.topology.vertices {
         vertex.position = reflection.point(vertex.position);
     }
@@ -129,7 +129,10 @@ pub fn mirrored(
     Ok(output)
 }
 
-fn reflect_surfaces(surfaces: &mut [SurfaceGeometry], reflection: Reflection) {
+fn reflect_surfaces(
+    surfaces: &mut [SurfaceGeometry],
+    reflection: Reflection,
+) -> Result<(), GeometryError> {
     for surface in surfaces {
         match surface {
             SurfaceGeometry::Plane { frame }
@@ -137,11 +140,16 @@ fn reflect_surfaces(surfaces: &mut [SurfaceGeometry], reflection: Reflection) {
             | SurfaceGeometry::Cylinder { frame, .. }
             | SurfaceGeometry::Cone { frame, .. }
             | SurfaceGeometry::Torus { frame, .. } => *frame = reflection.surface_frame(*frame),
+            SurfaceGeometry::Wrapped { .. } => return Err(unsupported_wrapped("mirroring")),
         }
     }
+    Ok(())
 }
 
-fn reflect_curves(curves: &mut [CurveGeometry], reflection: Reflection) {
+fn reflect_curves(
+    curves: &mut [CurveGeometry],
+    reflection: Reflection,
+) -> Result<(), GeometryError> {
     for curve in curves {
         match curve {
             CurveGeometry::Line { origin, direction } => {
@@ -152,8 +160,10 @@ fn reflect_curves(curves: &mut [CurveGeometry], reflection: Reflection) {
                 *frame = reflection.curve_frame(*frame)
             }
             CurveGeometry::Intersection { .. } => {}
+            CurveGeometry::Wrapped { .. } => return Err(unsupported_wrapped("mirroring")),
         }
     }
+    Ok(())
 }
 
 fn remap_pcurves(input: &BrepEnvelope, output: &mut BrepEnvelope) {

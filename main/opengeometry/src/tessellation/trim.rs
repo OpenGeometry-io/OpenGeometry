@@ -1,3 +1,4 @@
+use super::wrapped::chord_deviation;
 use crate::brep::{
     period_lifted_uv, BrepEnvelope, EdgeGeometry, Face, GeometryError, HalfEdge, Orientation,
     Surface, SurfaceGeometry,
@@ -262,6 +263,7 @@ pub(super) fn trimmed_surface_edge_deviation(
         }
     };
     let acceleration = match surface {
+        SurfaceGeometry::Wrapped { .. } => return chord_deviation(surface, uv[a], uv[b]),
         SurfaceGeometry::Plane { .. } => 0.0,
         SurfaceGeometry::Sphere { radius, .. } => {
             let cos_v = maximum_trig(0.0, f64::cos);

@@ -50,6 +50,9 @@ pub(super) fn positive(value: f64) -> Result<(), GeometryError> {
     }
     Ok(())
 }
+pub(crate) fn unsupported_wrapped(operation: &str) -> GeometryError {
+    GeometryError::UnsupportedGeometry(format!("{operation} of wrapped geometry"))
+}
 pub(crate) fn coverage_gap(a: &str, b: &str) -> GeometryError {
     GeometryError::CoverageGap {
         families: [a.into(), b.into()],

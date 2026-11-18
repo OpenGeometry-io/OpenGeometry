@@ -5,6 +5,7 @@ mod measure;
 mod ray_roots;
 #[cfg(test)]
 mod tests;
+mod wrapped_roots;
 
 pub use classification::PointClassification;
 pub use classify::classify_point;
