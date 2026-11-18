@@ -2,6 +2,12 @@ use crate::brep::error::GeometryError;
 use crate::brep::frame::{Frame3, UVBox};
 use crate::math::Interval;
 
+pub(super) fn lift(angle: f64, hint: Option<f64>) -> f64 {
+    hint.map_or(angle, |h| {
+        angle + ((h - angle) / std::f64::consts::TAU).round() * std::f64::consts::TAU
+    })
+}
+
 pub(super) fn reached(frame: &Frame3, axis: usize) -> usize {
     [frame.x[axis], frame.y[axis], frame.z[axis]]
         .iter()

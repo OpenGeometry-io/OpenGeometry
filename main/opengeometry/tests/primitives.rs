@@ -279,6 +279,7 @@ fn surface_kinds(body: &BrepEnvelope) -> Vec<&'static str> {
             SurfaceGeometry::Cylinder { .. } => "cylinder",
             SurfaceGeometry::Cone { .. } => "cone",
             SurfaceGeometry::Torus { .. } => "torus",
+            SurfaceGeometry::Wrapped { .. } => "wrapped",
         })
         .collect::<Vec<_>>();
     kinds.sort();

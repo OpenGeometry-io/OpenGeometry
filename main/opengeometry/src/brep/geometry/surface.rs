@@ -1,7 +1,8 @@
-use super::turned::{narrowed, reached, ring_axis, swept_axis};
+use super::turned::{lift, narrowed, reached, ring_axis, swept_axis};
+use super::wrap::Wrap;
 use crate::brep::bounds::PatchBounds;
 use crate::brep::error::GeometryError;
-use crate::brep::frame::{checked, Frame3, UVBox, UV};
+use crate::brep::frame::{checked, unit, Frame3, UVBox, UV};
 use crate::math::{add, finite, norm, scale, Interval, Point3};
 use serde::{Deserialize, Serialize};
 
@@ -57,6 +58,10 @@ pub enum SurfaceGeometry {
         major_radius: f64,
         minor_radius: f64,
     },
+    Wrapped {
+        wrap: Wrap,
+        surface: Box<SurfaceGeometry>,
+    },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -86,6 +91,7 @@ impl SurfaceGeometry {
             | Self::Cylinder { frame, .. }
             | Self::Cone { frame, .. }
             | Self::Torus { frame, .. } => frame,
+            Self::Wrapped { wrap, .. } => &wrap.frame,
         }
     }
     pub(crate) fn validate(&self) -> Result<(), GeometryError> {
@@ -110,6 +116,7 @@ impl SurfaceGeometry {
                     && *minor_radius > 0.0
                     && major_radius > minor_radius
             }
+            Self::Wrapped { wrap, surface } => return wrapped_validate(wrap, surface),
         };
         if !valid {
             return Err(GeometryError::InvalidGeometry(
@@ -120,6 +127,10 @@ impl SurfaceGeometry {
     }
 
     fn check_uv(&self, uv: UV) -> Result<(), GeometryError> {
+        if let Self::Wrapped { wrap, surface } = self {
+            wrap.validate()?;
+            return surface.check_uv(uv);
+        }
         self.validate()?;
         for x in uv {
             finite(x)?;
@@ -135,16 +146,13 @@ impl SurfaceGeometry {
     }
 
     pub(crate) fn parameter_in_domain(&self, uv: UV) -> bool {
+        if let Self::Wrapped { surface, .. } = self {
+            return surface.parameter_in_domain(uv);
+        }
         uv.into_iter().all(f64::is_finite)
             && (!matches!(self, Self::Sphere { .. }) || uv[1].abs() <= std::f64::consts::FRAC_PI_2)
             && (!matches!(self, Self::Cone { .. }) || uv[1] >= 0.0)
     }
-}
-
-fn lift(angle: f64, hint: Option<f64>) -> f64 {
-    hint.map_or(angle, |h| {
-        angle + ((h - angle) / std::f64::consts::TAU).round() * std::f64::consts::TAU
-    })
 }
 
 impl Surface for SurfaceGeometry {
@@ -215,6 +223,7 @@ impl Surface for SurfaceGeometry {
                     add(scale(radial, -a * cv), scale(z, -a * sv)),
                 )
             }
+            Self::Wrapped { wrap, surface } => return wrapped_derivatives(wrap, surface, uv),
         };
         let f = self.frame();
         Ok(SurfaceJet2 {
@@ -245,6 +254,7 @@ impl Surface for SurfaceGeometry {
                     -semi_angle.sin(),
                 ]
             }
+            Self::Wrapped { wrap, surface } => return wrapped_normal(wrap, surface, uv),
         };
         checked(self.frame().vector(n))
     }
@@ -257,6 +267,7 @@ impl Surface for SurfaceGeometry {
                 finite(v)?;
             }
         }
+        let world = p;
         let p = checked(self.frame().local(p))?;
         let radial = p[0].hypot(p[1]);
         let u = lift(p[1].atan2(p[0]), hint.map(|h| h[0]));
@@ -290,6 +301,7 @@ impl Surface for SurfaceGeometry {
                     lift(p[2].atan2(radial - major_radius), hint.map(|h| h[1])),
                 ]
             }
+            Self::Wrapped { wrap, surface } => return wrapped_project(wrap, surface, world, hint),
         };
         for x in result {
             finite(x)?;
@@ -304,6 +316,7 @@ impl Surface for SurfaceGeometry {
             Self::Cylinder { .. } => &CYLINDER_CHART,
             Self::Cone { .. } => &CONE_CHART,
             Self::Torus { .. } => &TORUS_CHART,
+            Self::Wrapped { surface, .. } => surface.charts(),
         }
     }
 
@@ -351,6 +364,7 @@ impl Surface for SurfaceGeometry {
                     v.sin()?.mul_interval(a)?,
                 ]
             }
+            Self::Wrapped { wrap, surface } => return wrap.enclose(surface.enclose(domain)?),
         };
         let bounds = self.frame().bounds(local)?;
         self.tightened(bounds, domain)
@@ -389,4 +403,53 @@ impl SurfaceGeometry {
         }
         Ok(bounds)
     }
+}
+
+fn wrapped_validate(wrap: &Wrap, surface: &SurfaceGeometry) -> Result<(), GeometryError> {
+    wrap.validate()?;
+    if matches!(surface, SurfaceGeometry::Wrapped { .. }) {
+        return Err(GeometryError::InvalidGeometry(
+            "a wrapped surface cannot wrap another wrapped surface".into(),
+        ));
+    }
+    surface.validate()
+}
+
+fn wrapped_derivatives(
+    wrap: &Wrap,
+    surface: &SurfaceGeometry,
+    uv: UV,
+) -> Result<SurfaceJet2, GeometryError> {
+    let f = surface.derivatives(uv)?;
+    let p = f.point;
+    let second = |a, b, d| add(wrap.second(p, a, b), wrap.push(p, d));
+    Ok(SurfaceJet2 {
+        point: checked(wrap.point(p))?,
+        du: checked(wrap.push(p, f.du))?,
+        dv: checked(wrap.push(p, f.dv))?,
+        duu: checked(second(f.du, f.du, f.duu))?,
+        duv: checked(second(f.du, f.dv, f.duv))?,
+        dvv: checked(second(f.dv, f.dv, f.dvv))?,
+    })
+}
+
+fn wrapped_normal(wrap: &Wrap, surface: &SurfaceGeometry, uv: UV) -> Result<Point3, GeometryError> {
+    let p = surface.point_at(uv)?;
+    if p[2] <= 0.0 {
+        return Err(GeometryError::SingularParameterization);
+    }
+    unit(wrap.push_normal(p, surface.normal_at(uv)?))
+}
+
+fn wrapped_project(
+    wrap: &Wrap,
+    surface: &SurfaceGeometry,
+    p: Point3,
+    hint: Option<UV>,
+) -> Result<UV, GeometryError> {
+    let hint_x = match hint {
+        Some(h) => Some(surface.point_at(h)?[0]),
+        None => None,
+    };
+    surface.project(wrap.flatten(p, hint_x)?, hint)
 }

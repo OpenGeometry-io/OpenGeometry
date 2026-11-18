@@ -68,6 +68,7 @@ pub(super) fn support_roots(
             domain,
             tolerance,
         )?),
+        SurfaceGeometry::Wrapped { .. } => None,
     };
     Ok(result.map(|roots| {
         roots
