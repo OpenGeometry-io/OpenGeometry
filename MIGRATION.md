@@ -12,7 +12,7 @@ It is written for people and for coding assistants alike: each section says what
 4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
 5. Finish with its "Check your result" steps.
 
-## Unreleased
+## 3.0 to 3.0.1
 
 ### What changed
 
