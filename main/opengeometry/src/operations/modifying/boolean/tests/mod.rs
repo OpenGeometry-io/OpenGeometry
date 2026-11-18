@@ -1,3 +1,5 @@
+mod arc_extrusions_half_space;
+mod arc_extrusions_notch;
 mod arc_extrusions_openings;
 mod arc_extrusions_splits;
 mod arched_band;
@@ -11,6 +13,7 @@ mod generic;
 mod planar_batch;
 mod planar_extrusions;
 mod planar_oblique;
+mod planar_polyhedra;
 mod shell;
 mod shell_necks;
 mod sphere_cylinder;

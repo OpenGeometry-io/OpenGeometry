@@ -12,6 +12,30 @@ It is written for people and for coding assistants alike: each section says what
 4. For a name the table does not list, look in "Partly replaced". Anything listed under "Removed" has no replacement: take that code out, or stay on the older version.
 5. Finish with its "Check your result" steps.
 
+## 3.0 to 3.0.1
+
+### What changed
+
+- `operate` now builds the union and the intersection of two planar solids that are not both axis-aligned boxes: a cuboid turned against the other body's axes, a polyhedron with sloped faces such as a roof, or a polyhedron that is not convex. 3.0 threw an error for these (`CoverageGap`, for some pairs `UnresolvedIntersection`). The result is one closed solid, or several when the intersection falls apart into pieces. The report's `handlers` is `['boolean_planar_polyhedra']`.
+
+### Different behaviour
+
+- Where faces of both bodies lie in one plane and face the same way, the connected region they cover becomes one face. Faces of one body alone in a plane stay as they are.
+- Some pairs that 3.0 already built through the generic route, for example a body inside the other that touches it along an edge, are now built by the planar handler with the same volume and number of solids. The report's `handlers` becomes `['boolean_planar_polyhedra']`.
+- Two of these solids that touch on a face, one standing on the other, now unite into one solid. 3.0 threw.
+- Two planar solids that touch only along an edge or at a corner give the same result as in 3.0: the union keeps both solids, and the intersection throws `EmptyResult`, as for two separate solids.
+- An intersection of two planar solids that touch only on a face now throws `EmptyResult` too, because nothing is left. 3.0 threw `CoverageGap` or `UnresolvedIntersection`.
+- Subtraction: pairs that built in 3.0 build the same bodies, and the report's `handlers` is still `['subtract_planar_polyhedra']`. Subtracting a body that only stands on a face of the host now returns the host. 3.0 threw `InvalidTopology`. When the host lies wholly inside the tool and touches it, on a face, along an edge or at a corner, the subtraction now throws `EmptyResult`, because nothing is left. 3.0 threw `CoverageGap` or `UnresolvedIntersection`.
+- Two flat faces whose normals differ by an angle of at most 1e-11 radians are now treated as parallel. Rounding gives such faces when a polyhedron's points are turned about a slanted axis. Pairs that were refused only because of such faces now build. For example, a box wholly inside a gable roof, not touching it, both turned that way, gives the roof for the union, the box for the intersection, the roof with a cavity for the roof minus the box, and `EmptyResult` for the box minus the roof. 3.0 threw `UnresolvedIntersection` for many such turns, with `plane intersection: SingularSystem` or `intersection curve misses support`. Some pairs that are still refused now throw `CoverageGap` instead.
+- When the boundaries of two solids do not cross, whether one lies inside the other is now decided from points on their surfaces, not from a point stepped inward from one face. Pairs where the inner solid lay very close to the face that was stepped from, or touched it there, now build. 3.0 threw `UnresolvedIntersection` with `mutual containment without a coincident boundary is unresolved`. Some pairs of a curved solid very close to a flat face, which 3.0 built through `prismatic_curved_boolean`, now report `['generic_non_intersecting_boolean']`, with the same volume, `coincident` false and fewer edges.
+- When a body has a cavity or several separate solids, and its shells lie on different sides of the other body, the operation throws `UnresolvedIntersection` with `generic boolean containment classification is unresolved`, unless another handler builds it. 3.0 built a wrong result for some of these pairs, for example a sphere in the wall of a hollow cube that encloses the cavity.
+- Subtracting a body that lies wholly inside another now puts a cavity for each of its solids into the solid that holds it. 3.0 made a cavity for only one of them, kept the others as solids turned inside out, and always put the cavity into the first solid, even when the hole lay in another. Subtracting a body that has a cavity of its own and lies wholly inside another now builds: the material left inside that cavity becomes a separate solid, and a cavity of the host or a solid of the cutter that lies inside it goes with that solid. 3.0 threw `InvalidTopology` with `closed shell has no solid membership` for a hollow ball inside a cube. Some of these pairs with a prism-shaped cutter, which 3.0 built through `prismatic_curved_boolean`, now report `['generic_non_intersecting_boolean']`, with the same volume and other faces and edges.
+- A union or intersection of two planar solids that is still refused throws `CoverageGap` with `details.families` equal to `['layered planar profile extrusion', 'layered planar profile extrusion']`. 3.0 gave `['canonical aligned cuboid', 'canonical aligned cuboid']`. Code that matches the old pair must match the new one.
+
+### Check your result
+
+1. A union of a cuboid of width 2, height 1 and depth 2 with a cuboid of width 1, height 1 and depth 1, turned 30 degrees about `[0, 1, 0]` and moved by `[1, 0, 0]`, does not throw. `validity()` gives `{ valid: true, closed: true, bodyType: 'Solid' }`, `measure().volume` is within `errorBound` of 4.5, and the report's `handlers` is `['boolean_planar_polyhedra']`. The intersection of the same pair has a volume of 0.5.
+
 ## 2.5 to 3.0
 
 2.5 was not published. From 2.0, follow 2.0 to 2.5, then 2.5 to 3.0.
