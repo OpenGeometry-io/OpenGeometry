@@ -1,15 +1,18 @@
 ---
 title: Revolve
-description: Turn a closed line-and-arc profile a full turn about an axis in its plane.
+description: Turn a closed line-and-arc profile a full or partial turn about an axis in its plane.
 icon: rotate
 ---
 
-`OG_OPERATION_REVOLVE` turns a closed profile a full turn into a solid. The parameters are `{ profile, axis? }`:
+`OG_OPERATION_REVOLVE` turns a closed profile into a solid. The parameters are `{ profile, axis?, angle? }`:
 
+- `angle`: signed radians, nonzero and at most one full turn in magnitude. The default is `2 * Math.PI`. Positive angles follow the right-hand rule about the axis direction; negative angles reverse it. Partial turns retain the start profile and add exact planar end caps.
 - `profile`: a closed `OG_PRIMITIVE_PROFILE` wire.
 - `axis`: `{ point: [u, v], direction: [du, dv] }` in the profile's own `[u, v]`. By default it is `{ point: [0, 0], direction: [0, 1] }`, the profile plane's v axis.
 
 Each profile edge off the axis becomes one plane, cylinder, cone, sphere or ring torus face. An edge on the axis makes no face.
+
+`OG_SUPPORTS_PARTIAL_REVOLVE` is `true` in SDK builds with this angle parameter. Older builds lack the flag. Pair the SDK with its matching WASM: an older kernel rejects an angle parameter instead of building a full turn.
 
 ## A bowl
 
@@ -57,9 +60,10 @@ These throw `InvalidParameter`:
 - A profile that crosses the axis, touches it at a single point, or meets it along two separate stretches.
 - An arc whose circle meets the axis.
 - A zero `direction`.
+- A zero, nonfinite or greater-than-one-turn `angle`.
+- A partial angle whose start/end cap separation is below the kernel geometric accuracy. Such an angle is refused rather than rounded to zero or a full turn.
 
 Not built:
 
-- A partial turn. There is no sweep angle; every revolve is a full turn.
 - A profile with holes. `OG_OPERATION_REVOLVE` takes no `holes`.
 - The shell of a full-turn revolve throws `CoverageGap`.

@@ -21,6 +21,6 @@ pub use frustum::frustum;
 pub use linear_extrusion::linear_extrusion;
 pub use outlines::{ring_sector_outline, rounded_rectangle_outline, slot_outline};
 pub use polysolid::{polysolid, PolysolidError, PolysolidJustify, PolysolidPath};
-pub use revolved_profile::revolved_profile;
+pub use revolved_profile::{partially_revolved_profile, revolved_profile};
 pub use sphere::sphere;
 pub use torus::torus;

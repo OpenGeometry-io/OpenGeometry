@@ -12,18 +12,29 @@ pub(crate) struct Axis {
 pub(crate) fn build(
     id: String,
     profile: ProfileLoop,
-    axis: Axis,
+    mut axis: Axis,
+    angle: f64,
     accuracy: Accuracy,
 ) -> Result<BrepEnvelope, OperationError> {
+    if !angle.is_finite() || angle == 0.0 || angle.abs() > std::f64::consts::TAU {
+        return Err(invalid(
+            "revolve angle must be nonzero, finite, and no greater than a full turn",
+        ));
+    }
+    if angle < 0.0 {
+        axis.direction = scale(axis.direction, -1.0);
+    }
     let g = accuracy.geometric;
     let plane = profile_frame(&profile, g)?;
     let frame = revolve_frame(&profile, plane, axis)?;
     let profile_edges = edges(&profile, meridian(frame.origin, frame.x, frame.z));
-    primitives::revolved_profile(id, frame, profile_edges, accuracy).map_err(|error| match error {
-        GeometryError::InvalidGeometry(message)
-        | GeometryError::UnresolvedIntersection(message) => invalid(message),
-        other => other.into(),
-    })
+    primitives::partially_revolved_profile(id, frame, profile_edges, angle.abs(), accuracy).map_err(
+        |error| match error {
+            GeometryError::InvalidGeometry(message)
+            | GeometryError::UnresolvedIntersection(message) => invalid(message),
+            other => other.into(),
+        },
+    )
 }
 
 fn revolve_frame(
