@@ -2,15 +2,15 @@ use super::handler_id::HandlerId;
 use super::trace::{record_handler, record_optional, Trace};
 use crate::brep::{BrepEnvelope, GeometryError, SurfaceGeometry};
 use crate::operations::modifying::boolean::handlers::{
-    boolean_boxes, boolean_cylinders, boolean_planar_extrusions, boolean_rectilinear,
-    boolean_spheres, conic_box_containment, conic_containment_boolean, cylinder_box_boolean,
-    cylinder_conic_containment, generic_multiple_closed_loops_boolean,
+    boolean_boxes, boolean_cylinders, boolean_planar_extrusions, boolean_planar_polyhedra,
+    boolean_rectilinear, boolean_spheres, conic_box_containment, conic_containment_boolean,
+    cylinder_box_boolean, cylinder_conic_containment, generic_multiple_closed_loops_boolean,
     generic_non_intersecting_boolean, generic_single_closed_loop_boolean,
     generic_two_sided_cutter_band_subtraction, prismatic_curved_boolean, sphere_box_boolean,
     sphere_conic_containment, sphere_cylinder_boolean, sphere_torus_containment,
-    subtract_layered_extrusions, subtract_planar_polyhedra, subtract_vertical_arc_extrusion,
-    torus_box_containment, torus_conic_containment, torus_containment_boolean,
-    torus_cylinder_containment,
+    subtract_arc_extrusion_from_planar_solid, subtract_half_space_from_arc_extrusion,
+    subtract_layered_extrusions, subtract_vertical_arc_extrusion, torus_box_containment,
+    torus_conic_containment, torus_containment_boolean, torus_cylinder_containment,
 };
 use crate::operations::modifying::boolean::operands::all_planar;
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
@@ -129,9 +129,17 @@ const FAMILY_HANDLERS: &[FamilyHandler] = &[
 
 struct BoxHandler {
     name: HandlerId,
-    subtract_only: bool,
+    operations: &'static [BooleanOp],
     call: BooleanHandler,
 }
+
+const EVERY_OPERATION: &[BooleanOp] = &[
+    BooleanOp::Union,
+    BooleanOp::Intersection,
+    BooleanOp::Subtraction,
+];
+const SUBTRACTION: &[BooleanOp] = &[BooleanOp::Subtraction];
+const UNION_AND_INTERSECTION: &[BooleanOp] = &[BooleanOp::Union, BooleanOp::Intersection];
 
 fn dispatch_boxes(
     a: &BrepEnvelope,
@@ -160,40 +168,36 @@ fn dispatch_layered(
     subtract_layered_extrusions(a, b, id)
 }
 
-fn dispatch_polyhedra(
-    a: &BrepEnvelope,
-    b: &BrepEnvelope,
-    _: BooleanOp,
-    id: String,
-) -> Result<BooleanResult, GeometryError> {
-    subtract_planar_polyhedra(a, b, id)
-}
-
 const BOX_HANDLERS: &[BoxHandler] = &[
     BoxHandler {
         name: HandlerId::BooleanBoxes,
-        subtract_only: false,
+        operations: EVERY_OPERATION,
         call: dispatch_boxes,
     },
     BoxHandler {
         name: HandlerId::BooleanPlanarExtrusions,
-        subtract_only: false,
+        operations: EVERY_OPERATION,
         call: boolean_planar_extrusions,
     },
     BoxHandler {
         name: HandlerId::BooleanRectilinear,
-        subtract_only: false,
+        operations: EVERY_OPERATION,
         call: dispatch_rectilinear,
     },
     BoxHandler {
         name: HandlerId::SubtractLayeredExtrusions,
-        subtract_only: true,
+        operations: SUBTRACTION,
         call: dispatch_layered,
     },
     BoxHandler {
         name: HandlerId::SubtractPlanarPolyhedra,
-        subtract_only: true,
-        call: dispatch_polyhedra,
+        operations: SUBTRACTION,
+        call: boolean_planar_polyhedra,
+    },
+    BoxHandler {
+        name: HandlerId::BooleanPlanarPolyhedra,
+        operations: UNION_AND_INTERSECTION,
+        call: boolean_planar_polyhedra,
     },
 ];
 
@@ -213,8 +217,8 @@ pub(super) fn specialized_boolean(
     if pair == [OperandFamily::Planar, OperandFamily::Planar] {
         let mut gap = None;
         for entry in BOX_HANDLERS {
-            if entry.subtract_only && operation != BooleanOp::Subtraction {
-                break;
+            if !entry.operations.contains(&operation) {
+                continue;
             }
             match record_handler(trace, entry.name, || {
                 (entry.call)(a, b, operation, id.clone())
@@ -251,6 +255,33 @@ fn maybe_vertical_arc_extrusion(
     operation: BooleanOp,
     id: String,
 ) -> Result<Option<BooleanResult>, GeometryError> {
+    maybe_arc_extrusion_cut(a, b, operation, || {
+        subtract_vertical_arc_extrusion(a, b, id)
+    })
+}
+
+fn maybe_half_space_arc_extrusion(
+    a: &BrepEnvelope,
+    b: &BrepEnvelope,
+    operation: BooleanOp,
+    id: String,
+) -> Result<Option<BooleanResult>, GeometryError> {
+    if all_planar(a) {
+        return maybe_arc_extrusion_cut(b, a, operation, || {
+            subtract_arc_extrusion_from_planar_solid(a, b, id)
+        });
+    }
+    maybe_arc_extrusion_cut(a, b, operation, || {
+        subtract_half_space_from_arc_extrusion(a, b, id)
+    })
+}
+
+fn maybe_arc_extrusion_cut(
+    a: &BrepEnvelope,
+    b: &BrepEnvelope,
+    operation: BooleanOp,
+    cut: impl FnOnce() -> Result<BooleanResult, GeometryError>,
+) -> Result<Option<BooleanResult>, GeometryError> {
     if operation != BooleanOp::Subtraction
         || !all_planar(b)
         || !a
@@ -261,7 +292,7 @@ fn maybe_vertical_arc_extrusion(
     {
         return Ok(None);
     }
-    match subtract_vertical_arc_extrusion(a, b, id) {
+    match cut() {
         Ok(result) => Ok(Some(result)),
         Err(GeometryError::CoverageGap { .. }) => Ok(None),
         Err(error) => Err(error),
@@ -272,6 +303,10 @@ const GENERIC_HANDLERS: &[GenericHandler] = &[
     GenericHandler {
         name: HandlerId::SubtractVerticalArcExtrusion,
         call: maybe_vertical_arc_extrusion,
+    },
+    GenericHandler {
+        name: HandlerId::SubtractHalfSpaceFromArcExtrusion,
+        call: maybe_half_space_arc_extrusion,
     },
     GenericHandler {
         name: HandlerId::GenericTwoSidedCutterBandSubtraction,

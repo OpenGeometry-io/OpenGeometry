@@ -3,6 +3,7 @@ mod band_chain_faces;
 mod band_chain_seam;
 mod band_notch;
 mod band_rim;
+mod half_space_extrusion;
 mod multiple_closed_loops;
 mod non_intersecting;
 mod prismatic_curved;
@@ -11,6 +12,10 @@ mod single_closed_loop;
 mod tests;
 mod two_sided_cutter_band;
 
+pub(crate) use half_space_extrusion::{
+    subtract_arc_extrusion_from_planar_solid, subtract_half_space_from_arc_extrusion,
+    subtract_half_spaces_from_arc_extrusion,
+};
 pub(crate) use multiple_closed_loops::generic_multiple_closed_loops_boolean;
 pub(crate) use non_intersecting::generic_non_intersecting_boolean;
 pub(crate) use prismatic_curved::prismatic_curved_boolean;
