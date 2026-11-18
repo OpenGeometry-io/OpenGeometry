@@ -42,6 +42,15 @@ pub fn plane_boundary(
             axis_a: local(scale(c.x, *radius)),
             axis_b: local(scale(c.y, *radius)),
         },
+        CurveGeometry::Ellipse {
+            frame: c,
+            major_radius,
+            minor_radius,
+        } => PcurveGeometry::Conic2 {
+            origin: local(sub(c.origin, frame.origin)),
+            axis_a: local(scale(c.x, *major_radius)),
+            axis_b: local(scale(c.y, *minor_radius)),
+        },
         _ => {
             return Err(GeometryError::UnsupportedGeometry(
                 "planar primitive boundary".into(),
