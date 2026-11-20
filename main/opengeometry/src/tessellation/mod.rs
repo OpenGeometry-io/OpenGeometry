@@ -2,6 +2,7 @@ mod area_bound;
 #[cfg(test)]
 mod cache;
 mod curved_face;
+mod delaunay;
 mod deviation;
 pub mod display;
 mod edges;

@@ -1,3 +1,4 @@
+use super::delaunay::{straight_run_corners, Triangulation};
 use super::grid::Rect;
 use super::mesh::Tessellation;
 use super::trim::{
@@ -5,8 +6,8 @@ use super::trim::{
 };
 use crate::brep::{BrepEnvelope, Face, GeometryError, Surface, SurfaceGeometry};
 use crate::geom2d::{point_in_ring2, Pt2};
-use crate::math::{scale, Interval, Point3};
-use std::collections::{BTreeSet, HashMap};
+use crate::math::{norm, scale, Interval, Point3};
+use std::collections::BTreeSet;
 
 const COUNT_ROUNDING: f64 = 1e-9;
 
@@ -205,12 +206,8 @@ fn general_curved_trimmed_face(
 ) -> Result<(), GeometryError> {
     let mut uv = Vec::new();
     let mut points = Vec::new();
-    let mut holes = Vec::new();
     let mut boundary_edges = BTreeSet::new();
-    for (loop_index, ring) in loops.iter().enumerate() {
-        if loop_index > 0 {
-            holes.push(uv.len());
-        }
+    for ring in loops {
         let start = uv.len();
         for &(coordinate, point) in ring {
             uv.push(coordinate);
@@ -222,27 +219,28 @@ fn general_curved_trimmed_face(
             boundary_edges.insert(if a < b { (a, b) } else { (b, a) });
         }
     }
-    let boundary_count = uv.len();
-    let mut triangles = earcut_triangles(&uv, &holes)?;
     let surface = brep.geometry.surface(face.surface)?;
-    for _ in 0..128 {
-        let split_edges = edges_to_split(&triangles, &boundary_edges, surface, &uv, error);
-        if split_edges.is_empty() {
-            break;
-        }
-        if triangles
-            .len()
-            .checked_mul(4)
-            .is_none_or(|count| count > max_triangles)
+    let metric = uv_metric(surface, &uv[..loops[0].len()])?;
+    let mut triangulation = triangulate(brep, &mut uv, loops, metric, &boundary_edges)?;
+    triangulation.flip(&uv, triangulation.free_edges());
+    let mut queue = triangulation.free_edges();
+    while let Some((a, b)) = queue.pop() {
+        if !triangulation.has_edge(a, b)
+            || trimmed_surface_edge_deviation(surface, &uv, a, b) <= error * 2.0
         {
+            continue;
+        }
+        if triangulation.triangles.len() + 2 > max_triangles {
             return Err(GeometryError::LimitExceeded(
                 "curved trim refinement triangles".into(),
             ));
         }
-        let midpoints =
-            add_edge_midpoints(&split_edges, surface, &mut uv, &mut points, boundary_count)?;
-        triangles = refined_triangles(triangles, &midpoints);
+        let coordinate = [(uv[a][0] + uv[b][0]) * 0.5, (uv[a][1] + uv[b][1]) * 0.5];
+        uv.push(coordinate);
+        points.push(surface.point_at(coordinate)?);
+        queue.extend(triangulation.split(&uv, a, b, uv.len() - 1));
     }
+    let triangles = triangulation.triangles;
     check_trim_refinement(face, surface, &triangles, &boundary_edges, &uv, error)?;
     if triangles.len() > max_triangles {
         return Err(GeometryError::LimitExceeded("curved trim triangles".into()));
@@ -267,6 +265,75 @@ fn general_curved_trimmed_face(
     Ok(())
 }
 
+fn snap_axis_noise(ring: &mut [[f64; 2]], tolerance: [f64; 2]) {
+    let count = ring.len();
+    for index in 0..count {
+        let previous = ring[(index + count - 1) % count];
+        for axis in 0..2 {
+            if (ring[index][axis] - previous[axis]).abs() <= tolerance[axis] {
+                ring[index][axis] = previous[axis];
+            }
+        }
+    }
+}
+
+fn triangulate<'a>(
+    brep: &BrepEnvelope,
+    uv: &mut [[f64; 2]],
+    loops: &[Vec<([f64; 2], Point3)>],
+    metric: [f64; 2],
+    boundary_edges: &'a BTreeSet<(usize, usize)>,
+) -> Result<Triangulation<'a>, GeometryError> {
+    let tolerance = metric.map(|scale| brep.accuracy.geometric / scale);
+    let mut rings = Vec::with_capacity(loops.len());
+    for ring in loops {
+        let start = rings
+            .last()
+            .map_or(0, |range: &std::ops::Range<usize>| range.end);
+        rings.push(start..start + ring.len());
+        snap_axis_noise(&mut uv[start..start + ring.len()], tolerance);
+    }
+    let corners = rings
+        .iter()
+        .map(|ring| straight_run_corners(uv, ring.clone(), metric))
+        .collect::<Vec<_>>();
+    let kept = corners.concat();
+    let mut kept_holes = Vec::with_capacity(corners.len());
+    for ring in &corners[..corners.len() - 1] {
+        kept_holes.push(kept_holes.last().copied().unwrap_or(0) + ring.len());
+    }
+    let kept_uv = kept.iter().map(|&index| uv[index]).collect::<Vec<_>>();
+    let triangles = earcut_triangles(&kept_uv, &kept_holes)?
+        .into_iter()
+        .map(|triangle| triangle.map(|index| kept[index]))
+        .collect();
+    let mut triangulation = Triangulation::new(triangles, metric, boundary_edges);
+    for (ring, corners) in rings.iter().zip(&corners) {
+        let next = |index: usize| ring.start + (index - ring.start + 1) % ring.len();
+        for (k, &corner) in corners.iter().enumerate() {
+            let end = corners[(k + 1) % corners.len()];
+            let (mut current, mut index) = (corner, next(corner));
+            while index != end && index != corner {
+                triangulation.insert_on_boundary(uv, current, end, index);
+                (current, index) = (index, next(index));
+            }
+        }
+    }
+    Ok(triangulation)
+}
+
+fn uv_metric(surface: &SurfaceGeometry, outer: &[[f64; 2]]) -> Result<[f64; 2], GeometryError> {
+    let count = outer.len().max(1) as f64;
+    let center = [0, 1].map(|axis| outer.iter().map(|uv| uv[axis]).sum::<f64>() / count);
+    let jet = surface.derivatives(center)?;
+    let metric = [norm(jet.du), norm(jet.dv)];
+    if metric.iter().all(|value| value.is_finite() && *value > 0.0) {
+        Ok(metric)
+    } else {
+        Ok([1.0, 1.0])
+    }
+}
+
 fn earcut_triangles(uv: &[[f64; 2]], holes: &[usize]) -> Result<Vec<[usize; 3]>, GeometryError> {
     let flattened = uv
         .iter()
@@ -282,90 +349,6 @@ fn earcut_triangles(uv: &[[f64; 2]], holes: &[usize]) -> Result<Vec<[usize; 3]>,
         .chunks_exact(3)
         .map(|triangle| [triangle[0], triangle[1], triangle[2]])
         .collect::<Vec<_>>())
-}
-
-fn edges_to_split(
-    triangles: &[[usize; 3]],
-    boundary_edges: &BTreeSet<(usize, usize)>,
-    surface: &SurfaceGeometry,
-    uv: &[[f64; 2]],
-    error: f64,
-) -> BTreeSet<(usize, usize)> {
-    let mut split_edges = BTreeSet::new();
-    for triangle in triangles {
-        for [a, b] in [
-            [triangle[0], triangle[1]],
-            [triangle[1], triangle[2]],
-            [triangle[2], triangle[0]],
-        ] {
-            let key = if a < b { (a, b) } else { (b, a) };
-            if boundary_edges.contains(&key) {
-                continue;
-            }
-            let needs_refinement = trimmed_surface_edge_deviation(surface, uv, a, b) > error * 2.0;
-            if needs_refinement {
-                split_edges.insert(key);
-            }
-        }
-    }
-    split_edges
-}
-
-fn add_edge_midpoints(
-    split_edges: &BTreeSet<(usize, usize)>,
-    surface: &SurfaceGeometry,
-    uv: &mut Vec<[f64; 2]>,
-    points: &mut Vec<Point3>,
-    boundary_count: usize,
-) -> Result<HashMap<(usize, usize), usize>, GeometryError> {
-    let mut midpoints = HashMap::with_capacity(split_edges.len());
-    for &(a, b) in split_edges {
-        let coordinate = [(uv[a][0] + uv[b][0]) * 0.5, (uv[a][1] + uv[b][1]) * 0.5];
-        let id = uv.len();
-        uv.push(coordinate);
-        let match_boundary = (0..boundary_count).find(|&index| {
-            (0..2).all(|axis| {
-                (uv[index][axis] - coordinate[axis]).abs()
-                    <= 4.0 * f64::EPSILON * coordinate[axis].abs().max(1.0)
-            })
-        });
-        points.push(if let Some(index) = match_boundary {
-            points[index]
-        } else {
-            surface.point_at(coordinate)?
-        });
-        midpoints.insert((a, b), id);
-    }
-    Ok(midpoints)
-}
-
-fn refined_triangles(
-    triangles: Vec<[usize; 3]>,
-    midpoints: &HashMap<(usize, usize), usize>,
-) -> Vec<[usize; 3]> {
-    let midpoint = |a: usize, b: usize| {
-        let key = if a < b { (a, b) } else { (b, a) };
-        midpoints.get(&key).copied()
-    };
-    let mut refined = Vec::with_capacity(triangles.len() * 4);
-    for [a, b, c] in triangles {
-        let ab = midpoint(a, b);
-        let bc = midpoint(b, c);
-        let ca = midpoint(c, a);
-        match (ab, bc, ca) {
-            (None, None, None) => refined.push([a, b, c]),
-            (Some(ab), None, None) => refined.extend([[a, ab, c], [ab, b, c]]),
-            (None, Some(bc), None) => refined.extend([[b, bc, a], [bc, c, a]]),
-            (None, None, Some(ca)) => refined.extend([[c, ca, b], [ca, a, b]]),
-            (Some(ab), Some(bc), None) => refined.extend([[b, bc, ab], [ab, bc, c], [ab, c, a]]),
-            (None, Some(bc), Some(ca)) => refined.extend([[c, ca, bc], [bc, ca, a], [bc, a, b]]),
-            (Some(ab), None, Some(ca)) => refined.extend([[a, ab, ca], [ca, ab, b], [ca, b, c]]),
-            (Some(ab), Some(bc), Some(ca)) => {
-                refined.extend([[a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]])
-            }
-        }
-    }
-    refined
 }
 
 fn check_trim_refinement(
