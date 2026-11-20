@@ -1,114 +1,109 @@
 use super::classification::PointClassification;
-use super::classify::classify_point_validated;
-use super::face_trim::face_contains_uv;
+use super::classify::Classifier;
+use super::face_trim::FaceTrim;
 use crate::brep::{unit, BrepEnvelope, Face, GeometryError, Surface, UV};
-use crate::math::{add, norm, scale, sub};
+use crate::math::{add, scale, sub, Point3};
 
-const GRID: usize = 6;
+const GRIDS: [usize; 2] = [6, 24];
 const PROBE_OFFSET: f64 = 100.0;
-const RELIABLE_TOLERANCE: f64 = 1e-12;
+const SPACINGS_PER_OFFSET: f64 = 256.0;
 
 pub fn validate_orientation(brep: &BrepEnvelope) -> Result<(), GeometryError> {
     brep.validate()?;
-    validate_orientation_validated(brep)
-}
-
-pub(super) fn validate_orientation_validated(brep: &BrepEnvelope) -> Result<(), GeometryError> {
-    if brep.solids.is_empty() {
-        return Ok(());
-    }
-    match check_faces(brep) {
-        Err(GeometryError::Math(_)) => Ok(()),
-        outcome => outcome,
-    }
-}
-
-fn check_faces(brep: &BrepEnvelope) -> Result<(), GeometryError> {
-    let Some(bounds) = brep.bounds_unchecked()? else {
-        return Ok(());
-    };
-    let diagonal = norm(std::array::from_fn(|axis| bounds.axes[axis].width()));
-    let coordinates = bounds
-        .axes
+    let offset = PROBE_OFFSET * brep.accuracy.geometric;
+    let frames_resolve = brep
+        .geometry
+        .surfaces
         .iter()
-        .flat_map(|axis| [axis.lo, axis.hi])
-        .chain(brep.geometry.surfaces.iter().flat_map(|s| s.frame().origin))
-        .fold(diagonal, |scale, value| scale.max(value.abs()));
-    if !coordinates.is_finite() || brep.accuracy.geometric < RELIABLE_TOLERANCE * coordinates {
+        .all(|surface| resolves(offset, surface.frame().origin));
+    if brep.solids.is_empty() || !frames_resolve {
         return Ok(());
     }
-    for face in &brep.topology.faces {
-        if face_is_inverted(brep, face)? {
-            return Err(GeometryError::InvalidTopology(format!(
-                "face {} ('{}') has its material normal pointing into the solid",
-                face.id, face.key
-            )));
-        }
+    let classifier = Classifier::new(brep);
+    match brep
+        .topology
+        .faces
+        .iter()
+        .find(|face| face_is_inverted(brep, &classifier, face))
+    {
+        Some(face) => Err(GeometryError::InvalidTopology(format!(
+            "face {} ('{}') has its material normal pointing into the solid",
+            face.id, face.key
+        ))),
+        None => Ok(()),
     }
-    Ok(())
 }
 
-fn face_is_inverted(brep: &BrepEnvelope, face: &Face) -> Result<bool, GeometryError> {
-    let [first, second] = probe_points(brep, face)?;
-    let Some(first) = first else {
-        return Ok(false);
+fn face_is_inverted(brep: &BrepEnvelope, classifier: &Classifier, face: &Face) -> bool {
+    let Ok(trim) = FaceTrim::new(brep, face) else {
+        return false;
     };
-    if probe(brep, face, first)? != Some(true) {
-        return Ok(false);
-    }
-    let Some(second) = second else {
-        return Ok(true);
-    };
-    Ok(probe(brep, face, second)? == Some(true))
-}
-
-fn probe(brep: &BrepEnvelope, face: &Face, uv: UV) -> Result<Option<bool>, GeometryError> {
-    let surface = brep.geometry.surface(face.surface)?;
-    let Ok(normal) = surface.normal_at(uv) else {
-        return Ok(None);
-    };
-    let step = scale(
-        unit(normal)?,
-        face.sense.multiplier() * PROBE_OFFSET * brep.accuracy.geometric,
-    );
-    let on_face = surface.point_at(uv)?;
-    let front = classify_point_validated(brep, add(on_face, step))?;
-    let back = classify_point_validated(brep, sub(on_face, step))?;
-    Ok(match (front, back) {
-        (PointClassification::Inside, PointClassification::Outside) => Some(true),
-        (PointClassification::Outside, PointClassification::Inside) => Some(false),
-        _ => None,
+    probe_points(brep, face, &trim).is_some_and(|points| {
+        points
+            .into_iter()
+            .all(|uv| probe(brep, classifier, face, uv) == Some(true))
     })
 }
 
-fn probe_points(brep: &BrepEnvelope, face: &Face) -> Result<[Option<UV>; 2], GeometryError> {
-    let cell =
-        |i: usize, j: usize| -> UV { [i, j].map(|index| (index as f64 + 0.5) / GRID as f64) };
-    let at = |fraction: UV| -> UV {
-        std::array::from_fn(|axis| {
-            let bounds = face.trim.uv_bounds[axis];
-            bounds.lo + bounds.width() * fraction[axis]
-        })
-    };
-    let mut inside = [[false; GRID]; GRID];
-    for (i, row) in inside.iter_mut().enumerate() {
-        for (j, value) in row.iter_mut().enumerate() {
-            *value = face_contains_uv(brep, face, at(cell(i, j)))? == Some(true);
-        }
+fn probe(brep: &BrepEnvelope, classifier: &Classifier, face: &Face, uv: UV) -> Option<bool> {
+    let surface = brep.geometry.surface(face.surface).ok()?;
+    let normal = unit(surface.normal_at(uv).ok()?).ok()?;
+    let on_face = surface.point_at(uv).ok()?;
+    let offset = PROBE_OFFSET * brep.accuracy.geometric;
+    if !resolves(offset, on_face) {
+        return None;
     }
-    let mut ranked: Vec<(usize, usize, usize)> = (0..GRID * GRID)
-        .map(|index| (index / GRID, index % GRID))
-        .filter(|&(i, j)| inside[i][j])
-        .map(|(i, j)| (depth(&inside, i, j), i, j))
-        .collect();
-    ranked.sort_by_key(|&(depth, i, j)| (std::cmp::Reverse(depth), i, j));
-    Ok([0, 1].map(|rank| ranked.get(rank).map(|&(_, i, j)| at(cell(i, j)))))
+    let step = scale(normal, face.sense.multiplier() * offset);
+    let front = classifier.classify(add(on_face, step)).ok()?;
+    let back = classifier.classify(sub(on_face, step)).ok()?;
+    match (front, back) {
+        (PointClassification::Inside, PointClassification::Outside) => Some(true),
+        (PointClassification::Outside, PointClassification::Inside) => Some(false),
+        _ => None,
+    }
 }
 
-fn depth(inside: &[[bool; GRID]; GRID], i: usize, j: usize) -> usize {
-    let border = [i + 1, j + 1, GRID - i, GRID - j].into_iter().min();
-    let outside = (0..GRID * GRID)
-        .map(|index| (index / GRID, index % GRID))
+fn resolves(offset: f64, at: Point3) -> bool {
+    let reach = at
+        .iter()
+        .fold(0.0_f64, |reach, value| reach.max(value.abs()));
+    offset > SPACINGS_PER_OFFSET * f64::EPSILON * reach
+}
+
+fn probe_points(brep: &BrepEnvelope, face: &Face, trim: &FaceTrim) -> Option<[UV; 2]> {
+    GRIDS.into_iter().find_map(|grid| {
+        let at = |i: usize, j: usize| -> UV {
+            std::array::from_fn(|axis| {
+                let bounds = face.trim.uv_bounds[axis];
+                let index = [i, j][axis] as f64;
+                bounds.lo + bounds.width() * (index + 0.5) / grid as f64
+            })
+        };
+        let inside: Vec<Vec<bool>> = (0..grid)
+            .map(|i| {
+                (0..grid)
+                    .map(|j| trim.contains(brep, face, at(i, j)) == Ok(Some(true)))
+                    .collect()
+            })
+            .collect();
+        let mut ranked: Vec<(usize, usize, usize)> = (0..grid * grid)
+            .map(|index| (index / grid, index % grid))
+            .filter(|&(i, j)| inside[i][j])
+            .map(|(i, j)| (depth(&inside, i, j), i, j))
+            .collect();
+        ranked.sort_by_key(|&(depth, i, j)| (std::cmp::Reverse(depth), i, j));
+        match ranked[..] {
+            [(_, i, j), (_, k, l), ..] => Some([at(i, j), at(k, l)]),
+            _ => None,
+        }
+    })
+}
+
+fn depth(inside: &[Vec<bool>], i: usize, j: usize) -> usize {
+    let grid = inside.len();
+    let border = [i + 1, j + 1, grid - i, grid - j].into_iter().min();
+    let outside = (0..grid * grid)
+        .map(|index| (index / grid, index % grid))
         .filter(|&(k, l)| !inside[k][l])
         .map(|(k, l)| i.abs_diff(k).max(j.abs_diff(l)));
     border.into_iter().chain(outside).min().unwrap_or(0)
