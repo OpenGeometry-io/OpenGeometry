@@ -105,6 +105,7 @@ fn finish_sheet(mut builder: Builder) -> Result<BrepEnvelope, OperationError> {
         faces,
         is_closed: false,
     });
+    builder.brep.orient_loops()?;
     builder.brep.validate()?;
     Ok(builder.brep)
 }

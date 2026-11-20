@@ -241,6 +241,7 @@ fn finish_grid_result(
         .max(b.brep.revision)
         .checked_add(1)
         .ok_or_else(|| GeometryError::LimitExceeded("boolean revision overflow".into()))?;
+    out.orient_loops()?;
     out.validate()?;
     let face_mappings = [a, b]
         .into_iter()

@@ -74,6 +74,7 @@ pub fn shell_brep(
             }
         })
         .collect();
+    result.brep.orient_loops()?;
     result.brep.validate()?;
     Ok(result)
 }
