@@ -1,7 +1,11 @@
 use super::classification::PointClassification;
 use super::classify::{classify_point, classify_point_validated};
-use crate::brep::{coarse_accuracy, unit, Accuracy, BrepEnvelope, Frame3};
+use super::validate_orientation;
+use crate::brep::{
+    coarse_accuracy, fine_accuracy, unit, Accuracy, BrepEnvelope, Frame3, GeometryError,
+};
 use crate::math::{add, cross, dot, scale, Point3};
+use crate::operations::modifying::boolean::{boolean_brep, BooleanOp};
 use crate::primitives;
 
 mod face_trim;
@@ -432,4 +436,126 @@ fn cuboid_corners_edges_and_face_points_are_boundary() {
             })
             .collect(),
     );
+}
+
+fn assert_inverted(body: &BrepEnvelope, face: u32) {
+    body.validate().unwrap();
+    let key = &body.topology.faces[face as usize].key;
+    match validate_orientation(body) {
+        Err(GeometryError::InvalidTopology(message)) => {
+            assert!(message.contains(&format!("'{key}'")), "{message}")
+        }
+        other => panic!("face {face} not reported: {other:?}"),
+    }
+}
+
+fn flipped(body: &BrepEnvelope, faces: impl IntoIterator<Item = u32>) -> BrepEnvelope {
+    let mut body = body.clone();
+    for face in faces {
+        let face = &mut body.topology.faces[face as usize];
+        face.sense = face.sense.reversed();
+    }
+    body
+}
+
+fn cube_at(id: &str, origin: Point3, size: [f64; 3], accuracy: Accuracy) -> BrepEnvelope {
+    let frame = Frame3 {
+        origin,
+        ..Frame3::IDENTITY
+    };
+    primitives::cuboid(id.into(), frame, size, accuracy).unwrap()
+}
+
+#[test]
+fn a_face_whose_material_normal_points_into_the_solid_is_rejected() {
+    let accuracy = coarse_accuracy(1e-5);
+    let cube = cube_at("cube", [0.0; 3], [1.0; 3], accuracy);
+    validate_orientation(&cube).unwrap();
+    assert_inverted(&flipped(&cube, [5]), 5);
+
+    let sphere = primitives::sphere("ball".into(), Frame3::IDENTITY, 1.0, accuracy).unwrap();
+    assert_inverted(&flipped(&sphere, 0..sphere.topology.faces.len() as u32), 0);
+}
+
+#[test]
+fn reversed_bores_thin_plates_and_curved_solids_pass_the_orientation_check() {
+    let accuracy = coarse_accuracy(1e-5);
+    let bodies = [
+        primitives::annular_cylinder("tube".into(), Frame3::IDENTITY, 0.5, 1.0, 2.0, accuracy),
+        primitives::cuboid(
+            "plate".into(),
+            Frame3::IDENTITY,
+            [1000.0, 500.0, 1.0],
+            Accuracy::STANDARD,
+        ),
+        primitives::torus("ring".into(), Frame3::IDENTITY, 2.0, 0.5, accuracy),
+        primitives::cone("cone".into(), Frame3::IDENTITY, 1.0, 2.0, accuracy),
+    ];
+    for body in bodies {
+        validate_orientation(&body.unwrap()).unwrap();
+    }
+}
+
+#[test]
+fn a_flipped_face_far_from_the_origin_is_rejected() {
+    for origin in [[1e4, 2e4, 3e4], [2e5, -3e5, 1e5], [6.5e5, 5.8e6, 2.0e2]] {
+        let cube = cube_at("site", origin, [3.0, 2.0, 1.0], Accuracy::STANDARD);
+        validate_orientation(&cube).unwrap();
+        assert_inverted(&flipped(&cube, [2]), 2);
+    }
+}
+
+#[test]
+fn a_flipped_face_in_a_cavity_shell_or_a_second_solid_is_rejected() {
+    let accuracy = coarse_accuracy(1e-5);
+    let host = cube_at("host", [0.0; 3], [3.0; 3], accuracy);
+    let pocket = cube_at("pocket", [1.0; 3], [1.0; 3], accuracy);
+    let cavity = boolean_brep(&host, &pocket, BooleanOp::Subtraction, "cavity".into())
+        .unwrap()
+        .brep;
+    let shell = cavity.solids[0].cavity_shells[0];
+    let inner = cavity.topology.shells[shell as usize].faces[0];
+    validate_orientation(&cavity).unwrap();
+    assert_inverted(&flipped(&cavity, [inner]), inner);
+
+    let blade = cube_at("blade", [1.0, -1.0, -1.0], [1.0, 5.0, 5.0], accuracy);
+    let split = boolean_brep(&host, &blade, BooleanOp::Subtraction, "split".into())
+        .unwrap()
+        .brep;
+    assert_eq!(split.solids.len(), 2);
+    let shell = split.solids[1].outer_shell;
+    let second = split.topology.shells[shell as usize].faces[0];
+    validate_orientation(&split).unwrap();
+    assert_inverted(&flipped(&split, [second]), second);
+}
+
+#[test]
+fn the_orientation_check_stands_aside_where_classification_is_unreliable() {
+    let near_cylinder = primitives::frustum(
+        "near".into(),
+        Frame3::IDENTITY,
+        1.0,
+        1.0 + 2.0_f64.powi(-48),
+        1.0,
+        fine_accuracy(),
+    )
+    .unwrap();
+    validate_orientation(&near_cylinder).unwrap();
+    for (radius, geometric) in [(1e300, 1e290), (1e-200, 1e-210)] {
+        let accuracy = Accuracy {
+            geometric,
+            intersection: geometric / 4.0,
+            ..fine_accuracy()
+        };
+        let sphere =
+            primitives::sphere("extreme".into(), Frame3::IDENTITY, radius, accuracy).unwrap();
+        validate_orientation(&sphere).unwrap();
+    }
+    let beyond = cube_at(
+        "beyond",
+        [3e7, 1e7, 0.0],
+        [3.0, 2.0, 1.0],
+        Accuracy::STANDARD,
+    );
+    validate_orientation(&flipped(&beyond, [2])).unwrap();
 }

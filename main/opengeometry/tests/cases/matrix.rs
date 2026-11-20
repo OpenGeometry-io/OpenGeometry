@@ -3,7 +3,7 @@ use opengeometry::operations::modifying::boolean::{
     boolean_brep_outcome_with_handlers, boolean_brep_with_handlers, BooleanOp,
 };
 use opengeometry::primitives;
-use opengeometry::query::validity;
+use opengeometry::query::{validate_orientation, validity};
 use opengeometry_test_support::{stored, volume};
 use serde_json::json;
 
@@ -57,6 +57,7 @@ fn boolean_fixtures_match_stored_brep_and_handlers() {
         ($name:literal, $a:expr, $b:expr, $operation:expr) => {{
             let (result, handlers) =
                 boolean_brep_with_handlers($a, $b, $operation, $name.into()).unwrap();
+            validate_orientation(&result.brep).unwrap();
             let json = result.brep.to_json().unwrap();
             if stored::compared() {
                 assert_eq!(
@@ -111,7 +112,7 @@ fn boolean_support_matrix_matches_stored_outcomes_and_handlers() {
             boolean_brep_outcome_with_handlers(&a, &b, operation, format!("matrix-{name}"));
         let actual = match result {
             Ok(result) => {
-                result.brep.validate().unwrap();
+                validate_orientation(&result.brep).unwrap();
                 let expected_volume = match name {
                     "box-union" => Some(27.0),
                     "box-intersection" => Some(8.0),
@@ -171,7 +172,7 @@ fn rotated_box_union_and_intersection_build_through_planar_polyhedra() {
         let (result, handlers) =
             boolean_brep_outcome_with_handlers(&a, &b, operation, format!("{operation:?}"));
         let body = result.unwrap().brep;
-        body.validate().unwrap();
+        validate_orientation(&body).unwrap();
         let checked = validity(&body);
         assert!(checked.valid && checked.closed, "{operation:?}");
         let value = serde_json::to_value(&body).unwrap();

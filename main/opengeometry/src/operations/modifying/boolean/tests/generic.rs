@@ -1,8 +1,9 @@
 use super::support::{cylinder, sphere};
-use crate::brep::{Accuracy, CurveGeometry, FaceRole, Frame3};
+use crate::brep::{Accuracy, BrepEnvelope, CurveGeometry, FaceRole, Frame3, GeometryError};
 use crate::operations::modifying::boolean::dispatch::boolean_brep;
 use crate::operations::modifying::boolean::types::BooleanOp;
 use crate::primitives;
+use crate::query::validate_orientation;
 use crate::tessellation::tessellate;
 
 #[test]
@@ -75,6 +76,15 @@ fn provably_disjoint_surface_families_use_exact_regularized_results() {
     );
 }
 
+fn assert_known_inversion(body: &BrepEnvelope, key: &str) {
+    match validate_orientation(body) {
+        Err(GeometryError::InvalidTopology(message)) => {
+            assert!(message.contains(&format!("'{key}'")), "{message}")
+        }
+        other => panic!("'{key}' is no longer reported inverted: {other:?}"),
+    }
+}
+
 #[test]
 fn generic_closed_loop_imprints_an_off_axis_sphere_cone_intersection() {
     let accuracy = cylinder("accuracy", 0.0, 1.0, false).accuracy;
@@ -115,6 +125,10 @@ fn generic_closed_loop_imprints_an_off_axis_sphere_cone_intersection() {
             .iter()
             .all(|face| !face.provenance.sources.is_empty()));
         result.brep.validate().unwrap();
+        match operation {
+            BooleanOp::Intersection => validate_orientation(&result.brep).unwrap(),
+            _ => assert_known_inversion(&result.brep, "cone:lateral"),
+        }
         tessellate(&result.brep, 0.01, 2_000_000)
             .unwrap_or_else(|error| panic!("{operation:?} tessellation: {error}"));
     }
@@ -136,6 +150,7 @@ fn generic_closed_loop_handles_periodic_winding() {
     .unwrap();
     let result = boolean_brep(&cone, &sphere, BooleanOp::Intersection, "winding".into()).unwrap();
     result.brep.validate().unwrap();
+    assert_known_inversion(&result.brep, "lateral:intersection-patch");
     tessellate(&result.brep, 0.01, 2_000_000).unwrap();
 }
 
