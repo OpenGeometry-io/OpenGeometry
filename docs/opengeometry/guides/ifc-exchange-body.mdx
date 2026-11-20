@@ -33,7 +33,7 @@ This prints `AdvancedBrep Z 1 6`.
 `AnalyticExchangeBodyV2` is a read-only object:
 
 - `schema_version`: `2`.
-- World metres, with Z up.
+- World metres, with Z up. For a body built in millimetres, pass `{ modelUnit: 'millimetre' }` and the numbers are scaled to metres.
 - `representation_type`: `'AdvancedBrep'`, or `'CSG'` for a solid with a cavity.
 - `entities`, `solids` and `faces`: the geometry and topology for the writer. Values are of type `IfcPreparedValue`.
 

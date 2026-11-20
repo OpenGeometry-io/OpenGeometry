@@ -12,6 +12,7 @@ const LABEL = 'OpenGeometry.exportStep';
 export function exportStep(options: {
   nodes: (Body | SystemAssembly | string)[];
   unit?: 'metre' | 'millimetre';
+  modelUnit?: 'metre' | 'millimetre';
   upAxis?: 'Y' | 'Z';
   name?: string;
   timestamp?: string;

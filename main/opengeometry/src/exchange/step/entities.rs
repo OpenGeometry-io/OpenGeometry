@@ -3,6 +3,7 @@ use crate::brep::{
 };
 use crate::exchange::fit_curve::FittedIntersectionCurve;
 use crate::exchange::part21::Part21Writer;
+use crate::exchange::unit::Scale;
 use crate::math::{dot, norm};
 
 pub(super) struct PcurveOnSurface<'a> {
@@ -22,7 +23,7 @@ pub(super) fn sense(value: Orientation) -> &'static str {
 pub(super) fn curve(
     writer: &mut Part21Writer,
     geometry: &CurveGeometry,
-    scale: f64,
+    scale: Scale,
 ) -> Result<usize, GeometryError> {
     Ok(match geometry {
         CurveGeometry::Line { origin, direction } => line(
@@ -91,7 +92,7 @@ fn direction(writer: &mut Part21Writer, value: &[f64]) -> usize {
         value.iter().map(|v| real(*v)).collect::<Vec<_>>().join(",")
     ))
 }
-pub(super) fn placement(writer: &mut Part21Writer, frame: Frame3, scale: f64) -> usize {
+pub(super) fn placement(writer: &mut Part21Writer, frame: Frame3, scale: Scale) -> usize {
     let p = point(writer, &frame.origin.map(|v| v * scale));
     let z = direction(writer, &frame.z);
     let x = direction(writer, &frame.x);
@@ -102,7 +103,7 @@ pub(super) fn pcurve(
     writer: &mut Part21Writer,
     on_surface: &PcurveOnSurface<'_>,
     context: usize,
-    scale: f64,
+    scale: Scale,
     lift: [i32; 2],
     fitted: Option<&FittedIntersectionCurve>,
 ) -> Result<usize, GeometryError> {
@@ -112,9 +113,9 @@ pub(super) fn pcurve(
         surface_id,
     } = *on_surface;
     let metric = match surface {
-        SurfaceGeometry::Plane { .. } => [scale, scale],
-        SurfaceGeometry::Cylinder { .. } => [1.0, scale],
-        SurfaceGeometry::Cone { semi_angle, .. } => [1.0, scale / semi_angle.cos()],
+        SurfaceGeometry::Plane { .. } => [scale.ratio(); 2],
+        SurfaceGeometry::Cylinder { .. } => [1.0, scale.ratio()],
+        SurfaceGeometry::Cone { semi_angle, .. } => [1.0, scale.ratio() / semi_angle.cos()],
         _ => [1.0, 1.0],
     };
     let period = match surface {

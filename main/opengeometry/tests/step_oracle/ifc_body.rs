@@ -1,6 +1,8 @@
 use crate::support::{fixture_names, fixture_text};
 use opengeometry::brep::{Accuracy, BrepEnvelope, Frame3, GeometryError};
-use opengeometry::exchange::ifc_body::{export_ifc_body, AnalyticExchangeBodyV2};
+use opengeometry::exchange::ifc_body::{
+    export_ifc_body, export_ifc_body_in, AnalyticExchangeBodyV2,
+};
 use opengeometry::primitives;
 use opengeometry::world_graph::{
     CreateOptions, CreatingOperation, ErrorCode, Primitive, StepOptions, Transform, WorldGraph,
@@ -294,7 +296,7 @@ fn more_than_100_000_estimated_entities_is_limit_exceeded() {
             named("prism"),
         )
         .unwrap();
-    let error = world.export_ifc_body("prism").unwrap_err();
+    let error = world.export_ifc_body("prism", "metre").unwrap_err();
     assert_eq!(error.error_code(), ErrorCode::LimitExceeded);
     assert!(error
         .message()
@@ -375,25 +377,11 @@ fn graph_ifc_body_is_world_placed_z_up_and_read_only() {
     let world = scene();
     let revision = world.revision();
     let before = state(&world, revision);
-    let body = world.export_ifc_body("box").unwrap();
+    let body = world.export_ifc_body("box", "metre").unwrap();
     let value = serde_json::to_value(&body).unwrap();
     assert_eq!(value["coordinate_space"], "world");
     assert_eq!(value["representation_type"], "AdvancedBrep");
-    let points: Vec<Vec<f64>> = value["entities"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|entity| entity["entity_type"] == "IfcCartesianPoint")
-        .filter_map(|entity| {
-            let values = entity["attributes"][0]["values"].as_array()?;
-            (values.len() == 3).then(|| {
-                values
-                    .iter()
-                    .map(|v| v["value"].as_f64().unwrap())
-                    .collect()
-            })
-        })
-        .collect();
+    let points = points(&value);
     assert!(points.iter().any(|point| point[0] >= 10.5));
     assert!(points.iter().any(|point| point[2] >= 3.5));
     assert!(points.iter().all(|point| point[1].abs() <= 1.5));
@@ -410,9 +398,69 @@ fn graph_ifc_body_refuses_sheets_wires_assemblies_and_unknown_nodes() {
         ("missing", ErrorCode::UnknownNode),
     ] {
         assert_eq!(
-            world.export_ifc_body(og_id).unwrap_err().error_code(),
+            world
+                .export_ifc_body(og_id, "metre")
+                .unwrap_err()
+                .error_code(),
             code,
             "{og_id}"
         );
     }
+}
+
+fn points(value: &Value) -> Vec<Vec<f64>> {
+    value["entities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entity| entity["entity_type"] == "IfcCartesianPoint")
+        .filter_map(|entity| {
+            let values = entity["attributes"][0]["values"].as_array()?;
+            (values.len() == 3).then(|| {
+                values
+                    .iter()
+                    .map(|v| v["value"].as_f64().unwrap())
+                    .collect()
+            })
+        })
+        .collect()
+}
+
+#[test]
+fn unknown_ifc_body_model_unit_is_rejected() {
+    let (_, body) = single_body_fixtures().remove(0);
+    assert!(matches!(
+        export_ifc_body_in(&body, "inch", Frame3::IDENTITY),
+        Err(GeometryError::InvalidGeometry(_))
+    ));
+}
+
+#[test]
+fn graph_ifc_body_of_a_millimetre_model_is_a_thousandth_of_the_metre_body() {
+    let world = scene();
+    let metre = serde_json::to_value(world.export_ifc_body("box", "metre").unwrap()).unwrap();
+    let millimetre =
+        serde_json::to_value(world.export_ifc_body("box", "millimetre").unwrap()).unwrap();
+    assert_eq!(millimetre["length_unit"], "metre");
+    for field in ["geometric_tolerance", "exchange_error_bound"] {
+        assert_eq!(
+            millimetre[field].as_f64().unwrap(),
+            metre[field].as_f64().unwrap() / 1000.0,
+            "{field}"
+        );
+    }
+    let (metre, millimetre) = (points(&metre), points(&millimetre));
+    assert_eq!(metre.len(), millimetre.len());
+    for (metre, millimetre) in metre.iter().zip(&millimetre) {
+        for (metre, millimetre) in metre.iter().zip(millimetre) {
+            assert!((metre / 1000.0 - millimetre).abs() <= 1e-15);
+        }
+    }
+    assert_eq!(
+        world
+            .export_ifc_body("box", "inch")
+            .unwrap_err()
+            .error_code(),
+        ErrorCode::InvalidParameter
+    );
 }

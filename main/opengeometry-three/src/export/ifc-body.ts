@@ -9,10 +9,13 @@ import { checkHandle, worldGraph } from '../world-graph/world-graph-client';
 
 const LABEL = 'OpenGeometry.exportIfcBody';
 
-export function exportIfcBody(node: Body | SystemAssembly): AnalyticExchangeBodyV2 {
+export function exportIfcBody(
+  node: Body | SystemAssembly,
+  options: { modelUnit?: 'metre' | 'millimetre' } = {},
+): AnalyticExchangeBodyV2 {
   if (!(node instanceof SystemAssembly) && runtime().bodies.get(bodyKey(node.handle, node.generation)) !== node) {
     throw new OGError('Disposed', LABEL, `${node.ogId} is not a live body`);
   }
   checkHandle(LABEL, node);
-  return decodeIfcBody(call(LABEL, () => worldGraph().exportIfcBody(node.ogId)), LABEL);
+  return decodeIfcBody(call(LABEL, () => worldGraph().exportIfcBody(node.ogId, options.modelUnit ?? 'metre')), LABEL);
 }

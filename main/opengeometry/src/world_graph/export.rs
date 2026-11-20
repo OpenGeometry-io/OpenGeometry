@@ -13,6 +13,7 @@ use std::collections::BTreeSet;
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct StepOptions {
     pub unit: String,
+    pub model_unit: String,
     pub up_axis: String,
     pub name: String,
     pub timestamp: String,
@@ -22,6 +23,7 @@ impl Default for StepOptions {
     fn default() -> Self {
         Self {
             unit: "millimetre".into(),
+            model_unit: "metre".into(),
             up_axis: "Z".into(),
             name: "opengeometry-export".into(),
             timestamp: "1970-01-01T00:00:00".into(),
@@ -111,6 +113,7 @@ impl WorldGraph {
             ));
         }
         if !matches!(options.unit.as_str(), "metre" | "millimetre")
+            || !matches!(options.model_unit.as_str(), "metre" | "millimetre")
             || !matches!(options.up_axis.as_str(), "Y" | "Z")
             || !valid_timestamp(&options.timestamp)
             || options.name.is_empty()
@@ -145,6 +148,7 @@ impl WorldGraph {
             .collect::<Vec<_>>();
         export_bodies(
             &inputs,
+            &options.model_unit,
             &options.unit,
             &options.up_axis,
             &options.name,
