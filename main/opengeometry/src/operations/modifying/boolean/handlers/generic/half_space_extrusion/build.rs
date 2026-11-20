@@ -308,7 +308,7 @@ fn add_plane_side(
 
 fn cylinder_pcurve(conic: &Conic, surface: u32) -> PcurveGeometry {
     if conic.slope == 0.0 {
-        return uv_line([conic.alpha, conic.middle], [1.0, 0.0]);
+        return uv_line([conic.alpha, conic.middle], [1.0, 0.0]).into();
     }
     let rise = conic.radius * conic.slope;
     PcurveGeometry::ProjectedCurve {
@@ -349,9 +349,9 @@ fn add_cylinder_side(
     let [low, high] = [prism.caps[0].height, prism.caps[1].height];
     let pcurves = [
         on_cap(0)?,
-        uv_line([end_angle, low.at(to)], [0.0, 1.0]),
+        uv_line([end_angle, low.at(to)], [0.0, 1.0]).into(),
         on_cap(1)?,
-        uv_line([start_angle, low.at(from)], [0.0, 1.0]),
+        uv_line([start_angle, low.at(from)], [0.0, 1.0]).into(),
     ];
     let uses = side_steps(side)
         .into_iter()

@@ -89,6 +89,7 @@ pub(super) fn line_pcurve(frame: Frame3, origin: Point3, direction: Point3) -> P
         [local[0], local[1]],
         [dot(direction, frame.x), dot(direction, frame.y)],
     )
+    .into()
 }
 
 pub(super) fn conic(a: f64, b: f64) -> PcurveGeometry {

@@ -18,7 +18,7 @@ mod validate;
 pub use accuracy::Accuracy;
 pub use body_type::BodyType;
 pub use bounds::PatchBounds;
-pub use builder::{boundary, plane_boundary, uv_line, Builder, Use};
+pub use builder::{boundary, plane_boundary, uv_conic, uv_line, Builder, Use, UvCurve};
 pub(super) use builder::{dimensions, padded_uv_bounds, WireUse};
 pub(super) use error::coverage_gap;
 pub use error::GeometryError;
@@ -32,8 +32,7 @@ pub use geometry::{
     CurveGeometry, GeometryStore, IntersectionPoint, Surface, SurfaceChart, SurfaceGeometry,
     SurfaceJet2,
 };
-pub(super) use pcurve::period_lifted_uv;
-pub use pcurve::{IntersectionSide, PcurveGeometry};
+pub(super) use pcurve::{period_lifted_uv, IntersectionSide, PcurveGeometry};
 pub use placement::{mirror::mirrored, placed};
 pub use similarity::Similarity3;
 #[cfg(test)]

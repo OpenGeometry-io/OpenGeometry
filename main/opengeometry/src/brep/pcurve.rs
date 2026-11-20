@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", deny_unknown_fields)]
-pub enum PcurveGeometry {
+pub(crate) enum PcurveGeometry {
     Line2 {
         origin: UV,
         direction: UV,
@@ -27,7 +27,7 @@ pub enum PcurveGeometry {
     },
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum IntersectionSide {
+pub(crate) enum IntersectionSide {
     A,
     B,
 }

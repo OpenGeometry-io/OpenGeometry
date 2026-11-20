@@ -1,5 +1,5 @@
 use super::brep_builder::{Builder, Use};
-use crate::brep::error::GeometryError;
+use crate::brep::error::{missing, GeometryError};
 use crate::brep::frame::Frame3;
 use crate::brep::geometry::CurveGeometry;
 use crate::brep::pcurve::PcurveGeometry;
@@ -23,8 +23,19 @@ pub fn plane_boundary(
     to: u32,
     sense: Orientation,
 ) -> Result<Use, GeometryError> {
-    let curve = match builder.brep.topology.edges[edge as usize].geometry {
-        EdgeGeometry::Curve { curve, .. } => &builder.brep.geometry.curves[curve as usize],
+    let brep = &builder.brep;
+    let geometry = &brep
+        .topology
+        .edges
+        .get(edge as usize)
+        .ok_or_else(|| missing("edge", edge))?
+        .geometry;
+    let curve = match *geometry {
+        EdgeGeometry::Curve { curve, .. } => brep
+            .geometry
+            .curves
+            .get(curve as usize)
+            .ok_or_else(|| missing("curve", curve))?,
         _ => {
             return Err(GeometryError::InvalidGeometry(
                 "collapsed planar boundary".into(),
@@ -36,20 +47,20 @@ pub fn plane_boundary(
         CurveGeometry::Line { origin, direction } => {
             uv_line(local(sub(*origin, frame.origin)), local(*direction))
         }
-        CurveGeometry::Circle { frame: c, radius } => PcurveGeometry::Conic2 {
-            origin: local(sub(c.origin, frame.origin)),
-            axis_a: local(scale(c.x, *radius)),
-            axis_b: local(scale(c.y, *radius)),
-        },
+        CurveGeometry::Circle { frame: c, radius } => uv_conic(
+            local(sub(c.origin, frame.origin)),
+            local(scale(c.x, *radius)),
+            local(scale(c.y, *radius)),
+        ),
         CurveGeometry::Ellipse {
             frame: c,
             major_radius,
             minor_radius,
-        } => PcurveGeometry::Conic2 {
-            origin: local(sub(c.origin, frame.origin)),
-            axis_a: local(scale(c.x, *major_radius)),
-            axis_b: local(scale(c.y, *minor_radius)),
-        },
+        } => uv_conic(
+            local(sub(c.origin, frame.origin)),
+            local(scale(c.x, *major_radius)),
+            local(scale(c.y, *minor_radius)),
+        ),
         _ => {
             return Err(GeometryError::UnsupportedGeometry(
                 "planar primitive boundary".into(),
@@ -59,16 +70,46 @@ pub fn plane_boundary(
     Ok(boundary(edge, from, to, sense, pcurve))
 }
 
-pub fn uv_line(origin: [f64; 2], direction: [f64; 2]) -> PcurveGeometry {
-    PcurveGeometry::Line2 { origin, direction }
+#[derive(Clone, Debug, PartialEq)]
+pub struct UvCurve(PcurveGeometry);
+
+impl From<PcurveGeometry> for UvCurve {
+    fn from(pcurve: PcurveGeometry) -> Self {
+        Self(pcurve)
+    }
 }
-pub fn boundary(edge: u32, from: u32, to: u32, sense: Orientation, pcurve: PcurveGeometry) -> Use {
+
+impl From<UvCurve> for PcurveGeometry {
+    fn from(curve: UvCurve) -> Self {
+        curve.0
+    }
+}
+
+pub fn uv_line(origin: [f64; 2], direction: [f64; 2]) -> UvCurve {
+    UvCurve(PcurveGeometry::Line2 { origin, direction })
+}
+
+pub fn uv_conic(origin: [f64; 2], axis_a: [f64; 2], axis_b: [f64; 2]) -> UvCurve {
+    UvCurve(PcurveGeometry::Conic2 {
+        origin,
+        axis_a,
+        axis_b,
+    })
+}
+
+pub fn boundary(
+    edge: u32,
+    from: u32,
+    to: u32,
+    sense: Orientation,
+    pcurve: impl Into<UvCurve>,
+) -> Use {
     Use {
         edge,
         from,
         to,
         sense,
-        pcurve,
+        pcurve: pcurve.into().0,
     }
 }
 

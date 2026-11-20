@@ -359,10 +359,10 @@ fn add_bridge_edge(
             cutter.geometry.surface(surface)?
         };
         let [a, b] = [geometry.project(start, None)?, geometry.project(end, None)?];
-        pcurves.push(uv_line(
+        pcurves.push(PcurveGeometry::from(uv_line(
             a,
             [0, 1].map(|axis| (b[axis] - a[axis]) / range.hi),
-        ));
+        )));
     }
     let Ok(pcurves) = <[PcurveGeometry; 2]>::try_from(pcurves) else {
         return Ok(None);
