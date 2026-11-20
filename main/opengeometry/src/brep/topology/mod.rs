@@ -16,5 +16,5 @@ pub(crate) use envelope::GeometryQuality;
 pub(super) use envelope::SCHEMA_VERSION;
 #[cfg(test)]
 pub(crate) use fixtures::{circular_face, coarse_accuracy, fine_accuracy};
-pub(crate) use orientation::Orientation;
+pub use orientation::Orientation;
 pub use provenance::{FaceProvenance, FaceRole, FaceSource};

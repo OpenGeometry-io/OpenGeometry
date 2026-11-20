@@ -16,6 +16,20 @@ Contributor-facing notes. For end-user docs see [README.md](./README.md) and
 - `main/opengeometry-three/` — Three.js wrapper (the published TypeScript SDK)
 - `main/dist/` — generated npm bundle (do not edit)
 
+## Building a B-rep from Rust
+
+`brep::Builder` builds a body face by face for Rust crates that depend on `opengeometry`.
+Edge uses are made with `boundary(edge, from, to, sense, pcurve)` (the pcurve from `uv_line`
+or `uv_conic`) or `plane_boundary`, and passed to `face` or `face_with_holes`.
+
+- An unknown edge, vertex or face id is a `MissingReference`. An edge used by a third loop
+  is `InvalidTopology`. A rejected face leaves the builder unchanged, so the corrected face
+  can be added next.
+- `finish_solid` checks topology with `validate()`, **not orientation**. The caller owns
+  each face's sense (`set_face_sense`, read back with `face_sense`): a solid whose faces
+  point inward is accepted as built. To check one, take a point just off each face along
+  `face_normal_at`; `query::classify_point` should call it `Outside`.
+
 ## Local build
 
 ```bash

@@ -83,5 +83,6 @@ pub(super) fn add_plane_side(
         SurfaceGeometry::Plane { frame: side_frame },
         [[-g, norm(sub(destination, origin)) + g], [-g, height + g]],
         uses,
-    )
+    )?;
+    Ok(())
 }

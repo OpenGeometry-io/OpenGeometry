@@ -1,5 +1,5 @@
 use crate::brep::accuracy::Accuracy;
-use crate::brep::error::GeometryError;
+use crate::brep::error::{missing, GeometryError};
 use crate::brep::geometry::{CurveGeometry, SurfaceGeometry};
 use crate::brep::pcurve::PcurveGeometry;
 use crate::brep::topology::{
@@ -7,8 +7,9 @@ use crate::brep::topology::{
     HalfEdgeGeometryUse, Loop, Orientation, Shell, SolidRegion, TrimRegion, Vertex,
 };
 use crate::math::{Interval, Point3};
+use std::collections::BTreeMap;
 
-pub(crate) struct Use {
+pub struct Use {
     pub(super) edge: u32,
     pub(super) from: u32,
     pub(super) to: u32,
@@ -16,16 +17,19 @@ pub(crate) struct Use {
     pub(super) pcurve: PcurveGeometry,
 }
 
-pub(crate) struct Builder {
+pub struct Builder {
     pub(crate) brep: BrepEnvelope,
 }
 impl Builder {
-    pub(crate) fn new(id: String, accuracy: Accuracy) -> Result<Self, GeometryError> {
+    pub fn new(id: String, accuracy: Accuracy) -> Result<Self, GeometryError> {
         Ok(Self {
             brep: BrepEnvelope::new(id, accuracy)?,
         })
     }
-    pub(crate) fn vertex(&mut self, p: Point3) -> u32 {
+    pub fn brep(&self) -> &BrepEnvelope {
+        &self.brep
+    }
+    pub fn vertex(&mut self, p: Point3) -> u32 {
         let id = self.brep.topology.vertices.len() as u32;
         self.brep.topology.vertices.push(Vertex {
             id,
@@ -35,7 +39,7 @@ impl Builder {
         });
         id
     }
-    pub(crate) fn edge(&mut self, curve: CurveGeometry, range: Interval, seam: bool) -> u32 {
+    pub fn edge(&mut self, curve: CurveGeometry, range: Interval, seam: bool) -> u32 {
         let curve_id = self.brep.geometry.curves.len() as u32;
         self.brep.geometry.curves.push(curve);
         self.edge_geometry(
@@ -64,35 +68,59 @@ impl Builder {
         is_hole: bool,
         uses: Vec<Use>,
     ) -> Result<u32, GeometryError> {
-        let loop_id = self.brep.topology.loops.len() as u32;
-        let start = self.brep.topology.halfedges.len() as u32;
-        let count = uses.len() as u32;
-        if count == 0 {
-            return Err(GeometryError::InvalidTopology(
-                "empty primitive face".into(),
-            ));
-        }
-        for (i, u) in uses.into_iter().enumerate() {
-            let id = start + i as u32;
-            let pcurve = self.brep.geometry.pcurves.len() as u32;
-            self.brep.geometry.pcurves.push(u.pcurve);
-            let e = self
-                .brep
-                .topology
-                .edges
-                .get_mut(u.edge as usize)
-                .ok_or_else(|| {
-                    GeometryError::InvalidTopology("builder references missing edge".into())
-                })?;
-            let twin = if e.halfedge == u32::MAX {
-                e.halfedge = id;
-                None
-            } else {
-                if e.twin_halfedge.is_some() {
+        self.check_loops([&uses])?;
+        Ok(self.write_loop(face, is_hole, uses))
+    }
+    fn check_loops<'a>(
+        &self,
+        loops: impl IntoIterator<Item = &'a Vec<Use>>,
+    ) -> Result<(), GeometryError> {
+        let topology = &self.brep.topology;
+        let mut uses_of_edge = BTreeMap::new();
+        for uses in loops {
+            if uses.is_empty() {
+                return Err(GeometryError::InvalidTopology(
+                    "empty primitive face".into(),
+                ));
+            }
+            for u in uses {
+                let edge = topology
+                    .edges
+                    .get(u.edge as usize)
+                    .ok_or_else(|| missing("edge", u.edge))?;
+                if let Some(&vertex) = [u.from, u.to]
+                    .iter()
+                    .find(|&&vertex| vertex as usize >= topology.vertices.len())
+                {
+                    return Err(missing("vertex", vertex));
+                }
+                let uses = uses_of_edge.entry(u.edge).or_insert(
+                    usize::from(edge.halfedge != u32::MAX)
+                        + usize::from(edge.twin_halfedge.is_some()),
+                );
+                *uses += 1;
+                if *uses > 2 {
                     return Err(GeometryError::InvalidTopology(
                         "nonmanifold primitive edge".into(),
                     ));
                 }
+            }
+        }
+        Ok(())
+    }
+    fn write_loop(&mut self, face: u32, is_hole: bool, uses: Vec<Use>) -> u32 {
+        let loop_id = self.brep.topology.loops.len() as u32;
+        let start = self.brep.topology.halfedges.len() as u32;
+        let count = uses.len() as u32;
+        for (i, u) in uses.into_iter().enumerate() {
+            let id = start + i as u32;
+            let pcurve = self.brep.geometry.pcurves.len() as u32;
+            self.brep.geometry.pcurves.push(u.pcurve);
+            let e = &mut self.brep.topology.edges[u.edge as usize];
+            let twin = if e.halfedge == u32::MAX {
+                e.halfedge = id;
+                None
+            } else {
                 e.twin_halfedge = Some(id);
                 self.brep.topology.halfedges[e.halfedge as usize].twin = Some(id);
                 Some(e.halfedge)
@@ -127,33 +155,38 @@ impl Builder {
             face_ref: face,
             is_hole,
         });
-        Ok(loop_id)
+        loop_id
     }
-    pub(crate) fn face(
+    pub fn face(
         &mut self,
         key: &str,
         surface: SurfaceGeometry,
         bounds: [[f64; 2]; 2],
         uses: Vec<Use>,
-    ) -> Result<(), GeometryError> {
+    ) -> Result<u32, GeometryError> {
         self.face_with_holes(key, surface, bounds, uses, Vec::new())
     }
-    pub(crate) fn face_with_holes(
+    pub fn face_with_holes(
         &mut self,
         key: &str,
         surface: SurfaceGeometry,
         bounds: [[f64; 2]; 2],
         outer_uses: Vec<Use>,
         hole_uses: Vec<Vec<Use>>,
-    ) -> Result<(), GeometryError> {
+    ) -> Result<u32, GeometryError> {
+        let uv_bounds = [
+            Interval::new(bounds[0][0], bounds[0][1])?,
+            Interval::new(bounds[1][0], bounds[1][1])?,
+        ];
+        self.check_loops(std::iter::once(&outer_uses).chain(&hole_uses))?;
         let surface_id = self.brep.geometry.surfaces.len() as u32;
         self.brep.geometry.surfaces.push(surface);
         let face = self.brep.topology.faces.len() as u32;
-        let outer = self.face_loop(face, false, outer_uses)?;
-        let mut holes = Vec::with_capacity(hole_uses.len());
-        for uses in hole_uses {
-            holes.push(self.face_loop(face, true, uses)?);
-        }
+        let outer = self.write_loop(face, false, outer_uses);
+        let holes = hole_uses
+            .into_iter()
+            .map(|uses| self.write_loop(face, true, uses))
+            .collect();
         self.brep.topology.faces.push(Face {
             id: face,
             key: key.into(),
@@ -161,10 +194,7 @@ impl Builder {
             sense: Orientation::Forward,
             trim: TrimRegion {
                 chart: 0,
-                uv_bounds: [
-                    Interval::new(bounds[0][0], bounds[0][1])?,
-                    Interval::new(bounds[1][0], bounds[1][1])?,
-                ],
+                uv_bounds,
                 outer,
                 holes,
             },
@@ -180,9 +210,26 @@ impl Builder {
                 reversed: false,
             },
         });
+        Ok(face)
+    }
+    pub fn face_sense(&self, face: u32) -> Result<Orientation, GeometryError> {
+        self.brep
+            .topology
+            .faces
+            .get(face as usize)
+            .map(|face| face.sense)
+            .ok_or_else(|| missing("face", face))
+    }
+    pub fn set_face_sense(&mut self, face: u32, sense: Orientation) -> Result<(), GeometryError> {
+        self.brep
+            .topology
+            .faces
+            .get_mut(face as usize)
+            .ok_or_else(|| missing("face", face))?
+            .sense = sense;
         Ok(())
     }
-    pub(crate) fn finish_solid(mut self) -> Result<BrepEnvelope, GeometryError> {
+    pub fn finish_solid(mut self) -> Result<BrepEnvelope, GeometryError> {
         let faces = (0..self.brep.topology.faces.len() as u32).collect();
         self.brep.topology.shells.push(Shell {
             id: 0,

@@ -190,7 +190,8 @@ fn add_cap_faces(
         bottom_bounds,
         bottom_outer,
         bottom_holes,
-    )
+    )?;
+    Ok(())
 }
 
 fn cap_uses(
