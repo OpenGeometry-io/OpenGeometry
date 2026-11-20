@@ -1,6 +1,6 @@
 use crate::brep::{
-    Accuracy, BrepEnvelope, GeometryError, GeometryStore, IntersectionDefinition, IntersectionSide,
-    PcurveGeometry, SurfaceGeometry,
+    Accuracy, BrepEnvelope, CurveGeometry, GeometryError, GeometryStore, IntersectionDefinition,
+    IntersectionSide, PcurveGeometry, SurfaceGeometry,
 };
 use crate::intersection::{intersect_breps, IntersectionBranch, IntersectionGraph};
 use crate::math::{norm, sub};
@@ -8,11 +8,12 @@ use crate::operations::modifying::boolean::assembly::{
     add_complement_input, add_hole_loop, add_patch_face, add_patch_loop,
     append_closed_branch_geometry, finish_analytic_result, intersection_definition,
     loop_containment, loop_regions, loop_sense, merge_selected_shells, pcurve_support_surface,
-    pcurve_winding, reframe_sphere_intersection, reverse_face, ClosedBranchEdge, LoopRegion,
-    LoopSides,
+    pcurve_winding, reframe_sphere_intersection, reverse_face, sphere_loop_chart, ClosedBranchEdge,
+    LoopRegion, LoopSides, SphereLoopChart,
 };
-use crate::operations::modifying::boolean::operands::required_id;
+use crate::operations::modifying::boolean::operands::{full_sphere, required_id};
 use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
+use crate::primitives;
 
 pub(crate) fn generic_single_closed_loop_boolean(
     a: &BrepEnvelope,
@@ -43,7 +44,7 @@ pub(crate) fn generic_single_closed_loop_boolean(
     if norm(sub(branch.endpoints[0], branch.endpoints[1])) > accuracy.intersection {
         return Ok(None);
     }
-    let Some(windings) = supported_windings(graph, branch)? else {
+    let Some(charts) = winding_sphere_charts(graph, branch)? else {
         return Ok(None);
     };
     let inputs = [a, b];
@@ -53,13 +54,17 @@ pub(crate) fn generic_single_closed_loop_boolean(
         b,
         graph,
         branch,
+        &charts,
         "closed SSI loop interior is unclassified",
     )?;
     let (regions, reverse_selected) = loop_regions(operation, true, loop_inside_other);
-
+    let Some(charted) = charted_complements(inputs, &charts, regions)? else {
+        return Ok(None);
+    };
+    let complements = [0, 1].map(|side| charted[side].as_ref().unwrap_or(inputs[side]));
     let mut out = BrepEnvelope::new(id, accuracy)?;
     let (mut selected_faces, selected_surfaces) =
-        add_selected_sides(&mut out, graph, inputs, face_ids, regions)?;
+        add_selected_sides(&mut out, graph, complements, face_ids, regions)?;
     let sides = LoopSides {
         inputs,
         face_ids,
@@ -71,7 +76,7 @@ pub(crate) fn generic_single_closed_loop_boolean(
         &mut out,
         graph,
         branch,
-        windings,
+        &charts,
         sides.surfaces,
         accuracy.geometric,
     )?;
@@ -124,6 +129,78 @@ fn supported_windings(
     Ok(Some(windings))
 }
 
+fn winding_sphere_charts(
+    graph: &IntersectionGraph,
+    branch: &IntersectionBranch,
+) -> Result<Option<[Option<SphereLoopChart>; 2]>, GeometryError> {
+    let Some(windings) = supported_windings(graph, branch)? else {
+        return Ok(None);
+    };
+    let mut charts = [None, None];
+    for side in 0..2 {
+        if windings[side] == [0, 0] {
+            continue;
+        }
+        let CurveGeometry::Intersection { definition } =
+            graph.geometry.curves[branch.curve as usize]
+        else {
+            return Err(GeometryError::InvalidGeometry(
+                "winding closed loop requires an intersection curve".into(),
+            ));
+        };
+        charts[side] = Some(sphere_loop_chart(
+            &graph.geometry,
+            &graph.geometry.intersections[definition as usize],
+            intersection_pcurve_side(&graph.geometry, branch.pcurves[side])?,
+        )?);
+    }
+    Ok(Some(charts))
+}
+
+fn charted_complements(
+    inputs: [&BrepEnvelope; 2],
+    charts: &[Option<SphereLoopChart>; 2],
+    regions: [LoopRegion; 2],
+) -> Result<Option<[Option<BrepEnvelope>; 2]>, GeometryError> {
+    let mut charted = [None, None];
+    for side in 0..2 {
+        let Some(chart) = &charts[side] else {
+            continue;
+        };
+        if regions[side] != LoopRegion::Complement {
+            continue;
+        }
+        if full_sphere(inputs[side]).is_err() {
+            return Ok(None);
+        }
+        let mut sphere = primitives::sphere(
+            inputs[side].id.clone(),
+            chart.frame,
+            chart.radius,
+            inputs[side].accuracy,
+        )?;
+        sphere.topology.faces[0].key = inputs[side].topology.faces[0].key.clone();
+        charted[side] = Some(sphere);
+    }
+    Ok(Some(charted))
+}
+
+fn intersection_pcurve_side(geometry: &GeometryStore, pcurve: u32) -> Result<usize, GeometryError> {
+    match geometry.pcurves.get(pcurve as usize) {
+        Some(PcurveGeometry::IntersectionSide {
+            side: IntersectionSide::A,
+            ..
+        }) => Ok(0),
+        Some(PcurveGeometry::IntersectionSide {
+            side: IntersectionSide::B,
+            ..
+        }) => Ok(1),
+        _ => Err(GeometryError::InvalidGeometry(
+            "winding intersection loop is missing its support pcurve".into(),
+        )),
+    }
+}
+
 fn add_selected_sides(
     out: &mut BrepEnvelope,
     graph: &IntersectionGraph,
@@ -163,7 +240,7 @@ fn add_intersection_edge(
     out: &mut BrepEnvelope,
     graph: &IntersectionGraph,
     branch: &IntersectionBranch,
-    windings: [[i32; 2]; 2],
+    charts: &[Option<SphereLoopChart>; 2],
     selected_surfaces: [Option<u32>; 2],
     geometric: f64,
 ) -> Result<ClosedBranchEdge, GeometryError> {
@@ -178,7 +255,7 @@ fn add_intersection_edge(
                 graph,
                 branch,
                 definition,
-                windings,
+                charts,
                 selected_surfaces,
             )
         },
@@ -191,7 +268,7 @@ fn retarget_loop_definition(
     graph: &IntersectionGraph,
     branch: &IntersectionBranch,
     definition: u32,
-    windings: [[i32; 2]; 2],
+    charts: &[Option<SphereLoopChart>; 2],
     selected_surfaces: [Option<u32>; 2],
 ) -> Result<IntersectionDefinition, GeometryError> {
     let mut definition_geometry = intersection_definition(graph, definition)?;
@@ -208,25 +285,15 @@ fn retarget_loop_definition(
         })?,
     ];
     for side in 0..2 {
-        if windings[side] == [0, 0] {
+        let Some(chart) = &charts[side] else {
             continue;
-        }
-        let definition_side = match graph.geometry.pcurves[branch.pcurves[side] as usize] {
-            PcurveGeometry::IntersectionSide {
-                side: IntersectionSide::A,
-                ..
-            } => 0,
-            PcurveGeometry::IntersectionSide {
-                side: IntersectionSide::B,
-                ..
-            } => 1,
-            _ => {
-                return Err(GeometryError::InvalidGeometry(
-                    "winding intersection loop is missing its support pcurve".into(),
-                ))
-            }
         };
-        reframe_sphere_intersection(geometry, &mut definition_geometry, definition_side)?;
+        reframe_sphere_intersection(
+            geometry,
+            &mut definition_geometry,
+            intersection_pcurve_side(&graph.geometry, branch.pcurves[side])?,
+            chart,
+        )?;
     }
     Ok(definition_geometry)
 }

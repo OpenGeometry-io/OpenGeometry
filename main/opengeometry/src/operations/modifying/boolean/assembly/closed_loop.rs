@@ -4,13 +4,14 @@ use super::loop_pcurves::{
     topology_loop_bounds,
 };
 use super::provenance::reverse;
+use super::sphere_loop_chart::SphereLoopChart;
 use crate::brep::{
-    unit, BrepEnvelope, CurveGeometry, Edge, EdgeGeometry, Face, FaceProvenance, FaceRole, Frame3,
-    GeometryError, GeometryStore, HalfEdge, HalfEdgeGeometryUse, IntersectionDefinition, Loop,
-    Orientation, PcurveGeometry, Shell, SolidRegion, Surface, SurfaceGeometry, TrimRegion, Vertex,
+    BrepEnvelope, CurveGeometry, Edge, EdgeGeometry, Face, FaceProvenance, FaceRole, GeometryError,
+    GeometryStore, HalfEdge, HalfEdgeGeometryUse, IntersectionDefinition, Loop, Orientation,
+    PcurveGeometry, Shell, SolidRegion, Surface, TrimRegion, Vertex,
 };
 use crate::intersection::{IntersectionBranch, IntersectionGraph};
-use crate::math::{dot, Interval, Point3};
+use crate::math::Interval;
 use crate::operations::modifying::boolean::operands::brep_face_source;
 use crate::operations::modifying::boolean::types::BooleanOp;
 use crate::query::{classify_point, PointClassification};
@@ -35,12 +36,6 @@ pub(crate) struct ClosedBranchEdge {
     pub(crate) pcurves: [PcurveGeometry; 2],
 }
 
-struct SphereCandidate {
-    score: f64,
-    surface: SurfaceGeometry,
-    coordinates: Vec<[f64; 2]>,
-}
-
 pub(crate) struct PatchLoop {
     pub(crate) face: u32,
     loop_id: u32,
@@ -52,18 +47,19 @@ pub(crate) fn loop_containment(
     b: &BrepEnvelope,
     graph: &IntersectionGraph,
     branch: &IntersectionBranch,
+    charts: &[Option<SphereLoopChart>; 2],
     unclassified: &str,
 ) -> Result<[bool; 2], GeometryError> {
-    let loop_inside_other = [
-        classify_point(
-            b,
-            graph.geometry.surfaces[0].point_at(intersection_loop_sample(graph, branch, 0)?)?,
-        )?,
-        classify_point(
-            a,
-            graph.geometry.surfaces[1].point_at(intersection_loop_sample(graph, branch, 1)?)?,
-        )?,
-    ];
+    let inputs = [a, b];
+    let patch_inside_other = |side: usize| {
+        let sample = match &charts[side] {
+            Some(chart) => chart.patch_sample()?,
+            None => graph.geometry.surfaces[side]
+                .point_at(intersection_loop_sample(graph, branch, side)?)?,
+        };
+        classify_point(inputs[1 - side], sample)
+    };
+    let loop_inside_other = [patch_inside_other(0)?, patch_inside_other(1)?];
     if loop_inside_other.iter().any(|classification| {
         matches!(
             classification,
@@ -300,124 +296,6 @@ pub(crate) fn intersection_definition(
         .clone())
 }
 
-pub(crate) fn reframe_sphere_intersection(
-    geometry: &mut GeometryStore,
-    definition: &mut IntersectionDefinition,
-    side: usize,
-) -> Result<(), GeometryError> {
-    let surface_id = definition.surfaces[side];
-    let (frame, radius) = match geometry.surface(surface_id)? {
-        SurfaceGeometry::Sphere { frame, radius } => (*frame, *radius),
-        _ => {
-            return Err(GeometryError::CoverageGap {
-                families: ["periodic winding".into(), "non-spherical support".into()],
-            })
-        }
-    };
-    let references = [frame.x, frame.y, frame.z];
-    let mut best: Option<SphereCandidate> = None;
-    for i in -1..=1 {
-        for j in -1..=1 {
-            for k in -1..=1 {
-                if [i, j, k] == [0, 0, 0] {
-                    continue;
-                }
-                let axis = unit(frame.vector([i as f64, j as f64, k as f64]))?;
-                let Some(candidate) =
-                    scored_sphere_candidate(frame, radius, references, axis, definition)?
-                else {
-                    continue;
-                };
-                if best
-                    .as_ref()
-                    .is_none_or(|best| candidate.score < best.score)
-                {
-                    best = Some(candidate);
-                }
-            }
-        }
-    }
-    let SphereCandidate {
-        surface: candidate,
-        coordinates,
-        ..
-    } = best.ok_or_else(|| GeometryError::CoverageGap {
-        families: ["sphere".into(), "unresolved periodic winding".into()],
-    })?;
-    geometry.surfaces[surface_id as usize] = candidate;
-    for (anchor, uv) in definition.anchors.iter_mut().zip(&coordinates) {
-        if side == 0 {
-            anchor.uv_a = *uv;
-        } else {
-            anchor.uv_b = *uv;
-        }
-    }
-    let offset = side * 2;
-    for (index, tube) in definition.uv_tubes.iter_mut().enumerate() {
-        for axis in 0..2 {
-            let a = coordinates[index][axis];
-            let b = coordinates[index + 1][axis];
-            let padding = (a - b).abs().max(definition.residual_tolerance / radius) * 2.0;
-            tube[offset + axis] = Interval::new(a.min(b) - padding, a.max(b) + padding)?;
-        }
-    }
-    definition.validate(geometry)
-}
-
-fn scored_sphere_candidate(
-    frame: Frame3,
-    radius: f64,
-    references: [Point3; 3],
-    axis: Point3,
-    definition: &IntersectionDefinition,
-) -> Result<Option<SphereCandidate>, GeometryError> {
-    let reference = references
-        .into_iter()
-        .min_by(|left, right| dot(*left, axis).abs().total_cmp(&dot(*right, axis).abs()))
-        .ok_or_else(|| GeometryError::InvalidGeometry("no reference axes".into()))?;
-    let candidate = SurfaceGeometry::Sphere {
-        frame: Frame3::from_axis(frame.origin, axis, reference)?,
-        radius,
-    };
-    let mut coordinates = Vec::with_capacity(definition.anchors.len());
-    let mut hint = None;
-    let mut failed = false;
-    for anchor in &definition.anchors {
-        match candidate.project(anchor.point, hint) {
-            Ok(uv) => {
-                coordinates.push(uv);
-                hint = Some(uv);
-            }
-            Err(_) => {
-                failed = true;
-                break;
-            }
-        }
-    }
-    if failed {
-        return Ok(None);
-    }
-    let Some(last) = coordinates.last() else {
-        return Ok(None);
-    };
-    let longitude_span = (last[0] - coordinates[0][0]).abs();
-    let pole_proximity = coordinates
-        .iter()
-        .map(|uv| uv[1].abs())
-        .fold(0.0_f64, f64::max);
-    if longitude_span >= std::f64::consts::PI
-        || pole_proximity >= std::f64::consts::FRAC_PI_2 - 1.0e-6
-    {
-        return Ok(None);
-    }
-    let score = pole_proximity + longitude_span;
-    Ok(Some(SphereCandidate {
-        score,
-        surface: candidate,
-        coordinates,
-    }))
-}
-
 pub(crate) fn loop_sense(side: usize, reversed: bool) -> Orientation {
     let nominal_sense = if side == 0 {
         Orientation::Forward
@@ -448,7 +326,45 @@ pub(crate) fn add_hole_loop(
         sense,
         true,
     )?;
-    let loop_bounds = topology_loop_bounds(out, loop_id, tolerance)?;
+    add_hole_lifted_into_face(out, face, loop_id, tolerance)
+}
+
+pub(crate) fn add_hole_lifted_into_face(
+    out: &mut BrepEnvelope,
+    face: u32,
+    loop_id: u32,
+    tolerance: f64,
+) -> Result<(), GeometryError> {
+    let face_record = &out.topology.faces[face as usize];
+    let window = face_record.trim.uv_bounds;
+    let periods = out.geometry.surface(face_record.surface)?.charts()
+        [face_record.trim.chart as usize]
+        .periods;
+    let mut loop_bounds = topology_loop_bounds(out, loop_id, tolerance)?;
+    let mut lift = [0; 2];
+    for axis in 0..2 {
+        let Some(period) = periods[axis] else {
+            continue;
+        };
+        let turns = ((window[axis].lo - loop_bounds[axis].lo) / period).ceil();
+        if loop_bounds[axis].hi + turns * period > window[axis].hi {
+            return Err(GeometryError::CoverageGap {
+                families: [
+                    "closed intersection loop as a hole".into(),
+                    format!("loop crossing the chart seam of face '{}'", face_record.key),
+                ],
+            });
+        }
+        loop_bounds[axis] = Interval::new(
+            loop_bounds[axis].lo + turns * period,
+            loop_bounds[axis].hi + turns * period,
+        )?;
+        lift[axis] = turns as i32;
+    }
+    let start = out.topology.loops[loop_id as usize].start_halfedge;
+    out.topology.halfedges[start as usize]
+        .geometry_use
+        .periodic_lift = lift;
     widen_trim_bounds(out, face, loop_bounds)?;
     out.topology.faces[face as usize].trim.holes.push(loop_id);
     Ok(())

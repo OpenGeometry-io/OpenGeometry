@@ -6,9 +6,9 @@ use crate::brep::{
 use crate::intersection::{intersect_faces, FaceView, IntersectionBranch, IntersectionGraph};
 use crate::math::{norm, sub};
 use crate::operations::modifying::boolean::assembly::{
-    add_closed_intersection_loop, add_complement_input, finish_analytic_result,
-    intersection_loop_bounds, loop_containment, loop_regions, loop_sense, merge_selected_shells,
-    reverse_face, widen_trim_bounds, LoopRegion,
+    add_closed_intersection_loop, add_complement_input, add_hole_lifted_into_face,
+    finish_analytic_result, intersection_loop_bounds, loop_containment, loop_regions, loop_sense,
+    merge_selected_shells, pcurve_support_surface, pcurve_winding, reverse_face, LoopRegion,
 };
 use crate::operations::modifying::boolean::operands::{
     brep_face_source, required_id, CylinderInput, SphereInput,
@@ -78,6 +78,7 @@ pub(super) fn offset_sphere_cylinder_boolean(
         cylinder.brep,
         &graph,
         branch,
+        &[None, None],
         "sphere/cylinder intersection loop interior is unclassified",
     )?;
     let (regions, reverse_selected) = loop_regions(operation, sphere_is_a, loop_inside_other);
@@ -114,6 +115,14 @@ fn single_closed_branch(
             })
         }
     };
+    for pcurve in branch.pcurves {
+        let surface = pcurve_support_surface(&graph.geometry, pcurve)?;
+        if pcurve_winding(&graph.geometry, surface, pcurve, branch.range)? != [0, 0] {
+            return Err(GeometryError::CoverageGap {
+                families: ["sphere".into(), "cylinder loop winding the sphere".into()],
+            });
+        }
+    }
     Ok((branch, curve_definition))
 }
 
@@ -259,13 +268,6 @@ fn add_loop_sides(
         let (pcurve, sense) = side_pcurve(classified, side, loop_edge.definition)?;
         if classified.regions[side] == LoopRegion::Complement {
             let face = required_id(selected_faces[side])?;
-            let loop_bounds = intersection_loop_bounds(
-                classified.graph,
-                classified.branch,
-                side,
-                out.accuracy.intersection,
-            )?;
-            widen_trim_bounds(out, face, loop_bounds)?;
             let loop_id = add_closed_intersection_loop(
                 out,
                 loop_edge.edge,
@@ -275,7 +277,8 @@ fn add_loop_sides(
                 sense,
                 true,
             )?;
-            out.topology.faces[face as usize].trim.holes.push(loop_id);
+            let tolerance = out.accuracy.intersection;
+            add_hole_lifted_into_face(out, face, loop_id, tolerance)?;
         } else {
             let face = out.topology.faces.len() as u32;
             let loop_id = add_closed_intersection_loop(

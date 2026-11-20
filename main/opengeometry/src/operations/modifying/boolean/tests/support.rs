@@ -1,8 +1,9 @@
-use crate::brep::{Accuracy, BrepEnvelope, Frame3};
+use crate::brep::{Accuracy, BrepEnvelope, Frame3, GeometryError};
 use crate::math::{cross, dot, Point3};
 use crate::operations::modifying::boolean::dispatch::boolean_brep_with_handlers;
-use crate::operations::modifying::boolean::types::BooleanOp;
+use crate::operations::modifying::boolean::types::{BooleanOp, BooleanResult};
 use crate::primitives;
+use crate::query::{classify_point, PointClassification};
 use crate::tessellation::tessellate;
 
 pub(super) fn sphere(id: &str, center: Point3, radius: f64) -> BrepEnvelope {
@@ -126,4 +127,29 @@ pub(super) fn assert_prismatic_volume(
         (measured - expected).abs() <= 1e-3 * expected,
         "{measured} != {expected}"
     );
+}
+
+pub(super) fn assert_classifies(brep: &BrepEnvelope, points: &[(Point3, PointClassification)]) {
+    for (point, expected) in points {
+        assert_eq!(
+            classify_point(brep, *point).unwrap(),
+            *expected,
+            "{} at {point:?}",
+            brep.id
+        );
+    }
+}
+
+pub(super) fn assert_seam_coverage_gap(result: Result<BooleanResult, GeometryError>, face: &str) {
+    match result {
+        Err(GeometryError::CoverageGap { families }) => assert_eq!(
+            families,
+            [
+                "closed intersection loop as a hole".to_string(),
+                format!("loop crossing the chart seam of face '{face}'"),
+            ]
+        ),
+        Err(error) => panic!("expected a seam coverage gap, got {error}"),
+        Ok(_) => panic!("expected a seam coverage gap, got a result"),
+    }
 }

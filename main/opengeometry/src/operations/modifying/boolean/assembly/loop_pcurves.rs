@@ -146,6 +146,10 @@ pub(crate) fn intersection_loop_sample(
         let parameter = branch.range.lo + branch.range.width() * index as f64 / subdivisions as f64;
         points.push(graph.geometry.pcurve_at(branch.pcurves[side], parameter)?);
     }
+    Ok(polygon_centroid(&points))
+}
+
+pub(crate) fn polygon_centroid(points: &[[f64; 2]]) -> [f64; 2] {
     let mut twice_area = 0.0;
     let mut centroid = [0.0; 2];
     for index in 0..points.len() {
@@ -157,15 +161,15 @@ pub(crate) fn intersection_loop_sample(
         centroid[1] += (a[1] + b[1]) * cross;
     }
     if twice_area.abs() <= f64::EPSILON {
-        return Ok([
+        return [
             points.iter().map(|point| point[0]).sum::<f64>() / points.len() as f64,
             points.iter().map(|point| point[1]).sum::<f64>() / points.len() as f64,
-        ]);
+        ];
     }
-    Ok([
+    [
         centroid[0] / (3.0 * twice_area),
         centroid[1] / (3.0 * twice_area),
-    ])
+    ]
 }
 
 pub(crate) fn intersection_loop_bounds(
