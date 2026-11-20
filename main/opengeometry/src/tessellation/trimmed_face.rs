@@ -5,7 +5,7 @@ use super::trim::{
 };
 use crate::brep::{BrepEnvelope, Face, GeometryError, Surface, SurfaceGeometry};
 use crate::geom2d::{point_in_ring2, Pt2};
-use crate::math::{scale, Interval, Point3};
+use crate::math::{cross, dot, norm, scale, sub, Interval, Point3};
 use std::collections::{BTreeSet, HashMap};
 
 const COUNT_ROUNDING: f64 = 1e-9;
@@ -194,7 +194,7 @@ fn shift_periodic_holes(
     Ok(())
 }
 
-fn general_curved_trimmed_face(
+pub(super) fn general_curved_trimmed_face(
     brep: &BrepEnvelope,
     face: &Face,
     _desired: [usize; 2],
@@ -252,17 +252,47 @@ fn general_curved_trimmed_face(
         let normal = trim_normal(brep, face, surface, *coordinate)?;
         mesh.vertex(point, normal)?;
     }
-    for triangle in triangles {
-        let center = std::array::from_fn(|axis| {
-            (uv[triangle[0]][axis] + uv[triangle[1]][axis] + uv[triangle[2]][axis]) / 3.0
-        });
+    let triangles = triangles
+        .into_iter()
+        .map(|triangle| {
+            (
+                triangle.map(|index| (start + index) as u32),
+                triangle.map(|index| uv[index]),
+            )
+        })
+        .collect::<Vec<_>>();
+    push_triangles_with_one_winding(brep, face, surface, &triangles, mesh, max_triangles)
+}
+
+fn push_triangles_with_one_winding(
+    brep: &BrepEnvelope,
+    face: &Face,
+    surface: &SurfaceGeometry,
+    triangles: &[([u32; 3], [[f64; 2]; 3])],
+    mesh: &mut Tessellation,
+    max_triangles: usize,
+) -> Result<(), GeometryError> {
+    let mut oriented = Vec::with_capacity(triangles.len());
+    let mut flip = None;
+    for (ids, coordinates) in triangles {
+        let center =
+            std::array::from_fn(|axis| coordinates.iter().map(|uv| uv[axis]).sum::<f64>() / 3.0);
         let normal = trim_normal(brep, face, surface, center)?;
-        mesh.triangle(
-            triangle.map(|index| (start + index) as u32),
-            face.id,
-            normal,
-            max_triangles,
-        )?;
+        let [a, b, c] = ids.map(|id| mesh.point(id));
+        let direction = cross(sub(b, a), sub(c, a));
+        let along = dot(direction, normal);
+        let edge_on = along.abs() <= 1e-6 * norm(direction);
+        if !edge_on && flip.is_none() {
+            flip = Some(along < 0.0);
+        }
+        oriented.push((*ids, normal, direction, edge_on));
+    }
+    for (ids, normal, direction, edge_on) in oriented {
+        let normal = match (edge_on, flip) {
+            (true, Some(flip)) => scale(direction, if flip { -1.0 } else { 1.0 }),
+            _ => normal,
+        };
+        mesh.triangle(ids, face.id, normal, max_triangles)?;
     }
     Ok(())
 }
