@@ -3,7 +3,7 @@ use opengeometry::primitives::{self, ProfileEdge};
 use opengeometry::query::{classify_point, PointClassification};
 use opengeometry_test_support::accuracy::accuracy;
 use opengeometry_test_support::volume::estimate;
-use std::f64::consts::{FRAC_PI_2, PI};
+use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
 #[test]
 fn independent_volumes_match_analytic_formulas() {
@@ -430,4 +430,99 @@ fn revolve_refuses_sub_resolution_edges() {
         refusal(sliver),
         GeometryError::InvalidGeometry("profile arc is unresolved".into())
     );
+}
+
+#[test]
+fn partial_revolved_profiles_are_closed_and_match_analytic_sector_volumes() {
+    for angle in [PI / 3.0, PI, 1.5 * PI, TAU] {
+        for (name, edges, full_volume) in revolved_volume_cases() {
+            let body = primitives::partially_revolved_profile(
+                format!("partial-{name}"),
+                Frame3::IDENTITY,
+                edges,
+                angle,
+                accuracy(1e-6),
+            )
+            .unwrap_or_else(|error| panic!("{name} at {angle}: {error:?}"));
+            body.validate().unwrap();
+            let measured = estimate(&body, 0.01);
+            let expected = full_volume * angle / TAU;
+            assert!(
+                (measured.value - expected).abs() <= measured.error_bound,
+                "{name} at {angle}: {} versus {expected} bound {}",
+                measured.value,
+                measured.error_bound
+            );
+            let restored = BrepEnvelope::from_json(&body.to_json().unwrap()).unwrap();
+            restored.validate().unwrap();
+            let (step, report) = opengeometry::exchange::export_step(&body, "metre").unwrap();
+            assert_eq!(serde_json::to_value(report).unwrap()["solids"], 1);
+            assert!(step.contains("ADVANCED_FACE"));
+        }
+    }
+}
+
+#[test]
+fn partial_revolve_is_equivariant_under_rotated_translated_frames() {
+    let a = 0.71_f64;
+    let frame = Frame3 {
+        origin: [7.3, -5.2, 11.9],
+        x: [a.cos(), 0.0, a.sin()],
+        y: [0.0, -1.0, 0.0],
+        z: [a.sin(), 0.0, -a.cos()],
+    };
+    for (name, edges, full_volume) in revolved_volume_cases() {
+        let body = primitives::partially_revolved_profile(
+            format!("placed-{name}"),
+            frame,
+            edges,
+            PI * 1.5,
+            accuracy(1e-6),
+        )
+        .unwrap();
+        body.validate().unwrap();
+        let measured = estimate(&body, 0.01);
+        assert!(
+            (measured.value - full_volume * 0.75).abs() <= measured.error_bound,
+            "{name}"
+        );
+        opengeometry::exchange::export_step(&body, "metre").unwrap();
+    }
+}
+
+#[test]
+fn partial_revolve_refuses_unresolved_cap_separation_without_rounding_the_angle() {
+    for angle in [1e-12, 1e-9, TAU - 1e-12, TAU - 1e-9] {
+        let pole_result = primitives::partially_revolved_profile(
+            "unresolved-poles".into(),
+            Frame3::IDENTITY,
+            semicircle(),
+            angle,
+            accuracy(1e-6),
+        );
+        assert!(matches!(
+            pole_result,
+            Err(GeometryError::InvalidGeometry(_))
+        ));
+        let result = primitives::partially_revolved_profile(
+            "unresolved".into(),
+            Frame3::IDENTITY,
+            off_axis_circle(),
+            angle,
+            accuracy(1e-6),
+        );
+        assert!(matches!(result, Err(GeometryError::InvalidGeometry(_))));
+    }
+    for angle in [0.0001, TAU - 0.0001] {
+        primitives::partially_revolved_profile(
+            "resolved".into(),
+            Frame3::IDENTITY,
+            off_axis_circle(),
+            angle,
+            accuracy(1e-6),
+        )
+        .unwrap()
+        .validate()
+        .unwrap();
+    }
 }

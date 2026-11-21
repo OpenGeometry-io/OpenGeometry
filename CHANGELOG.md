@@ -4,6 +4,14 @@ All notable changes to the `opengeometry` package are in this file. The format f
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Revolve accepts an optional signed `angle` in radians for exact capped partial turns.
+  Line-and-arc profiles retain analytic plane, cylinder, cone, sphere and torus faces.
+  Omitting the angle preserves the existing full-turn behavior.
+
 ## [3.0.1] - 2026-11-17
 
 Some booleans that threw in 3.0.0 now build, and some refused pairs throw a different error.

@@ -29,6 +29,8 @@ pub enum CreatingOperation {
         profile: String,
         #[serde(default)]
         axis: Option<RevolveAxis>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        angle: Option<f64>,
     },
 }
 
@@ -95,10 +97,21 @@ impl WorldGraph {
                 sweep::build(id, profile, path, caps.unwrap_or(true), self.accuracy)
                     .map_err(GraphError::from)
             }
-            CreatingOperation::Revolve { profile, axis } => {
+            CreatingOperation::Revolve {
+                profile,
+                axis,
+                angle,
+            } => {
                 let outer = profile_loop(self, profile, target)?;
                 let axis = self.revolve_axis(profile, target, *axis)?;
-                revolve::build(id, outer, axis, self.accuracy).map_err(GraphError::from)
+                revolve::build(
+                    id,
+                    outer,
+                    axis,
+                    angle.unwrap_or(std::f64::consts::TAU),
+                    self.accuracy,
+                )
+                .map_err(GraphError::from)
             }
         }
     }

@@ -183,6 +183,7 @@ fn revolved_bowl(graph: &mut WorldGraph) -> Result<(), Failure> {
     };
     create(graph, "profile", profile, upright())?;
     let revolve = CreatingOperation::Revolve {
+        angle: None,
         profile: "profile".into(),
         axis: None,
     };

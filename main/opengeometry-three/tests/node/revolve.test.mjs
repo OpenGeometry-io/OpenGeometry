@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   OpenGeometry, Solid, Wire, OG_OPERATION_PARAMS_REVOLVE, OG_OPERATION_REVOLVE, OG_PRIMITIVE_PROFILE,
+  OG_SUPPORTS_PARTIAL_REVOLVE,
 } from '../../../dist/index.js';
 import { boot, failsWith } from './support.mjs';
 
@@ -91,4 +92,50 @@ test('a revolve with holes is refused as InvalidParameter', async () => {
   const profile = upright(polygon([[1, 0], [3, 0], [3, 2], [1, 2]]));
   const hole = upright(polygon([[1.5, 0.5], [2.5, 0.5], [2.5, 1.5], [1.5, 1.5]]));
   assert.throws(() => new Solid(OG_OPERATION_REVOLVE, { profile, holes: [hole] }), failsWith('InvalidParameter'));
+});
+
+test('signed partial revolutions retain exact rounded sides, caps and STEP topology', async () => {
+  await boot();
+  assert.equal(OG_SUPPORTS_PARTIAL_REVOLVE, true);
+  const profile = upright({
+    start: [1.025, 0],
+    segments: [
+      { to: [1, 0] },
+      { to: [0.99, -0.01], arc: { center: [1, -0.01], counterClockwise: true } },
+      { to: [0.99, -0.03] },
+      { to: [1, -0.04], arc: { center: [1, -0.03], counterClockwise: true } },
+      { to: [1.025, -0.04] },
+      { to: [1.025, 0] },
+    ],
+    closed: true,
+  });
+  for (const degrees of [90, 270, 360, -90, -270, -360]) {
+    const angle = degrees * Math.PI / 180;
+    const part = new Solid(
+      OG_OPERATION_REVOLVE, OG_OPERATION_PARAMS_REVOLVE({ profile, angle }), { ogId: `round-${degrees}` },
+    );
+    const brep = part.getBrep();
+    assert.equal(brep.topology.faces.length, Math.abs(degrees) === 360 ? 6 : 8);
+    const { text, report } = await OpenGeometry.exportStep({ nodes: [part], unit: 'metre' });
+    assert.equal(report.solids, 1);
+    assert.equal(report.pcurvelessEdges, 0);
+    assert.equal(surfaces(text, 'TOROIDAL_SURFACE('), 2);
+    assert.equal(part.lastInfo.bodyType, 'Solid');
+  }
+});
+
+test('partial revolve sign chooses the intended side and rejected edits preserve the old solid', async () => {
+  await boot();
+  const profile = upright(polygon([[1, 0], [2, 0], [2, 1], [1, 1]]));
+  const quarter = new Solid(OG_OPERATION_REVOLVE, { profile, angle: Math.PI / 2 });
+  assert.equal(quarter.classifyPoint([1, -1, -0.5]), 'Inside');
+  assert.equal(quarter.classifyPoint([1, 1, -0.5]), 'Outside');
+  const negative = new Solid(OG_OPERATION_REVOLVE, { profile, angle: -Math.PI / 2 });
+  assert.equal(negative.classifyPoint([1, 1, -0.5]), 'Inside');
+  assert.equal(negative.classifyPoint([1, -1, -0.5]), 'Outside');
+  const old = quarter.getBrep();
+  for (const angle of [0, 2 * Math.PI + 0.1, -2 * Math.PI - 0.1, 1e-12, 2 * Math.PI - 1e-12]) {
+    assert.throws(() => quarter.rebuild(OG_OPERATION_REVOLVE, { profile, angle }), failsWith('InvalidParameter'));
+    assert.deepEqual(quarter.getBrep(), old);
+  }
 });

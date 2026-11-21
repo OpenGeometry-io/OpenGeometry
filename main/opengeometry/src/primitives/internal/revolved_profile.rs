@@ -1,3 +1,6 @@
+mod partial;
+pub use partial::partially_revolved_profile;
+
 use crate::brep::{
     boundary, plane_boundary, unit, uv_line, Accuracy, BrepEnvelope, Builder, CurveGeometry,
     EdgeGeometry, Frame3, GeometryError, Orientation, Surface, SurfaceGeometry, Use,
